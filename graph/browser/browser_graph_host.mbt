@@ -5,12 +5,12 @@
 const GRAPH_HOST_BLOCK_SIZE : Int = 128
 
 ///|
-let graph_host_engine : @ref.Ref[@lifecycle.Engine[@runtime.BoundDsp]?] = @ref.new(
+let graph_host_engine : @ref.Ref[@lifecycle.Engine[@runtime.BoundDsp]?] = Ref(
   None,
 )
 
 ///|
-let graph_host_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
+let graph_host_context : @ref.Ref[@moondsp.DspContext?] = Ref(None)
 
 ///|
 let graph_host_handles : Map[Int, @lifecycle.Mount[@runtime.BoundDsp]] = Map([])
@@ -22,10 +22,10 @@ let graph_host_batch : @runtime.GraphControlBatch = @runtime.GraphControlBatch::
 )
 
 ///|
-let graph_host_bindings : @ref.Ref[String] = @ref.new("")
+let graph_host_bindings : @ref.Ref[String] = Ref("")
 
 ///|
-let graph_host_next_handle : @ref.Ref[Int] = @ref.new(1)
+let graph_host_next_handle : @ref.Ref[Int] = Ref(1)
 
 ///|
 let graph_host_input : StringBuilder = StringBuilder()
@@ -36,7 +36,7 @@ let graph_host_output : @moondsp.AudioBuffer = @moondsp.AudioBuffer::filled(
 )
 
 ///|
-let graph_host_error : @ref.Ref[String] = @ref.new("")
+let graph_host_error : @ref.Ref[String] = Ref("")
 
 ///|
 priv enum HostErrorCode {
@@ -52,10 +52,10 @@ priv enum HostErrorCode {
 }
 
 ///|
-let graph_host_error_kind : @ref.Ref[HostErrorCode] = @ref.new(None)
+let graph_host_error_kind : @ref.Ref[HostErrorCode] = Ref(None)
 
 ///|
-let graph_host_error_node : @ref.Ref[Int] = @ref.new(-1)
+let graph_host_error_node : @ref.Ref[Int] = Ref(-1)
 
 ///|
 fn graph_host_reject(

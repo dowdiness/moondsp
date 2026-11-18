@@ -17,10 +17,11 @@ import {
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum ActiveNoteError {
-  UnknownInstrument(Int)
+  UnknownInstrument(Int32)
   Transport(@transport.TransportError)
-} derive(Eq, @debug.Debug)
+}
 pub fn ActiveNoteError::equal(Self, Self) -> Bool
 pub fn ActiveNoteError::not_equal(Self, Self) -> Bool
 pub fn ActiveNoteError::to_repr(Self) -> @debug.Repr
@@ -31,10 +32,11 @@ pub(all) enum ActiveVoiceEffect {
   Retune(VoiceControlBatch)
 }
 
+#derive(Eq, @debug.Debug)
 pub struct ActiveVoiceEffectOutcome {
-  retuned_voice_count : Int
-  detached_note_count : Int
-} derive(Eq, @debug.Debug)
+  retuned_voice_count : Int32
+  detached_note_count : Int32
+}
 pub fn ActiveVoiceEffectOutcome::equal(Self, Self) -> Bool
 pub fn ActiveVoiceEffectOutcome::not_equal(Self, Self) -> Bool
 pub fn ActiveVoiceEffectOutcome::to_repr(Self) -> @debug.Repr
@@ -45,11 +47,12 @@ pub struct BlockFrame {
   logical_arc : @pattern.TimeSpan
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum InstrumentSelector {
   AllEvents
   HasControl(String)
   ControlEquals(String, Double)
-} derive(Eq, @debug.Debug)
+}
 pub fn InstrumentSelector::equal(Self, Self) -> Bool
 pub fn InstrumentSelector::not_equal(Self, Self) -> Bool
 pub fn InstrumentSelector::to_repr(Self) -> @debug.Repr
@@ -59,19 +62,19 @@ pub struct OnsetBuffer {
 }
 pub fn OnsetBuffer::OnsetBuffer() -> Self
 pub fn OnsetBuffer::clear(Self) -> Unit
-pub fn OnsetBuffer::count(Self) -> Int
+pub fn OnsetBuffer::count(Self) -> Int32
 pub fn OnsetBuffer::dropped(Self) -> Double
 pub fn OnsetBuffer::enable(Self, Bool) -> Unit
-pub fn OnsetBuffer::field(Self, Int, Int) -> Double
+pub fn OnsetBuffer::field(Self, Int32, Int32) -> Double
 
 pub struct PatternScheduler {
   // private fields
 }
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, instruments~ : Array[(InstrumentSelector, @voice.BoundVoicePool)]) -> Self raise @transport.TransportError
-pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
+pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int32, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
 pub fn PatternScheduler::accept_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::accepted_snapshot(Self) -> PlaybackSnapshot?
-pub fn PatternScheduler::active_note_count(Self) -> Int
+pub fn PatternScheduler::active_note_count(Self) -> Int32
 pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::attach_onset_buffer(Self, OnsetBuffer) -> Unit
@@ -82,13 +85,13 @@ pub fn PatternScheduler::expire_notes(Self, @pattern.TimeSpan) -> Result[Unit, @
 pub fn PatternScheduler::expire_notes_at(Self, PerformanceTime) -> Unit
 pub fn PatternScheduler::kill_all_voices(Self) -> Unit
 pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
-pub fn PatternScheduler::pending_material_change_count(Self) -> Int
+pub fn PatternScheduler::pending_material_change_count(Self) -> Int32
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan) -> Unit
 pub fn PatternScheduler::process_section_block(Self, @song.Section[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_song_block(Self, @song.Song[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn PatternScheduler::push_active_note(Self, Int, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
-pub fn PatternScheduler::push_active_note_until(Self, Int, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
+pub fn PatternScheduler::push_active_note(Self, Int32, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
+pub fn PatternScheduler::push_active_note_until(Self, Int32, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@pattern.ControlMap]) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot[@pattern.ControlMap], PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
@@ -103,11 +106,12 @@ pub fn PatternScheduler::sample_at(Self, @pattern.Rational) -> Result[Int64, @tr
 pub fn PatternScheduler::sample_counter(Self) -> Int64
 pub fn PatternScheduler::set_bpm(Self, Double) -> Result[Unit, @transport.TransportError]
 pub fn PatternScheduler::set_tempo(Self, Tempo, end_? : @pattern.Rational) -> Result[Unit, @transport.TransportError]
-pub fn PatternScheduler::skipped_material_change_count(Self) -> Int
+pub fn PatternScheduler::skipped_material_change_count(Self) -> Int32
 
+#derive(Eq, @debug.Debug)
 pub struct PatternVoiceScope {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn PatternVoiceScope::equal(Self, Self) -> Bool
 pub fn PatternVoiceScope::node(@identity.PatternNodeId) -> Self
 pub fn PatternVoiceScope::not_equal(Self, Self) -> Bool
@@ -129,7 +133,7 @@ pub enum PlaybackSnapshot {
   Song(@song.SongSnapshot[@pattern.ControlMap])
   RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
 }
-pub fn PlaybackSnapshot::material_count(Self) -> Int
+pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
@@ -138,9 +142,10 @@ pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
+#derive(Eq, @debug.Debug)
 pub struct SongVoiceScope {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SongVoiceScope::equal(Self, Self) -> Bool
 pub fn SongVoiceScope::layer(@identity.SectionId, @identity.SectionLayerId) -> Self
 pub fn SongVoiceScope::not_equal(Self, Self) -> Bool
@@ -154,12 +159,12 @@ pub struct Tempo {
 pub fn Tempo::bpm(Self) -> Double
 pub fn Tempo::from_bpm(Double) -> Result[Self, @transport.TransportError]
 pub fn Tempo::sample_at_start(Self, @pattern.Rational, sample_rate~ : Double) -> Result[Int64, @transport.TransportError]
-pub fn Tempo::span_for_samples(Self, Int, sample_rate~ : Double) -> Result[@pattern.Rational, @transport.TransportError]
+pub fn Tempo::span_for_samples(Self, Int32, sample_rate~ : Double) -> Result[@pattern.Rational, @transport.TransportError]
 
 pub struct VoiceControlBatch {
   // private fields
 }
-pub fn VoiceControlBatch::VoiceControlBatch(instrument~ : Int, @graph.GraphControl, rest? : Array[@graph.GraphControl]) -> Self
+pub fn VoiceControlBatch::VoiceControlBatch(instrument~ : Int32, @graph.GraphControl, rest? : Array[@graph.GraphControl]) -> Self
 
 // Type aliases
 pub using @transport {type TransportError}

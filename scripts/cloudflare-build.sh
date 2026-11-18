@@ -19,7 +19,7 @@ set -euo pipefail
 export NEW_MOON_MOD=0
 
 echo "── Installing MoonBit toolchain ───────────────────────"
-curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- 0.10.14+7d59c7ec9
+curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- 0.10.21+06da1ed44
 export PATH="$HOME/.moon/bin:$PATH"
 moon version || true
 

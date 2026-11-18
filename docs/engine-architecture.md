@@ -210,7 +210,7 @@ Benchmark results depend on the graph, target, toolchain, host, and measurement 
 ## Engine Development Workflows
 
 ### Prerequisites
-- [MoonBit toolchain](https://www.moonbitlang.com/): pinned to `0.10.14+7d59c7ec9` across GitHub Actions, Copilot setup, and `scripts/cloudflare-build.sh`.
+- [MoonBit toolchain](https://www.moonbitlang.com/): pinned to `0.10.21+06da1ed44` across GitHub Actions, Copilot setup, `.agents/setup`, and `scripts/cloudflare-build.sh`.
 - Node.js 22.12+ (22.x LTS) and npm 11.19.0+
 
 Prefix direct Moon commands with `NEW_MOON_MOD=0` to preserve the repository's hand-maintained manifests.

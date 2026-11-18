@@ -28,8 +28,8 @@ fn wire_integer(
 ///|
 fn draft_version_json(version : DraftVersion) -> Json {
   [
-    version.epoch.serial().to_double().to_json(),
-    version.revision.to_double().to_json(),
+    Json(version.epoch.serial().to_double()),
+    Json(version.revision.to_double()),
   ]
 }
 
@@ -59,60 +59,60 @@ fn decode_draft_version(value : Json) -> DraftVersion raise PlaybackWireError {
 fn SourceMap::wire_json(self : SourceMap) -> Json {
   let atoms : Array[Json] = self.atoms.map(atom => {
     [
-      atom.id.serial().to_double().to_json(),
-      atom.kind.to_json(),
-      atom.span.start.to_json(),
-      atom.span.end.to_json(),
+      Json(atom.id.serial().to_double()),
+      Json(atom.kind),
+      Json(atom.span.start),
+      Json(atom.span.end),
     ]
   })
   let literals : Array[Json] = self.literals.map(literal => {
     [
-      literal.id.serial().to_double().to_json(),
-      literal.kind.to_json(),
-      literal.span.start.to_json(),
-      literal.span.end.to_json(),
+      Json(literal.id.serial().to_double()),
+      Json(literal.kind),
+      Json(literal.span.start),
+      Json(literal.span.end),
     ]
   })
   let definitions : Array[Json] = self.definitions.map(definition => {
     [
-      definition.id.serial().to_double().to_json(),
-      definition.name.to_json(),
-      definition.span.start.to_json(),
-      definition.span.end.to_json(),
-      definition.visible_after.to_json(),
+      Json(definition.id.serial().to_double()),
+      Json(definition.name),
+      Json(definition.span.start),
+      Json(definition.span.end),
+      Json(definition.visible_after),
     ]
   })
   let references : Array[Json] = self.references.map(reference => {
     let (binding, target) : (Json, Json) = match reference.binding {
       Bound(binding, target) =>
         (
-          binding.serial().to_double().to_json(),
-          target.serial().to_double().to_json(),
+          Json(binding.serial().to_double()),
+          Json(target.serial().to_double()),
         )
       Unresolved(_) => (Json::null(), Json::null())
     }
     [
-      reference.id.serial().to_double().to_json(),
-      reference.name.to_json(),
-      reference.span.start.to_json(),
-      reference.span.end.to_json(),
+      Json(reference.id.serial().to_double()),
+      Json(reference.name),
+      Json(reference.span.start),
+      Json(reference.span.end),
       binding,
       target,
     ]
   })
   {
-    "epoch": self.epoch.serial().to_double().to_json(),
-    "atoms": atoms.to_json(),
-    "literals": literals.to_json(),
-    "definitions": definitions.to_json(),
-    "references": references.to_json(),
+    "epoch": Json(self.epoch.serial().to_double()),
+    "atoms": Json(atoms),
+    "literals": Json(literals),
+    "definitions": Json(definitions),
+    "references": Json(references),
   }
 }
 
 ///|
 /// Encode frozen text and witnesses together; never serialize closures or history.
 pub fn PlaybackInput::encode_wire(self : PlaybackInput) -> String {
-  let fields : Map[String, Json] = { "schema": 1, "text": self.input.to_json() }
+  let fields : Map[String, Json] = { "schema": 1, "text": Json(self.input) }
   match self.payload {
     Text => fields["kind"] = "text"
     Song(version, sources) => {

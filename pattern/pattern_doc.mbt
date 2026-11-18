@@ -1340,7 +1340,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       } else {
         child.buses.map(bus => {
           bus.map_signal(signal => {
-            Every(Int64::from_int(n), signal, signal.transformed(transform))
+            Every(n.to_int64(), signal, signal.transformed(transform))
           })
         })
       }

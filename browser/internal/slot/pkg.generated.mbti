@@ -19,7 +19,7 @@ pub struct GraphSlot[T, O] {
 }
 pub fn[T, O] GraphSlot::GraphSlot(output~ : O, compile~ : (@dsp.DspContext) -> T?) -> Self[T, O]
 pub fn[T, O] GraphSlot::ctx_val(Self[T, O]) -> @dsp.DspContext
-pub fn[T, O : Output] GraphSlot::ensure(Self[T, O], Double, Int, on_rebuild? : () -> Unit) -> Bool
+pub fn[T, O : Output] GraphSlot::ensure(Self[T, O], Double, Int32, on_rebuild? : () -> Unit) -> Bool
 pub fn[T, O] GraphSlot::graph_val(Self[T, O]) -> T
 pub fn[T, O : Output] GraphSlot::reset(Self[T, O]) -> Unit
 
@@ -27,22 +27,22 @@ pub struct MonoOut {
   // private fields
 }
 pub fn MonoOut::MonoOut() -> Self
-pub fn MonoOut::allocate(Self, Int) -> Unit
+pub fn MonoOut::allocate(Self, Int32) -> Unit
 pub fn MonoOut::get(Self) -> @dsp.AudioBuffer
 pub fn MonoOut::reset(Self) -> Unit
-pub fn MonoOut::sample(Self, Int) -> Double
+pub fn MonoOut::sample(Self, Int32) -> Double
 pub impl Output for MonoOut
 
 pub struct StereoOut {
   // private fields
 }
 pub fn StereoOut::StereoOut() -> Self
-pub fn StereoOut::allocate(Self, Int) -> Unit
+pub fn StereoOut::allocate(Self, Int32) -> Unit
 pub fn StereoOut::left_buf(Self) -> @dsp.AudioBuffer
-pub fn StereoOut::left_sample(Self, Int) -> Double
+pub fn StereoOut::left_sample(Self, Int32) -> Double
 pub fn StereoOut::reset(Self) -> Unit
 pub fn StereoOut::right_buf(Self) -> @dsp.AudioBuffer
-pub fn StereoOut::right_sample(Self, Int) -> Double
+pub fn StereoOut::right_sample(Self, Int32) -> Double
 pub impl Output for StereoOut
 
 // Type aliases
@@ -50,5 +50,5 @@ pub impl Output for StereoOut
 // Traits
 pub trait Output {
   fn reset(Self) -> Unit
-  fn allocate(Self, Int) -> Unit
+  fn allocate(Self, Int32) -> Unit
 }

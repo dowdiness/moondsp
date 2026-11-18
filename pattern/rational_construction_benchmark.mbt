@@ -9,7 +9,7 @@ test "bench/rational/construction" (b : @bench.T) {
   })
   let general = Array::makei(128, index => index * 31 - 4096)
   let denominators = Array::makei(128, index => {
-    let value = Int64::from_int(index * 7 + 3)
+    let value = (index * 7 + 3).to_int64()
     if index % 2 == 0 {
       value
     } else {
@@ -17,7 +17,7 @@ test "bench/rational/construction" (b : @bench.T) {
     }
   })
   let fractions = Array::makei(128, index => {
-    (Int64::from_int(index * 13 + 5), Int64::from_int(index * 17 + 9))
+    ((index * 13 + 5).to_int64(), (index * 17 + 9).to_int64())
   })
   b.bench(name="from_int_small", fn() {
     for value in small {
@@ -49,7 +49,7 @@ test "bench/rational/construction" (b : @bench.T) {
 ///|
 test "bench/time/whole-cycles" (b : @bench.T) {
   let arcs = Array::makei(128, index => {
-    let begin = Rational(Int64::from_int(index * 13 - 512), 12L)
+    let begin = Rational((index * 13 - 512).to_int64(), 12L)
     TimeSpan(begin, begin + Rational(7L, 4L))
   })
   b.bench(name="whole_cycles_varied", fn() {
@@ -64,7 +64,7 @@ test "bench/pattern/sequence-slots" (b : @bench.T) {
   let pat = sequence(Array::makei(16, index => Pat::pure(index)))
   let width = Rational(1L, 600L)
   let arcs = Array::makei(600, index => {
-    let begin = Rational(Int64::from_int(index), 300L)
+    let begin = Rational(index.to_int64(), 300L)
     TimeSpan(begin, begin + width)
   })
   b.bench(name="sequence_600_varied_arcs", fn() {

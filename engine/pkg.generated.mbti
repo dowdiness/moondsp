@@ -10,6 +10,7 @@ import {
 // Values
 
 // Errors
+#derive(@debug.Debug)
 pub suberror GraphEngineError {
   InvalidConfiguration
   EngineClosed
@@ -17,16 +18,16 @@ pub suberror GraphEngineError {
   CapacityExceeded
   InvalidHandle
   InvalidGraph(@graph.GraphCompileError)
-  BufferSizeMismatch(expected~ : Int, actual~ : Int)
+  BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
   ControlRejected(@graph.GraphControlError)
-} derive(@debug.Debug)
+}
 pub fn GraphEngineError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct GraphEngine {
   // private fields
 }
-pub fn GraphEngine::GraphEngine(@dsp.DspContext, capacity? : Int) -> Self raise GraphEngineError
+pub fn GraphEngine::GraphEngine(@dsp.DspContext, capacity? : Int32) -> Self raise GraphEngineError
 pub fn GraphEngine::close(Self) -> Unit
 pub fn GraphEngine::mount(Self, Array[@graph.DspNode]) -> MountedGraph raise GraphEngineError
 pub fn GraphEngine::process(Self, @dsp.AudioBuffer) -> Unit raise GraphEngineError

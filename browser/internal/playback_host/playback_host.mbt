@@ -39,7 +39,7 @@ fn Player::Player(
 }
 
 ///|
-let player : @ref.Ref[Player?] = @ref.new(None)
+let player : @ref.Ref[Player?] = Ref(None)
 
 ///|
 /// Mini's voice-frame keys, which every instrument receives.
@@ -278,7 +278,7 @@ const SCHEDULER_PARSE_STATUS_OK : Int = 0
 const SCHEDULER_PARSE_STATUS_ERROR : Int = 1
 
 ///|
-let sched_last_error : @ref.Ref[String] = @ref.new("")
+let sched_last_error : @ref.Ref[String] = Ref("")
 
 ///|
 fn set_scheduler_parse_success() -> Int {
@@ -299,7 +299,7 @@ const MAX_PLAYBACK_INPUT_CODE_UNITS : Int = 2097152
 let playback_input_chars : Array[Int] = []
 
 ///|
-let playback_input_overflow : @ref.Ref[Bool] = @ref.new(false)
+let playback_input_overflow : @ref.Ref[Bool] = Ref(false)
 
 ///|
 fn input_chars_to_string(chars : Array[Int]) -> Result[String, String] {

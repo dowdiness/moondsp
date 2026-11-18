@@ -1,6 +1,6 @@
 ///|
 fn r(num : Int, den : Int) -> @pattern.Rational {
-  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(num.to_int64(), den.to_int64())
 }
 
 ///|

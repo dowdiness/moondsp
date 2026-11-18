@@ -310,7 +310,7 @@ fn BusSignal::eval(
       child.eval((cycle + 1L) * den - num, den, !left)
     }
     Sequence(children) => {
-      let n = Int64::from_int(children.length())
+      let n = (children.length()).to_int64()
       let cycle = bus_floor(num, den, left)
       let pos = (num - cycle * den) * n
       let slot = bus_floor(pos, den, left)
@@ -427,7 +427,7 @@ fn slot_signals(
 fn weight_bounds(weights : Array[Int]) -> Array[Int64] {
   let bounds = [0L]
   for weight in weights {
-    bounds.push(bounds[bounds.length() - 1] + Int64::from_int(weight))
+    bounds.push(bounds[bounds.length() - 1] + weight.to_int64())
   }
   bounds
 }
@@ -518,7 +518,7 @@ fn[A] compile_signal(
       if n <= 0 {
         plain
       } else {
-        Every(Int64::from_int(n), plain, plain.transformed(transform))
+        Every(n.to_int64(), plain, plain.transformed(transform))
       }
     }
     Sequence(children) => Sequence(children.map(sub))

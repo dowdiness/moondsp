@@ -6,3 +6,7 @@ import {
   "moonbitlang/core/double",
   "moonbitlang/core/int",
 }
+
+// Existing Result-returning APIs are deliberate; changing them to raise is an API change.
+
+warnings = "-result_error_return"

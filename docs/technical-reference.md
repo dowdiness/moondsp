@@ -1673,7 +1673,7 @@ establish audible dropouts. The command timings still exceed one quantum: source
 admission and retained-state bounds are not a hard-real-time guarantee.
 
 MoonBit async remains at the JS host lifetime boundary, not in the synchronous
-AudioWorklet renderer. `packages/browser/host` already uses async 0.21.3:
+AudioWorklet renderer. `packages/browser/host` already uses async 0.22.9:
 `EngineLifetime.wait` bridges a cancellable Promise, while `close` uses
 `protect_from_cancel` to finish cleanup. On 2026-09-16, an isolated async 0.22.1
 task-group probe on moon 0.1.20260904 completed both children with the JS target;

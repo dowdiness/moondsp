@@ -31,7 +31,7 @@
 /// during a `process_*` call.
 
 ///|
-let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource())
+let demo : @ref.Ref[@moondsp.DemoSource] = Ref(@moondsp.DemoSource())
 
 // ---------------------------------------------------------------------------
 // Shared constants

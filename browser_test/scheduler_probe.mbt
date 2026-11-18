@@ -27,16 +27,16 @@ priv struct SchedulerProbeRuntime {
 }
 
 ///|
-let scheduler_probe_runtime : @ref.Ref[SchedulerProbeRuntime?] = @ref.new(None)
+let scheduler_probe_runtime : @ref.Ref[SchedulerProbeRuntime?] = Ref(None)
 
 ///|
-let scheduler_probe_active_notes : @ref.Ref[Array[Double]?] = @ref.new(None)
+let scheduler_probe_active_notes : @ref.Ref[Array[Double]?] = Ref(None)
 
 ///|
-let scheduler_probe_voices_started : @ref.Ref[Bool] = @ref.new(false)
+let scheduler_probe_voices_started : @ref.Ref[Bool] = Ref(false)
 
 ///|
-let scheduler_probe_gain : @ref.Ref[Double] = @ref.new(
+let scheduler_probe_gain : @ref.Ref[Double] = Ref(
   SCHEDULER_PROBE_DEFAULT_GAIN,
 )
 
@@ -44,7 +44,7 @@ let scheduler_probe_gain : @ref.Ref[Double] = @ref.new(
 let scheduler_probe_pattern_input_chars : Array[Int] = []
 
 ///|
-let scheduler_probe_last_error : @ref.Ref[String] = @ref.new("")
+let scheduler_probe_last_error : @ref.Ref[String] = Ref("")
 
 ///|
 fn scheduler_probe_synth_template(
@@ -171,7 +171,7 @@ fn scheduler_probe_pattern_notes(text : String) -> Array[Double]? {
 }
 
 ///|
-let scheduler_probe_pending : @ref.Ref[Array[Double]?] = @ref.new(None)
+let scheduler_probe_pending : @ref.Ref[Array[Double]?] = Ref(None)
 
 ///|
 pub fn clear_playback_input() -> Unit {

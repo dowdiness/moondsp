@@ -152,7 +152,7 @@ fn build_bench_external_authoring_fixture(
         DspNode::biquad(
           input=previous,
           mode=BiquadMode::LowPass,
-          cutoff_hz=900.0 + Double::from_int(stage),
+          cutoff_hz=900.0 + stage.to_double(),
           q=0.707,
         )
       _ => DspNode::clip(previous, 0.9)
@@ -466,7 +466,7 @@ fn bench_external_control_values(
   for i in 0..<fixture.control_keys.length() {
     controls[fixture.control_keys[i]] = 0.5 +
       offset +
-      Double::from_int(i % 5) * 0.01
+      (i % 5).to_double() * 0.01
   }
   controls
 }
@@ -699,7 +699,7 @@ fn bench_external_string_control_resolution_group(
     let bindings = bench_external_binding_map(fixture)
     let controls_a = bench_external_control_values(fixture, 0.01)
     let controls_b = bench_external_control_values(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
@@ -1107,7 +1107,7 @@ test "bench/external_control/apply_param_batch_compiled" (b : @bench.T) {
     let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
@@ -1130,7 +1130,7 @@ test "bench/external_control/apply_param_batch_topology_controller" (
     ).unwrap()
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
@@ -1178,7 +1178,7 @@ test "bench/external_authoring/compile_prepared_template_change" (b : @bench.T) 
     }
     let template_a = doc.analyze()
     let template_b = edited_doc.analyze()
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let template = if use_b.val { template_b } else { template_a }
       use_b.val = !use_b.val
@@ -1202,7 +1202,7 @@ test "bench/external_authoring/queue_prepared_hotswap_setup" (b : @bench.T) {
     }
     let compiled_a = Dsp::compile(doc.analyze(), ctx).unwrap()
     let compiled_b = Dsp::compile(edited_doc.analyze(), ctx).unwrap()
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let active = if use_b.val { compiled_b } else { compiled_a }
       let next = if use_b.val { compiled_a } else { compiled_b }
@@ -1255,7 +1255,7 @@ test "bench/external_control_diagnostics/apply_invalid_param_batch_compiled" (
     let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
     let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
     let controls_b = bench_external_invalid_param_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
@@ -1281,7 +1281,7 @@ test "bench/external_control_diagnostics/apply_invalid_param_batch_topology_cont
     ).unwrap()
     let controls_a = bench_external_invalid_param_batch(fixture, 0.01)
     let controls_b = bench_external_invalid_param_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
@@ -1484,7 +1484,7 @@ test "bench/external_control/realistic_apply_param_batch_compiled" (
   for fixture in bench_external_realistic_authoring_fixtures() {
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     match fixture.graph_kind {
       MonoExternalGraph => {
         let compiled = Dsp::compile(AnalyzedGraph::analyze(fixture.nodes), ctx).unwrap()
@@ -1519,7 +1519,7 @@ test "bench/external_control/realistic_apply_param_batch_topology_controller" (
   for fixture in bench_external_realistic_authoring_fixtures() {
     let controls_a = bench_external_control_batch(fixture, 0.01)
     let controls_b = bench_external_control_batch(fixture, 0.02)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     match fixture.graph_kind {
       MonoExternalGraph => {
         let controller = match
@@ -1593,7 +1593,7 @@ test "bench/external_authoring/realistic_compile_prepared_shape_change" (
     let edited_doc = bench_external_shape_rewire_doc(doc, fixture)
     let template_a = doc.analyze()
     let template_b = edited_doc.analyze()
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     match fixture.graph_kind {
       MonoExternalGraph =>
         b.bench(name=fixture.name, fn() {
@@ -1621,7 +1621,7 @@ test "bench/external_authoring/realistic_queue_prepared_hotswap_setup" (
   for fixture in bench_external_realistic_authoring_fixtures() {
     let doc = bench_external_doc(fixture)
     let edited_doc = bench_external_shape_rewire_doc(doc, fixture)
-    let use_b = @ref.new(false)
+    let use_b = Ref(false)
     match fixture.graph_kind {
       MonoExternalGraph => {
         let compiled_a = Dsp::compile(doc.analyze(), ctx).unwrap()

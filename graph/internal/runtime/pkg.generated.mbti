@@ -9,7 +9,7 @@ import {
 }
 
 // Values
-pub fn updated_model_node_param_result(@model.DspNode, Int, @model.GraphParamSlot, Double, Double) -> Result[@model.DspNode, GraphControlError]
+pub fn updated_model_node_param_result(@model.DspNode, Int32, @model.GraphParamSlot, Double, Double) -> Result[@model.DspNode, GraphControlError]
 
 // Errors
 pub suberror BoundGraphError {
@@ -32,7 +32,7 @@ pub fn CompiledGraph::apply_control_impl(Self, @model.GraphControl) -> Result[Un
 pub fn CompiledGraph::apply_controls_impl(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledGraph::apply_controls_to_pair(Self, Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
 pub fn CompiledGraph::compile_sample_rate(Self) -> Double
-pub fn CompiledGraph::compiled_buffer_capacity(Self) -> Int
+pub fn CompiledGraph::compiled_buffer_capacity(Self) -> Int32
 pub fn CompiledGraph::copy_compatible_runtime_state_from(Self, Self) -> Unit
 pub fn CompiledGraph::validate_controls_impl(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
 
@@ -40,39 +40,40 @@ type Dsp
 pub fn Dsp::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
 pub fn Dsp::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
 pub fn[T] Dsp::apply_controls_to_all(Array[Result[Self, T]], Array[@model.GraphControl], (GraphControlError) -> T) -> Result[Unit, T]
-pub fn Dsp::can_set_param_bool(Self, Int, @model.GraphParamSlot, Double) -> Bool
+pub fn Dsp::can_set_param_bool(Self, Int32, @model.GraphParamSlot, Double) -> Bool
 pub fn Dsp::compile(@template.AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn Dsp::compile_raw(Array[@model.DspNode], @dsp.DspContext) -> Self?
 pub fn Dsp::compile_result(@template.AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
-pub fn Dsp::compiled_buffer_capacity(Self) -> Int
+pub fn Dsp::compiled_buffer_capacity(Self) -> Int32
 pub fn Dsp::disable_debug_validation(Self) -> Unit
 pub fn Dsp::enable_debug_validation(Self) -> Unit
 pub fn Dsp::from_graph(CompiledGraph) -> Self
-pub fn Dsp::gate_off_bool(Self, Int) -> Bool
-pub fn Dsp::gate_on_bool(Self, Int) -> Bool
+pub fn Dsp::gate_off_bool(Self, Int32) -> Bool
+pub fn Dsp::gate_on_bool(Self, Int32) -> Bool
 pub fn Dsp::has_feedback_edges(Self) -> Bool
 pub fn Dsp::is_voice_finished(Self) -> Bool
-pub fn Dsp::last_sanitized_count(Self) -> Int
+pub fn Dsp::last_sanitized_count(Self) -> Int32
 pub fn Dsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn Dsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn Dsp::raw_graph(Self) -> CompiledGraph
 pub fn Dsp::reset_runtime_state(Self) -> Unit
-pub fn Dsp::set_param_bool(Self, Int, @model.GraphParamSlot, Double) -> Bool
+pub fn Dsp::set_param_bool(Self, Int32, @model.GraphParamSlot, Double) -> Bool
 pub fn Dsp::validate_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
 
+#derive(@debug.Debug)
 pub enum GraphCompileError {
   InvalidSampleRate(Double)
   MissingOutput(@model.DspNodeKind)
   MultipleOutputs(@model.DspNodeKind)
-  WrongOutputKind(Int, @model.DspNodeKind, @model.DspNodeKind)
-  InvalidInput(Int, @model.DspNodeKind, GraphInputSlot, Int)
-  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
-  InvalidDelaySamples(Int, Int, Int)
-  UnreachableNode(Int)
-  InvalidFeedbackEdge(Int, Int, Int)
-  DuplicateFeedbackInput(Int, GraphInputSlot)
+  WrongOutputKind(Int32, @model.DspNodeKind, @model.DspNodeKind)
+  InvalidInput(Int32, @model.DspNodeKind, GraphInputSlot, Int32)
+  InvalidParamValue(Int32, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  InvalidDelaySamples(Int32, Int32, Int32)
+  UnreachableNode(Int32)
+  InvalidFeedbackEdge(Int32, Int32, Int32)
+  DuplicateFeedbackInput(Int32, GraphInputSlot)
   InvalidTerminalShape(@model.DspNodeKind)
-} derive(@debug.Debug)
+}
 pub fn GraphCompileError::output(Self, &Logger) -> Unit
 pub fn GraphCompileError::to_repr(Self) -> @debug.Repr
 pub fn GraphCompileError::to_string(Self) -> String
@@ -81,49 +82,52 @@ pub impl Show for GraphCompileError
 pub struct GraphControlBatch {
   // private fields
 }
-pub fn GraphControlBatch::GraphControlBatch(Int) -> Self
+pub fn GraphControlBatch::GraphControlBatch(Int32) -> Self
 pub fn GraphControlBatch::clear(Self) -> Unit
-pub fn GraphControlBatch::length(Self) -> Int
-pub fn GraphControlBatch::push(Self, Int, Double) -> Bool
+pub fn GraphControlBatch::length(Self) -> Int32
+pub fn GraphControlBatch::push(Self, Int32, Double) -> Bool
 
 pub enum GraphControlBatchError {
   BatchCapacityExceeded
-  InvalidBindingIndex(Int)
-  InvalidGateValue(Int, Double)
-  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  InvalidBindingIndex(Int32)
+  InvalidGateValue(Int32, Double)
+  InvalidParamValue(Int32, @model.DspNodeKind, @model.GraphParamSlot, Double)
 }
 
+#derive(@debug.Debug)
 pub enum GraphControlError {
-  InvalidNodeIndex(Int)
-  OrphanNode(Int)
-  InvalidGateNode(Int, @model.DspNodeKind)
-  InvalidSlotForNode(Int, @model.DspNodeKind, @model.GraphParamSlot)
-  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
-  MissingRuntimeState(Int, @model.DspNodeKind)
-} derive(@debug.Debug)
+  InvalidNodeIndex(Int32)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, @model.DspNodeKind)
+  InvalidSlotForNode(Int32, @model.DspNodeKind, @model.GraphParamSlot)
+  InvalidParamValue(Int32, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  MissingRuntimeState(Int32, @model.DspNodeKind)
+}
 pub fn GraphControlError::output(Self, &Logger) -> Unit
 pub fn GraphControlError::to_repr(Self) -> @debug.Repr
 pub fn GraphControlError::to_string(Self) -> String
 pub impl Show for GraphControlError
 
 pub(all) enum GraphControlTarget {
-  Param(Int, @model.GraphParamSlot)
-  Gate(Int)
+  Param(Int32, @model.GraphParamSlot)
+  Gate(Int32)
 }
 
+#derive(Eq, @debug.Debug)
 pub enum GraphInputSlot {
   Input0
   Input1
-} derive(Eq, @debug.Debug)
+}
 pub fn GraphInputSlot::equal(Self, Self) -> Bool
 pub fn GraphInputSlot::not_equal(Self, Self) -> Bool
 pub fn GraphInputSlot::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum GraphValidationError {
-  InvalidInput0(Int, Int, Int)
-  InvalidInput1(Int, Int, Int)
-  InvalidStateIndex(Int, String)
-} derive(Eq, @debug.Debug)
+  InvalidInput0(Int32, Int32, Int32)
+  InvalidInput1(Int32, Int32, Int32)
+  InvalidStateIndex(Int32, String)
+}
 pub fn GraphValidationError::equal(Self, Self) -> Bool
 pub fn GraphValidationError::not_equal(Self, Self) -> Bool
 pub fn GraphValidationError::output(Self, &Logger) -> Unit
@@ -137,12 +141,12 @@ pub fn StereoDsp::apply_controls(Self, Array[@model.GraphControl]) -> Result[Uni
 pub fn StereoDsp::compile(@template.AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn StereoDsp::compile_raw(Array[@model.DspNode], @dsp.DspContext) -> Self?
 pub fn StereoDsp::compile_result(@template.AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
-pub fn StereoDsp::compiled_buffer_capacity(Self) -> Int
+pub fn StereoDsp::compiled_buffer_capacity(Self) -> Int32
 pub fn StereoDsp::disable_debug_validation(Self) -> Unit
 pub fn StereoDsp::enable_debug_validation(Self) -> Unit
 pub fn StereoDsp::from_graph(CompiledGraph) -> Self
 pub fn StereoDsp::has_feedback_edges(Self) -> Bool
-pub fn StereoDsp::last_sanitized_count(Self) -> Int
+pub fn StereoDsp::last_sanitized_count(Self) -> Int32
 pub fn StereoDsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn StereoDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDsp::raw_graph(Self) -> CompiledGraph

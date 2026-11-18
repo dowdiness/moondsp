@@ -72,8 +72,8 @@ test "weighted and nested repeated rests retain source identity and compiled tim
   assert_true(start > 0.399 && start < 0.401)
   assert_true(end_ > 0.799 && end_ < 0.801)
   guard nodes[node_index.to_int()] is Object(rest_node) &&
-    rest_node.get("kind") == Some("atom".to_json()) &&
-    rest_node.get("value") == Some("~".to_json()) else {
+    rest_node.get("kind") == Some(Json("atom")) &&
+    rest_node.get("value") == Some(Json("~")) else {
     fail("rest occurrence must reference the original rest source atom")
   }
   let nested = @json.parse(project_notation("note", "[~@2 60]*2"))
@@ -131,8 +131,8 @@ test "all-rest phrase projects usable timed occurrences" {
   assert_true(first_end > 0.666 && first_end < 0.667 && second_end == 1.0)
   guard nodes[first_node.to_int()] is Object(first_source) &&
     nodes[second_node.to_int()] is Object(second_source) &&
-    first_source.get("value") == Some("~".to_json()) &&
-    second_source.get("value") == Some("~".to_json()) else {
+    first_source.get("value") == Some(Json("~")) &&
+    second_source.get("value") == Some(Json("~")) else {
     fail("all-rest event mappings must refer to source rest atoms")
   }
 }
@@ -186,10 +186,10 @@ test "explicit chord projection keeps all pitches on one complete source atom" {
   }
   assert_true(first_node == repeated_node)
   guard nodes[node_number.to_int()] is Object(atom) &&
-    atom.get("value") == Some("{60,63,68}".to_json()) &&
-    atom.get("from") == Some((0).to_json()) &&
-    atom.get("baseTo") == Some((10).to_json()) &&
-    atom.get("end") == Some((14).to_json()) else {
+    atom.get("value") == Some(Json("{60,63,68}")) &&
+    atom.get("from") == Some(Json(0)) &&
+    atom.get("baseTo") == Some(Json(10)) &&
+    atom.get("end") == Some(Json(14)) else {
     fail("explicit chord projection must retain its full source span")
   }
 }
@@ -239,17 +239,17 @@ test "onset lookup keeps exact references but retires edited literal geometry" {
   }
   let row : Array[Json] = [
     Json::number(5.0),
-    origin.atom().epoch().serial().to_double().to_json(),
-    origin.atom().serial().to_double().to_json(),
-    frame.serial().to_double().to_json(),
-    source_event.source_start().to_json(),
-    source_event.source_pitch().to_json(),
-    bindings.length().to_json(),
+    Json(origin.atom().epoch().serial().to_double()),
+    Json(origin.atom().serial().to_double()),
+    Json(frame.serial().to_double()),
+    Json(source_event.source_start()),
+    Json(source_event.source_pitch()),
+    Json(bindings.length()),
   ]
   for binding in bindings {
-    row.push(binding.reference().serial().to_double().to_json())
-    row.push(binding.id().serial().to_double().to_json())
-    row.push(binding.definition().serial().to_double().to_json())
+    row.push(Json(binding.reference().serial().to_double()))
+    row.push(Json(binding.id().serial().to_double()))
+    row.push(Json(binding.definition().serial().to_double()))
   }
   let decoded = @json.parse(
     locate_onsets(draft, Json::array([Json::array(row)]).stringify()),
@@ -327,15 +327,15 @@ test "negative pitch is distinct from an unpitched drum onset" {
     let wire_pitch = if event.source_pitch().is_nan() {
       Json::null()
     } else {
-      event.source_pitch().to_json()
+      Json(event.source_pitch())
     }
     assert_true(wire_pitch == pitch)
     let row : Json = [
       0,
-      event.origin().atom().epoch().serial().to_double().to_json(),
-      event.origin().atom().serial().to_double().to_json(),
-      frame.serial().to_double().to_json(),
-      event.source_start().to_json(),
+      Json(event.origin().atom().epoch().serial().to_double()),
+      Json(event.origin().atom().serial().to_double()),
+      Json(frame.serial().to_double()),
+      Json(event.source_start()),
       wire_pitch,
       0,
     ]

@@ -12,41 +12,41 @@ pub fn clear_playback_input() -> Unit
 
 pub fn get_playback_error() -> String
 
-pub fn get_playback_error_char(Int) -> Int
+pub fn get_playback_error_char(Int32) -> Int32
 
-pub fn get_playback_error_length() -> Int
+pub fn get_playback_error_length() -> Int32
 
-pub fn init_scheduler_graph_with_templates(Double, Int, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
+pub fn init_scheduler_graph_with_templates(Double, Int32, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
 
 pub fn player_mode() -> PlaybackMode
 
 pub fn player_onset_clear() -> Unit
 
-pub fn player_onset_count() -> Int
+pub fn player_onset_count() -> Int32
 
 pub fn player_onset_dropped() -> Double
 
-pub fn player_onset_enable(Int) -> Unit
+pub fn player_onset_enable(Int32) -> Unit
 
-pub fn player_onset_field(Int, Int) -> Double
+pub fn player_onset_field(Int32, Int32) -> Double
 
-pub fn player_pause() -> Int
+pub fn player_pause() -> Int32
 
-pub fn player_pending_count() -> Int
+pub fn player_pending_count() -> Int32
 
-pub fn player_play() -> Int
+pub fn player_play() -> Int32
 
-pub fn player_restart_input() -> Int
+pub fn player_restart_input() -> Int32
 
-pub fn player_skipped_count() -> Int
+pub fn player_skipped_count() -> Int32
 
-pub fn player_state() -> Int
+pub fn player_state() -> Int32
 
-pub fn player_update_input() -> Int
+pub fn player_update_input() -> Int32
 
 pub fn process_scheduler_block() -> Bool
 
-pub fn push_playback_char(Int) -> Unit
+pub fn push_playback_char(Int32) -> Unit
 
 pub fn reset_scheduler_graph() -> Unit
 
@@ -54,19 +54,20 @@ pub fn scheduler_bpm() -> Double
 
 pub fn scheduler_cycle_position() -> Double
 
-pub fn scheduler_left_sample(Int) -> Double
+pub fn scheduler_left_sample(Int32) -> Double
 
-pub fn scheduler_right_sample(Int) -> Double
+pub fn scheduler_right_sample(Int32) -> Double
 
 pub fn scheduler_sample_position() -> Double
 
-pub fn set_scheduler_bpm(Double) -> Int
+pub fn set_scheduler_bpm(Double) -> Int32
 
 pub fn set_scheduler_gain(Double) -> Unit
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum PlayState {
   Empty
   Ready
@@ -74,16 +75,17 @@ pub(all) enum PlayState {
   Paused
   Ended
   Fault
-} derive(Eq, @debug.Debug)
+}
 pub fn PlayState::equal(Self, Self) -> Bool
 pub fn PlayState::not_equal(Self, Self) -> Bool
 pub fn PlayState::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub enum PlaybackMode {
   None
   Pattern
   Song
-} derive(Eq, @debug.Debug)
+}
 pub fn PlaybackMode::equal(Self, Self) -> Bool
 pub fn PlaybackMode::not_equal(Self, Self) -> Bool
 pub fn PlaybackMode::to_repr(Self) -> @debug.Repr
@@ -97,13 +99,14 @@ pub fn Player::restart(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
 pub fn Player::update(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
 pub fn Player::view(Self) -> PlayerView
 
+#derive(Eq, @debug.Debug)
 pub(all) enum PlayerError {
   InvalidSource(String)
   RestartRequired
   NoSong
   TransportRange
   Failed(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn PlayerError::equal(Self, Self) -> Bool
 pub fn PlayerError::not_equal(Self, Self) -> Bool
 pub fn PlayerError::to_repr(Self) -> @debug.Repr
@@ -113,8 +116,8 @@ pub struct PlayerView {
   source : String?
   bpm : Double
   sample_position : Double
-  pending_materials : Int
-  skipped_materials : Int
+  pending_materials : Int32
+  skipped_materials : Int32
 }
 
 // Type aliases

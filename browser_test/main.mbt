@@ -1,5 +1,5 @@
 ///|
-let demo : @ref.Ref[@moondsp.DemoSource] = @ref.new(@moondsp.DemoSource())
+let demo : @ref.Ref[@moondsp.DemoSource] = Ref(@moondsp.DemoSource())
 
 ///|
 /// Browser test wrapper package that proves mono compiled fallback when
@@ -24,19 +24,19 @@ const BROWSER_TEST_FEEDBACK_CLIP_THRESHOLD : Double = 1.0
 const BROWSER_TEST_FEEDBACK_MAX_GAIN : Double = 0.95
 
 ///|
-let compiled_graph : @ref.Ref[@moondsp.Dsp?] = @ref.new(None)
+let compiled_graph : @ref.Ref[@moondsp.Dsp?] = Ref(None)
 
 ///|
-let compiled_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(None)
+let compiled_context : @ref.Ref[@moondsp.DspContext?] = Ref(None)
 
 ///|
-let compiled_output : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+let compiled_output : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 
 ///|
-let compiled_sample_rate : @ref.Ref[Double] = @ref.new(0.0)
+let compiled_sample_rate : @ref.Ref[Double] = Ref(0.0)
 
 ///|
-let compiled_block_size : @ref.Ref[Int] = @ref.new(0)
+let compiled_block_size : @ref.Ref[Int] = Ref(0)
 
 ///|
 pub fn reset_phase() -> Unit {

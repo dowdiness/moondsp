@@ -121,44 +121,44 @@ priv struct CrackleProbeValidatedInput {
 }
 
 ///|
-let crackle_probe_metrics : @ref.Ref[FixedArray[Double]?] = @ref.new(None)
+let crackle_probe_metrics : @ref.Ref[FixedArray[Double]?] = Ref(None)
 
 ///|
-let crackle_probe_output : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+let crackle_probe_output : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 
 ///|
-let crackle_probe_reference : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+let crackle_probe_reference : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 
 ///|
-let crackle_probe_residual : @ref.Ref[@moondsp.AudioBuffer?] = @ref.new(None)
+let crackle_probe_residual : @ref.Ref[@moondsp.AudioBuffer?] = Ref(None)
 
 ///|
-let crackle_probe_blocks : @ref.Ref[Int] = @ref.new(0)
+let crackle_probe_blocks : @ref.Ref[Int] = Ref(0)
 
 ///|
-let crackle_probe_last_error_code : @ref.Ref[Int] = @ref.new(0)
+let crackle_probe_last_error_code : @ref.Ref[Int] = Ref(0)
 
 ///|
-let crackle_probe_stream_state : @ref.Ref[CrackleProbeStreamState?] = @ref.new(
+let crackle_probe_stream_state : @ref.Ref[CrackleProbeStreamState?] = Ref(
   None,
 )
 
 ///|
-let crackle_probe_stream_context : @ref.Ref[@moondsp.DspContext?] = @ref.new(
+let crackle_probe_stream_context : @ref.Ref[@moondsp.DspContext?] = Ref(
   None,
 )
 
 ///|
-let crackle_probe_stream_block_size : @ref.Ref[Int] = @ref.new(0)
+let crackle_probe_stream_block_size : @ref.Ref[Int] = Ref(0)
 
 ///|
-let crackle_probe_stream_has_previous : @ref.Ref[Bool] = @ref.new(false)
+let crackle_probe_stream_has_previous : @ref.Ref[Bool] = Ref(false)
 
 ///|
-let crackle_probe_stream_previous_output : @ref.Ref[Double] = @ref.new(0.0)
+let crackle_probe_stream_previous_output : @ref.Ref[Double] = Ref(0.0)
 
 ///|
-let crackle_probe_stream_previous_reference : @ref.Ref[Double] = @ref.new(0.0)
+let crackle_probe_stream_previous_reference : @ref.Ref[Double] = Ref(0.0)
 
 ///|
 pub fn crackle_probe_reset() -> Unit {

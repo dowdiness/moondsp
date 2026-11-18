@@ -19,26 +19,27 @@ pub fn apply_topology_edits(Array[@model.DspNode], Array[GraphTopologyEdit]) -> 
 type DspHotSwap
 pub fn DspHotSwap::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
 pub fn DspHotSwap::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
-pub fn DspHotSwap::from_graph(@runtime.Dsp, crossfade_samples? : Int) -> Self
+pub fn DspHotSwap::from_graph(@runtime.Dsp, crossfade_samples? : Int32) -> Self
 pub fn DspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn DspHotSwap::queue_swap(Self, @runtime.Dsp) -> Result[Unit, HotSwapQueueError]
 
 type DspTopologyController
 pub fn DspTopologyController::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
 pub fn DspTopologyController::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
-pub fn DspTopologyController::from_nodes(Array[@model.DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
+pub fn DspTopologyController::from_nodes(Array[@model.DspNode], @dsp.DspContext, crossfade_samples? : Int32) -> Self?
 pub fn DspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn DspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn DspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
 
+#derive(@debug.Debug)
 pub enum GraphControlError {
-  InvalidNodeIndex(Int)
-  OrphanNode(Int)
-  InvalidGateNode(Int, @model.DspNodeKind)
-  InvalidSlotForNode(Int, @model.DspNodeKind, @model.GraphParamSlot)
-  InvalidParamValue(Int, @model.DspNodeKind, @model.GraphParamSlot, Double)
-  MissingRuntimeState(Int, @model.DspNodeKind)
-} derive(@debug.Debug)
+  InvalidNodeIndex(Int32)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, @model.DspNodeKind)
+  InvalidSlotForNode(Int32, @model.DspNodeKind, @model.GraphParamSlot)
+  InvalidParamValue(Int32, @model.DspNodeKind, @model.GraphParamSlot, Double)
+  MissingRuntimeState(Int32, @model.DspNodeKind)
+}
 pub fn GraphControlError::output(Self, &Logger) -> Unit
 pub fn GraphControlError::to_repr(Self) -> @debug.Repr
 pub fn GraphControlError::to_string(Self) -> String
@@ -48,72 +49,76 @@ pub struct GraphEditResult {
   // private fields
 }
 pub fn GraphEditResult::nodes(Self) -> Array[@model.DspNode]
-pub fn GraphEditResult::old_to_new(Self) -> FixedArray[Int]
+pub fn GraphEditResult::old_to_new(Self) -> FixedArray[Int32]
 
 pub(all) enum GraphTopologyEdit {
-  ReplaceNode(Int, @model.DspNode)
-  RewireInput(Int, GraphTopologyInputSlot, Int)
-  InsertNode(Int, GraphTopologyInputSlot, @model.DspNode)
-  DeleteNode(Int, Int, GraphTopologyInputSlot, Int)
-  InsertChain(Int, GraphTopologyInputSlot, Array[@model.DspNode])
-  DeleteChain(Int, Int, Int, GraphTopologyInputSlot, Int)
+  ReplaceNode(Int32, @model.DspNode)
+  RewireInput(Int32, GraphTopologyInputSlot, Int32)
+  InsertNode(Int32, GraphTopologyInputSlot, @model.DspNode)
+  DeleteNode(Int32, Int32, GraphTopologyInputSlot, Int32)
+  InsertChain(Int32, GraphTopologyInputSlot, Array[@model.DspNode])
+  DeleteChain(Int32, Int32, Int32, GraphTopologyInputSlot, Int32)
 }
-pub fn GraphTopologyEdit::delete_chain(Int, Int, Int, GraphTopologyInputSlot, Int) -> Self
-pub fn GraphTopologyEdit::delete_node(Int, Int, GraphTopologyInputSlot, Int) -> Self
-pub fn GraphTopologyEdit::insert_chain(Int, GraphTopologyInputSlot, Array[@model.DspNode]) -> Self
-pub fn GraphTopologyEdit::insert_node(Int, GraphTopologyInputSlot, @model.DspNode) -> Self
-pub fn GraphTopologyEdit::replace_node(Int, @model.DspNode) -> Self
-pub fn GraphTopologyEdit::rewire_input(Int, GraphTopologyInputSlot, Int) -> Self
+pub fn GraphTopologyEdit::delete_chain(Int32, Int32, Int32, GraphTopologyInputSlot, Int32) -> Self
+pub fn GraphTopologyEdit::delete_node(Int32, Int32, GraphTopologyInputSlot, Int32) -> Self
+pub fn GraphTopologyEdit::insert_chain(Int32, GraphTopologyInputSlot, Array[@model.DspNode]) -> Self
+pub fn GraphTopologyEdit::insert_node(Int32, GraphTopologyInputSlot, @model.DspNode) -> Self
+pub fn GraphTopologyEdit::replace_node(Int32, @model.DspNode) -> Self
+pub fn GraphTopologyEdit::rewire_input(Int32, GraphTopologyInputSlot, Int32) -> Self
 
+#derive(@debug.Debug)
 pub(all) enum GraphTopologyEditError {
-  InvalidNodeIndex(Int)
-  InvalidSourceIndex(Int)
-  UnsupportedInputSlot(Int, GraphTopologyInputSlot, @model.DspNodeKind)
+  InvalidNodeIndex(Int32)
+  InvalidSourceIndex(Int32)
+  UnsupportedInputSlot(Int32, GraphTopologyInputSlot, @model.DspNodeKind)
   UnsupportedInsertTemplate(@model.DspNodeKind)
   EmptyInsertChain
-  UnsupportedChainNode(Int, @model.DspNodeKind)
-  InvalidDeleteRange(Int, Int)
-  ReplacementSourceInDeletedRange(Int)
-  DeleteNodeRequiresUnary(Int, @model.DspNodeKind)
-  DeleteNodeRequiresSingleConsumer(Int)
-  DeleteNodeConsumerMismatch(Int, Int)
-  DeleteChainRequiresUnary(Int, @model.DspNodeKind)
-  DeleteChainRequiresSingleConsumer(Int)
-  DeleteChainConsumerMismatch(Int, Int, Int)
-} derive(@debug.Debug)
+  UnsupportedChainNode(Int32, @model.DspNodeKind)
+  InvalidDeleteRange(Int32, Int32)
+  ReplacementSourceInDeletedRange(Int32)
+  DeleteNodeRequiresUnary(Int32, @model.DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int32)
+  DeleteNodeConsumerMismatch(Int32, Int32)
+  DeleteChainRequiresUnary(Int32, @model.DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int32)
+  DeleteChainConsumerMismatch(Int32, Int32, Int32)
+}
 pub fn GraphTopologyEditError::output(Self, &Logger) -> Unit
 pub fn GraphTopologyEditError::to_repr(Self) -> @debug.Repr
 pub fn GraphTopologyEditError::to_string(Self) -> String
 pub impl Show for GraphTopologyEditError
 
 pub(all) struct GraphTopologyEditFailure {
-  edit_index : Int
+  edit_index : Int32
   reason : GraphTopologyEditError
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
-} derive(Eq, @debug.Debug)
+}
 pub fn GraphTopologyInputSlot::equal(Self, Self) -> Bool
 pub fn GraphTopologyInputSlot::not_equal(Self, Self) -> Bool
 pub fn GraphTopologyInputSlot::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int, GraphTopologyEditError)
+  InvalidEdit(Int32, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
-} derive(@debug.Debug)
+}
 pub fn GraphTopologyQueueError::output(Self, &Logger) -> Unit
 pub fn GraphTopologyQueueError::to_repr(Self) -> @debug.Repr
 pub fn GraphTopologyQueueError::to_string(Self) -> String
 pub impl Show for GraphTopologyQueueError
 
+#derive(@debug.Debug)
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
-  BlockCapacityMismatch(Int, Int)
-} derive(@debug.Debug)
+  BlockCapacityMismatch(Int32, Int32)
+}
 pub fn HotSwapQueueError::output(Self, &Logger) -> Unit
 pub fn HotSwapQueueError::to_repr(Self) -> @debug.Repr
 pub fn HotSwapQueueError::to_string(Self) -> String
@@ -122,14 +127,14 @@ pub impl Show for HotSwapQueueError
 type StereoDspHotSwap
 pub fn StereoDspHotSwap::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
 pub fn StereoDspHotSwap::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
-pub fn StereoDspHotSwap::from_graph(@runtime.StereoDsp, crossfade_samples? : Int) -> Self
+pub fn StereoDspHotSwap::from_graph(@runtime.StereoDsp, crossfade_samples? : Int32) -> Self
 pub fn StereoDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDspHotSwap::queue_swap(Self, @runtime.StereoDsp) -> Result[Unit, HotSwapQueueError]
 
 type StereoDspTopologyController
 pub fn StereoDspTopologyController::apply_control(Self, @model.GraphControl) -> Result[Unit, GraphControlError]
 pub fn StereoDspTopologyController::apply_controls(Self, Array[@model.GraphControl]) -> Result[Unit, GraphControlError]
-pub fn StereoDspTopologyController::from_nodes(Array[@model.DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
+pub fn StereoDspTopologyController::from_nodes(Array[@model.DspNode], @dsp.DspContext, crossfade_samples? : Int32) -> Self?
 pub fn StereoDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn StereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]

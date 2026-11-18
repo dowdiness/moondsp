@@ -421,7 +421,7 @@ fn[A] every_known(
   if signature != "" && pat.body is Silence {
     return pat
   }
-  let n64 = Int64::from_int(n)
+  let n64 = n.to_int64()
   let inner = pat
   make_pat(
     fn(arc) {

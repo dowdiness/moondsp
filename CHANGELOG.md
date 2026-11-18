@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whitespace-only edits; each `?` in a notation string also salts its seed with
   its step order. Scores that use them drop different events than before.
 
+- Move to MoonBit `0.10.21+06da1ed44` (CI, orb setup, and the Cloudflare
+  build) with `incr` 0.16.0, `quickcheck` 0.15.1, and the browser host's
+  `moonbitlang/async` 0.22.9. Generated `.mbti` files now spell `Int` as
+  `Int32`; the browser ABI is unchanged.
 - **Breaking browser API:** replace the exposed `engine.output` Worklet with
   synchronous `engine.connect` / `engine.disconnect`, preserving native routing
   overloads. New connections reject after closing/failure; disconnection remains

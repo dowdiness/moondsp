@@ -3,7 +3,7 @@ name = "dowdiness/moondsp-browser-host"
 version = "0.1.0"
 
 import {
-  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.22.9",
 }
 
 preferred_target = "js"

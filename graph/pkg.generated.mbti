@@ -13,13 +13,14 @@ pub fn node_accepts_slot(DspNode, GraphParamSlot) -> Bool
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[DspNode]) -> T?
 
 // Errors
+#derive(@debug.Debug)
 pub(all) suberror GraphDocumentError {
-  LengthMismatch(Int, Int)
+  LengthMismatch(Int32, Int32)
   DuplicateNodeId(String)
   MissingNodeId(String)
   RetiredNodeId(String)
   Topology(GraphTopologyEditError)
-} derive(@debug.Debug)
+}
 pub fn GraphDocumentError::output(Self, &Logger) -> Unit
 pub fn GraphDocumentError::to_repr(Self) -> @debug.Repr
 pub fn GraphDocumentError::to_string(Self) -> String
@@ -29,18 +30,19 @@ pub impl Show for GraphDocumentError
 pub struct AnalyzedGraph {
   // private fields
 }
-pub fn AnalyzedGraph::adsr_authoring_indices(Self) -> FixedArray[Int]
+pub fn AnalyzedGraph::adsr_authoring_indices(Self) -> FixedArray[Int32]
 pub fn AnalyzedGraph::analyze(Array[DspNode]) -> Self
 pub fn AnalyzedGraph::equal(Self, Self) -> Bool
 pub fn AnalyzedGraph::not_equal(Self, Self) -> Bool
-pub fn AnalyzedGraph::orphan_adsr_count(Self) -> Int
+pub fn AnalyzedGraph::orphan_adsr_count(Self) -> Int32
 pub impl Eq for AnalyzedGraph
 
+#derive(Eq, @debug.Debug)
 pub struct ControlBinding {
   key : String
   target : ControlTarget
   unit : ControlUnit
-} derive(Eq, @debug.Debug)
+}
 pub fn ControlBinding::ControlBinding(key~ : String, target~ : ControlTarget, unit~ : ControlUnit) -> Self
 pub fn ControlBinding::equal(Self, Self) -> Bool
 pub fn ControlBinding::not_equal(Self, Self) -> Bool
@@ -49,11 +51,12 @@ pub fn ControlBinding::to_repr(Self) -> @debug.Repr
 pub fn ControlBinding::to_string(Self) -> String
 pub impl Show for ControlBinding
 
+#derive(@debug.Debug)
 pub struct ControlBindingBuilder {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
-pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int, slot~ : GraphParamSlot, unit? : ControlUnit) -> Self
+pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int32, slot~ : GraphParamSlot, unit? : ControlUnit) -> Self
 pub fn ControlBindingBuilder::bind_voice(Self, key~ : String, param~ : VoiceParam) -> Self
 pub fn ControlBindingBuilder::build(Self, AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
 pub fn ControlBindingBuilder::output(Self, &Logger) -> Unit
@@ -61,12 +64,13 @@ pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
 pub fn ControlBindingBuilder::to_string(Self) -> String
 pub impl Show for ControlBindingBuilder
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ControlBindingError {
-  InvalidNodeIndex(Int)
-  InvalidSlotForNode(Int, GraphParamSlot)
+  InvalidNodeIndex(Int32)
+  InvalidSlotForNode(Int32, GraphParamSlot)
   DuplicateKey(String)
-  OrphanBinding(String, Int)
-} derive(Eq, @debug.Debug)
+  OrphanBinding(String, Int32)
+}
 pub fn ControlBindingError::equal(Self, Self) -> Bool
 pub fn ControlBindingError::not_equal(Self, Self) -> Bool
 pub fn ControlBindingError::output(Self, &Logger) -> Unit
@@ -74,14 +78,15 @@ pub fn ControlBindingError::to_repr(Self) -> @debug.Repr
 pub fn ControlBindingError::to_string(Self) -> String
 pub impl Show for ControlBindingError
 
+#derive(Eq, @debug.Debug)
 pub struct ControlBindingMap {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ControlBindingMap::binding(Self, String) -> ControlBinding?
 pub fn ControlBindingMap::default_value(Self, String) -> Double?
 pub fn ControlBindingMap::each_voice_value(Self, Map[String, Double], (VoiceParam, Double) -> Unit) -> Unit
 pub fn ControlBindingMap::equal(Self, Self) -> Bool
-pub fn ControlBindingMap::length(Self) -> Int
+pub fn ControlBindingMap::length(Self) -> Int32
 pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
 pub fn ControlBindingMap::output(Self, &Logger) -> Unit
 pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
@@ -89,19 +94,21 @@ pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
 pub fn ControlBindingMap::to_string(Self) -> String
 pub impl Show for ControlBindingMap
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ControlTarget {
-  Graph(Int, GraphParamSlot)
+  Graph(Int32, GraphParamSlot)
   Voice(VoiceParam)
-} derive(Eq, @debug.Debug)
+}
 pub fn ControlTarget::equal(Self, Self) -> Bool
 pub fn ControlTarget::not_equal(Self, Self) -> Bool
 pub fn ControlTarget::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ControlUnit {
   Linear
   MidiToHz
   SecondsToMs
-} derive(Eq, @debug.Debug)
+}
 pub fn ControlUnit::convert(Self, Double) -> Double
 pub fn ControlUnit::equal(Self, Self) -> Bool
 pub fn ControlUnit::not_equal(Self, Self) -> Bool
@@ -111,23 +118,23 @@ type Dsp
 pub fn Dsp::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn Dsp::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub fn[T] Dsp::apply_controls_to_all(Array[Result[Self, T]], Array[GraphControl], (GraphControlError) -> T) -> Result[Unit, T]
-pub fn Dsp::can_set_param_bool(Self, Int, GraphParamSlot, Double) -> Bool
+pub fn Dsp::can_set_param_bool(Self, Int32, GraphParamSlot, Double) -> Bool
 pub fn Dsp::compile(AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn Dsp::compile_result(AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
 pub fn Dsp::disable_debug_validation(Self) -> Unit
 pub fn Dsp::enable_debug_validation(Self) -> Unit
-pub fn Dsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn Dsp::gate_off_bool(Self, Int) -> Bool
-pub fn Dsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
-pub fn Dsp::gate_on_bool(Self, Int) -> Bool
+pub fn Dsp::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn Dsp::gate_off_bool(Self, Int32) -> Bool
+pub fn Dsp::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn Dsp::gate_on_bool(Self, Int32) -> Bool
 pub fn Dsp::has_feedback_edges(Self) -> Bool
 pub fn Dsp::is_voice_finished(Self) -> Bool
-pub fn Dsp::last_sanitized_count(Self) -> Int
+pub fn Dsp::last_sanitized_count(Self) -> Int32
 pub fn Dsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn Dsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn Dsp::reset_runtime_state(Self) -> Unit
-pub fn Dsp::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
-pub fn Dsp::set_param_bool(Self, Int, GraphParamSlot, Double) -> Bool
+pub fn Dsp::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn Dsp::set_param_bool(Self, Int32, GraphParamSlot, Double) -> Bool
 pub fn Dsp::validate_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for Dsp
 pub impl GraphDebuggable for Dsp
@@ -135,52 +142,52 @@ pub impl GraphDebuggable for Dsp
 type DspHotSwap
 pub fn DspHotSwap::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn DspHotSwap::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn DspHotSwap::from_graph(Dsp, crossfade_samples? : Int) -> Self
-pub fn DspHotSwap::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn DspHotSwap::gate_on(Self, Int) -> Result[Unit, GraphControlError]
+pub fn DspHotSwap::from_graph(Dsp, crossfade_samples? : Int32) -> Self
+pub fn DspHotSwap::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn DspHotSwap::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
 pub fn DspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn DspHotSwap::queue_swap(Self, Dsp) -> Result[Unit, HotSwapQueueError]
-pub fn DspHotSwap::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn DspHotSwap::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for DspHotSwap
 
 pub struct DspNode {
   // private fields
 }
 pub fn DspNode::adsr(attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Self
-pub fn DspNode::biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::biquad(input~ : Int32, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
 pub fn DspNode::can_delete(Self) -> Bool
 pub fn DspNode::can_insert_after(Self) -> Bool
-pub fn DspNode::clip(Int, Double) -> Self
+pub fn DspNode::clip(Int32, Double) -> Self
 pub fn DspNode::constant(Double) -> Self
-pub fn DspNode::delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
-pub fn DspNode::delay_max_samples(Self) -> Int
-pub fn DspNode::delay_samples(Self) -> Int
-pub fn DspNode::envelope_gain(input~ : Int, envelope~ : Int, amount~ : Double) -> Self
+pub fn DspNode::delay(input~ : Int32, max_delay_samples~ : Int32, delay_samples? : Int32, feedback? : Double) -> Self
+pub fn DspNode::delay_max_samples(Self) -> Int32
+pub fn DspNode::delay_samples(Self) -> Int32
+pub fn DspNode::envelope_gain(input~ : Int32, envelope~ : Int32, amount~ : Double) -> Self
 pub fn DspNode::equal(Self, Self) -> Bool
 pub fn DspNode::filter_mode(Self) -> @dsp.BiquadMode
 pub fn DspNode::fold_value(Self, Double, Double) -> Double
-pub fn DspNode::gain(Int, Double) -> Self
-pub fn DspNode::input0(Self) -> Int
-pub fn DspNode::input1(Self) -> Int
+pub fn DspNode::gain(Int32, Double) -> Self
+pub fn DspNode::input0(Self) -> Int32
+pub fn DspNode::input1(Self) -> Int32
 pub fn DspNode::is_foldable(Self) -> Bool
 pub fn DspNode::is_stateful(Self) -> Bool
 pub fn DspNode::kind(Self) -> DspNodeKind
-pub fn DspNode::mix(Int, Int) -> Self
-pub fn DspNode::mul(Int, Int) -> Self
-pub fn DspNode::noise(UInt) -> Self
+pub fn DspNode::mix(Int32, Int32) -> Self
+pub fn DspNode::mul(Int32, Int32) -> Self
+pub fn DspNode::noise(UInt32) -> Self
 pub fn DspNode::not_equal(Self, Self) -> Bool
 pub fn DspNode::oscillator(@dsp.Waveform, Double) -> Self
-pub fn DspNode::oscillator_from(Int, @dsp.Waveform) -> Self
-pub fn DspNode::output(Int) -> Self
-pub fn DspNode::pan(Int, Double) -> Self
-pub fn DspNode::seed(Self) -> UInt
-pub fn DspNode::signal_shape(Self) -> Int
-pub fn DspNode::stereo_biquad(input~ : Int, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
-pub fn DspNode::stereo_clip(input~ : Int, threshold~ : Double) -> Self
-pub fn DspNode::stereo_delay(input~ : Int, max_delay_samples~ : Int, delay_samples? : Int, feedback? : Double) -> Self
-pub fn DspNode::stereo_gain(input~ : Int, amount~ : Double) -> Self
-pub fn DspNode::stereo_mixdown(Int) -> Self
-pub fn DspNode::stereo_output(Int) -> Self
+pub fn DspNode::oscillator_from(Int32, @dsp.Waveform) -> Self
+pub fn DspNode::output(Int32) -> Self
+pub fn DspNode::pan(Int32, Double) -> Self
+pub fn DspNode::seed(Self) -> UInt32
+pub fn DspNode::signal_shape(Self) -> Int32
+pub fn DspNode::stereo_biquad(input~ : Int32, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
+pub fn DspNode::stereo_clip(input~ : Int32, threshold~ : Double) -> Self
+pub fn DspNode::stereo_delay(input~ : Int32, max_delay_samples~ : Int32, delay_samples? : Int32, feedback? : Double) -> Self
+pub fn DspNode::stereo_gain(input~ : Int32, amount~ : Double) -> Self
+pub fn DspNode::stereo_mixdown(Int32) -> Self
+pub fn DspNode::stereo_output(Int32) -> Self
 pub fn DspNode::value0(Self) -> Double
 pub fn DspNode::value1(Self) -> Double
 pub fn DspNode::value2(Self) -> Double
@@ -192,6 +199,7 @@ pub impl NodeSpanning for DspNode
 pub impl NodeStateful for DspNode
 pub impl Eq for DspNode
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DspNodeKind {
   Constant
   Oscillator
@@ -211,7 +219,7 @@ pub(all) enum DspNodeKind {
   StereoDelay
   StereoMixDown
   StereoOutput
-} derive(Eq, @debug.Debug)
+}
 pub fn DspNodeKind::equal(Self, Self) -> Bool
 pub fn DspNodeKind::not_equal(Self, Self) -> Bool
 pub fn DspNodeKind::to_repr(Self) -> @debug.Repr
@@ -219,13 +227,13 @@ pub fn DspNodeKind::to_repr(Self) -> @debug.Repr
 type DspTopologyController
 pub fn DspTopologyController::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn DspTopologyController::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn DspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
-pub fn DspTopologyController::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn DspTopologyController::gate_on(Self, Int) -> Result[Unit, GraphControlError]
+pub fn DspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int32) -> Self?
+pub fn DspTopologyController::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn DspTopologyController::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
 pub fn DspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn DspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn DspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
-pub fn DspTopologyController::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn DspTopologyController::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for DspTopologyController
 
 pub struct GraphBuilder {
@@ -236,18 +244,18 @@ pub fn GraphBuilder::analyze(Self) -> AnalyzedGraph
 pub fn GraphBuilder::biquad(Self, @dsp.BiquadMode, Double, Double) -> Self
 pub fn GraphBuilder::clip(Self, Double) -> Self
 pub fn GraphBuilder::constant(Double) -> Self
-pub fn GraphBuilder::delay(Self, Int, Int, Double) -> Self
+pub fn GraphBuilder::delay(Self, Int32, Int32, Double) -> Self
 pub fn GraphBuilder::gain(Self, Double) -> Self
 pub fn GraphBuilder::mix(Self, Self) -> Self
 pub fn GraphBuilder::mul(Self, Self) -> Self
 pub fn GraphBuilder::nodes(Self) -> Array[DspNode]
-pub fn GraphBuilder::noise(UInt) -> Self
+pub fn GraphBuilder::noise(UInt32) -> Self
 pub fn GraphBuilder::oscillator(Self, @dsp.Waveform) -> Self
 pub fn GraphBuilder::output(Self) -> Self
 pub fn GraphBuilder::pan(Self, Double) -> Self
 pub fn GraphBuilder::stereo_biquad(Self, @dsp.BiquadMode, Double, Double) -> Self
 pub fn GraphBuilder::stereo_clip(Self, Double) -> Self
-pub fn GraphBuilder::stereo_delay(Self, Int, Int, Double) -> Self
+pub fn GraphBuilder::stereo_delay(Self, Int32, Int32, Double) -> Self
 pub fn GraphBuilder::stereo_gain(Self, Double) -> Self
 pub fn GraphBuilder::stereo_mixdown(Self) -> Self
 pub fn GraphBuilder::stereo_output(Self) -> Self
@@ -259,19 +267,20 @@ pub impl @dsp.StereoDelaySym for GraphBuilder
 pub impl @dsp.StereoFilterSym for GraphBuilder
 pub impl @dsp.StereoSym for GraphBuilder
 
+#derive(@debug.Debug)
 pub(all) enum GraphCompileError {
   InvalidSampleRate(Double)
   MissingOutput(DspNodeKind)
   MultipleOutputs(DspNodeKind)
-  WrongOutputKind(Int, DspNodeKind, DspNodeKind)
-  InvalidInput(Int, DspNodeKind, GraphTopologyInputSlot, Int)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  InvalidDelaySamples(Int, Int, Int)
-  UnreachableNode(Int)
-  InvalidFeedbackEdge(Int, Int, Int)
-  DuplicateFeedbackInput(Int, GraphTopologyInputSlot)
+  WrongOutputKind(Int32, DspNodeKind, DspNodeKind)
+  InvalidInput(Int32, DspNodeKind, GraphTopologyInputSlot, Int32)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  InvalidDelaySamples(Int32, Int32, Int32)
+  UnreachableNode(Int32)
+  InvalidFeedbackEdge(Int32, Int32, Int32)
+  DuplicateFeedbackInput(Int32, GraphTopologyInputSlot)
   InvalidTerminalShape(DspNodeKind)
-} derive(@debug.Debug)
+}
 pub fn GraphCompileError::output(Self, &Logger) -> Unit
 pub fn GraphCompileError::to_repr(Self) -> @debug.Repr
 pub fn GraphCompileError::to_string(Self) -> String
@@ -280,32 +289,34 @@ pub impl Show for GraphCompileError
 pub struct GraphControl {
   // private fields
 }
-pub fn GraphControl::gate_off(Int) -> Self
-pub fn GraphControl::gate_on(Int) -> Self
+pub fn GraphControl::gate_off(Int32) -> Self
+pub fn GraphControl::gate_on(Int32) -> Self
 pub fn GraphControl::kind(Self) -> GraphControlKind
-pub fn GraphControl::node_index(Self) -> Int
-pub fn GraphControl::set_param(Int, GraphParamSlot, Double) -> Self
+pub fn GraphControl::node_index(Self) -> Int32
+pub fn GraphControl::set_param(Int32, GraphParamSlot, Double) -> Self
 pub fn GraphControl::slot(Self) -> GraphParamSlot
 pub fn GraphControl::value(Self) -> Double
 
+#derive(@debug.Debug)
 pub(all) enum GraphControlError {
-  InvalidNodeIndex(Int)
-  OrphanNode(Int)
-  InvalidGateNode(Int, DspNodeKind)
-  InvalidSlotForNode(Int, DspNodeKind, GraphParamSlot)
-  InvalidParamValue(Int, DspNodeKind, GraphParamSlot, Double)
-  MissingRuntimeState(Int, DspNodeKind)
-} derive(@debug.Debug)
+  InvalidNodeIndex(Int32)
+  OrphanNode(Int32)
+  InvalidGateNode(Int32, DspNodeKind)
+  InvalidSlotForNode(Int32, DspNodeKind, GraphParamSlot)
+  InvalidParamValue(Int32, DspNodeKind, GraphParamSlot, Double)
+  MissingRuntimeState(Int32, DspNodeKind)
+}
 pub fn GraphControlError::output(Self, &Logger) -> Unit
 pub fn GraphControlError::to_repr(Self) -> @debug.Repr
 pub fn GraphControlError::to_string(Self) -> String
 pub impl Show for GraphControlError
 
+#derive(Eq)
 pub(all) enum GraphControlKind {
   GateOn
   GateOff
   SetParam
-} derive(Eq)
+}
 pub fn GraphControlKind::equal(Self, Self) -> Bool
 pub fn GraphControlKind::not_equal(Self, Self) -> Bool
 
@@ -323,10 +334,10 @@ pub fn GraphDocument::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : A
 pub fn GraphDocument::index_map(Self) -> GraphIndexMap
 pub fn GraphDocument::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, GraphTopologyInputSlot, Array[DspNode]) -> Self raise GraphDocumentError
 pub fn GraphDocument::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, DspNode) -> Self raise GraphDocumentError
-pub fn GraphDocument::length(Self) -> Int
+pub fn GraphDocument::length(Self) -> Int32
 pub fn GraphDocument::node_at(Self, @identity.GraphNodeId) -> DspNode?
-pub fn GraphDocument::node_id_at(Self, Int) -> @identity.GraphNodeId?
-pub fn GraphDocument::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphDocument::node_id_at(Self, Int32) -> @identity.GraphNodeId?
+pub fn GraphDocument::node_index(Self, @identity.GraphNodeId) -> Int32?
 pub fn GraphDocument::nodes(Self) -> Array[DspNode]
 pub fn GraphDocument::replace_node(Self, @identity.GraphNodeId, DspNode) -> Self raise GraphDocumentError
 pub fn GraphDocument::revision(Self) -> @identity.Revision
@@ -342,21 +353,22 @@ pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> GraphControl?
 pub fn GraphIndexMap::gate_on(Self, @identity.GraphNodeId) -> GraphControl?
 pub fn GraphIndexMap::insert_chain(Self, @identity.GraphNodeId, GraphTopologyInputSlot, Array[DspNode]) -> GraphTopologyEdit?
 pub fn GraphIndexMap::insert_node(Self, @identity.GraphNodeId, GraphTopologyInputSlot, DspNode) -> GraphTopologyEdit?
-pub fn GraphIndexMap::length(Self) -> Int
-pub fn GraphIndexMap::node_id_at(Self, Int) -> @identity.GraphNodeId?
-pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphIndexMap::length(Self) -> Int32
+pub fn GraphIndexMap::node_id_at(Self, Int32) -> @identity.GraphNodeId?
+pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int32?
 pub fn GraphIndexMap::replace_node(Self, @identity.GraphNodeId, DspNode) -> GraphTopologyEdit?
 pub fn GraphIndexMap::revision(Self) -> @identity.Revision
 pub fn GraphIndexMap::rewire_input(Self, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
 pub fn GraphIndexMap::set_param(Self, @identity.GraphNodeId, GraphParamSlot, Double) -> GraphControl?
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GraphParamSlot {
   Value0
   Value1
   Value2
   Value3
   DelaySamples
-} derive(Eq, @debug.Debug)
+}
 pub fn GraphParamSlot::equal(Self, Self) -> Bool
 pub fn GraphParamSlot::not_equal(Self, Self) -> Bool
 pub fn GraphParamSlot::output(Self, &Logger) -> Unit
@@ -365,65 +377,69 @@ pub fn GraphParamSlot::to_string(Self) -> String
 pub impl Show for GraphParamSlot
 
 pub(all) enum GraphTopologyEdit {
-  ReplaceNode(Int, DspNode)
-  RewireInput(Int, GraphTopologyInputSlot, Int)
-  InsertNode(Int, GraphTopologyInputSlot, DspNode)
-  DeleteNode(Int, Int, GraphTopologyInputSlot, Int)
-  InsertChain(Int, GraphTopologyInputSlot, Array[DspNode])
-  DeleteChain(Int, Int, Int, GraphTopologyInputSlot, Int)
+  ReplaceNode(Int32, DspNode)
+  RewireInput(Int32, GraphTopologyInputSlot, Int32)
+  InsertNode(Int32, GraphTopologyInputSlot, DspNode)
+  DeleteNode(Int32, Int32, GraphTopologyInputSlot, Int32)
+  InsertChain(Int32, GraphTopologyInputSlot, Array[DspNode])
+  DeleteChain(Int32, Int32, Int32, GraphTopologyInputSlot, Int32)
 }
-pub fn GraphTopologyEdit::delete_chain(Int, Int, Int, GraphTopologyInputSlot, Int) -> Self
-pub fn GraphTopologyEdit::delete_node(Int, Int, GraphTopologyInputSlot, Int) -> Self
-pub fn GraphTopologyEdit::insert_chain(Int, GraphTopologyInputSlot, Array[DspNode]) -> Self
-pub fn GraphTopologyEdit::insert_node(Int, GraphTopologyInputSlot, DspNode) -> Self
-pub fn GraphTopologyEdit::replace_node(Int, DspNode) -> Self
-pub fn GraphTopologyEdit::rewire_input(Int, GraphTopologyInputSlot, Int) -> Self
+pub fn GraphTopologyEdit::delete_chain(Int32, Int32, Int32, GraphTopologyInputSlot, Int32) -> Self
+pub fn GraphTopologyEdit::delete_node(Int32, Int32, GraphTopologyInputSlot, Int32) -> Self
+pub fn GraphTopologyEdit::insert_chain(Int32, GraphTopologyInputSlot, Array[DspNode]) -> Self
+pub fn GraphTopologyEdit::insert_node(Int32, GraphTopologyInputSlot, DspNode) -> Self
+pub fn GraphTopologyEdit::replace_node(Int32, DspNode) -> Self
+pub fn GraphTopologyEdit::rewire_input(Int32, GraphTopologyInputSlot, Int32) -> Self
 
+#derive(@debug.Debug)
 pub(all) enum GraphTopologyEditError {
-  InvalidNodeIndex(Int)
-  InvalidSourceIndex(Int)
-  UnsupportedInputSlot(Int, GraphTopologyInputSlot, DspNodeKind)
+  InvalidNodeIndex(Int32)
+  InvalidSourceIndex(Int32)
+  UnsupportedInputSlot(Int32, GraphTopologyInputSlot, DspNodeKind)
   UnsupportedInsertTemplate(DspNodeKind)
   EmptyInsertChain
-  UnsupportedChainNode(Int, DspNodeKind)
-  InvalidDeleteRange(Int, Int)
-  ReplacementSourceInDeletedRange(Int)
-  DeleteNodeRequiresUnary(Int, DspNodeKind)
-  DeleteNodeRequiresSingleConsumer(Int)
-  DeleteNodeConsumerMismatch(Int, Int)
-  DeleteChainRequiresUnary(Int, DspNodeKind)
-  DeleteChainRequiresSingleConsumer(Int)
-  DeleteChainConsumerMismatch(Int, Int, Int)
-} derive(@debug.Debug)
+  UnsupportedChainNode(Int32, DspNodeKind)
+  InvalidDeleteRange(Int32, Int32)
+  ReplacementSourceInDeletedRange(Int32)
+  DeleteNodeRequiresUnary(Int32, DspNodeKind)
+  DeleteNodeRequiresSingleConsumer(Int32)
+  DeleteNodeConsumerMismatch(Int32, Int32)
+  DeleteChainRequiresUnary(Int32, DspNodeKind)
+  DeleteChainRequiresSingleConsumer(Int32)
+  DeleteChainConsumerMismatch(Int32, Int32, Int32)
+}
 pub fn GraphTopologyEditError::output(Self, &Logger) -> Unit
 pub fn GraphTopologyEditError::to_repr(Self) -> @debug.Repr
 pub fn GraphTopologyEditError::to_string(Self) -> String
 pub impl Show for GraphTopologyEditError
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GraphTopologyInputSlot {
   Input0
   Input1
-} derive(Eq, @debug.Debug)
+}
 pub fn GraphTopologyInputSlot::equal(Self, Self) -> Bool
 pub fn GraphTopologyInputSlot::not_equal(Self, Self) -> Bool
 pub fn GraphTopologyInputSlot::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub(all) enum GraphTopologyQueueError {
   PendingSwap
-  InvalidEdit(Int, GraphTopologyEditError)
+  InvalidEdit(Int32, GraphTopologyEditError)
   RecompileRejected
   HotSwap(HotSwapQueueError)
-} derive(@debug.Debug)
+}
 pub fn GraphTopologyQueueError::output(Self, &Logger) -> Unit
 pub fn GraphTopologyQueueError::to_repr(Self) -> @debug.Repr
 pub fn GraphTopologyQueueError::to_string(Self) -> String
 pub impl Show for GraphTopologyQueueError
 
+#derive(Eq, @debug.Debug)
 pub(all) enum GraphValidationError {
-  InvalidInput0(Int, Int, Int)
-  InvalidInput1(Int, Int, Int)
-  InvalidStateIndex(Int, String)
-} derive(Eq, @debug.Debug)
+  InvalidInput0(Int32, Int32, Int32)
+  InvalidInput1(Int32, Int32, Int32)
+  InvalidStateIndex(Int32, String)
+}
 pub fn GraphValidationError::equal(Self, Self) -> Bool
 pub fn GraphValidationError::not_equal(Self, Self) -> Bool
 pub fn GraphValidationError::output(Self, &Logger) -> Unit
@@ -431,10 +447,11 @@ pub fn GraphValidationError::to_repr(Self) -> @debug.Repr
 pub fn GraphValidationError::to_string(Self) -> String
 pub impl Show for GraphValidationError
 
+#derive(@debug.Debug)
 pub(all) enum HotSwapQueueError {
   SampleRateMismatch(Double, Double)
-  BlockCapacityMismatch(Int, Int)
-} derive(@debug.Debug)
+  BlockCapacityMismatch(Int32, Int32)
+}
 pub fn HotSwapQueueError::output(Self, &Logger) -> Unit
 pub fn HotSwapQueueError::to_repr(Self) -> @debug.Repr
 pub fn HotSwapQueueError::to_string(Self) -> String
@@ -447,13 +464,13 @@ pub fn StereoDsp::compile(AnalyzedGraph, @dsp.DspContext) -> Self?
 pub fn StereoDsp::compile_result(AnalyzedGraph, @dsp.DspContext) -> Result[Self, GraphCompileError]
 pub fn StereoDsp::disable_debug_validation(Self) -> Unit
 pub fn StereoDsp::enable_debug_validation(Self) -> Unit
-pub fn StereoDsp::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn StereoDsp::gate_on(Self, Int) -> Result[Unit, GraphControlError]
+pub fn StereoDsp::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn StereoDsp::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::has_feedback_edges(Self) -> Bool
-pub fn StereoDsp::last_sanitized_count(Self) -> Int
+pub fn StereoDsp::last_sanitized_count(Self) -> Int32
 pub fn StereoDsp::last_validation_errors(Self) -> Array[GraphValidationError]
 pub fn StereoDsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn StereoDsp::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn StereoDsp::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub fn StereoDsp::validate_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for StereoDsp
 pub impl GraphDebuggable for StereoDsp
@@ -461,31 +478,32 @@ pub impl GraphDebuggable for StereoDsp
 type StereoDspHotSwap
 pub fn StereoDspHotSwap::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn StereoDspHotSwap::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn StereoDspHotSwap::from_graph(StereoDsp, crossfade_samples? : Int) -> Self
-pub fn StereoDspHotSwap::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn StereoDspHotSwap::gate_on(Self, Int) -> Result[Unit, GraphControlError]
+pub fn StereoDspHotSwap::from_graph(StereoDsp, crossfade_samples? : Int32) -> Self
+pub fn StereoDspHotSwap::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn StereoDspHotSwap::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
 pub fn StereoDspHotSwap::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDspHotSwap::queue_swap(Self, StereoDsp) -> Result[Unit, HotSwapQueueError]
-pub fn StereoDspHotSwap::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn StereoDspHotSwap::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for StereoDspHotSwap
 
 type StereoDspTopologyController
 pub fn StereoDspTopologyController::apply_control(Self, GraphControl) -> Result[Unit, GraphControlError]
 pub fn StereoDspTopologyController::apply_controls(Self, Array[GraphControl]) -> Result[Unit, GraphControlError]
-pub fn StereoDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int) -> Self?
-pub fn StereoDspTopologyController::gate_off(Self, Int) -> Result[Unit, GraphControlError]
-pub fn StereoDspTopologyController::gate_on(Self, Int) -> Result[Unit, GraphControlError]
+pub fn StereoDspTopologyController::from_nodes(Array[DspNode], @dsp.DspContext, crossfade_samples? : Int32) -> Self?
+pub fn StereoDspTopologyController::gate_off(Self, Int32) -> Result[Unit, GraphControlError]
+pub fn StereoDspTopologyController::gate_on(Self, Int32) -> Result[Unit, GraphControlError]
 pub fn StereoDspTopologyController::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn StereoDspTopologyController::queue_topology_edit(Self, GraphTopologyEdit) -> Result[Unit, GraphTopologyQueueError]
 pub fn StereoDspTopologyController::queue_topology_edits(Self, Array[GraphTopologyEdit]) -> Result[Unit, GraphTopologyQueueError]
-pub fn StereoDspTopologyController::set_param(Self, Int, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
+pub fn StereoDspTopologyController::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]
 pub impl GraphControllable for StereoDspTopologyController
 
+#derive(Eq, @debug.Debug)
 pub(all) enum VoiceParam {
   Gain
   Pan
   Send
-} derive(Eq, @debug.Debug)
+}
 pub fn VoiceParam::equal(Self, Self) -> Bool
 pub fn VoiceParam::not_equal(Self, Self) -> Bool
 pub fn VoiceParam::to_repr(Self) -> @debug.Repr
@@ -515,7 +533,7 @@ pub(open) trait NodeFoldable : NodeSpanning {
 }
 
 pub(open) trait NodeSpanning {
-  fn signal_shape(Self) -> Int
+  fn signal_shape(Self) -> Int32
 }
 
 pub(open) trait NodeStateful : NodeSpanning {

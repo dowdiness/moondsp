@@ -27,12 +27,12 @@ pub fn create_draft(
 ///|
 fn state_json(state : @mini.DraftState) -> Json {
   let diagnostic : Json = match state.diagnostic() {
-    Some(error) => error.message().to_json()
+    Some(error) => Json(error.message())
     None => Json::null()
   }
   {
-    "text": state.text().to_json(),
-    "version": state.version().to_json(),
+    "text": Json(state.text()),
+    "version": Json(state.version()),
     "diagnostic": diagnostic,
   }
 }
@@ -69,7 +69,7 @@ fn decode_transaction(
     raise InvalidEdit("invalid edit transaction")
   }
   let version = draft.state().version()
-  guard base == version.to_json() else {
+  guard base == Json(version) else {
     raise InvalidEdit("stale draft version")
   }
   let decoded = edits.map(edit => {
@@ -96,10 +96,10 @@ pub fn edit_draft(draft : @mini.Draft, transaction : String) -> String {
     let transaction = decode_transaction(draft, transaction)
     match draft.edit(transaction) {
       Ok(state) => { "ok": true, "state": state_json(state) }
-      Err(error) => { "ok": false, "message": "\{Repr(error)}".to_json() }
+      Err(error) => { "ok": false, "message": Json("\{Repr(error)}") }
     }
   } catch {
-    InvalidEdit(message) => { "ok": false, "message": message.to_json() }
+    InvalidEdit(message) => { "ok": false, "message": Json(message) }
   }
   result.stringify()
 }
@@ -107,8 +107,8 @@ pub fn edit_draft(draft : @mini.Draft, transaction : String) -> String {
 ///|
 pub fn prepare_playback(draft : @mini.Draft) -> String {
   let result : Json = match draft.prepare_playback() {
-    Ok(input) => { "ok": true, "input": input.encode_wire().to_json() }
-    Err(error) => { "ok": false, "message": error.message().to_json() }
+    Ok(input) => { "ok": true, "input": Json(input.encode_wire()) }
+    Err(error) => { "ok": false, "message": Json(error.message()) }
   }
   result.stringify()
 }
@@ -122,9 +122,9 @@ pub fn dispose_draft(draft : @mini.Draft) -> Unit {
 fn projection_atom_index(nodes : Array[Json], start : Int, end_ : Int) -> Int? {
   for index, node in nodes {
     if node is Object(fields) &&
-      fields.get("kind") == Some("atom".to_json()) &&
-      fields.get("from") == Some(start.to_json()) &&
-      fields.get("baseTo") == Some(end_.to_json()) {
+      fields.get("kind") == Some(Json("atom")) &&
+      fields.get("from") == Some(Json(start)) &&
+      fields.get("baseTo") == Some(Json(end_)) {
       return Some(index)
     }
   }
@@ -135,8 +135,8 @@ fn projection_atom_index(nodes : Array[Json], start : Int, end_ : Int) -> Int? {
 fn notation_projection_is_rest(nodes : Array[Json], index : Int) -> Bool {
   match nodes.get(index) {
     Some(Object(fields)) =>
-      fields.get("kind") == Some("atom".to_json()) &&
-      fields.get("value") == Some("~".to_json())
+      fields.get("kind") == Some(Json("atom")) &&
+      fields.get("value") == Some(Json("~"))
     _ => false
   }
 }
@@ -225,14 +225,14 @@ fn notation_projection_events(
               Json::null()
             } else {
               match event.value.get("note") {
-                Some(value) => value.to_json()
+                Some(value) => Json(value)
                 None => raise InvalidEdit("compiled note event has no pitch")
               }
             }
             projected.push({
-              "node": node.to_json(),
-              "start": start.to_json(),
-              "end": whole.end_.to_double().to_json(),
+              "node": Json(node),
+              "start": Json(start),
+              "end": Json(whole.end_.to_double()),
               "pitch": pitch,
             })
           }
@@ -364,7 +364,7 @@ fn notation_projection_json(
       "nodes": Json::array(nodes),
       "events": Json::array(events),
       "rests": Json::array(rests),
-      "span": span_value.to_json(),
+      "span": Json(span_value),
     }
   } catch {
     InvalidEdit(message) => {
@@ -382,7 +382,7 @@ pub fn project_notation(kind : String, content : String) -> String {
   let result : Json = notation_projection_json(kind, content) catch {
     InvalidEdit(message) =>
       {
-        "error": message.to_json(),
+        "error": Json(message),
         "roots": Json::array([]),
         "nodes": Json::array([]),
         "events": Json::array([]),
@@ -410,7 +410,7 @@ fn onset_wire_integer(value : Json) -> Int64? {
 
 ///|
 fn source_range_json(range : @mini.SourceRange) -> Json {
-  { "from": range.start().to_json(), "to": range.end().to_json() }
+  { "from": Json(range.start()), "to": Json(range.end()) }
 }
 
 ///|
@@ -461,17 +461,17 @@ pub fn locate_onsets(draft : @mini.Draft, wire : String) -> String {
           match draft.locate_frame_fields(epoch, frame_serial) {
             Some(range) =>
               {
-                "from": range.start().to_json(),
-                "to": range.end().to_json(),
-                "start": local_start.to_json(),
+                "from": Json(range.start()),
+                "to": Json(range.end()),
+                "start": Json(local_start),
                 "pitch": fields[5],
               }
             None => Json::null()
           }
         }
         resolved.push({
-          "from": atom.start().to_json(),
-          "to": atom.end().to_json(),
+          "from": Json(atom.start()),
+          "to": Json(atom.end()),
           "references": Json::array(references.map(source_range_json)),
           "notation": notation,
         })

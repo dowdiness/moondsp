@@ -10,7 +10,7 @@ step() {
 }
 
 # Match the toolchain CI pins so dependencies and warnings resolve the same way.
-moonbit_version='0.10.14+7d59c7ec9'
+moonbit_version='0.10.21+06da1ed44'
 # The installer replaces lib/core after the binaries, so an interrupted install
 # can leave the right moonc without core; require all three before skipping.
 if ! { [[ -x "$HOME/.moon/bin/moon" && -f "$HOME/.moon/lib/core/moon.mod" ]] &&

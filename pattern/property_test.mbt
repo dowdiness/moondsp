@@ -1,6 +1,6 @@
 ///|
 fn r_prop(num : Int, den : Int) -> @pattern.Rational {
-  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(num.to_int64(), den.to_int64())
 }
 
 ///|
@@ -73,7 +73,7 @@ test "prop: slow(n, pat) == fast(1/n, pat)" {
     fn(n_raw : Int) {
       let n_val = n_raw.abs() % 7 + 1
       let n = @pattern.Rational::from_int(n_val)
-      let inv_n = @pattern.Rational(1L, Int64::from_int(n_val))
+      let inv_n = @pattern.Rational(1L, n_val.to_int64())
       let pat = @pattern.Pat::pure(42)
       let lhs = pat.slow(n)
       let rhs = pat.fast(inv_n)

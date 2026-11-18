@@ -6,10 +6,11 @@ import {
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
-pub fn drum_midi(String) -> Int?
+pub fn drum_midi(String) -> Int32?
 
 pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
@@ -23,15 +24,16 @@ pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
 
 pub fn parse_song_with_bpm(String) -> Result[ParsedSong, String]
 
-pub fn project_notation_nodes(String, String) -> Result[Json, String]
+pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror DraftEditError {
   WrongBase
   InvalidEdit(String)
   IdentityExhausted
   Disposed
-} derive(Eq, @debug.Debug)
+}
 pub fn DraftEditError::equal(Self, Self) -> Bool
 pub fn DraftEditError::not_equal(Self, Self) -> Bool
 pub fn DraftEditError::to_repr(Self) -> @debug.Repr
@@ -50,9 +52,10 @@ pub fn Draft::prepare_playback(Self) -> Result[PlaybackInput, DraftDiagnostic]
 pub fn Draft::reset(Self, String) -> Result[DraftState, DraftEditError]
 pub fn Draft::state(Self) -> DraftState
 
+#derive(Eq, @debug.Debug)
 pub struct DraftDiagnostic {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn DraftDiagnostic::equal(Self, Self) -> Bool
 pub fn DraftDiagnostic::kind(Self) -> DraftDiagnosticKind
 pub fn DraftDiagnostic::message(Self) -> String
@@ -60,12 +63,13 @@ pub fn DraftDiagnostic::not_equal(Self, Self) -> Bool
 pub fn DraftDiagnostic::to_repr(Self) -> @debug.Repr
 pub fn DraftDiagnostic::version(Self) -> DraftVersion
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
   CompilerContract
   Disposed
-} derive(Eq, @debug.Debug)
+}
 pub fn DraftDiagnosticKind::equal(Self, Self) -> Bool
 pub fn DraftDiagnosticKind::not_equal(Self, Self) -> Bool
 pub fn DraftDiagnosticKind::to_repr(Self) -> @debug.Repr
@@ -78,24 +82,26 @@ pub fn DraftState::text(Self) -> String
 pub fn DraftState::tracking(Self) -> DraftTracking
 pub fn DraftState::version(Self) -> DraftVersion
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DraftTracking {
   Pattern
   Song
   TrackingUnavailable
   Disposed
-} derive(Eq, @debug.Debug)
+}
 pub fn DraftTracking::equal(Self, Self) -> Bool
 pub fn DraftTracking::not_equal(Self, Self) -> Bool
 pub fn DraftTracking::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct DraftVersion {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn DraftVersion::equal(Self, Self) -> Bool
 pub fn DraftVersion::not_equal(Self, Self) -> Bool
-pub fn DraftVersion::to_json(Self) -> Json
+pub fn DraftVersion::to_json(Self) -> @json.Json
 pub fn DraftVersion::to_repr(Self) -> @debug.Repr
-pub impl ToJson for DraftVersion
+pub impl @json.ToJson for DraftVersion
 
 pub struct EditTransaction {
   // private fields
@@ -107,9 +113,9 @@ pub struct MiniDocBuilder {
 }
 pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::control(Self, @pattern.PatternDoc[@pattern.ControlMap], String, Double) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc[@pattern.ControlMap], Double, step? : Int) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc[@pattern.ControlMap], Int, Int, Int) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::every(Self, @pattern.PatternDoc[@pattern.ControlMap], Int, @pattern.TimeTransform) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc[@pattern.ControlMap], Double, step? : Int32) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc[@pattern.ControlMap], Int32, Int32, Int32) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn MiniDocBuilder::every(Self, @pattern.PatternDoc[@pattern.ControlMap], Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::jux(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.TimeTransform) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
@@ -120,19 +126,21 @@ pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Resu
 pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum OriginLocation {
   Located(SourceRange, Array[SourceRange])
   Unavailable(OriginUnavailable)
-} derive(Eq, @debug.Debug)
+}
 pub fn OriginLocation::equal(Self, Self) -> Bool
 pub fn OriginLocation::not_equal(Self, Self) -> Bool
 pub fn OriginLocation::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum OriginUnavailable {
   SourceReset
   AtomRetired
   BrokenReference
-} derive(Eq, @debug.Debug)
+}
 pub fn OriginUnavailable::equal(Self, Self) -> Bool
 pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
 pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
@@ -170,19 +178,20 @@ pub(all) enum PreparedPlayback {
   Runtime(PlaySource)
 }
 
+#derive(Eq, @debug.Debug)
 pub struct SourceRange {
   // private fields
-} derive(Eq, @debug.Debug)
-pub fn SourceRange::end(Self) -> Int
+}
+pub fn SourceRange::end(Self) -> Int32
 pub fn SourceRange::equal(Self, Self) -> Bool
 pub fn SourceRange::not_equal(Self, Self) -> Bool
-pub fn SourceRange::start(Self) -> Int
+pub fn SourceRange::start(Self) -> Int32
 pub fn SourceRange::to_repr(Self) -> @debug.Repr
 
 pub struct TextEdit {
   // private fields
 }
-pub fn TextEdit::TextEdit(from~ : Int, to~ : Int, inserted~ : String) -> Self
+pub fn TextEdit::TextEdit(from~ : Int32, to~ : Int32, inserted~ : String) -> Self
 
 // Type aliases
 

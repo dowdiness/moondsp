@@ -156,7 +156,7 @@ pub async fn EngineLifetime::wait(self : EngineLifetime) -> EngineExit {
 /// closes the caller's AudioContext. Native rejection is a structured Result.
 pub async fn EngineLifetime::close(
   self : EngineLifetime,
-) -> Result[Unit, RuntimeFailure] {
+) -> Result[Unit, RuntimeFailure] nocancel {
   @async.protect_from_cancel(() => {
     let outcome = native_close(self.native).wait()
     if close_ok(outcome) {

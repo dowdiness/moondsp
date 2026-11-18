@@ -9,20 +9,22 @@ import {
 // Values
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror TransportError {
   InvalidTempo
   InvalidSampleRate
   TimeOutOfRange
-} derive(Eq, @debug.Debug)
+}
 pub fn TransportError::equal(Self, Self) -> Bool
 pub fn TransportError::not_equal(Self, Self) -> Bool
 pub fn TransportError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct Clock {
   // private fields
-} derive(Eq, @debug.Debug)
-pub fn Clock::advance(Self, Int) -> Result[Self, TransportError]
+}
+pub fn Clock::advance(Self, Int32) -> Result[Self, TransportError]
 pub fn Clock::at_start(Tempo, Double) -> Result[Self, TransportError]
 pub fn Clock::cycle_position(Self) -> Double
 pub fn Clock::equal(Self, Self) -> Bool
@@ -35,9 +37,10 @@ pub fn Clock::tempo(Self) -> Tempo
 pub fn Clock::to_repr(Self) -> @debug.Repr
 pub fn Clock::with_tempo(Self, Tempo) -> Self
 
+#derive(Eq, @debug.Debug)
 pub struct Tempo {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn Tempo::bpm(Self) -> Double
 pub fn Tempo::equal(Self, Self) -> Bool
 pub fn Tempo::from_bpm(Double) -> Result[Self, TransportError]

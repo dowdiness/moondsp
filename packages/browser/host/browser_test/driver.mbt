@@ -45,9 +45,10 @@ extern "js" fn abort_notification(
   #| })
 
 ///|
-/// async 0.21.3's from_async abort handler cancels without rescheduling the JS
-/// event loop. Deliver external abort through a Promise, then cancel the scope
-/// inside that loop. No polling, private scheduler API, or dependency patch.
+/// async's from_async abort handler (0.21.3 through 0.22.9) cancels without
+/// rescheduling the JS event loop. Deliver external abort through a Promise,
+/// then cancel the scope inside that loop. No polling, private scheduler API,
+/// or dependency patch.
 fn export_with_signal(
   signal : @js_async.AbortSignal,
   action : async () -> JsValue,

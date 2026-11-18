@@ -286,6 +286,14 @@ For multi-project workspaces (monorepos with multiple `moon.mod.json`):
 - **`MOON_WORK` env var:** Override the `moon.work` location, or set `MOON_WORK=off` to disable workspace behavior for a single invocation.
 - **Manifest migration:** This repository already maintains `moon.mod` by hand. Do not enable automatic manifest migration; follow the `NEW_MOON_MOD=0` policy in [the project guide](../CLAUDE.md#commands-and-verification).
 
+### Toolchain 0.10.21 idioms
+
+Since `0.10.21`, `ToJson` lives in `@json`, so primitives have no `.to_json()`
+method: write `Json(value)`. Write `Ref(value)`, `n.to_int64()`, and
+`n.to_double()` instead of the deprecated `@ref.new`, `Int64::from_int`, and
+`Double::from_int`. The packages whose existing `Result`-returning APIs are
+deliberate disable `result_error_return` in their own `moon.pkg`.
+
 ### Explicit trait methods
 
 MoonBit v0.10.14 warns when trait methods are promoted implicitly. Preserve

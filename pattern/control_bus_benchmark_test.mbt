@@ -26,8 +26,8 @@ test "bench/control_bus/per_block" (b : @bench.T) {
   let snapshot = doc.lower() catch { _ => abort("lower") }
   let arcs = Array::makei(750, n => {
     @pattern.TimeSpan(
-      @pattern.Rational(Int64::from_int(n * 128), 48000L),
-      @pattern.Rational(Int64::from_int((n + 1) * 128), 48000L),
+      @pattern.Rational((n * 128).to_int64(), 48000L),
+      @pattern.Rational(((n + 1) * 128).to_int64(), 48000L),
     )
   })
   b.bench(name="block query with bus bindings", () => {

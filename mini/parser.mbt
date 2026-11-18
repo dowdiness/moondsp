@@ -410,7 +410,7 @@ fn parse_decimal_rational(
   }
   let mut whole = 0L
   for index in digits_start..<point {
-    let digit = Int64::from_int(input[index].to_int() - '0'.to_int())
+    let digit = (input[index].to_int() - '0'.to_int()).to_int64()
     guard whole <= (9223372036854775807L - digit) / 10L else {
       raise ParseError(
         "position \{error_position}: decimal factor exceeds exact rational range",
@@ -437,7 +437,7 @@ fn parse_decimal_rational(
   for index in (point + 1)..<fractional_end {
     denominator *= 10L
     fractional = fractional * 10L +
-      Int64::from_int(input[index].to_int() - '0'.to_int())
+      (input[index].to_int() - '0'.to_int()).to_int64()
   }
   guard whole <= (9223372036854775807L - fractional) / denominator else {
     raise ParseError(

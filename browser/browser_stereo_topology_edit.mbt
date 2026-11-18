@@ -1,5 +1,5 @@
 ///|
-let stereo_topo_edit_level : @ref.Ref[Double] = @ref.new(1.0)
+let stereo_topo_edit_level : @ref.Ref[Double] = Ref(1.0)
 
 ///|
 let compiled_stereo_topology_edit : GraphSlot[

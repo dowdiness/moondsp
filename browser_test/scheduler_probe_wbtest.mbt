@@ -1,6 +1,6 @@
 ///|
 fn scheduler_probe_eval_pattern_for_test(text : String) -> Int {
-  let input : Json = { "schema": 1, "kind": "text", "text": text.to_json() }
+  let input : Json = { "schema": 1, "kind": "text", "text": Json(text) }
   let wire = input.stringify()
   clear_playback_input()
   for i in 0..<wire.length() {

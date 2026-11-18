@@ -31,7 +31,7 @@ ALLOWED_PATTERNS=(
   "^pub fn GraphDocument::insert_chain\("
   "^pub fn GraphIndexMap::insert_chain\("
   "^pub fn GraphTopologyEdit::insert_chain\("
-  "^  InsertChain\(Int, GraphTopologyInputSlot, ${DSPN}\)"
+  "^  InsertChain\(Int32, GraphTopologyInputSlot, ${DSPN}\)"
 )
 
 # Public mbti files audited by this script. The list is intentionally

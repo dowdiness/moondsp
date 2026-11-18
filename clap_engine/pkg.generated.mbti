@@ -8,25 +8,26 @@ import {
 }
 
 // Values
-pub const CLAP_PARAM_CUTOFF_HZ : Int = 2
+pub const CLAP_PARAM_CUTOFF_HZ : Int32 = 2
 
-pub const CLAP_PARAM_MASTER_GAIN : Int = 0
+pub const CLAP_PARAM_MASTER_GAIN : Int32 = 0
 
-pub const CLAP_PARAM_PAN : Int = 4
+pub const CLAP_PARAM_PAN : Int32 = 4
 
-pub const CLAP_PARAM_RESONANCE : Int = 3
+pub const CLAP_PARAM_RESONANCE : Int32 = 3
 
-pub const CLAP_PARAM_VOICE_GAIN : Int = 1
+pub const CLAP_PARAM_VOICE_GAIN : Int32 = 1
 
 pub fn default_synth_template() -> Array[@graph.DspNode]
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror ClapEngineError {
   InvalidSampleRate
   InvalidMaxBlockSize
   InvalidMaxVoices
   PoolInitFailed(@voice.BoundVoicePoolError)
-} derive(Eq, @debug.Debug)
+}
 pub fn ClapEngineError::equal(Self, Self) -> Bool
 pub fn ClapEngineError::not_equal(Self, Self) -> Bool
 pub fn ClapEngineError::output(Self, &Logger) -> Unit
@@ -38,21 +39,21 @@ pub impl Show for ClapEngineError
 pub struct ClapSynthEngine {
   // private fields
 }
-pub fn ClapSynthEngine::ClapSynthEngine(sample_rate? : Double, max_block_size? : Int, max_voices? : Int) -> Self raise ClapEngineError
+pub fn ClapSynthEngine::ClapSynthEngine(sample_rate? : Double, max_block_size? : Int32, max_voices? : Int32) -> Self raise ClapEngineError
 pub fn ClapSynthEngine::all_notes_off(Self) -> Unit
 pub fn ClapSynthEngine::cutoff_hz(Self) -> Double
-pub fn ClapSynthEngine::left_sample(Self, Int) -> Double
+pub fn ClapSynthEngine::left_sample(Self, Int32) -> Double
 pub fn ClapSynthEngine::master_gain(Self) -> Double
-pub fn ClapSynthEngine::note_off(Self, note_id~ : Int, key~ : Int) -> Bool
-pub fn ClapSynthEngine::note_on(Self, note_id~ : Int, key~ : Int, velocity~ : Double) -> Bool
+pub fn ClapSynthEngine::note_off(Self, note_id~ : Int32, key~ : Int32) -> Bool
+pub fn ClapSynthEngine::note_on(Self, note_id~ : Int32, key~ : Int32, velocity~ : Double) -> Bool
 pub fn ClapSynthEngine::pan(Self) -> Double
-pub fn ClapSynthEngine::process(Self, Int) -> Int
+pub fn ClapSynthEngine::process(Self, Int32) -> Int32
 pub fn ClapSynthEngine::resonance(Self) -> Double
-pub fn ClapSynthEngine::right_sample(Self, Int) -> Double
+pub fn ClapSynthEngine::right_sample(Self, Int32) -> Double
 pub fn ClapSynthEngine::set_cutoff_hz(Self, Double) -> Double
 pub fn ClapSynthEngine::set_master_gain(Self, Double) -> Double
 pub fn ClapSynthEngine::set_pan(Self, Double) -> Double
-pub fn ClapSynthEngine::set_param(Self, Int, Double) -> Bool
+pub fn ClapSynthEngine::set_param(Self, Int32, Double) -> Bool
 pub fn ClapSynthEngine::set_resonance(Self, Double) -> Double
 pub fn ClapSynthEngine::set_voice_gain(Self, Double) -> Double
 pub fn ClapSynthEngine::voice_gain(Self) -> Double

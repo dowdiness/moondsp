@@ -1598,7 +1598,7 @@ test "notation projection retains nested source spans and postfix order" {
     fail("expected notation source projection")
   }
   let groups = nodes.filter(node => {
-    node is Object(fields) && fields.get("kind") == Some("group".to_json())
+    node is Object(fields) && fields.get("kind") == Some(Json("group"))
   })
   guard groups is [Object(group)] &&
     group.get("from") == Some(Json::number(0.0)) &&
@@ -1609,20 +1609,20 @@ test "notation projection retains nested source spans and postfix order" {
   }
   assert_eq(modifiers.length(), 4)
   guard modifiers[0] is Object(first_modifier) &&
-    first_modifier.get("kind") == Some("repeat".to_json()) &&
+    first_modifier.get("kind") == Some(Json("repeat")) &&
     modifiers[1] is Object(second_modifier) &&
-    second_modifier.get("kind") == Some("slow".to_json()) &&
+    second_modifier.get("kind") == Some(Json("slow")) &&
     modifiers[2] is Object(third_modifier) &&
-    third_modifier.get("kind") == Some("degrade".to_json()) &&
+    third_modifier.get("kind") == Some(Json("degrade")) &&
     modifiers[3] is Object(fourth_modifier) &&
-    fourth_modifier.get("kind") == Some("weight".to_json()) else {
+    fourth_modifier.get("kind") == Some(Json("weight")) else {
     fail("expected source modifier order")
   }
 
   let rests = nodes.filter(node => {
     node is Object(fields) &&
-    fields.get("kind") == Some("atom".to_json()) &&
-    fields.get("value") == Some("~".to_json())
+    fields.get("kind") == Some(Json("atom")) &&
+    fields.get("value") == Some(Json("~"))
   })
   assert_eq(rests.length(), 1)
 }

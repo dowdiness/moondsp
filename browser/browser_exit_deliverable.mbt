@@ -22,13 +22,13 @@ const EXIT_BIQUAD_NODE : Int = 9
 const EXIT_GAIN_NODE : Int = 10
 
 ///|
-let exit_lfo_rate : @ref.Ref[Double] = @ref.new(2.0)
+let exit_lfo_rate : @ref.Ref[Double] = Ref(2.0)
 
 ///|
-let exit_cutoff : @ref.Ref[Double] = @ref.new(800.0)
+let exit_cutoff : @ref.Ref[Double] = Ref(800.0)
 
 ///|
-let exit_gain : @ref.Ref[Double] = @ref.new(0.3)
+let exit_gain : @ref.Ref[Double] = Ref(0.3)
 
 ///|
 let exit_deliverable : GraphSlot[@moondsp.Dsp, MonoOut] = GraphSlot(

@@ -887,7 +887,7 @@ fn exact_int_value(value : Double) -> Int? {
     return None
   }
   let int_value = value.to_int()
-  if Double::from_int(int_value) == value {
+  if int_value.to_double() == value {
     Some(int_value)
   } else {
     None

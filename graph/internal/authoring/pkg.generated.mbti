@@ -13,13 +13,14 @@ import {
 // Values
 
 // Errors
+#derive(@debug.Debug)
 pub(all) suberror GraphDocumentError {
-  LengthMismatch(Int, Int)
+  LengthMismatch(Int32, Int32)
   DuplicateNodeId(String)
   MissingNodeId(String)
   RetiredNodeId(String)
   Topology(@staging.GraphTopologyEditError)
-} derive(@debug.Debug)
+}
 pub fn GraphDocumentError::output(Self, &Logger) -> Unit
 pub fn GraphDocumentError::to_repr(Self) -> @debug.Repr
 pub fn GraphDocumentError::to_string(Self) -> String
@@ -38,10 +39,10 @@ pub fn GraphDocument::from_nodes(ids~ : Array[@identity.GraphNodeId], nodes~ : A
 pub fn GraphDocument::index_map(Self) -> GraphIndexMap
 pub fn GraphDocument::insert_chain(Self, Array[@identity.GraphNodeId], @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> Self raise GraphDocumentError
 pub fn GraphDocument::insert_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> Self raise GraphDocumentError
-pub fn GraphDocument::length(Self) -> Int
+pub fn GraphDocument::length(Self) -> Int32
 pub fn GraphDocument::node_at(Self, @identity.GraphNodeId) -> @model.DspNode?
-pub fn GraphDocument::node_id_at(Self, Int) -> @identity.GraphNodeId?
-pub fn GraphDocument::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphDocument::node_id_at(Self, Int32) -> @identity.GraphNodeId?
+pub fn GraphDocument::node_index(Self, @identity.GraphNodeId) -> Int32?
 pub fn GraphDocument::nodes(Self) -> Array[@model.DspNode]
 pub fn GraphDocument::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> Self raise GraphDocumentError
 pub fn GraphDocument::revision(Self) -> @identity.Revision
@@ -57,9 +58,9 @@ pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> @model.GraphContr
 pub fn GraphIndexMap::gate_on(Self, @identity.GraphNodeId) -> @model.GraphControl?
 pub fn GraphIndexMap::insert_chain(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, Array[@model.DspNode]) -> @staging.GraphTopologyEdit?
 pub fn GraphIndexMap::insert_node(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @model.DspNode) -> @staging.GraphTopologyEdit?
-pub fn GraphIndexMap::length(Self) -> Int
-pub fn GraphIndexMap::node_id_at(Self, Int) -> @identity.GraphNodeId?
-pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int?
+pub fn GraphIndexMap::length(Self) -> Int32
+pub fn GraphIndexMap::node_id_at(Self, Int32) -> @identity.GraphNodeId?
+pub fn GraphIndexMap::node_index(Self, @identity.GraphNodeId) -> Int32?
 pub fn GraphIndexMap::replace_node(Self, @identity.GraphNodeId, @model.DspNode) -> @staging.GraphTopologyEdit?
 pub fn GraphIndexMap::revision(Self) -> @identity.Revision
 pub fn GraphIndexMap::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?

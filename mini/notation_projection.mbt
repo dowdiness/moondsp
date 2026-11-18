@@ -1,28 +1,28 @@
 ///|
 fn projection_modifier_json(modifier : NotationProjectionModifier) -> Json {
   {
-    "kind": modifier.kind.to_json(),
-    "from": modifier.from.to_json(),
-    "to": modifier.to.to_json(),
-    "value": modifier.value.to_json(),
-    "args": Json::array(modifier.args.map(value => value.to_json())),
+    "kind": Json(modifier.kind),
+    "from": Json(modifier.from),
+    "to": Json(modifier.to),
+    "value": Json(modifier.value),
+    "args": Json::array(modifier.args.map(value => Json(value))),
   }
 }
 
 ///|
 fn projection_node_json(node : NotationProjectionNode) -> Json {
   {
-    "kind": node.kind.to_json(),
-    "from": node.from.to_json(),
-    "baseTo": node.base_to.to_json(),
-    "end": node.end.to_json(),
-    "value": node.value.to_json(),
+    "kind": Json(node.kind),
+    "from": Json(node.from),
+    "baseTo": Json(node.base_to),
+    "end": Json(node.end),
+    "value": Json(node.value),
     "parent": match node.parent {
-      Some(parent) => parent.to_json()
+      Some(parent) => Json(parent)
       None => Json::null()
     },
-    "children": Json::array(node.children.map(child => child.to_json())),
-    "weight": node.weight.to_json(),
+    "children": Json::array(node.children.map(child => Json(child))),
+    "weight": Json(node.weight),
     "modifiers": Json::array(node.modifiers.map(projection_modifier_json)),
   }
 }
@@ -76,8 +76,8 @@ pub fn project_notation_nodes(
     return Err("notation projection exceeds the bounded query budget")
   }
   Ok({
-    "roots": Json::array(roots.map(root => root.to_json())),
+    "roots": Json::array(roots.map(root => Json(root))),
     "nodes": Json::array(nodes.map(projection_node_json)),
-    "span": span.to_json(),
+    "span": Json(span),
   })
 }

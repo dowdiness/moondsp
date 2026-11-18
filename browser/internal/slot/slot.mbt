@@ -20,7 +20,7 @@ pub struct MonoOut {
 
 ///|
 pub fn MonoOut::MonoOut() -> MonoOut {
-  { buffer: @ref.new(None), }
+  { buffer: Ref(None), }
 }
 
 ///|
@@ -56,7 +56,7 @@ pub struct StereoOut {
 
 ///|
 pub fn StereoOut::StereoOut() -> StereoOut {
-  { left: @ref.new(None), right: @ref.new(None), }
+  { left: Ref(None), right: Ref(None), }
 }
 
 ///|
@@ -116,11 +116,11 @@ pub fn[T, O] GraphSlot::GraphSlot(
   compile~ : (@moondsp.DspContext) -> T?,
 ) -> GraphSlot[T, O] {
   {
-    graph: @ref.new(None),
-    context: @ref.new(None),
+    graph: Ref(None),
+    context: Ref(None),
     output,
-    sample_rate: @ref.new(0.0),
-    block_size: @ref.new(0),
+    sample_rate: Ref(0.0),
+    block_size: Ref(0),
     compile,
   }
 }

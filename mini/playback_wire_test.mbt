@@ -109,10 +109,10 @@ test "wire validates safe integers versions and input bounds" {
       fields.get("sourceMap") is Some(Object(sources)) else {
       fail("expected tracked input")
     }
-    fields["version"] = [invalid.to_json(), 0]
+    fields["version"] = [Json(invalid), 0]
     assert_true(@mini.PlaybackInput::decode_wire(json.stringify()) is Err(_))
     fields["version"] = version
-    sources["epoch"] = invalid.to_json()
+    sources["epoch"] = Json(invalid)
     assert_true(@mini.PlaybackInput::decode_wire(json.stringify()) is Err(_))
   }
   assert_true(

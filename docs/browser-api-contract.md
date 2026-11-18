@@ -265,7 +265,7 @@ perform browser admission.
 
 [`packages/browser/host`](../packages/browser/host/) is the separate MoonBit
 source module `dowdiness/moondsp-browser-host`, with preferred target `js` and
-`moonbitlang/async@0.21.3`. It is not imported by the DSP/Wasm module, and its
+`moonbitlang/async@0.22.9`. It is not imported by the DSP/Wasm module, and its
 test driver is not shipped in the `@moondsp/browser` npm tarball.
 
 Wrap the existing JavaScript engine handle in `EngineLifetime::EngineLifetime`.

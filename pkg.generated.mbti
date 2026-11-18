@@ -12,7 +12,7 @@ import {
 // Values
 pub fn apply_controls_to_voices(Array[(@voice.BoundVoicePool, @voice.VoiceHandle)], Array[@graph.GraphControl]) -> Result[Unit, @voice.VoiceControlError]
 
-pub fn effective_sample_count(@dsp.DspContext, @dsp.AudioBuffer) -> Int
+pub fn effective_sample_count(@dsp.DspContext, @dsp.AudioBuffer) -> Int32
 
 pub fn[T : @dsp.FilterSym] exit_deliverable() -> T
 
@@ -24,7 +24,7 @@ pub fn[T : @dsp.ArithSym] lin_map(T, Double, Double, Double, Double) -> T
 
 pub fn max_feedback_amount() -> Double
 
-pub fn mono_shape() -> Int
+pub fn mono_shape() -> Int32
 
 pub fn node_accepts_slot(@graph.DspNode, @graph.GraphParamSlot) -> Bool
 
@@ -36,9 +36,9 @@ pub fn[T : @dsp.ArithSym] range(T, Double, Double) -> T
 
 pub fn[T : @dsp.ArithSym + @dsp.DspSym + @dsp.FilterSym + @dsp.DelaySym + @dsp.StereoSym + @dsp.StereoFilterSym + @dsp.StereoDelaySym] replay(Array[@graph.DspNode]) -> T?
 
-pub fn sanitize_buffer(@dsp.AudioBuffer, Int) -> Int
+pub fn sanitize_buffer(@dsp.AudioBuffer, Int32) -> Int32
 
-pub fn stereo_shape() -> Int
+pub fn stereo_shape() -> Int32
 
 // Errors
 

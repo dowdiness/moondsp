@@ -9,21 +9,22 @@ import {
 // Values
 
 // Errors
+#derive(@debug.Debug)
 pub suberror LifecycleError {
   InvalidConfiguration
   EngineClosed
   MountClosed
   CapacityExceeded
   InvalidHandle
-  BufferSizeMismatch(expected~ : Int, actual~ : Int)
-} derive(@debug.Debug)
+  BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
+}
 pub fn LifecycleError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub struct Engine[G] {
   // private fields
 }
-pub fn[G] Engine::Engine(@dsp.DspContext, (G, @dsp.DspContext, @dsp.AudioBuffer) -> Unit, capacity? : Int) -> Self[G] raise LifecycleError
+pub fn[G] Engine::Engine(@dsp.DspContext, (G, @dsp.DspContext, @dsp.AudioBuffer) -> Unit, capacity? : Int32) -> Self[G] raise LifecycleError
 pub fn[G] Engine::check_mount(Self[G]) -> Unit raise LifecycleError
 pub fn[G] Engine::close(Self[G]) -> Unit
 pub fn[G] Engine::process(Self[G], @dsp.AudioBuffer) -> LifecycleError?

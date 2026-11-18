@@ -8,18 +8,20 @@ import {
 // Values
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror StableIdError {
   EmptyId
   InvalidId(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn StableIdError::equal(Self, Self) -> Bool
 pub fn StableIdError::not_equal(Self, Self) -> Bool
 pub fn StableIdError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub struct DefinitionId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn DefinitionId::DefinitionId(SourceEpoch, Int64) -> Self raise StableIdError
 pub fn DefinitionId::epoch(Self) -> SourceEpoch
 pub fn DefinitionId::equal(Self, Self) -> Bool
@@ -27,30 +29,34 @@ pub fn DefinitionId::not_equal(Self, Self) -> Bool
 pub fn DefinitionId::serial(Self) -> Int64
 pub fn DefinitionId::to_repr(Self) -> @debug.Repr
 
-pub struct GraphNodeId(String) derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+pub struct GraphNodeId(String)
 pub fn GraphNodeId::equal(Self, Self) -> Bool
 pub fn GraphNodeId::from_string(String) -> Self raise StableIdError
 pub fn GraphNodeId::not_equal(Self, Self) -> Bool
 pub fn GraphNodeId::to_repr(Self) -> @debug.Repr
 pub fn GraphNodeId::value(Self) -> String
 
-pub struct OccurrenceId(String) derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+pub struct OccurrenceId(String)
 pub fn OccurrenceId::equal(Self, Self) -> Bool
 pub fn OccurrenceId::from_string(String) -> Self raise StableIdError
 pub fn OccurrenceId::not_equal(Self, Self) -> Bool
 pub fn OccurrenceId::to_repr(Self) -> @debug.Repr
 pub fn OccurrenceId::value(Self) -> String
 
-pub struct PatternNodeId(String) derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+pub struct PatternNodeId(String)
 pub fn PatternNodeId::equal(Self, Self) -> Bool
 pub fn PatternNodeId::from_string(String) -> Self raise StableIdError
 pub fn PatternNodeId::not_equal(Self, Self) -> Bool
 pub fn PatternNodeId::to_repr(Self) -> @debug.Repr
 pub fn PatternNodeId::value(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub struct ReferenceBindingId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ReferenceBindingId::ReferenceBindingId(SourceEpoch, Int64) -> Self raise StableIdError
 pub fn ReferenceBindingId::epoch(Self) -> SourceEpoch
 pub fn ReferenceBindingId::equal(Self, Self) -> Bool
@@ -58,9 +64,10 @@ pub fn ReferenceBindingId::not_equal(Self, Self) -> Bool
 pub fn ReferenceBindingId::serial(Self) -> Int64
 pub fn ReferenceBindingId::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct ReferenceId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ReferenceId::ReferenceId(SourceEpoch, Int64) -> Self raise StableIdError
 pub fn ReferenceId::epoch(Self) -> SourceEpoch
 pub fn ReferenceId::equal(Self, Self) -> Bool
@@ -68,9 +75,10 @@ pub fn ReferenceId::not_equal(Self, Self) -> Bool
 pub fn ReferenceId::serial(Self) -> Int64
 pub fn ReferenceId::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct Revision {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn Revision::combine(Self, Self) -> Self
 pub fn Revision::equal(Self, Self) -> Bool
 pub fn Revision::max(Self, Self) -> Self
@@ -80,23 +88,26 @@ pub fn Revision::to_repr(Self) -> @debug.Repr
 pub fn Revision::value(Self) -> Int64
 pub fn Revision::zero() -> Self
 
-pub struct SectionId(String) derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+pub struct SectionId(String)
 pub fn SectionId::equal(Self, Self) -> Bool
 pub fn SectionId::from_string(String) -> Self raise StableIdError
 pub fn SectionId::not_equal(Self, Self) -> Bool
 pub fn SectionId::to_repr(Self) -> @debug.Repr
 pub fn SectionId::value(Self) -> String
 
-pub struct SectionLayerId(String) derive(Eq, @debug.Debug)
+#derive(Eq, @debug.Debug)
+pub struct SectionLayerId(String)
 pub fn SectionLayerId::equal(Self, Self) -> Bool
 pub fn SectionLayerId::from_string(String) -> Self raise StableIdError
 pub fn SectionLayerId::not_equal(Self, Self) -> Bool
 pub fn SectionLayerId::to_repr(Self) -> @debug.Repr
 pub fn SectionLayerId::value(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub struct SourceAtomId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceAtomId::SourceAtomId(SourceEpoch, Int64) -> Self raise StableIdError
 pub fn SourceAtomId::epoch(Self) -> SourceEpoch
 pub fn SourceAtomId::equal(Self, Self) -> Bool
@@ -104,18 +115,20 @@ pub fn SourceAtomId::not_equal(Self, Self) -> Bool
 pub fn SourceAtomId::serial(Self) -> Int64
 pub fn SourceAtomId::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct SourceEpoch {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceEpoch::SourceEpoch(Int64) -> Self raise StableIdError
 pub fn SourceEpoch::equal(Self, Self) -> Bool
 pub fn SourceEpoch::not_equal(Self, Self) -> Bool
 pub fn SourceEpoch::serial(Self) -> Int64
 pub fn SourceEpoch::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub struct SourceFrameId {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SourceFrameId::SourceFrameId(SourceEpoch, Int64) -> Self raise StableIdError
 pub fn SourceFrameId::epoch(Self) -> SourceEpoch
 pub fn SourceFrameId::equal(Self, Self) -> Bool

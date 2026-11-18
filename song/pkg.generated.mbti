@@ -10,72 +10,80 @@ import {
 // Values
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror SectionBuildError {
   NonPositiveLength
-} derive(Eq, @debug.Debug)
+}
 pub fn SectionBuildError::equal(Self, Self) -> Bool
 pub fn SectionBuildError::not_equal(Self, Self) -> Bool
 pub fn SectionBuildError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SectionDocBuildError {
   NonPositiveSectionLength
   EmptyLayers
   DuplicateLayerId(String)
   DuplicateLayerName(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SectionDocBuildError::equal(Self, Self) -> Bool
 pub fn SectionDocBuildError::not_equal(Self, Self) -> Bool
 pub fn SectionDocBuildError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SectionDocEditError {
   MissingLayerId(String)
   DuplicateLayerName(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SectionDocEditError::equal(Self, Self) -> Bool
 pub fn SectionDocEditError::not_equal(Self, Self) -> Bool
 pub fn SectionDocEditError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SectionPatchError {
   MissingLayer(String)
   DuplicateLayer(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SectionPatchError::equal(Self, Self) -> Bool
 pub fn SectionPatchError::not_equal(Self, Self) -> Bool
 pub fn SectionPatchError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SongBuildError {
   EmptySong
   DuplicateOccurrence(String)
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SongBuildError::equal(Self, Self) -> Bool
 pub fn SongBuildError::not_equal(Self, Self) -> Bool
 pub fn SongBuildError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SongDocBuildError {
   EmptySongDoc
   DuplicateSongDocOccurrenceId(String)
   DuplicateSongDocOccurrenceName(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn SongDocBuildError::equal(Self, Self) -> Bool
 pub fn SongDocBuildError::not_equal(Self, Self) -> Bool
 pub fn SongDocBuildError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror SongDocEditError {
   MissingSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceName(String)
-  InvalidSongDocOccurrenceIndex(Int)
+  InvalidSongDocOccurrenceIndex(Int32)
   CannotRemoveLastSongDocOccurrence
-} derive(Eq, @debug.Debug)
+}
 pub fn SongDocEditError::equal(Self, Self) -> Bool
 pub fn SongDocEditError::not_equal(Self, Self) -> Bool
 pub fn SongDocEditError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror TimeScopeBuildError {
   NonPositiveRate
-} derive(Eq, @debug.Debug)
+}
 pub fn TimeScopeBuildError::equal(Self, Self) -> Bool
 pub fn TimeScopeBuildError::not_equal(Self, Self) -> Bool
 pub fn TimeScopeBuildError::to_repr(Self) -> @debug.Repr
@@ -90,7 +98,7 @@ pub fn[A] Section::body(Self[A]) -> @pattern.Pat[A]
 pub fn[A] Section::from_pattern(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
 pub fn[A] Section::get_layer(Self[A], String) -> @pattern.Pat[A]?
 pub fn[A] Section::layer(Self[A], name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] Section::layer_count(Self[A]) -> Int
+pub fn[A] Section::layer_count(Self[A]) -> Int32
 pub fn[A] Section::length_cycles(Self[A]) -> @pattern.Rational
 pub fn[A] Section::name(Self[A]) -> String
 pub fn[A] Section::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
@@ -104,7 +112,7 @@ pub enum SectionBody[A] {
   Layers(Array[SectionLayer[A]])
 }
 pub fn[A] SectionBody::get_layer(Self[A], String) -> @pattern.Pat[A]?
-pub fn[A] SectionBody::layer_count(Self[A]) -> Int
+pub fn[A] SectionBody::layer_count(Self[A]) -> Int32
 pub fn[A] SectionBody::layers(Array[SectionLayer[A]]) -> Self[A]
 pub fn[A] SectionBody::single(@pattern.Pat[A]) -> Self[A]
 pub fn[A] SectionBody::to_pattern(Self[A]) -> @pattern.Pat[A]
@@ -116,7 +124,7 @@ pub fn[A] SectionDoc::SectionDoc(id~ : @identity.SectionId, name~ : String, leng
 pub fn[A] SectionDoc::body(Self[A]) -> SectionDocBody[A]
 pub fn[A] SectionDoc::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
 pub fn[A] SectionDoc::id(Self[A]) -> @identity.SectionId
-pub fn[A] SectionDoc::layer_count(Self[A]) -> Int
+pub fn[A] SectionDoc::layer_count(Self[A]) -> Int32
 pub fn[A] SectionDoc::length_cycles(Self[A]) -> @pattern.Rational
 pub fn[A] SectionDoc::name(Self[A]) -> String
 pub fn[A] SectionDoc::rename(Self[A], name~ : String) -> Self[A]
@@ -135,7 +143,7 @@ pub enum SectionDocBody[A] {
   Layers(Array[SectionLayerDoc[A]])
 }
 pub fn[A] SectionDocBody::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
-pub fn[A] SectionDocBody::layer_count(Self[A]) -> Int
+pub fn[A] SectionDocBody::layer_count(Self[A]) -> Int32
 pub fn[A] SectionDocBody::layers(Array[SectionLayerDoc[A]]) -> Self[A]
 pub fn[A] SectionDocBody::single(SectionLayerDoc[A]) -> Self[A]
 
@@ -185,9 +193,9 @@ pub fn[A] Song::from_sections(Array[Section[A]]) -> Self[A] raise SongBuildError
 pub fn[A] Song::gap_spans(Self[A]) -> Array[@pattern.TimeSpan]
 pub fn[A] Song::get_occurrence(Self[A], String) -> SectionOccurrence[A]?
 pub fn[A] Song::get_occurrence_by_id(Self[A], @identity.OccurrenceId) -> SectionOccurrence[A]?
-pub fn[A] Song::occurrence(Self[A], Int) -> SectionOccurrence[A]?
+pub fn[A] Song::occurrence(Self[A], Int32) -> SectionOccurrence[A]?
 pub fn[A] Song::occurrence_at(Self[A], @pattern.Rational) -> SectionOccurrence[A]?
-pub fn[A] Song::occurrence_count(Self[A]) -> Int
+pub fn[A] Song::occurrence_count(Self[A]) -> Int32
 pub fn[A] Song::occurrences(Self[A]) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::occurrences_at(Self[A], @pattern.Rational) -> Array[SectionOccurrence[A]]
 pub fn[A] Song::occurrences_intersecting(Self[A], @pattern.TimeSpan) -> Array[SectionOccurrence[A]]
@@ -199,12 +207,12 @@ pub struct SongDoc[A] {
 pub fn[A] SongDoc::SongDoc(parts~ : Array[SongOccurrenceDoc[A]]) -> Self[A] raise SongDocBuildError
 pub fn[A] SongDoc::clear_occurrence_start(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::get_occurrence(Self[A], @identity.OccurrenceId) -> SongOccurrenceDoc[A]?
-pub fn[A] SongDoc::insert_occurrence(Self[A], index~ : Int, occurrence~ : SongOccurrenceDoc[A]) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::insert_occurrence(Self[A], index~ : Int32, occurrence~ : SongOccurrenceDoc[A]) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::layout_revision(Self[A]) -> @identity.Revision
 pub fn[A] SongDoc::lower(Self[A]) -> SongSnapshot[A] raise SongBuildError
-pub fn[A] SongDoc::move_occurrence(Self[A], @identity.OccurrenceId, index~ : Int) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::occurrence(Self[A], Int) -> SongOccurrenceDoc[A]?
-pub fn[A] SongDoc::occurrence_count(Self[A]) -> Int
+pub fn[A] SongDoc::move_occurrence(Self[A], @identity.OccurrenceId, index~ : Int32) -> Self[A] raise SongDocEditError
+pub fn[A] SongDoc::occurrence(Self[A], Int32) -> SongOccurrenceDoc[A]?
+pub fn[A] SongDoc::occurrence_count(Self[A]) -> Int32
 pub fn[A] SongDoc::occurrences(Self[A]) -> Array[SongOccurrenceDoc[A]]
 pub fn[A] SongDoc::remove_occurrence(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::rename_occurrence(Self[A], @identity.OccurrenceId, name~ : String) -> Self[A] raise SongDocEditError
@@ -213,9 +221,10 @@ pub fn[A] SongDoc::revision(Self[A]) -> @identity.Revision
 pub fn[A] SongDoc::set_occurrence_start(Self[A], @identity.OccurrenceId, start~ : @pattern.Rational) -> Self[A] raise SongDocEditError
 pub fn[A] SongDoc::to_song(Self[A]) -> Song[A] raise SongBuildError
 
+#derive(Eq, @debug.Debug)
 pub struct SongEventOrigin {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn SongEventOrigin::equal(Self, Self) -> Bool
 pub fn SongEventOrigin::layer(Self) -> @identity.SectionLayerId
 pub fn SongEventOrigin::not_equal(Self, Self) -> Bool
@@ -257,7 +266,7 @@ pub struct SongSnapshot[A] {
 pub fn[A] SongSnapshot::layout_revision(Self[A]) -> @identity.Revision
 pub fn[A] SongSnapshot::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
 pub fn[A] SongSnapshot::query_sourced_events(Self[A], @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
-pub fn[A] SongSnapshot::query_sourced_events_for_entry(Self[A], Int, @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
+pub fn[A] SongSnapshot::query_sourced_events_for_entry(Self[A], Int32, @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
 pub fn[A] SongSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] SongSnapshot::section_id_for_occurrence(Self[A], @identity.OccurrenceId) -> @identity.SectionId?
 pub fn[A] SongSnapshot::song(Self[A]) -> Song[A]

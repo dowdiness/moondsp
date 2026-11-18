@@ -10,3 +10,7 @@ import {
 import {
   "moonbitlang/core/debug",
 } for "test"
+
+// Existing Result-returning APIs are deliberate; changing them to raise is an API change.
+
+warnings = "-result_error_return"

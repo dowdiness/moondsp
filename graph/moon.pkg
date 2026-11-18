@@ -9,7 +9,6 @@ import {
   "dowdiness/moondsp/graph/internal/authoring",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
-  "moonbitlang/core/ref",
 }
 
 import {

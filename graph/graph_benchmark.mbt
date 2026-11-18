@@ -460,7 +460,7 @@ test "bench/hotswap/minimal_voice" (b : @bench.T) {
     let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes_b), ctx).unwrap()
     let hs = DspHotSwap::from_graph(compiled_a, crossfade_samples=block_size)
     let output = AudioBuffer::filled(block_size)
-    let use_b = @ref.new(true)
+    let use_b = Ref(true)
     b.bench(name="minimal_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
@@ -481,7 +481,7 @@ test "bench/hotswap/fm_voice" (b : @bench.T) {
     let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes_b), ctx).unwrap()
     let hs = DspHotSwap::from_graph(compiled_a, crossfade_samples=block_size)
     let output = AudioBuffer::filled(block_size)
-    let use_b = @ref.new(true)
+    let use_b = Ref(true)
     b.bench(name="fm_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
@@ -502,7 +502,7 @@ test "bench/hotswap/full_voice" (b : @bench.T) {
     let compiled_b = Dsp::compile(AnalyzedGraph::analyze(nodes_b), ctx).unwrap()
     let hs = DspHotSwap::from_graph(compiled_a, crossfade_samples=block_size)
     let output = AudioBuffer::filled(block_size)
-    let use_b = @ref.new(true)
+    let use_b = Ref(true)
     b.bench(name="full_voice/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val
@@ -527,7 +527,7 @@ test "bench/hotswap/stereo_chain" (b : @bench.T) {
     )
     let left = AudioBuffer::filled(block_size)
     let right = AudioBuffer::filled(block_size)
-    let use_b = @ref.new(true)
+    let use_b = Ref(true)
     b.bench(name="stereo_chain/\{block_size}", fn() {
       let next = if use_b.val { compiled_b } else { compiled_a }
       use_b.val = !use_b.val

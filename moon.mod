@@ -3,8 +3,8 @@ name = "dowdiness/moondsp"
 version = "0.6.0"
 
 import {
-  "dowdiness/incr@0.15.1",
-  "moonbitlang/quickcheck@0.14.0",
+  "dowdiness/incr@0.16.0",
+  "moonbitlang/quickcheck@0.15.1",
 }
 
 readme = "README.mbt.md"

@@ -8,15 +8,15 @@ import {
 }
 
 // Values
-pub fn chord(String, octave? : Int) -> Pat[ControlMap]
+pub fn chord(String, octave? : Int32) -> Pat[ControlMap]
 
-pub fn chord_notes(String, octave? : Int) -> Array[Double]?
+pub fn chord_notes(String, octave? : Int32) -> Array[Double]?
 
 pub fn continuous(String, (Double) -> Double) -> Pat[ControlMap]
 
 pub fn control(String, Double) -> Pat[ControlMap]
 
-pub fn[A] every(Int, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
+pub fn[A] every(Int32, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
 
 pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
 
@@ -26,7 +26,7 @@ pub fn note_name(String) -> Pat[ControlMap]
 
 pub fn note_name_to_midi(String) -> Double?
 
-pub fn parse_chord(String) -> Array[Int]?
+pub fn parse_chord(String) -> Array[Int32]?
 
 pub fn s_gain(Double) -> Pat[ControlMap]
 
@@ -38,13 +38,14 @@ pub fn s_pan(Double) -> Pat[ControlMap]
 
 pub fn[A] sequence(Array[Pat[A]]) -> Pat[A]
 
-pub fn[A] sequence_weighted(Array[Pat[A]], Array[Int]) -> Pat[A]
+pub fn[A] sequence_weighted(Array[Pat[A]], Array[Int32]) -> Pat[A]
 
 pub fn sound(Double) -> Pat[ControlMap]
 
 pub fn[A] stack(Array[Pat[A]]) -> Pat[A]
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror PatternDocError {
   MissingNode(String)
   DuplicateNodeId(String)
@@ -53,15 +54,16 @@ pub(all) suberror PatternDocError {
   MissingAtomOrigin(@identity.PatternNodeId)
   MissingReferenceBinding(@identity.PatternNodeId)
   UnsupportedControl(@identity.PatternNodeId)
-} derive(Eq, @debug.Debug)
+}
 pub fn PatternDocError::equal(Self, Self) -> Bool
 pub fn PatternDocError::not_equal(Self, Self) -> Bool
 pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(@debug.Debug)
 pub struct ControlMap {
   // private fields
-} derive(@debug.Debug)
+}
 pub fn ControlMap::each(Self, (String, Double) -> Unit) -> Unit
 pub fn ControlMap::empty() -> Self
 pub fn ControlMap::entries(Self) -> Map[String, Double]
@@ -74,11 +76,12 @@ pub fn ControlMap::to_repr(Self) -> @debug.Repr
 pub fn ControlMap::to_string(Self) -> String
 pub impl Show for ControlMap
 
+#derive(@debug.Debug)
 pub struct Event[A] {
   whole : TimeSpan?
   part : TimeSpan
   value : A
-} derive(@debug.Debug)
+}
 pub fn[A : @debug.Debug] Event::output(Self[A], &Logger) -> Unit
 pub fn[A] Event::placed(Self[A], Placement) -> Self[A]
 pub fn[A] Event::shift(Self[A], Rational) -> Self[A]
@@ -94,15 +97,16 @@ pub fn EventBuses::none() -> Self
 pub fn EventBuses::placed(Self, Placement) -> Self
 pub fn EventBuses::reader(Self, String) -> ((Int64, Int64) -> Double)?
 
+#derive(Eq, @debug.Debug)
 pub struct EventOrigin {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn EventOrigin::atom(Self) -> @identity.SourceAtomId
 pub fn EventOrigin::bindings(Self) -> Array[ReferenceBinding]
 pub fn EventOrigin::equal(Self, Self) -> Bool
 pub fn EventOrigin::not_equal(Self, Self) -> Bool
 pub fn EventOrigin::to_repr(Self) -> @debug.Repr
-pub fn EventOrigin::write_binding_serials(Self, Array[Double], Int, Int) -> Int
+pub fn EventOrigin::write_binding_serials(Self, Array[Double], Int32, Int32) -> Int32
 
 pub struct EventWithOrigin[A] {
   // private fields
@@ -120,11 +124,11 @@ pub struct Pat[A] {
   // private fields
 }
 pub fn[A] Pat::add(Self[A], Self[A]) -> Self[A]
-pub fn[A] Pat::degrade_by(Self[A], Double, seed? : Int) -> Self[A]
+pub fn[A] Pat::degrade_by(Self[A], Double, seed? : Int32) -> Self[A]
 pub fn[A] Pat::entries(Self[A]) -> Array[Self[A]]
 pub fn[A] Pat::entry_key(Self[A]) -> String
 pub fn[A] Pat::entry_period(Self[A]) -> Rational
-pub fn[A] Pat::euclid(Self[A], Int, Int, rotation? : Int) -> Self[A]
+pub fn[A] Pat::euclid(Self[A], Int32, Int32, rotation? : Int32) -> Self[A]
 pub fn[A] Pat::fast(Self[A], Rational) -> Self[A]
 pub fn[A] Pat::filter_map(Self[A], (A) -> A?) -> Self[A]
 pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
@@ -149,9 +153,9 @@ pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
 pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : String, f~ : (Double) -> Double) -> Self[ControlMap]
 pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
-pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int) -> Self[A] raise PatternDocError
-pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int, n~ : Int, rotation? : Int) -> Self[A] raise PatternDocError
-pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int, transform~ : TimeTransform) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int32) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int32, n~ : Int32, rotation? : Int32) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int32, transform~ : TimeTransform) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::fast(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::filter_map(Self[A], id~ : @identity.PatternNodeId, f~ : (A) -> A?) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
@@ -161,7 +165,7 @@ pub fn[A] PatternDoc::lower(Self[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> PatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::lower_with_origins(Self[A], cache? : PatternLoweringCache[A]) -> PatternSnapshotWithOrigins[A] raise PatternDocError
 pub fn PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[ControlMap], right~ : Self[ControlMap]) -> Self[ControlMap] raise PatternDocError
-pub fn[A] PatternDoc::node_count(Self[A]) -> Int
+pub fn[A] PatternDoc::node_count(Self[A]) -> Int32
 pub fn[A] PatternDoc::node_revision(Self[A], @identity.PatternNodeId) -> @identity.Revision raise PatternDocError
 pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::reference(id~ : @identity.PatternNodeId, definition~ : Self[A]) -> Self[A]
@@ -174,7 +178,7 @@ pub fn[A] PatternDoc::rev(Self[A], id~ : @identity.PatternNodeId) -> Self[A] rai
 pub fn[A] PatternDoc::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternDoc::root(Self[A]) -> @identity.PatternNodeId
 pub fn[A] PatternDoc::sequence(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
-pub fn[A] PatternDoc::sequence_weighted(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]], weights~ : Array[Int]) -> Self[A] raise PatternDocError
+pub fn[A] PatternDoc::sequence_weighted(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]], weights~ : Array[Int32]) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> Self[A]
 pub fn[A] PatternDoc::slow(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::stack(id~ : @identity.PatternNodeId, docs~ : Array[Self[A]]) -> Self[A] raise PatternDocError
@@ -188,15 +192,16 @@ pub struct PatternLoweringCache[A] {
   // private fields
 }
 pub fn[A] PatternLoweringCache::clear(Self[A]) -> Unit
-pub fn[A] PatternLoweringCache::entry_count(Self[A]) -> Int
-pub fn[A] PatternLoweringCache::hit_count(Self[A]) -> Int
-pub fn[A] PatternLoweringCache::miss_count(Self[A]) -> Int
+pub fn[A] PatternLoweringCache::entry_count(Self[A]) -> Int32
+pub fn[A] PatternLoweringCache::hit_count(Self[A]) -> Int32
+pub fn[A] PatternLoweringCache::miss_count(Self[A]) -> Int32
 pub fn[A] PatternLoweringCache::new() -> Self[A]
 pub fn[A] PatternLoweringCache::reset_stats(Self[A]) -> Unit
 
+#derive(Eq, @debug.Debug)
 pub struct PatternNodePath {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn PatternNodePath::equal(Self, Self) -> Bool
 pub fn PatternNodePath::leaf(Self) -> @identity.PatternNodeId
 pub fn PatternNodePath::nodes(Self) -> Array[@identity.PatternNodeId]
@@ -209,7 +214,7 @@ pub struct PatternSnapshot[A] {
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
-pub fn[A] PatternSnapshot::query_sourced_events_for_entry(Self[A], Int, TimeSpan) -> Array[PatternSnapshotEvent[A]]
+pub fn[A] PatternSnapshot::query_sourced_events_for_entry(Self[A], Int32, TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A] PatternSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
 
@@ -227,7 +232,7 @@ pub struct PatternSnapshotWithOrigins[A] {
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
-pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int, TimeSpan) -> Array[EventWithOrigin[A]]
+pub fn[A] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int32, TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] PatternSnapshotWithOrigins::revision(Self[A]) -> @identity.Revision
 pub fn[A] PatternSnapshotWithOrigins::root(Self[A]) -> @identity.PatternNodeId
 
@@ -237,17 +242,18 @@ pub struct Placement {
 pub fn Placement::Placement(origin? : Rational, rate? : Rational) -> Self
 pub fn Placement::local_span(Self, TimeSpan) -> TimeSpan
 
+#derive(Eq, @debug.Debug)
 pub struct Rational {
   num : Int64
   den : Int64
-} derive(Eq, @debug.Debug)
+}
 pub fn Rational::Rational(Int64, Int64) -> Self
 pub fn Rational::add(Self, Self) -> Self
-pub fn Rational::compare(Self, Self) -> Int
+pub fn Rational::compare(Self, Self) -> Int32
 pub fn Rational::div(Self, Self) -> Self
 pub fn Rational::equal(Self, Self) -> Bool
 pub fn Rational::floor(Self) -> Int64
-pub fn Rational::from_int(Int) -> Self
+pub fn Rational::from_int(Int32) -> Self
 pub fn Rational::mul(Self, Self) -> Self
 pub fn Rational::not_equal(Self, Self) -> Bool
 pub fn Rational::op_ge(Self, Self) -> Bool
@@ -266,9 +272,10 @@ pub impl Mul for Rational
 pub impl Show for Rational
 pub impl Sub for Rational
 
+#derive(Eq, @debug.Debug)
 pub struct ReferenceBinding {
   // private fields
-} derive(Eq, @debug.Debug)
+}
 pub fn ReferenceBinding::definition(Self) -> @identity.DefinitionId
 pub fn ReferenceBinding::equal(Self, Self) -> Bool
 pub fn ReferenceBinding::id(Self) -> @identity.ReferenceBindingId
@@ -281,10 +288,11 @@ pub struct ResolvedReference[A] {
 }
 pub fn[A] ResolvedReference::ResolvedReference(definition~ : PatternDoc[A], definition_id~ : @identity.DefinitionId, reference~ : @identity.ReferenceId, binding~ : @identity.ReferenceBindingId) -> Self[A] raise @identity.StableIdError
 
+#derive(Eq, @debug.Debug)
 pub struct TimeSpan {
   begin : Rational
   end_ : Rational
-} derive(Eq, @debug.Debug)
+}
 pub fn TimeSpan::TimeSpan(Rational, Rational) -> Self
 pub fn TimeSpan::contains(Self, Rational) -> Bool
 pub fn TimeSpan::duration(Self) -> Rational
@@ -304,7 +312,7 @@ pub(all) enum TimeTransform {
   Reverse
 }
 pub fn[A] TimeTransform::apply(Self, Pat[A]) -> Pat[A]
-pub fn[A] TimeTransform::every(Self, Int, Pat[A]) -> Pat[A]
+pub fn[A] TimeTransform::every(Self, Int32, Pat[A]) -> Pat[A]
 pub fn TimeTransform::jux(Self, Pat[ControlMap]) -> Pat[ControlMap]
 
 // Type aliases

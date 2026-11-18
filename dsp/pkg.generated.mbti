@@ -2,7 +2,7 @@
 package "dowdiness/moondsp/dsp"
 
 // Values
-pub fn effective_sample_count(DspContext, AudioBuffer) -> Int
+pub fn effective_sample_count(DspContext, AudioBuffer) -> Int32
 
 pub fn[T : FilterSym] exit_deliverable() -> T
 
@@ -14,7 +14,7 @@ pub fn[T : ArithSym] lin_map(T, Double, Double, Double, Double) -> T
 
 pub fn max_feedback_amount() -> Double
 
-pub fn mono_shape() -> Int
+pub fn mono_shape() -> Int32
 
 pub fn pan_left_gain(Double) -> Double
 
@@ -22,9 +22,9 @@ pub fn pan_right_gain(Double) -> Double
 
 pub fn[T : ArithSym] range(T, Double, Double) -> T
 
-pub fn sanitize_buffer(AudioBuffer, Int) -> Int
+pub fn sanitize_buffer(AudioBuffer, Int32) -> Int32
 
-pub fn stereo_shape() -> Int
+pub fn stereo_shape() -> Int32
 
 // Errors
 
@@ -53,10 +53,10 @@ pub fn AudioBuffer::all(Self, (Double) -> Bool raise?) -> Bool raise?
 #alias(exists)
 pub fn AudioBuffer::any(Self, (Double) -> Bool raise?) -> Bool raise?
 pub fn AudioBuffer::fill(Self, Double) -> Unit
-pub fn AudioBuffer::filled(Int, init? : Double) -> Self
-pub fn AudioBuffer::get(Self, Int) -> Double
-pub fn AudioBuffer::length(Self) -> Int
-pub fn AudioBuffer::set(Self, Int, Double) -> Unit
+pub fn AudioBuffer::filled(Int32, init? : Double) -> Self
+pub fn AudioBuffer::get(Self, Int32) -> Double
+pub fn AudioBuffer::length(Self) -> Int32
+pub fn AudioBuffer::set(Self, Int32, Double) -> Unit
 
 pub struct Biquad {
   // private fields
@@ -68,11 +68,12 @@ pub fn Biquad::reset(Self) -> Unit
 pub fn Biquad::tick(Self, Double) -> Double
 pub fn Biquad::update(Self, DspContext, BiquadMode, Double, Double) -> Bool
 
+#derive(Eq)
 pub(all) enum BiquadMode {
   LowPass
   HighPass
   BandPass
-} derive(Eq)
+}
 pub fn BiquadMode::equal(Self, Self) -> Bool
 pub fn BiquadMode::not_equal(Self, Self) -> Bool
 
@@ -84,14 +85,14 @@ pub fn Clip::process(Self, context~ : DspContext, buffer~ : AudioBuffer, thresho
 pub struct DelayLine {
   // private fields
 }
-pub fn DelayLine::DelayLine(Int, delay_samples? : Int, feedback? : Double) -> Self
+pub fn DelayLine::DelayLine(Int32, delay_samples? : Int32, feedback? : Double) -> Self
 pub fn DelayLine::copy_state_from(Self, Self) -> Bool
-pub fn DelayLine::delay_samples(Self) -> Int
+pub fn DelayLine::delay_samples(Self) -> Int32
 pub fn DelayLine::feedback(Self) -> Double
-pub fn DelayLine::max_delay_samples(Self) -> Int
+pub fn DelayLine::max_delay_samples(Self) -> Int32
 pub fn DelayLine::process(Self, DspContext, AudioBuffer) -> Unit
 pub fn DelayLine::reset(Self) -> Unit
-pub fn DelayLine::set_delay_samples(Self, Int) -> Unit
+pub fn DelayLine::set_delay_samples(Self, Int32) -> Unit
 pub fn DelayLine::set_feedback(Self, Double) -> Unit
 pub fn DelayLine::tick(Self, Double) -> Double
 
@@ -100,23 +101,24 @@ pub struct DemoSource {
 }
 pub fn DemoSource::DemoSource() -> Self
 pub fn DemoSource::reset(Self) -> Unit
-pub fn DemoSource::tick_source(Self, source_id~ : Int, freq_hz~ : Double, sample_rate~ : Double) -> Double
+pub fn DemoSource::tick_source(Self, source_id~ : Int32, freq_hz~ : Double, sample_rate~ : Double) -> Double
 
 pub struct DspContext {
   // private fields
 }
-pub fn DspContext::DspContext(sample_rate~ : Double, block_size~ : Int) -> Self
-pub fn DspContext::block_size(Self) -> Int
+pub fn DspContext::DspContext(sample_rate~ : Double, block_size~ : Int32) -> Self
+pub fn DspContext::block_size(Self) -> Int32
 pub fn DspContext::make_buffer(Self, init? : Double) -> AudioBuffer
 pub fn DspContext::sample_rate(Self) -> Double
 
+#derive(Eq)
 pub enum EnvStage {
   Idle
   Attack
   Decay
   Sustain
   Release
-} derive(Eq)
+}
 pub fn EnvStage::equal(Self, Self) -> Bool
 pub fn EnvStage::not_equal(Self, Self) -> Bool
 
@@ -133,17 +135,17 @@ pub fn Mix::process(Self, DspContext, AudioBuffer, AudioBuffer) -> Unit
 pub struct Mono {
 }
 pub fn Mono::Mono() -> Self
-pub fn Mono::channel_count(Self) -> Int
+pub fn Mono::channel_count(Self) -> Int32
 pub impl ChannelSpec for Mono
 
 pub struct Noise {
   // private fields
 }
-pub fn Noise::Noise(UInt) -> Self
+pub fn Noise::Noise(UInt32) -> Self
 pub fn Noise::copy_state_from(Self, Self) -> Unit
 pub fn Noise::process(Self, DspContext, AudioBuffer) -> Unit
-pub fn Noise::reset(Self, UInt) -> Unit
-pub fn Noise::seed(Self) -> UInt
+pub fn Noise::reset(Self, UInt32) -> Unit
+pub fn Noise::seed(Self) -> UInt32
 pub fn Noise::tick(Self) -> Double
 
 pub struct Oscillator {
@@ -179,7 +181,7 @@ pub fn ParamSmoother::tick(Self) -> Double
 pub struct Stereo {
 }
 pub fn Stereo::Stereo() -> Self
-pub fn Stereo::channel_count(Self) -> Int
+pub fn Stereo::channel_count(Self) -> Int32
 pub impl ChannelSpec for Stereo
 
 pub struct StereoReverb {
@@ -189,12 +191,13 @@ pub fn StereoReverb::StereoReverb(Double, decay_seconds? : Double, damping? : Do
 pub fn StereoReverb::process(Self, DspContext, AudioBuffer, AudioBuffer, AudioBuffer, AudioBuffer) -> Unit
 pub fn StereoReverb::reset(Self) -> Unit
 
+#derive(Eq)
 pub(all) enum Waveform {
   Sine
   Saw
   Square
   Triangle
-} derive(Eq)
+}
 pub fn Waveform::equal(Self, Self) -> Bool
 pub fn Waveform::not_equal(Self, Self) -> Bool
 
@@ -209,16 +212,16 @@ pub(open) trait ArithSym {
 }
 
 pub trait ChannelSpec {
-  fn channel_count(Self) -> Int
+  fn channel_count(Self) -> Int32
 }
 
 pub(open) trait DelaySym : DspSym {
-  fn delay(Self, Int, Int, Double) -> Self
+  fn delay(Self, Int32, Int32, Double) -> Self
 }
 
 pub(open) trait DspSym : ArithSym {
   fn oscillator(Self, Waveform) -> Self
-  fn noise(UInt) -> Self
+  fn noise(UInt32) -> Self
   fn adsr(Double, Double, Double, Double) -> Self
   fn gain(Self, Double) -> Self
   fn output(Self) -> Self
@@ -229,7 +232,7 @@ pub(open) trait FilterSym : DspSym {
 }
 
 pub(open) trait StereoDelaySym : StereoSym + DelaySym {
-  fn stereo_delay(Self, Int, Int, Double) -> Self
+  fn stereo_delay(Self, Int32, Int32, Double) -> Self
 }
 
 pub(open) trait StereoFilterSym : StereoSym + FilterSym {

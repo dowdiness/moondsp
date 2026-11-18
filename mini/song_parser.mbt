@@ -306,7 +306,7 @@ fn Parser::read_song_rational(
       "position \{value_start}: \{label} denominator cannot be zero",
     )
   }
-  @pattern.Rational(Int64::from_int(num), Int64::from_int(den))
+  @pattern.Rational(num.to_int64(), den.to_int64())
 }
 
 ///|

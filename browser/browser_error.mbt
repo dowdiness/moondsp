@@ -20,10 +20,10 @@ const BROWSER_ERROR_RUNTIME_CONTROL : Int = 5
 const BROWSER_ERROR_INIT : Int = 6
 
 ///|
-let browser_last_error : @ref.Ref[String] = @ref.new("")
+let browser_last_error : @ref.Ref[String] = Ref("")
 
 ///|
-let browser_last_error_code : @ref.Ref[Int] = @ref.new(BROWSER_ERROR_NONE)
+let browser_last_error_code : @ref.Ref[Int] = Ref(BROWSER_ERROR_NONE)
 
 ///|
 fn clear_browser_error() -> Unit {

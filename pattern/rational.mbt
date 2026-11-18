@@ -49,7 +49,7 @@ pub fn Rational::Rational(num : Int64, den : Int64) -> Rational {
 
 ///|
 pub fn Rational::from_int(n : Int) -> Rational {
-  { num: Int64::from_int(n), den: 1L, }
+  { num: n.to_int64(), den: 1L, }
 }
 
 ///|
