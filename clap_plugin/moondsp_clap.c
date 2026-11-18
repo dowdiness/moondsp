@@ -41,7 +41,7 @@ static bool moonbit_ready = false;
 
 static void ensure_moonbit_runtime(void) {
   if (!moonbit_ready) {
-    moonbit_runtime_init(0, NULL);
+    // The foreign-library moonbit_init() also initializes the runtime.
     moonbit_init();
     moonbit_ready = true;
   }

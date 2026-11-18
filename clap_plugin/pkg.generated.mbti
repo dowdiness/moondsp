@@ -2,6 +2,33 @@
 package "dowdiness/moondsp/clap_plugin"
 
 // Values
+pub fn mb_engine_all_notes_off(Int32) -> Int32
+
+pub fn mb_engine_create(Double, Int32, Int32) -> Int32
+
+pub fn mb_engine_cutoff_hz(Int32) -> Double
+
+pub fn mb_engine_destroy(Int32) -> Int32
+
+pub fn mb_engine_left_sample(Int32, Int32) -> Double
+
+pub fn mb_engine_master_gain(Int32) -> Double
+
+pub fn mb_engine_note_off(Int32, Int32, Int32) -> Int32
+
+pub fn mb_engine_note_on(Int32, Int32, Int32, Double) -> Int32
+
+pub fn mb_engine_pan(Int32) -> Double
+
+pub fn mb_engine_process(Int32, Int32) -> Int32
+
+pub fn mb_engine_resonance(Int32) -> Double
+
+pub fn mb_engine_right_sample(Int32, Int32) -> Double
+
+pub fn mb_engine_set_param(Int32, Int32, Double) -> Int32
+
+pub fn mb_engine_voice_gain(Int32) -> Double
 
 // Errors
 

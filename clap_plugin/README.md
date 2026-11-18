@@ -21,8 +21,8 @@ In moondsp's native audio architecture, `clap_plugin` sits at the boundary betwe
 ```
 
 - **Upstream Host / DAW**: Communicates with the shared library (`moondsp-synth.clap`) via standard CLAP 1.2.8 entrypoints and C function tables.
-- **C ABI Shim (`moondsp_clap.c`)**: Implements `clap_plugin_t`, translates host parameter/note/transport events, manages `moonbit_runtime_init`, and interacts with MoonBit through stable `mb_engine_*` function aliases.
-- **Symbol Bridge Header (`moondsp_clap_moonbit.h`)**: Generated from compiled payload C code; maps stable `mb_engine_*` function calls to MoonBit's mangled native C symbols (e.g. `_M0FP39dowdiness...engine__create`).
+- **C ABI Shim (`moondsp_clap.c`)**: Implements `clap_plugin_t`, translates host parameter/note/transport events, initializes the runtime through `moonbit_init`, and interacts with MoonBit through stable `mb_engine_*` function aliases.
+- **Symbol Bridge Header (`moondsp_clap_moonbit.h`)**: Declares the stable `mb_engine_*` symbols that `clap_payload.mbt` exports with `#export_name`.
 - **Downstream dependencies**: [`clap_host/`](../clap_host/README.mbt.md) provides the flat integer-handle bridge functions; [`clap_engine/`](../clap_engine/README.mbt.md) drives the polyphonic synth engine.
 
 ## Component overview
@@ -30,10 +30,9 @@ In moondsp's native audio architecture, `clap_plugin` sits at the boundary betwe
 | Component | File | Role & Responsibility |
 |---|---|---|
 | **C ABI Shim** | `moondsp_clap.c` | Implements CLAP 1.2.8 plugin interface (`audio-ports`, `note-ports`, `params`), manages MoonBit runtime lifecycle, and routes host events to MoonBit |
-| **Bridge Header** | `moondsp_clap_moonbit.h` | Header generated from native payload C, mapping stable `mb_engine_*` macros to package-mangled MoonBit symbols |
-| **Payload Anchor** | `clap_payload.mbt` | Native MoonBit executable package that references all required `clap_host` functions to prevent dead-code elimination during native C emission |
+| **Bridge Header** | `moondsp_clap_moonbit.h` | Hand-maintained declarations of the exported `mb_engine_*` symbols; the build scripts compile the payload C with it included, so signature drift fails the build |
+| **Payload Exports** | `clap_payload.mbt` | `foreign_library` package whose `#export_name` wrappers export the `clap_host` functions under stable C names |
 | **Build Scripts** | `scripts/build-clap-prototype*.sh` | Compiles native MoonBit C payload, builds C shim, links MoonBit runtime, and produces `.clap` shared library (Linux ELF / Windows MinGW DLL) |
-| **Header Generator** | `scripts/generate-clap-moonbit-header.sh` | Parses emitted `clap_plugin.c`, verifies signatures of required bridge functions, and updates or checks `moondsp_clap_moonbit.h` |
 | **Validator** | `scripts/validate-clap-prototype.sh` | Builds plugin and executes automated verification using pinned `clap-validator` |
 | **Smoke Runner** | `scripts/smoke-clap-prototype.sh` | Headless dynamic-linking (`dlopen`) smoke test validating plugin factory, activation, and audio processing |
 
@@ -67,18 +66,11 @@ Run the local headless `dlopen` and processing smoke test:
 scripts/smoke-clap-prototype.sh
 ```
 
-### 4. Regenerate MoonBit bridge header
+### 4. Change the bridge ABI
 
-Regenerate or verify the MoonBit bridge header whenever the MoonBit toolchain or `clap_host` symbols change:
-
-```bash
-NEW_MOON_MOD=0 moon build --target native --release clap_plugin
-scripts/generate-clap-moonbit-header.sh \
-  _build/native/release/build/clap_plugin/clap_plugin.c \
-  clap_plugin/moondsp_clap_moonbit.h
-```
-
-Pass `--check` to verify that the existing header matches the emitted payload symbols without overwriting.
+When a `clap_host` primitive is added or changes signature, update its
+`#export_name` wrapper in `clap_payload.mbt` and its declaration in
+`moondsp_clap_moonbit.h` together. The build scripts fail on a mismatch.
 
 ### 5. Automated CLAP validator
 

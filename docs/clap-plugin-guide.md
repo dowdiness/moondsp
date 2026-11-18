@@ -33,15 +33,13 @@ functions so C does not need to understand MoonBit objects, `Result`, or
 
 `clap_plugin/` contains:
 
-- `clap_payload.mbt`: a native main package that forces MoonBit to emit the
-  CLAP payload C for `clap_host`;
+- `clap_payload.mbt`: a `foreign_library` package whose `#export_name`
+  wrappers export the `clap_host` primitives as stable `mb_engine_*` C symbols;
 - `moondsp_clap.c`: descriptor/factory/plugin callbacks, audio/note/param
   extensions, event translation, and output copying through the official CLAP
   headers;
-- `moondsp_clap_moonbit.h`: generated declarations mapping stable
-  `mb_engine_*` C aliases to the current MoonBit-mangled `clap_host` bridge
-  symbols; `scripts/generate-clap-moonbit-header.sh` regenerates or verifies it
-  from the native payload C.
+- `moondsp_clap_moonbit.h`: hand-maintained declarations of those
+  `mb_engine_*` symbols and the MoonBit runtime entrypoints.
 
 `third_party/clap/` vendors the official CLAP 1.2.8 C headers used by the
 prototype build and smoke test.
@@ -95,19 +93,17 @@ scripts/audit-clap-audio-allocations.sh --expect-zero
 
 ## Bridge-symbol guard
 
-The 2026-06-07 #174 probe showed that MoonBit native package exports do not yet
-provide stable C aliases for the `clap_host` primitives.
+The 2026-06-07 #174 probe showed that MoonBit native package exports did not
+yet provide stable C aliases for the `clap_host` primitives
+(`docs/development/2026-06-07-clap-native-bridge-symbol-probe.md`). MoonBit
+0.10.19 added `#export_name` for native `foreign_library` packages, and since
+toolchain 0.10.21 the bridge uses it:
 
-Current guard:
-
-- the C shim calls stable `mb_engine_*` aliases;
-- `clap_plugin/moondsp_clap_moonbit.h` maps those aliases to MoonBit's
-  package-mangled payload symbols;
-- the Linux and Windows prototype build scripts verify that generated header and
-  fail if it is stale.
-
-See `docs/development/2026-06-07-clap-native-bridge-symbol-probe.md` for the
-exact toolchain and probe result.
+- `clap_plugin/clap_payload.mbt` exports each primitive under a fixed
+  `mb_engine_*` name; Bool results cross as `int32_t` 1 or 0;
+- the C shim calls those symbols through `clap_plugin/moondsp_clap_moonbit.h`;
+- the Linux and Windows prototype build scripts compile the payload C with that
+  header included, so a signature mismatch fails the build.
 
 ## Remaining risks
 
@@ -129,7 +125,8 @@ exact toolchain and probe result.
    is stale.
 2. Keep MoonBit/native bridge-symbol rechecks separate from host coverage. Open
    a new bridge issue only if a future toolchain changes native export behavior.
-   Until then, keep the generated-header mapping as the durable bridge guard.
+   Until then, the `#export_name` wrappers in `clap_plugin/clap_payload.mbt`
+   and the build scripts' `-include` signature check are the bridge guard.
 3. Track broader real-host/DAW coverage in issue #180. Use
    `docs/development/2026-06-07-clap-host-coverage.md` for the checklist and
    matrix. Before interpreting host behavior, stop host processes and verify

@@ -20,8 +20,9 @@ In moondsp's native CLAP bridge, `clap_host` serves as the immediate boundary:
 [ clap_engine ] (ClapSynthEngine polyphonic synth)
 ```
 
-- **Upstream consumers**: [`clap_plugin/`](../clap_plugin/) generates C bindings
-  (`moondsp_clap_moonbit.h`) from `clap_host` symbols to link into `moondsp_clap.c`.
+- **Upstream consumers**: [`clap_plugin/`](../clap_plugin/) re-exports these
+  functions under stable `mb_engine_*` C names with `#export_name`, declared in
+  `moondsp_clap_moonbit.h` for `moondsp_clap.c`.
 - **Downstream dependencies**: [`clap_engine/`](../clap_engine/) provides the
   underlying `ClapSynthEngine` instances referenced by the integer handles.
 

@@ -11,7 +11,7 @@ For user-focused application concepts, creative goals, and workspace usage, see 
 `moondsp`'s core DSP, graph compilation, and pattern scheduling are completely platform-agnostic and free of browser or host globals:
 
 - **Browser (Web AudioWorklet via `wasm-gc`)**: Compiled via `wasm-gc` for in-browser live coding and real-time synthesis. Automated tests cover rendered PCM, resource lifecycle, and atomic control updates.
-- **Native DAWs (CLAP Plugin Prototype)**: Native shared library via MoonBit's C ABI shim. It passes `clap-validator`; real host/DAW loading, stable bridge symbols, and an audio-thread allocation audit remain production gates.
+- **Native DAWs (CLAP Plugin Prototype)**: Native shared library via MoonBit's C ABI shim. It passes `clap-validator` and exports stable `mb_engine_*` bridge symbols through `#export_name`; real host/DAW loading and an audio-thread allocation audit remain production gates.
 - **Host-Independent MoonBit API**: Direct programmatic audio synthesis in pure MoonBit via `GraphEngine` — embeddable into games, tools, or custom runtimes without JavaScript or WebAudio.
 - **CLI & Offline Rendering**: Headless command-line entry point for audio rendering, batch synthesis, and automated tests.
 

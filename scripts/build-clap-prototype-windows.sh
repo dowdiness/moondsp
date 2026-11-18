@@ -45,10 +45,6 @@ if [[ ! -f "$clap_include/clap/entry.h" ]]; then
 fi
 
 NEW_MOON_MOD=0 MOONBIT_NEW_NATIVE=0 moon -C "$repo_root" build --target native --release clap_plugin
-"$repo_root/scripts/generate-clap-moonbit-header.sh" \
-  --check \
-  "$payload_c" \
-  "$repo_root/clap_plugin/moondsp_clap_moonbit.h"
 mkdir -p "$out_dir"
 
 runtime_objects=()
@@ -64,6 +60,7 @@ done
   -I"$moon_home/include" \
   -o "$output" \
   "$repo_root/clap_plugin/moondsp_clap.c" \
+  -include "$repo_root/clap_plugin/moondsp_clap_moonbit.h" \
   "$payload_c" \
   "${runtime_objects[@]}" \
   -static-libgcc \

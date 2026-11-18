@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build) with `incr` 0.16.0, `quickcheck` 0.15.1, and the browser host's
   `moonbitlang/async` 0.22.9. Generated `.mbti` files now spell `Int` as
   `Int32`; the browser ABI is unchanged.
+- The CLAP prototype's MoonBit payload exports stable `mb_engine_*` C symbols
+  through `#export_name` instead of package-mangled names, so the bridge no
+  longer depends on compiler name mangling. Real host/DAW loading and the
+  audio-thread allocation audit remain the gates before calling it DAW-ready.
 - **Breaking browser API:** replace the exposed `engine.output` Worklet with
   synchronous `engine.connect` / `engine.disconnect`, preserving native routing
   overloads. New connections reject after closing/failure; disconnection remains
