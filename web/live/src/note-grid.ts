@@ -567,6 +567,9 @@ export function mountNoteGrid(
   function keydown(event: KeyboardEvent): void {
     const phrase = active;
     if (event.target !== svg || !phrase) return;
+    // A pointer gesture owns the grid until release; a key's default action
+    // must not reach the editor, whose selection WebKit still targets.
+    if (interaction && "pointer" in interaction) { event.preventDefault(); return; }
     const idle = !interaction && !controls.lock.holder;
     const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
     const vertical = event.key === "ArrowUp" || event.key === "ArrowDown";
