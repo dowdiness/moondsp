@@ -700,7 +700,6 @@ npx playwright install chromium
 Then build and serve matching artifacts:
 
 ```sh
-NEW_MOON_MOD=0 moon build --target wasm-gc --release
 ./playwright-serve.sh 8090
 # Open http://127.0.0.1:8090/graph-example.html
 # In a second terminal:
@@ -1375,23 +1374,14 @@ checkout with `npm ci --prefix web/live`.
 |---|---|
 | Live TypeScript, HTML, or CSS | None; the test run builds the app |
 | Worklet JS or shared playback controller | None; the test run syncs and builds them |
-| MoonBit code or WASM export manifest | Build WASM and copy it first, as below |
+| MoonBit code or WASM export manifest | None; the test run builds the WASM |
 
-```bash
-NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
-./playwright-sync-wasm.sh
-npm --prefix web/live run build
-```
-
-The artifact chain is:
-`_build/wasm-gc/release/build/browser/browser.wasm`
-→ `web/moonbit_dsp.wasm`
-→ `web/live/public/moonbit_dsp.wasm`
-→ `web/live/dist/moonbit_dsp.wasm`.
-`playwright-sync-wasm.sh` performs the first copy.
-The live `prebuild`/`prebuild:e2e`/`predev` hooks run `scripts/sync-assets.mjs`,
-copying the WASM and all three worklet/controller JS modules from `web/` into
-`public/`. Vite's build copies those public assets into `dist/`.
+The live `prebuild`/`prebuild:e2e`/`predev` hooks run `scripts/sync-assets.mjs`.
+It builds `_build/wasm-gc/release/build/browser/browser.wasm` and the
+authoring adapter, copies the WASM to `web/live/public/moonbit_dsp.wasm` and
+the three worklet/controller JS modules from `web/` into `public/`, and fails
+when any of them is missing. Vite's build copies those public assets into
+`dist/`.
 
 `npm --prefix web/live run build` type-checks and produces the production
 bundle. The live Playwright suite does not test that bundle: each run builds

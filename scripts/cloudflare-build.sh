@@ -4,9 +4,8 @@
 #
 # Cloudflare's default Pages build environment ships Node + npm but not
 # MoonBit, and only installs root-level npm deps — so the build needs
-# to (1) bootstrap the MoonBit toolchain and compile the browser wasm,
-# (2) sync the wasm into web/, and (3) install web/live's own deps
-# before running the Vite build.
+# to bootstrap the MoonBit toolchain and install web/live's own deps
+# before running the Vite build, which compiles the engine itself.
 #
 # Configure in Cloudflare Pages dashboard:
 #   Build command:        bash scripts/cloudflare-build.sh
@@ -25,12 +24,6 @@ moon version || true
 
 echo "── Fetching MoonBit dependencies ──────────────────────"
 moon update
-
-echo "── Building browser wasm (release) ────────────────────"
-moon build browser --target wasm-gc --release
-
-echo "── Syncing wasm into web/ ─────────────────────────────"
-./playwright-sync-wasm.sh
 
 echo "── Installing web/live npm dependencies ───────────────"
 cd web/live

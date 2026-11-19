@@ -37,8 +37,6 @@ Open **[Playground](https://moondsp.koji-ishimoto.workers.dev/)** and press `Ctr
 ### From source
 
 ```bash
-NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
-./playwright-sync-wasm.sh
 npm --prefix web/live ci
 npm --prefix web/live run dev
 # Open http://localhost:5173/

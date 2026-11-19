@@ -6,7 +6,7 @@ root_dir="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 web_dir="$root_dir/web"
 port="${1:-8090}"
 
-"$root_dir/playwright-sync-wasm.sh"
+"$root_dir/scripts/build-web-wasm.sh"
 node "$root_dir/scripts/build-audio-power-core.mjs" "$web_dir/audio-power-core.js"
 
 cd "$web_dir"

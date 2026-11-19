@@ -19,7 +19,7 @@ const config = {
     headless: true,
   },
   webServer: {
-    command: `bash -lc 'moon build --target wasm-gc --release && ./playwright-serve.sh ${port}'`,
+    command: `./playwright-serve.sh ${port}`,
     url: baseURL,
     // Never accept assets from a server launched in another checkout.
     reuseExistingServer: false,

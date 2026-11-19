@@ -7,8 +7,6 @@ the moondsp browser editor. See the
 ## Start the editor
 
 ```bash
-NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
-./playwright-sync-wasm.sh
 cd web/live
 npm ci
 npm run dev

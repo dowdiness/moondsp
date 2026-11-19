@@ -239,10 +239,6 @@ NEW_MOON_MOD=0 moon run cmd/main
 This builds and runs the text-first interactive editor shown in the main demo:
 
 ```bash
-# Build browser Wasm artifact and sync to web runtime
-NEW_MOON_MOD=0 moon build browser --target wasm-gc --release
-./playwright-sync-wasm.sh
-
 # Install dependencies and start Vite dev server
 npm --prefix web/live ci
 npm --prefix web/live run dev
@@ -259,7 +255,6 @@ npm --prefix web/live run preview
 
 ```bash
 # Serve the low-level standalone engine proof (web/)
-NEW_MOON_MOD=0 moon build --target wasm-gc --release
 ./playwright-serve.sh 8000
 # Open http://127.0.0.1:8000/
 
