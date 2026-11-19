@@ -3,7 +3,7 @@
 // adding production routing behavior while pinning the expected boundary shape.
 struct MiniGraphPreparedTemplate {
   name : String
-  bindings : @moondsp.ControlBindingMap
+  bindings : @moondsp.ControlBindingMap[@moondsp.Control]
   runtime : @moondsp.Dsp
 }
 
@@ -37,9 +37,13 @@ fn prepared_bd_graph_template(
   ]
   let template = @moondsp.AnalyzedGraph::analyze(nodes)
   let bindings = @moondsp.ControlBindingBuilder()
-    .bind(key="lpf", node_index=1, slot=@moondsp.GraphParamSlot::Value0)
-    .bind(key="hpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
-    .bind(key="gain", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(
+      key=@moondsp.Control::Lpf,
+      node_index=1,
+      slot=@moondsp.GraphParamSlot::Value0,
+    )
+    .bind(key=Hpf, node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+    .bind(key=Gain, node_index=3, slot=@moondsp.GraphParamSlot::Value0)
     .build(template)
     .unwrap()
   let runtime = @moondsp.Dsp::compile_result(template, ctx).unwrap()
@@ -100,7 +104,7 @@ fn resolve_mini_graph_controls(
   controls : @pattern.ControlMap,
   registry : Array[MiniGraphPreparedTemplate],
 ) -> Result[Array[@moondsp.GraphControl], MiniGraphBridgeError] {
-  let sound = match controls.get("sound") {
+  let sound = match controls.get(Sound) {
     Some(value) => value
     None => return Err(MiniGraphBridgeError::MissingSoundKey)
   }
@@ -115,11 +119,11 @@ fn resolve_mini_graph_controls(
     Some(entry) => entry
     None => return Err(MiniGraphBridgeError::MissingTemplate(template_name))
   }
-  let graph_controls : Map[String, Double] = Map([])
+  let graph_controls : Map[@moondsp.Control, Double] = Map([])
   controls.each(fn(key, value) {
     match key {
-      "sound" => () // selector, not a graph parameter
-      "pan" => () // default scheduler side-effect, not a graph parameter
+      Sound => () // selector, not a graph parameter
+      Pan => () // default scheduler side-effect, not a graph parameter
       _ => graph_controls[key] = value
     }
   })
@@ -167,7 +171,7 @@ test "Mini graph boundary: missing selected template is diagnostic" {
 ///|
 test "Mini graph boundary: unknown sound selector is diagnostic" {
   match
-    resolve_mini_graph_controls(@pattern.ControlMap::single("sound", 999.0), []) {
+    resolve_mini_graph_controls(@pattern.ControlMap::single(Sound, 999.0), []) {
     Err(MiniGraphBridgeError::MissingTemplate(name)) =>
       @debug.assert_eq(name, "999")
     _ => fail("expected unknown Mini sound selector to be reported")

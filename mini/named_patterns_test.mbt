@@ -72,8 +72,8 @@ test "one definition edit changes every section while preserving song layout" {
   for i in 0..<events.length() {
     @debug.assert_eq(events[i].whole, old_events[i].whole)
     @debug.assert_eq(events[i].part, old_events[i].part)
-    @debug.assert_eq(old_events[i].value.get("note"), Some(60.0))
-    @debug.assert_eq(events[i].value.get("note"), Some(72.0))
+    @debug.assert_eq(old_events[i].value.get(Note), Some(60.0))
+    @debug.assert_eq(events[i].value.get(Note), Some(72.0))
   }
 }
 

@@ -285,7 +285,7 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     ]),
     ctx,
     @moondsp.ControlBindingBuilder().bind(
-      key="note",
+      key=@moondsp.Control::Note,
       node_index=0,
       slot=@moondsp.GraphParamSlot::Value0,
     ),

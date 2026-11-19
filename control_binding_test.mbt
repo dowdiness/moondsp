@@ -100,7 +100,8 @@ test "build: multiple keys mapping to same node and slot are allowed" {
 ///|
 test "build: empty builder produces Ok with empty map" {
   let template = [@moondsp.DspNode::constant(1.0), @moondsp.DspNode::output(0)]
-  let result = @moondsp.ControlBindingBuilder().build(
+  let result = (
+    @moondsp.ControlBindingBuilder() : @moondsp.ControlBindingBuilder[String]).build(
     @moondsp.AnalyzedGraph::analyze(template),
   )
   assert_true(result is Ok(_))
@@ -329,7 +330,8 @@ test "build: duplicate key still reported for live-node bindings" {
 
 ///|
 test "build: empty builder still succeeds on any template" {
-  let result = @moondsp.ControlBindingBuilder().build(
+  let result = (
+    @moondsp.ControlBindingBuilder() : @moondsp.ControlBindingBuilder[String]).build(
     @moondsp.AnalyzedGraph::analyze(orphan_template()),
   )
   assert_true(result is Ok(_))

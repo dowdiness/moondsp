@@ -149,8 +149,8 @@ test "overlay keeps separate events" {
   let events = (notes + drums).query(cycle)
 
   assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[1].value.get("sound") == Some(36.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[1].value.get(Sound) == Some(36.0))
 }
 ```
 
@@ -169,12 +169,12 @@ test "controls shapes one event" {
     @pattern.Rational::from_int(1),
   )
   let events = @pattern.controls(
-    @pattern.ControlMap::single("note", 60.0).set("pan", -0.5),
+    @pattern.ControlMap::single(Note, 60.0).set(Pan, -0.5),
   ).query(cycle)
 
   assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[0].value.get("pan") == Some(-0.5))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.get(Pan) == Some(-0.5))
 }
 ```
 

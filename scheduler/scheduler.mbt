@@ -12,8 +12,8 @@ fn copy_control_events(
 #derive(Eq, Debug)
 pub(all) enum InstrumentSelector {
   AllEvents
-  HasControl(String)
-  ControlEquals(String, Double)
+  HasControl(@control.Control)
+  ControlEquals(@control.Control, Double)
 }
 
 ///|
@@ -174,7 +174,7 @@ fn PatternScheduler::process_single_event(
         ()
       } else {
         // The pool's bindings decide what each key sets and in which unit.
-        let map : Map[String, Double] = Map([])
+        let map : Map[@control.Control, Double] = Map([])
         event.value.each(fn(k, v) { map[k] = v })
         let gate = pool.note_gate(map)
         let endpoint = match gate {
@@ -195,7 +195,7 @@ fn PatternScheduler::process_single_event(
             return
           }
         }
-        let follow : Array[(String, (Int64, Int64) -> Double)] = []
+        let follow : Array[(@control.Control, (Int64, Int64) -> Double)] = []
         buses.each_reader((key, read) => follow.push((key, read)))
         match pool.note_on_controls(map, follow~) {
           None => ()

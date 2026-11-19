@@ -49,8 +49,8 @@ test "parse_song builds sections and implicit parts" {
   }
   let events = song.query(song_span(0L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 3)
-  assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[1].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Sound) == Some(36.0))
+  assert_true(events[1].value.get(Note) == Some(60.0))
 }
 
 ///|
@@ -88,10 +88,10 @@ test "parse_song accepts multiline whitespace and notation newlines" {
   let song = unwrap_parsed_song(@mini.parse_song(input))
   let events = song.query(song_span(0L, 1L, 4L, 1L))
   @debug.assert_eq(events.length(), 5)
-  assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[1].value.get("note") == Some(64.0))
-  assert_true(events[3].value.get("note") == Some(65.0))
-  assert_true(events[4].value.get("note") == Some(67.0))
+  assert_true(events[0].value.get(Sound) == Some(36.0))
+  assert_true(events[1].value.get(Note) == Some(64.0))
+  assert_true(events[3].value.get(Note) == Some(65.0))
+  assert_true(events[4].value.get(Note) == Some(67.0))
 }
 
 ///|
@@ -124,8 +124,8 @@ test "parse_song preserves authoring order for explicit overlaps" {
   @debug.assert_eq(hits[1].name(), "early1")
   let events = song.query(song_span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[1].value.get("sound") == Some(38.0))
+  assert_true(events[0].value.get(Sound) == Some(36.0))
+  assert_true(events[1].value.get(Sound) == Some(38.0))
 }
 
 ///|
@@ -149,8 +149,8 @@ test "parse_song applies boundary fill directives" {
   @debug.assert_eq(song.gap_spans().length(), 0)
   let events = song.query(song_span(1L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("sound") == Some(42.0))
-  assert_true(events[1].value.get("sound") == Some(42.0))
+  assert_true(events[0].value.get(Sound) == Some(42.0))
+  assert_true(events[1].value.get(Sound) == Some(42.0))
 }
 
 ///|

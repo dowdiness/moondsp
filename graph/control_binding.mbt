@@ -89,8 +89,8 @@ pub extend ControlTarget with Eq::{not_equal, equal}
 
 ///|
 #derive(Debug, Eq)
-pub struct ControlBinding {
-  key : String
+pub struct ControlBinding[K] {
+  key : K
   target : ControlTarget
   unit : ControlUnit
 }
@@ -102,23 +102,23 @@ pub extend ControlBinding with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ControlBinding with Eq::{not_equal, equal}
 
 ///|
-pub fn ControlBinding::ControlBinding(
-  key~ : String,
+pub fn[K] ControlBinding::ControlBinding(
+  key~ : K,
   target~ : ControlTarget,
   unit~ : ControlUnit,
-) -> ControlBinding {
+) -> ControlBinding[K] {
   { key, target, unit, }
 }
 
 ///|
 #derive(Debug, Eq)
-pub(all) enum ControlBindingError {
+pub(all) enum ControlBindingError[K] {
   InvalidNodeIndex(Int32)
   InvalidSlotForNode(Int32, GraphParamSlot)
-  DuplicateKey(String)
+  DuplicateKey(K)
   /// Binding (key, node_index) targets a template node that
   /// optimize_graph eliminated. Prevents silent set_param no-ops.
-  OrphanBinding(String, Int32)
+  OrphanBinding(K, Int32)
 }
 
 ///|
@@ -128,9 +128,9 @@ pub extend ControlBindingError with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ControlBindingError with Eq::{not_equal, equal}
 
 ///|
-fn control_binding_error_from_internal(
-  error : @binding.ControlBindingError,
-) -> ControlBindingError {
+fn[K] control_binding_error_from_internal(
+  error : @binding.ControlBindingError[K],
+) -> ControlBindingError[K] {
   match error {
     @binding.ControlBindingError::InvalidNodeIndex(index) =>
       ControlBindingError::InvalidNodeIndex(index)
@@ -148,35 +148,37 @@ fn control_binding_error_from_internal(
 
 ///|
 #derive(Debug)
-pub struct ControlBindingBuilder {
-  priv raw : @binding.ControlBindingBuilder
+pub struct ControlBindingBuilder[K] {
+  priv raw : @binding.ControlBindingBuilder[K]
 }
 
 ///|
 pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
+pub fn[K] ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder[
+  K,
+] {
   { raw: @binding.ControlBindingBuilder(), }
 }
 
 ///|
-fn ControlBindingBuilder::from_internal(
-  raw : @binding.ControlBindingBuilder,
-) -> ControlBindingBuilder {
+fn[K] ControlBindingBuilder::from_internal(
+  raw : @binding.ControlBindingBuilder[K],
+) -> ControlBindingBuilder[K] {
   { raw, }
 }
 
 ///|
 /// Bind `key` to a graph parameter; `unit` converts score values to the
 /// parameter's unit. Mutates internal array, returns self for chaining.
-pub fn ControlBindingBuilder::bind(
-  self : ControlBindingBuilder,
-  key~ : String,
+pub fn[K] ControlBindingBuilder::bind(
+  self : ControlBindingBuilder[K],
+  key~ : K,
   node_index~ : Int32,
   slot~ : GraphParamSlot,
   unit~ : ControlUnit = Linear,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[K] {
   {
     raw: self.raw.bind(
       key~,
@@ -189,11 +191,11 @@ pub fn ControlBindingBuilder::bind(
 ///|
 /// Bind `key` to a voice-frame parameter, which every voice has whatever its
 /// graph. Mutates internal array, returns self for chaining.
-pub fn ControlBindingBuilder::bind_voice(
-  self : ControlBindingBuilder,
-  key~ : String,
+pub fn[K] ControlBindingBuilder::bind_voice(
+  self : ControlBindingBuilder[K],
+  key~ : K,
   param~ : VoiceParam,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[K] {
   { raw: self.raw.bind(key~, target=Voice(param.to_model()), unit=Linear), }
 }
 
@@ -212,8 +214,8 @@ pub fn ControlBindingBuilder::bind_voice(
 /// ControlBindingMap whenever the template changes. Structural staleness
 /// detection is tracked as a follow-up.
 #derive(Debug, Eq)
-pub struct ControlBindingMap {
-  priv raw : @binding.ControlBindingMap
+pub struct ControlBindingMap[K] {
+  priv raw : @binding.ControlBindingMap[K]
 }
 
 ///|
@@ -223,15 +225,15 @@ pub extend ControlBindingMap with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ControlBindingMap with Eq::{not_equal, equal}
 
 ///|
-fn ControlBindingMap::from_internal(
-  raw : @binding.ControlBindingMap,
-) -> ControlBindingMap {
+fn[K] ControlBindingMap::from_internal(
+  raw : @binding.ControlBindingMap[K],
+) -> ControlBindingMap[K] {
   { raw, }
 }
 
 ///|
 /// Number of validated bindings in this map.
-pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int32 {
+pub fn[K] ControlBindingMap::length(self : ControlBindingMap[K]) -> Int32 {
   self.raw.length()
 }
 
@@ -241,10 +243,10 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int32 {
 /// node index bounds, slot compatibility with the authoring node kind,
 /// post-optimization liveness (rejects bindings on nodes eliminated by
 /// optimize_graph), and key uniqueness. Returns the first error found.
-pub fn ControlBindingBuilder::build(
-  self : ControlBindingBuilder,
+pub fn[K : Eq + Hash] ControlBindingBuilder::build(
+  self : ControlBindingBuilder[K],
   compiled_template : AnalyzedGraph,
-) -> Result[ControlBindingMap, ControlBindingError] {
+) -> Result[ControlBindingMap[K], ControlBindingError[K]] {
   match self.raw.build(compiled_template.raw()) {
     Ok(map) => Ok(ControlBindingMap::from_internal(map))
     Err(error) => Err(control_binding_error_from_internal(error))
@@ -257,9 +259,9 @@ pub fn ControlBindingBuilder::build(
 /// found in the input map, in binding insertion order. Missing keys are
 /// skipped; unrecognized and voice-frame keys are ignored. Values are passed
 /// through without domain validation.
-pub fn ControlBindingMap::resolve_controls(
-  self : ControlBindingMap,
-  controls : Map[String, Double],
+pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(
+  self : ControlBindingMap[K],
+  controls : Map[K, Double],
 ) -> Array[GraphControl] {
   let raw_controls = self.raw.resolve_controls(controls)
   let result : Array[GraphControl] = []
@@ -272,10 +274,10 @@ pub fn ControlBindingMap::resolve_controls(
 
 ///|
 /// The binding for `key`, if any.
-pub fn ControlBindingMap::binding(
-  self : ControlBindingMap,
-  key : String,
-) -> ControlBinding? {
+pub fn[K : Eq] ControlBindingMap::binding(
+  self : ControlBindingMap[K],
+  key : K,
+) -> ControlBinding[K]? {
   match self.raw.binding(key) {
     Some((Graph(node_index, slot), unit)) =>
       Some(
@@ -299,9 +301,9 @@ pub fn ControlBindingMap::binding(
 
 ///|
 /// Visit each voice-frame-bound key found in `controls`, in binding order.
-pub fn ControlBindingMap::each_voice_value(
-  self : ControlBindingMap,
-  controls : Map[String, Double],
+pub fn[K : Eq + Hash] ControlBindingMap::each_voice_value(
+  self : ControlBindingMap[K],
+  controls : Map[K, Double],
   f : (VoiceParam, Double) -> Unit,
 ) -> Unit {
   self.raw.each_voice_value(controls, (param, value) => {
@@ -310,7 +312,7 @@ pub fn ControlBindingMap::each_voice_value(
 }
 
 ///|
-pub impl Show for ControlBinding with fn output(self, logger) {
+pub impl[K : Debug] Show for ControlBinding[K] with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -318,7 +320,7 @@ pub impl Show for ControlBinding with fn output(self, logger) {
 pub extend ControlBinding with Show::{to_string, output}
 
 ///|
-pub impl Show for ControlBindingError with fn output(self, logger) {
+pub impl[K : Debug] Show for ControlBindingError[K] with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -326,7 +328,10 @@ pub impl Show for ControlBindingError with fn output(self, logger) {
 pub extend ControlBindingError with Show::{to_string, output}
 
 ///|
-pub impl Show for ControlBindingBuilder with fn output(self, logger) {
+pub impl[K : Debug] Show for ControlBindingBuilder[K] with fn output(
+  self,
+  logger,
+) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -334,7 +339,7 @@ pub impl Show for ControlBindingBuilder with fn output(self, logger) {
 pub extend ControlBindingBuilder with Show::{to_string, output}
 
 ///|
-pub impl Show for ControlBindingMap with fn output(self, logger) {
+pub impl[K : Debug] Show for ControlBindingMap[K] with fn output(self, logger) {
   logger.write_string(@debug.to_string(self))
 }
 
@@ -344,9 +349,9 @@ pub extend ControlBindingMap with Show::{to_string, output}
 ///|
 /// Read the default captured when these bindings were validated, in score
 /// units.
-pub fn ControlBindingMap::default_value(
-  self : ControlBindingMap,
-  key : String,
+pub fn[K : Eq] ControlBindingMap::default_value(
+  self : ControlBindingMap[K],
+  key : K,
 ) -> Double? {
   self.raw.default_value(key)
 }

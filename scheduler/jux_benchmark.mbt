@@ -36,15 +36,16 @@ fn bench_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn bench_binding_builder() -> @moondsp.ControlBindingBuilder {
-  @moondsp.ControlBindingBuilder()
+fn bench_binding_builder() -> @moondsp.ControlBindingBuilder[@moondsp.Control] {
+  let bindings : @moondsp.ControlBindingBuilder[@moondsp.Control] = @moondsp.ControlBindingBuilder()
+  bindings
   .bind(
-    key="note",
+    key=Note,
     node_index=0,
     slot=@moondsp.GraphParamSlot::Value0,
     unit=MidiToHz,
   )
-  .bind_voice(key="pan", param=Pan)
+  .bind_voice(key=Pan, param=Pan)
 }
 
 ///|

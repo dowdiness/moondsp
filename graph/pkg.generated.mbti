@@ -38,61 +38,61 @@ pub fn AnalyzedGraph::orphan_adsr_count(Self) -> Int32
 pub impl Eq for AnalyzedGraph
 
 #derive(Eq, @debug.Debug)
-pub struct ControlBinding {
-  key : String
+pub struct ControlBinding[K] {
+  key : K
   target : ControlTarget
   unit : ControlUnit
 }
-pub fn ControlBinding::ControlBinding(key~ : String, target~ : ControlTarget, unit~ : ControlUnit) -> Self
-pub fn ControlBinding::equal(Self, Self) -> Bool
-pub fn ControlBinding::not_equal(Self, Self) -> Bool
-pub fn ControlBinding::output(Self, &Logger) -> Unit
-pub fn ControlBinding::to_repr(Self) -> @debug.Repr
-pub fn ControlBinding::to_string(Self) -> String
-pub impl Show for ControlBinding
+pub fn[K] ControlBinding::ControlBinding(key~ : K, target~ : ControlTarget, unit~ : ControlUnit) -> Self[K]
+pub fn[K : Eq] ControlBinding::equal(Self[K], Self[K]) -> Bool
+pub fn[K : Eq] ControlBinding::not_equal(Self[K], Self[K]) -> Bool
+pub fn[K : @debug.Debug] ControlBinding::output(Self[K], &Logger) -> Unit
+pub fn[K : @debug.Debug] ControlBinding::to_repr(Self[K]) -> @debug.Repr
+pub fn[K : @debug.Debug] ControlBinding::to_string(Self[K]) -> String
+pub impl[K : @debug.Debug] Show for ControlBinding[K]
 
 #derive(@debug.Debug)
-pub struct ControlBindingBuilder {
+pub struct ControlBindingBuilder[K] {
   // private fields
 }
-pub fn ControlBindingBuilder::ControlBindingBuilder() -> Self
-pub fn ControlBindingBuilder::bind(Self, key~ : String, node_index~ : Int32, slot~ : GraphParamSlot, unit? : ControlUnit) -> Self
-pub fn ControlBindingBuilder::bind_voice(Self, key~ : String, param~ : VoiceParam) -> Self
-pub fn ControlBindingBuilder::build(Self, AnalyzedGraph) -> Result[ControlBindingMap, ControlBindingError]
-pub fn ControlBindingBuilder::output(Self, &Logger) -> Unit
-pub fn ControlBindingBuilder::to_repr(Self) -> @debug.Repr
-pub fn ControlBindingBuilder::to_string(Self) -> String
-pub impl Show for ControlBindingBuilder
+pub fn[K] ControlBindingBuilder::ControlBindingBuilder() -> Self[K]
+pub fn[K] ControlBindingBuilder::bind(Self[K], key~ : K, node_index~ : Int32, slot~ : GraphParamSlot, unit? : ControlUnit) -> Self[K]
+pub fn[K] ControlBindingBuilder::bind_voice(Self[K], key~ : K, param~ : VoiceParam) -> Self[K]
+pub fn[K : Eq + Hash] ControlBindingBuilder::build(Self[K], AnalyzedGraph) -> Result[ControlBindingMap[K], ControlBindingError[K]]
+pub fn[K : @debug.Debug] ControlBindingBuilder::output(Self[K], &Logger) -> Unit
+pub fn[K : @debug.Debug] ControlBindingBuilder::to_repr(Self[K]) -> @debug.Repr
+pub fn[K : @debug.Debug] ControlBindingBuilder::to_string(Self[K]) -> String
+pub impl[K : @debug.Debug] Show for ControlBindingBuilder[K]
 
 #derive(Eq, @debug.Debug)
-pub(all) enum ControlBindingError {
+pub(all) enum ControlBindingError[K] {
   InvalidNodeIndex(Int32)
   InvalidSlotForNode(Int32, GraphParamSlot)
-  DuplicateKey(String)
-  OrphanBinding(String, Int32)
+  DuplicateKey(K)
+  OrphanBinding(K, Int32)
 }
-pub fn ControlBindingError::equal(Self, Self) -> Bool
-pub fn ControlBindingError::not_equal(Self, Self) -> Bool
-pub fn ControlBindingError::output(Self, &Logger) -> Unit
-pub fn ControlBindingError::to_repr(Self) -> @debug.Repr
-pub fn ControlBindingError::to_string(Self) -> String
-pub impl Show for ControlBindingError
+pub fn[K : Eq] ControlBindingError::equal(Self[K], Self[K]) -> Bool
+pub fn[K : Eq] ControlBindingError::not_equal(Self[K], Self[K]) -> Bool
+pub fn[K : @debug.Debug] ControlBindingError::output(Self[K], &Logger) -> Unit
+pub fn[K : @debug.Debug] ControlBindingError::to_repr(Self[K]) -> @debug.Repr
+pub fn[K : @debug.Debug] ControlBindingError::to_string(Self[K]) -> String
+pub impl[K : @debug.Debug] Show for ControlBindingError[K]
 
 #derive(Eq, @debug.Debug)
-pub struct ControlBindingMap {
+pub struct ControlBindingMap[K] {
   // private fields
 }
-pub fn ControlBindingMap::binding(Self, String) -> ControlBinding?
-pub fn ControlBindingMap::default_value(Self, String) -> Double?
-pub fn ControlBindingMap::each_voice_value(Self, Map[String, Double], (VoiceParam, Double) -> Unit) -> Unit
-pub fn ControlBindingMap::equal(Self, Self) -> Bool
-pub fn ControlBindingMap::length(Self) -> Int32
-pub fn ControlBindingMap::not_equal(Self, Self) -> Bool
-pub fn ControlBindingMap::output(Self, &Logger) -> Unit
-pub fn ControlBindingMap::resolve_controls(Self, Map[String, Double]) -> Array[GraphControl]
-pub fn ControlBindingMap::to_repr(Self) -> @debug.Repr
-pub fn ControlBindingMap::to_string(Self) -> String
-pub impl Show for ControlBindingMap
+pub fn[K : Eq] ControlBindingMap::binding(Self[K], K) -> ControlBinding[K]?
+pub fn[K : Eq] ControlBindingMap::default_value(Self[K], K) -> Double?
+pub fn[K : Eq + Hash] ControlBindingMap::each_voice_value(Self[K], Map[K, Double], (VoiceParam, Double) -> Unit) -> Unit
+pub fn[K : Eq] ControlBindingMap::equal(Self[K], Self[K]) -> Bool
+pub fn[K] ControlBindingMap::length(Self[K]) -> Int32
+pub fn[K : Eq] ControlBindingMap::not_equal(Self[K], Self[K]) -> Bool
+pub fn[K : @debug.Debug] ControlBindingMap::output(Self[K], &Logger) -> Unit
+pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(Self[K], Map[K, Double]) -> Array[GraphControl]
+pub fn[K : @debug.Debug] ControlBindingMap::to_repr(Self[K]) -> @debug.Repr
+pub fn[K : @debug.Debug] ControlBindingMap::to_string(Self[K]) -> String
+pub impl[K : @debug.Debug] Show for ControlBindingMap[K]
 
 #derive(Eq, @debug.Debug)
 pub(all) enum ControlTarget {
@@ -346,7 +346,7 @@ pub fn GraphDocument::rewire_input(Self, @identity.GraphNodeId, GraphTopologyInp
 pub struct GraphIndexMap {
   // private fields
 }
-pub fn GraphIndexMap::bind_control(Self, ControlBindingBuilder, String, @identity.GraphNodeId, GraphParamSlot) -> ControlBindingBuilder?
+pub fn[K] GraphIndexMap::bind_control(Self, ControlBindingBuilder[K], K, @identity.GraphNodeId, GraphParamSlot) -> ControlBindingBuilder[K]?
 pub fn GraphIndexMap::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
 pub fn GraphIndexMap::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, GraphTopologyInputSlot, @identity.GraphNodeId) -> GraphTopologyEdit?
 pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> GraphControl?

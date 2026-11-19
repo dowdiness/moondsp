@@ -2,35 +2,35 @@
 test "note_name c3 = 48" {
   let pat = @pattern.note_name("c3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(48.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(48.0))
 }
 
 ///|
 test "note_name e3 = 52" {
   let pat = @pattern.note_name("e3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(52.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(52.0))
 }
 
 ///|
 test "note_name g3 = 55" {
   let pat = @pattern.note_name("g3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(55.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(55.0))
 }
 
 ///|
 test "note_name fs4 = 66" {
   let pat = @pattern.note_name("fs4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(66.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(66.0))
 }
 
 ///|
 test "note_name a4 = 69" {
   let pat = @pattern.note_name("a4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(69.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(69.0))
 }
 
 ///|
@@ -38,21 +38,21 @@ test "s_lpf and s_hpf carry cutoff and resonance on one event" {
   let lpf = @pattern.s_lpf(800.0, resonance=2.0).query(span(0, 1, 1, 1))
   let hpf = @pattern.s_hpf(120.0).query(span(0, 1, 1, 1))
   @debug.assert_eq(lpf.length(), 1)
-  @debug.assert_eq(lpf[0].value.get("lpf_resonance"), Some(2.0))
-  @debug.assert_eq(hpf[0].value.get("hpf_resonance"), None)
+  @debug.assert_eq(lpf[0].value.get(LpfResonance), Some(2.0))
+  @debug.assert_eq(hpf[0].value.get(HpfResonance), None)
   let merged = @pattern.controls(
-    @pattern.ControlMap::single("note", 60.0)
+    @pattern.ControlMap::single(Note, 60.0)
     .merge(lpf[0].value)
-    .set("hpf", 120.0)
-    .set("hpf_resonance", 0.5),
+    .set(Hpf, 120.0)
+    .set(HpfResonance, 0.5),
   )
   let events = merged.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 1)
-  @debug.assert_eq(events[0].value.get("note"), Some(60.0))
-  @debug.assert_eq(events[0].value.get("lpf"), Some(800.0))
-  @debug.assert_eq(events[0].value.get("lpf_resonance"), Some(2.0))
-  @debug.assert_eq(events[0].value.get("hpf"), Some(120.0))
-  @debug.assert_eq(events[0].value.get("hpf_resonance"), Some(0.5))
+  @debug.assert_eq(events[0].value.get(Note), Some(60.0))
+  @debug.assert_eq(events[0].value.get(Lpf), Some(800.0))
+  @debug.assert_eq(events[0].value.get(LpfResonance), Some(2.0))
+  @debug.assert_eq(events[0].value.get(Hpf), Some(120.0))
+  @debug.assert_eq(events[0].value.get(HpfResonance), Some(0.5))
 }
 
 ///|
@@ -62,7 +62,7 @@ test "jux(rev): event count and pan keys" {
   let events = result.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 4)
   let (pan_neg1, pan_pos1) = for ev in events; neg = 0, pos = 0 {
-    match ev.value.get("pan") {
+    match ev.value.get(Pan) {
       Some(-1.0) => continue neg + 1, pos
       Some(1.0) => continue neg, pos + 1
       _ => continue neg, pos
@@ -80,12 +80,8 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   // drops a control key while routing through merge_control. Without
   // a non-pan secondary key, the test only proves part+sound parity.
   let pat = @pattern.sequence([
-    @pattern.controls(
-      @pattern.ControlMap::single("sound", 36.0).set("lpf", 800.0),
-    ),
-    @pattern.controls(
-      @pattern.ControlMap::single("sound", 38.0).set("lpf", 800.0),
-    ),
+    @pattern.controls(@pattern.ControlMap::single(Sound, 36.0).set(Lpf, 800.0)),
+    @pattern.controls(@pattern.ControlMap::single(Sound, 38.0).set(Lpf, 800.0)),
   ])
   let result = pat.jux(fn(p) { p.rev() })
   let arc = span(0, 1, 1, 1)
@@ -96,7 +92,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   let left : Array[@pattern.Event[@pattern.ControlMap]] = []
   let right : Array[@pattern.Event[@pattern.ControlMap]] = []
   for ev in combined {
-    match ev.value.get("pan") {
+    match ev.value.get(Pan) {
       Some(-1.0) => left.push(ev)
       Some(1.0) => right.push(ev)
       _ => ()
@@ -107,20 +103,14 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   @debug.assert_eq(left.length(), self_events.length())
   for i in 0..<left.length() {
     @debug.assert_eq(left[i].part, self_events[i].part)
-    @debug.assert_eq(
-      left[i].value.get("sound"),
-      self_events[i].value.get("sound"),
-    )
-    @debug.assert_eq(left[i].value.get("lpf"), self_events[i].value.get("lpf"))
+    @debug.assert_eq(left[i].value.get(Sound), self_events[i].value.get(Sound))
+    @debug.assert_eq(left[i].value.get(Lpf), self_events[i].value.get(Lpf))
   }
   @debug.assert_eq(right.length(), f_events.length())
   for i in 0..<right.length() {
     @debug.assert_eq(right[i].part, f_events[i].part)
-    @debug.assert_eq(
-      right[i].value.get("sound"),
-      f_events[i].value.get("sound"),
-    )
-    @debug.assert_eq(right[i].value.get("lpf"), f_events[i].value.get("lpf"))
+    @debug.assert_eq(right[i].value.get(Sound), f_events[i].value.get(Sound))
+    @debug.assert_eq(right[i].value.get(Lpf), f_events[i].value.get(Lpf))
   }
 }
 
@@ -128,14 +118,14 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
 test "jux: overrides pre-existing pan" {
   // Pre-pan to 0.5, then jux — result should have only ±1 pan values.
   let pat = @pattern.controls(
-    @pattern.ControlMap::single("sound", 36.0).set("pan", 0.5),
+    @pattern.ControlMap::single(Sound, 36.0).set(Pan, 0.5),
   )
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
   // Guard against a vacuously-passing empty result.
   @debug.assert_eq(events.length(), 2)
   for ev in events {
-    let p = ev.value.get("pan")
+    let p = ev.value.get(Pan)
     let is_pm1 = p == Some(-1.0) || p == Some(1.0)
     assert_true(is_pm1)
   }
@@ -154,28 +144,28 @@ test "jux(fast(2)): right channel doubles event count" {
 test "note_name bf4 = 70 (B-flat)" {
   let pat = @pattern.note_name("bf4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(70.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(70.0))
 }
 
 ///|
 test "note_name ef3 = 51 (E-flat)" {
   let pat = @pattern.note_name("ef3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(51.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(51.0))
 }
 
 ///|
 test "note_name f4 = 65 (F natural, not flat)" {
   let pat = @pattern.note_name("f4")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(65.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(65.0))
 }
 
 ///|
 test "note_name cs3 = 49 (C-sharp)" {
   let pat = @pattern.note_name("cs3")
   let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(49.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(49.0))
 }
 
 ///|
@@ -188,13 +178,13 @@ test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   let events = pat.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 6)
   // First half: c3 e3 g3 in [0, 1/2)
-  @debug.assert_eq(events[0].value.get("note"), Some(48.0))
-  @debug.assert_eq(events[1].value.get("note"), Some(52.0))
-  @debug.assert_eq(events[2].value.get("note"), Some(55.0))
+  @debug.assert_eq(events[0].value.get(Note), Some(48.0))
+  @debug.assert_eq(events[1].value.get(Note), Some(52.0))
+  @debug.assert_eq(events[2].value.get(Note), Some(55.0))
   // Second half: c3 e3 g3 in [1/2, 1)
-  @debug.assert_eq(events[3].value.get("note"), Some(48.0))
-  @debug.assert_eq(events[4].value.get("note"), Some(52.0))
-  @debug.assert_eq(events[5].value.get("note"), Some(55.0))
+  @debug.assert_eq(events[3].value.get(Note), Some(48.0))
+  @debug.assert_eq(events[4].value.get(Note), Some(52.0))
+  @debug.assert_eq(events[5].value.get(Note), Some(55.0))
   // Verify rational time boundaries
   @debug.assert_eq(events[0].part.begin, @pattern.Rational(0L, 1L))
   @debug.assert_eq(events[0].part.end_, @pattern.Rational(1L, 6L))

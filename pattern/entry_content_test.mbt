@@ -3,13 +3,13 @@ test "editing event controls leaves source content unchanged" {
   let source = @pattern.note(60.0)
   let arc = span(0, 1, 1, 1)
   let value = source.query(arc)[0].value
-  let with_lpf = value.set("lpf", 800.0)
-  let replaced = with_lpf.merge(@pattern.ControlMap::single("note", 72.0))
+  let with_lpf = value.set(Lpf, 800.0)
+  let replaced = with_lpf.merge(@pattern.ControlMap::single(Note, 72.0))
   let exported = replaced.entries()
-  exported["note"] = 12.0
-  assert_eq(with_lpf.entries(), { "note": 60.0, "lpf": 800.0 })
-  assert_eq(replaced.entries(), { "note": 72.0, "lpf": 800.0 })
-  assert_eq(source.query(arc)[0].value.entries(), { "note": 60.0 })
+  exported[Note] = 12.0
+  assert_eq(with_lpf.entries(), Map([(Note, 60.0), (Lpf, 800.0)]))
+  assert_eq(replaced.entries(), Map([(Note, 72.0), (Lpf, 800.0)]))
+  assert_eq(source.query(arc)[0].value.entries(), Map([(Note, 60.0)]))
   assert_true(source.same_content(@pattern.note(60.0)))
 }
 
@@ -27,21 +27,21 @@ test "sequence owns its inputs so content and events stay consistent" {
   let inputs = [@pattern.note(60.0)]
   let sequence = @pattern.sequence(inputs)
   inputs[0] = @pattern.note(72.0)
-  assert_eq(sequence.query(span(0, 1, 1, 1))[0].value.get("note"), Some(60.0))
+  assert_eq(sequence.query(span(0, 1, 1, 1))[0].value.get(Note), Some(60.0))
   assert_true(sequence.same_content(@pattern.sequence([@pattern.note(60.0)])))
 }
 
 ///|
 test "control selection tracks both predicate and selected events" {
   let source = @pattern.stack([@pattern.note(60.0), @pattern.sound(36.0)])
-  let notes = source.select_control("note")
-  let missing = source.select_control("sound", value=38.0)
+  let notes = source.select_control(Note)
+  let missing = source.select_control(Sound, value=38.0)
   assert_eq(notes.query(span(0, 1, 1, 1)).map(e => e.value.entries()), [
-    { "note": 60.0 },
+    Map([(Note, 60.0)]),
   ])
   assert_eq(missing.query(span(0, 1, 1, 1)).length(), 0)
-  assert_true(notes.same_content(source.select_control("note")))
-  assert_false(missing.same_content(source.select_control("sound", value=36.0)))
+  assert_true(notes.same_content(source.select_control(Note)))
+  assert_false(missing.same_content(source.select_control(Sound, value=36.0)))
 }
 
 ///|

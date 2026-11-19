@@ -249,7 +249,7 @@ fn notation_projection_events(
             let pitch : Json = if rests_only || kind == "drum" {
               Json::null()
             } else {
-              match event.value.get("note") {
+              match event.value.get(Note) {
                 Some(value) => Json(value)
                 None => raise InvalidEdit("compiled note event has no pitch")
               }

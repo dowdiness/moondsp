@@ -43,11 +43,12 @@ let player : @ref.Ref[Player?] = Ref(None)
 
 ///|
 /// Mini's voice-frame keys, which every instrument receives.
-fn voice_frame_bindings() -> @moondsp.ControlBindingBuilder {
-  @moondsp.ControlBindingBuilder()
-  .bind_voice(key="gain", param=Gain)
-  .bind_voice(key="pan", param=Pan)
-  .bind_voice(key="room", param=Send)
+fn voice_frame_bindings() -> @moondsp.ControlBindingBuilder[@moondsp.Control] {
+  let bindings : @moondsp.ControlBindingBuilder[@moondsp.Control] = @moondsp.ControlBindingBuilder()
+  bindings
+  .bind_voice(key=Gain, param=Gain)
+  .bind_voice(key=Pan, param=Pan)
+  .bind_voice(key=Room, param=Send)
 }
 
 ///|
@@ -86,42 +87,34 @@ fn make_synth_pool(
       ctx,
       voice_frame_bindings()
       .bind(
-        key="note",
+        key=Note,
         node_index=0, // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
         unit=MidiToHz,
       )
       .bind(
-        key="attack",
+        key=Attack,
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value0,
         unit=SecondsToMs,
       )
+      .bind(key=Decay, node_index=1, slot=@moondsp.GraphParamSlot::Value1)
+      .bind(key=Sustain, node_index=1, slot=@moondsp.GraphParamSlot::Value2)
       .bind(
-        key="envelope_decay",
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value1,
-      )
-      .bind(
-        key="envelope_sustain",
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value2,
-      )
-      .bind(
-        key="release",
+        key=Release,
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value3,
         unit=SecondsToMs,
       )
-      .bind(key="lpf", node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(key=Lpf, node_index=2, slot=@moondsp.GraphParamSlot::Value0)
       .bind(
-        key="lpf_resonance",
+        key=LpfResonance,
         node_index=2,
         slot=@moondsp.GraphParamSlot::Value1,
       )
-      .bind(key="hpf", node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+      .bind(key=Hpf, node_index=3, slot=@moondsp.GraphParamSlot::Value0)
       .bind(
-        key="hpf_resonance",
+        key=HpfResonance,
         node_index=3,
         slot=@moondsp.GraphParamSlot::Value1,
       ),
@@ -148,12 +141,12 @@ pub fn init_scheduler_graph_with_templates(
   // The scheduler and its voice pools refuse any format they cannot run.
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let candidates = [
-    (@scheduler.ControlEquals("sound", 36.0), make_drum_pool(bd_template, ctx)),
-    (@scheduler.ControlEquals("sound", 38.0), make_drum_pool(sd_template, ctx)),
-    (@scheduler.ControlEquals("sound", 42.0), make_drum_pool(hh_template, ctx)),
-    (@scheduler.ControlEquals("sound", 39.0), make_drum_pool(cp_template, ctx)),
-    (@scheduler.ControlEquals("sound", 46.0), make_drum_pool(oh_template, ctx)),
-    (@scheduler.HasControl("note"), make_synth_pool(synth_template, ctx)),
+    (@scheduler.ControlEquals(Sound, 36.0), make_drum_pool(bd_template, ctx)),
+    (@scheduler.ControlEquals(Sound, 38.0), make_drum_pool(sd_template, ctx)),
+    (@scheduler.ControlEquals(Sound, 42.0), make_drum_pool(hh_template, ctx)),
+    (@scheduler.ControlEquals(Sound, 39.0), make_drum_pool(cp_template, ctx)),
+    (@scheduler.ControlEquals(Sound, 46.0), make_drum_pool(oh_template, ctx)),
+    (@scheduler.HasControl(Note), make_synth_pool(synth_template, ctx)),
   ]
   let instruments : Array[
     (@scheduler.InstrumentSelector, @moondsp.BoundVoicePool),

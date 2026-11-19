@@ -78,7 +78,7 @@ pub fn MiniDocBuilder::sound_atom(
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = match drum_midi(name) {
     Some(midi) =>
-      self.control_doc(id, "sound", midi.to_double()) catch {
+      self.control_doc(id, Sound, midi.to_double()) catch {
         ParseError(msg) => return Err(msg)
       }
     None => return Err("unknown drum name '\{name}'")
@@ -97,7 +97,7 @@ pub fn MiniDocBuilder::note_atom(
     Ok(note) => note
     Err(msg) => return Err(msg)
   }
-  let doc = self.control_doc(id, "note", note) catch {
+  let doc = self.control_doc(id, Note, note) catch {
     ParseError(msg) => return Err(msg)
   }
   Ok(doc)
@@ -132,7 +132,7 @@ fn MiniDocBuilder::chord_doc_from_notes(
             self.source_atom_by_graph_id[note_id.value()] = source_atom
           None => ()
         }
-        note_docs.push(self.control_doc(note_id, "note", midi.to_double()))
+        note_docs.push(self.control_doc(note_id, Note, midi.to_double()))
         tone_index += 1
       }
       @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
@@ -261,7 +261,7 @@ pub fn MiniDocBuilder::degrade(
 pub fn MiniDocBuilder::control(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  key : String,
+  key : @control.Control,
   value : Double,
 ) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
   let doc = self.scalar_control_doc(doc, key, value) catch {
@@ -454,7 +454,7 @@ fn MiniDocBuilder::rest_doc(
 fn MiniDocBuilder::control_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  key : String,
+  key : @control.Control,
   value : Double,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   self.contents[id.value()] = "control:\{key}:\{value}"
@@ -708,7 +708,7 @@ fn time_transform_signature(transform : @pattern.TimeTransform) -> String {
 fn MiniDocBuilder::scalar_control_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  key : String,
+  key : @control.Control,
   value : Double,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let control_id = self.id("mini:control:\{doc.root().value()}:\{key}:\{value}")
@@ -728,7 +728,7 @@ fn MiniDocBuilder::scalar_control_doc(
 fn MiniDocBuilder::control_value_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[@pattern.ControlMap],
-  key : String,
+  key : @control.Control,
   value : MiniValue,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
   let control_doc = match value {
@@ -760,7 +760,7 @@ fn MiniDocBuilder::control_value_doc(
     }
   }
   // The provider's node and content, not its spelling, identify the merge.
-  let id = self.node_id("merge_control", [doc, control_doc], key)
+  let id = self.node_id("merge_control", [doc, control_doc], key.name())
   match self.reuse_doc(id, inputs=[doc, control_doc]) {
     Some(doc) => doc
     None =>
@@ -1142,7 +1142,7 @@ fn NotationParser::parse_doc_atom(
           self.source_offset + start,
           self.source_offset + self.pos,
         )
-        builder.control_doc(id, "sound", midi.to_double())
+        builder.control_doc(id, Sound, midi.to_double())
       }
       None => raise ParseError("position \{start}: unknown drum name '\{name}'")
     }
@@ -1177,7 +1177,7 @@ fn NotationParser::parse_doc_atom(
         self.source_offset + token_start,
         self.source_offset + token_end,
       )
-      builder.control_doc(id, "note", note)
+      builder.control_doc(id, Note, note)
     } catch {
       ParseError(_) => self.parse_doc_note_name_atom(builder, start)
     } noraise {
@@ -1206,7 +1206,7 @@ fn NotationParser::parse_doc_note_name_atom(
         self.source_offset + name_start,
         self.source_offset + self.pos,
       )
-      builder.control_doc(id, "note", midi)
+      builder.control_doc(id, Note, midi)
     }
     None => raise ParseError("position \{start}: unknown note name '\{name}'")
   }

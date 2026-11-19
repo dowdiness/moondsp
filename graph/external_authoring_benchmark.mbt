@@ -429,7 +429,7 @@ fn bench_external_doc(fixture : BenchExternalAuthoringFixture) -> GraphDocument 
 fn build_bench_external_binding_builder(
   index_map : GraphIndexMap,
   fixture : BenchExternalAuthoringFixture,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[String] {
   let mut builder = ControlBindingBuilder()
   for i in 0..<fixture.control_ids.length() {
     match
@@ -449,7 +449,7 @@ fn build_bench_external_binding_builder(
 ///|
 fn bench_external_binding_map(
   fixture : BenchExternalAuthoringFixture,
-) -> ControlBindingMap {
+) -> ControlBindingMap[String] {
   let doc = bench_external_doc(fixture)
   let template = doc.analyze()
   build_bench_external_binding_builder(doc.index_map(), fixture)
@@ -720,7 +720,9 @@ fn[T, E] bench_expect_err(result : Result[T, E], label : String) -> E {
 ///|
 fn bench_external_control_binding_rejection(
   b : @bench.T,
-  make_builder : (GraphIndexMap, BenchExternalAuthoringFixture) -> ControlBindingBuilder,
+  make_builder : (GraphIndexMap, BenchExternalAuthoringFixture) -> ControlBindingBuilder[
+    String,
+  ],
   label : String,
 ) -> Unit {
   for fixture in bench_external_authoring_fixtures() {
@@ -754,7 +756,7 @@ fn bench_external_compile_result_rejection(
 fn bench_external_invalid_index_binding_builder(
   index_map : GraphIndexMap,
   fixture : BenchExternalAuthoringFixture,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[String] {
   let builder = build_bench_external_binding_builder(index_map, fixture)
   builder.bind(
     key="diagnostic:invalid-index",
@@ -767,7 +769,7 @@ fn bench_external_invalid_index_binding_builder(
 fn bench_external_invalid_slot_binding_builder(
   index_map : GraphIndexMap,
   fixture : BenchExternalAuthoringFixture,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[String] {
   let builder = build_bench_external_binding_builder(index_map, fixture)
   builder.bind(
     key="diagnostic:invalid-slot",
@@ -780,7 +782,7 @@ fn bench_external_invalid_slot_binding_builder(
 fn bench_external_duplicate_key_binding_builder(
   index_map : GraphIndexMap,
   fixture : BenchExternalAuthoringFixture,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[String] {
   let builder = build_bench_external_binding_builder(index_map, fixture)
   builder.bind(
     key=fixture.control_keys[0],

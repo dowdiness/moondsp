@@ -42,7 +42,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
   )
   let events = state.query_active_sourced_events(arc)
   assert_eq(
-    events.map(event => event.event().value.get("note").unwrap().to_int()),
+    events.map(event => event.event().value.get(Note).unwrap().to_int()),
     [60, 67],
   )
   let children = [left, right]
@@ -59,7 +59,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     @pattern.TimeSpan(@pattern.Rational(1L, 4L), @pattern.Rational(3L, 4L)),
   )
   assert_eq(
-    clipped.map(event => event.event().value.get("note").unwrap().to_int()),
+    clipped.map(event => event.event().value.get(Note).unwrap().to_int()),
     [60, 67],
   )
   for sourced in clipped {

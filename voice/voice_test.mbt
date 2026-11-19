@@ -239,7 +239,7 @@ test "bound voice pool constructor reports invalid bindings" {
       AnalyzedGraph::analyze(nodes),
       ctx,
       ControlBindingBuilder().bind(
-        key="bad",
+        key=@control.Control::Note,
         node_index=5,
         slot=GraphParamSlot::Value0,
       ),
@@ -266,7 +266,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
     AnalyzedGraph::analyze(nodes_a),
     ctx,
     ControlBindingBuilder().bind(
-      key="note",
+      key=@control.Control::Note,
       node_index=0,
       slot=GraphParamSlot::Value0,
     ),
@@ -274,7 +274,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
   let rejected = pool.set_template(
     AnalyzedGraph::analyze(nodes_b),
     ControlBindingBuilder().bind(
-      key="note",
+      key=@control.Control::Note,
       node_index=0,
       slot=GraphParamSlot::Value0,
     ),
@@ -283,7 +283,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
     Err(@voice.BoundVoicePoolError::Binding(_)) => ()
     _ => assert_true(false)
   }
-  let controls : Map[String, Double] = { "note": 880.0 }
+  let controls : Map[@control.Control, Double] = Map([(Note, 880.0)])
   assert_true(pool.note_on_controls(controls) is Some(_))
   assert_true(pool.active_voice_count() == 1)
 }
@@ -1166,10 +1166,14 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
     DspNode::output(2),
   ])
   let bindings = ControlBindingBuilder()
-    .bind(key="attack", node_index=1, slot=GraphParamSlot::Value0)
-    .bind(key="decay", node_index=1, slot=GraphParamSlot::Value1)
-    .bind(key="sustain", node_index=1, slot=GraphParamSlot::Value2)
-    .bind(key="release", node_index=1, slot=GraphParamSlot::Value3)
+    .bind(
+      key=@control.Control::Attack,
+      node_index=1,
+      slot=GraphParamSlot::Value0,
+    )
+    .bind(key=Decay, node_index=1, slot=GraphParamSlot::Value1)
+    .bind(key=Sustain, node_index=1, slot=GraphParamSlot::Value2)
+    .bind(key=Release, node_index=1, slot=GraphParamSlot::Value3)
   let pool = @voice.BoundVoicePool(template, ctx, bindings, max_voices=2)
   let left = ctx.make_buffer()
   let right = ctx.make_buffer()
@@ -1178,13 +1182,13 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
     right.fill(0.0)
     pool.process(ctx, left, right)
   }
-  let old = pool.note_on_controls({ "release": 2000.0 }).unwrap()
+  let old = pool.note_on_controls(Map([(Release, 2000.0)])).unwrap()
   render_second()
   let peak = left.get(127)
   assert_true(peak > 0.0)
   pool.note_off_result(old).unwrap()
   let newer = pool
-    .note_on_controls({ "attack": 2000.0, "sustain": 0.5 })
+    .note_on_controls(Map([(Attack, 2000.0), (Sustain, 0.5)]))
     .unwrap()
   render_second()
   // Old voice fades from 1 to .5 while new voice rises from 0 to .5.
@@ -1200,8 +1204,8 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
   pool.note_off_result(reused).unwrap()
   render_second()
   assert_eq(left.get(0), 0.0)
-  assert_true(pool.note_on_controls({ "sustain": 2.0 }) is None)
-  assert_true(pool.note_on_controls({ "release": -1.0 }) is None)
+  assert_true(pool.note_on_controls(Map([(Sustain, 2.0)])) is None)
+  assert_true(pool.note_on_controls(Map([(Release, -1.0)])) is None)
 }
 
 ///|
@@ -1214,18 +1218,18 @@ test "instrument gate follows template changes without mutating note controls" {
       DspNode::output(2),
     ])
   }
-  fn bindings() -> ControlBindingBuilder {
+  fn bindings() -> ControlBindingBuilder[@control.Control] {
     ControlBindingBuilder()
     .bind(
-      key="attack",
+      key=@control.Control::Attack,
       node_index=1,
       slot=GraphParamSlot::Value0,
       unit=SecondsToMs,
     )
-    .bind(key="envelope_decay", node_index=1, slot=GraphParamSlot::Value1)
-    .bind(key="envelope_sustain", node_index=1, slot=GraphParamSlot::Value2)
+    .bind(key=Decay, node_index=1, slot=GraphParamSlot::Value1)
+    .bind(key=Sustain, node_index=1, slot=GraphParamSlot::Value2)
     .bind(
-      key="release",
+      key=Release,
       node_index=1,
       slot=GraphParamSlot::Value3,
       unit=SecondsToMs,
@@ -1233,18 +1237,21 @@ test "instrument gate follows template changes without mutating note controls" {
   }
   let ctx = DspContext(sample_rate=128.0, block_size=128)
   let pool = @voice.BoundVoicePool(template(1000.0), ctx, bindings())
-  let controls : Map[String, Double] = { "hold": 2.0 }
+  let controls : Map[@control.Control, Double] = Map([(Hold, 2.0)])
   assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(3.0))
   assert_true(pool.note_on_controls(controls) is Some(_))
   assert_eq(controls.length(), 1)
-  assert_eq(controls.get("hold"), Some(2.0))
+  assert_eq(controls.get(Hold), Some(2.0))
   assert_eq(pool.note_gate({}), @voice.NoteGate::EventEnd)
-  assert_eq(pool.note_gate({ "hold": -1.0 }), @voice.NoteGate::InvalidDuration)
-  assert_true(pool.note_on_controls({ "hold": -1.0 }) is None)
+  assert_eq(
+    pool.note_gate(Map([(Hold, -1.0)])),
+    @voice.NoteGate::InvalidDuration,
+  )
+  assert_true(pool.note_on_controls(Map([(Hold, -1.0)])) is None)
   pool.set_template(template(2000.0), bindings()).unwrap()
   assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(4.0))
   let invalid = ControlBindingBuilder().bind(
-    key="attack",
+    key=@control.Control::Attack,
     node_index=99,
     slot=GraphParamSlot::Value0,
   )
@@ -1270,7 +1277,7 @@ test "followed values reach a releasing voice and end with the voice's slot" {
       DspNode::output(2),
     ]),
     ctx,
-    ControlBindingBuilder().bind_voice(key="gain", param=Gain),
+    ControlBindingBuilder().bind_voice(key=@control.Control::Gain, param=Gain),
     max_voices=1,
   )
   let left = AudioBuffer::filled(4)
@@ -1284,7 +1291,7 @@ test "followed values reach a releasing voice and end with the voice's slot" {
   // gain follows t = num / den.
   let ramp = (num : Int64, den : Int64) => num.to_double() / den.to_double()
   let first = pool
-    .note_on_controls({ "gain": 1.0 }, follow=[("gain", ramp)])
+    .note_on_controls(Map([(Gain, 1.0)]), follow=[(Gain, ramp)])
     .unwrap()
   for _ in 0..<100 {
     ignore(level())
@@ -1297,7 +1304,7 @@ test "followed values reach a releasing voice and end with the voice's slot" {
   // A quarter of the level, less the first samples of a 1 s release.
   assert_true((released / full - 0.25).abs() < 0.001)
   // Stealing the slot starts a voice without the old follower.
-  ignore(pool.note_on_controls({ "gain": 1.0 }).unwrap())
+  ignore(pool.note_on_controls(Map([(Gain, 1.0)])).unwrap())
   for _ in 0..<100 {
     ignore(level())
   }
@@ -1309,7 +1316,10 @@ test "followed values reach a releasing voice and end with the voice's slot" {
 test "a follower attaches only to voices of the template it was made for" {
   let ctx = DspContext(sample_rate=48000.0, block_size=4)
   let nodes = [DspNode::constant(1.0), DspNode::output(0)]
-  let bindings = ControlBindingBuilder().bind_voice(key="gain", param=Gain)
+  let bindings = ControlBindingBuilder().bind_voice(
+    key=@control.Control::Gain,
+    param=Gain,
+  )
   let pool = @voice.BoundVoicePool(
     AnalyzedGraph::analyze(nodes),
     ctx,
@@ -1317,12 +1327,12 @@ test "a follower attaches only to voices of the template it was made for" {
     max_voices=1,
   )
   let half = (_ : Int64, _ : Int64) => 0.5
-  let stale = pool.follower("gain", half).unwrap()
-  assert_true(pool.follower("cutoff", half) is None)
+  let stale = pool.follower(Gain, half).unwrap()
+  assert_true(pool.follower(Lpf, half) is None)
   pool.set_template(AnalyzedGraph::analyze(nodes), bindings).unwrap()
   let handle = pool.note_on_controls({}).unwrap()
   assert_true(!pool.follow(handle, stale))
-  assert_true(pool.follow(handle, pool.follower("gain", half).unwrap()))
+  assert_true(pool.follow(handle, pool.follower(Gain, half).unwrap()))
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
   pool.process(ctx, left, right)

@@ -105,7 +105,7 @@ test "fractional tempo remains queryable after eight hours" {
     .slow(@pattern.Rational::from_int(3))
     .query(arc)
   assert_eq(events.length(), 1)
-  assert_eq(events[0].value.get("note"), Some(64.0))
+  assert_eq(events[0].value.get(Note), Some(64.0))
   assert_true(events[0].part == arc)
 }
 

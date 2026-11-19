@@ -63,7 +63,7 @@ test "wrap a pattern as a section" {
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
   assert_true(section.scope().is_identity())
   assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
 }
 ```
 
@@ -131,8 +131,8 @@ test "arrange sections sequentially" {
   assert_true(arrangement.duration() == @pattern.Rational::from_int(3))
   assert_eq(arrangement.occurrence_count(), 2)
   assert_eq(events.length(), 3)
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[2].value.get("note") == Some(67.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[2].value.get(Note) == Some(67.0))
 }
 ```
 

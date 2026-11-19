@@ -244,8 +244,8 @@ test "SongPart explicit starts can overlap and range lookup returns all hits" {
   @debug.assert_eq(range_hits.length(), 2)
   let events = song.query(span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[1].value.get("note") == Some(64.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[1].value.get(Note) == Some(64.0))
 }
 
 ///|
@@ -356,8 +356,8 @@ test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
   @debug.assert_eq(filled.gap_spans().length(), 0)
   let events = filled.query(span(1L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(70.0))
-  assert_true(events[1].value.get("note") == Some(70.0))
+  assert_true(events[0].value.get(Note) == Some(70.0))
+  assert_true(events[1].value.get(Note) == Some(70.0))
 }
 
 ///|
@@ -430,8 +430,8 @@ test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
   @debug.assert_eq(overlap_hits[1].name(), "early1")
   let events = filled.query(span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[1].value.get("note") == Some(64.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[1].value.get(Note) == Some(64.0))
 }
 
 ///|
@@ -525,9 +525,9 @@ test "Song allows repeated sections with distinct occurrence names" {
   ])
   let events = song.query(span(0L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
-  assert_true(events[1].value.get("note") == Some(60.0))
+  assert_true(events[1].value.get(Note) == Some(60.0))
   assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
 }
 
@@ -547,7 +547,7 @@ test "Song::query shifts event whole and part into song time" {
   assert_true(events[1].part.begin == @pattern.Rational::from_int(1))
   assert_true(events[2].whole.unwrap().begin == @pattern.Rational::from_int(2))
   assert_true(events[2].part.begin == @pattern.Rational::from_int(2))
-  assert_true(events[2].value.get("note") == Some(64.0))
+  assert_true(events[2].value.get(Note) == Some(64.0))
 }
 
 ///|

@@ -25,10 +25,10 @@ fn bus_doc(
     id=bus_id("merge"),
     left=@pattern.PatternDoc::control_atom(
       id=bus_id("note"),
-      key="note",
+      key=Note,
       value=60.0,
     ),
-    right=@pattern.PatternDoc::continuous(id=bus_id("lpf"), key="lpf", f=cutoff),
+    right=@pattern.PatternDoc::continuous(id=bus_id("lpf"), key=Lpf, f=cutoff),
   )
   .slow(id=bus_id("slow"), factor=@pattern.Rational::from_int(2))
   .lower()
@@ -56,7 +56,7 @@ fn bus_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool raise {
     ]),
     ctx,
     @moondsp.ControlBindingBuilder().bind(
-      key="lpf",
+      key=@moondsp.Control::Lpf,
       node_index=1,
       slot=@moondsp.GraphParamSlot::Value0,
     ),
@@ -142,7 +142,10 @@ fn bus_first_block_rms(
       @moondsp.DspNode::output(0),
     ]),
     ctx,
-    @moondsp.ControlBindingBuilder().bind_voice(key="gain", param=Gain),
+    @moondsp.ControlBindingBuilder().bind_voice(
+      key=@moondsp.Control::Gain,
+      param=Gain,
+    ),
     max_voices=4,
   )
   let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
@@ -166,16 +169,12 @@ test "a voice starts from its bus value, which rev defines" {
   // start (0.1).
   let doc = (gain : @pattern.PatternDoc[@pattern.ControlMap]) => {
     @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
-      @pattern.PatternDoc::control_atom(
-        id=bus_id("other"),
-        key="gain",
-        value=0.0,
-      ),
+      @pattern.PatternDoc::control_atom(id=bus_id("other"), key=Gain, value=0.0),
       @pattern.PatternDoc::merge_control(
         id=bus_id("merge"),
         left=@pattern.PatternDoc::control_atom(
           id=bus_id("note"),
-          key="note",
+          key=Note,
           value=60.0,
         ),
         right=gain,
@@ -187,11 +186,11 @@ test "a voice starts from its bus value, which rev defines" {
       @pattern.PatternDoc::sequence(id=bus_id("steps"), docs=[
         @pattern.PatternDoc::pure(
           id=bus_id("low"),
-          value=@pattern.ControlMap::single("gain", 0.1),
+          value=@pattern.ControlMap::single(Gain, 0.1),
         ),
         @pattern.PatternDoc::pure(
           id=bus_id("high"),
-          value=@pattern.ControlMap::single("gain", 0.9),
+          value=@pattern.ControlMap::single(Gain, 0.9),
         ),
       ]),
     ),
@@ -200,7 +199,7 @@ test "a voice starts from its bus value, which rev defines" {
     doc(
       @pattern.PatternDoc::pure(
         id=bus_id("fixed"),
-        value=@pattern.ControlMap::single("gain", 0.9),
+        value=@pattern.ControlMap::single(Gain, 0.9),
       ),
     ),
   )

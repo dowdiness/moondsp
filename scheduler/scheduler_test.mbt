@@ -59,14 +59,14 @@ fn make_test_pool() -> (
       ctx,
       @moondsp.ControlBindingBuilder()
       .bind(
-        key="note",
+        key=@moondsp.Control::Note,
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
         unit=MidiToHz,
       )
-      .bind_voice(key="gain", param=Gain)
-      .bind_voice(key="pan", param=Pan)
-      .bind_voice(key="room", param=Send),
+      .bind_voice(key=Gain, param=Gain)
+      .bind_voice(key=Pan, param=Pan)
+      .bind_voice(key=Room, param=Send),
       max_voices=4,
     ),
   ) catch {
@@ -100,15 +100,15 @@ test "each event plays on the first instrument that selects it" {
   let (drum, _, ctx) = make_test_pool()
   let (synth, _, _) = make_test_pool()
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-    (@scheduler.ControlEquals("sound", 36.0), drum),
-    (@scheduler.HasControl("note"), synth),
+    (@scheduler.ControlEquals(Sound, 36.0), drum),
+    (@scheduler.HasControl(Note), synth),
   ])
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
   let pitched_drum = @pattern.controls(
-    @pattern.ControlMap::single("sound", 36.0).set("note", 60.0),
+    @pattern.ControlMap::single(Sound, 36.0).set(Note, 60.0),
   )
   sched.process_events(pitched_drum.query(arc), arc)
   sched.process_events(@pattern.sound(38.0).query(arc), arc)
@@ -277,7 +277,7 @@ test "expire_notes: removes notes past their end_time" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls({ "note": 69.0 })
+  let handle = pool.note_on_controls(Map([(Note, 69.0)]))
   match handle {
     None => assert_true(false)
     Some(h) => {
@@ -299,7 +299,7 @@ test "expire_notes_at: expires on performance sample boundary" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls({ "note": 69.0 })
+  let handle = pool.note_on_controls(Map([(Note, 69.0)]))
   match handle {
     None => assert_true(false)
     Some(h) => {
@@ -591,7 +591,7 @@ test "Retune preflights later voices before mutating the first voice" {
         @moondsp.DspNode::output(2),
       ]),
       @moondsp.ControlBindingBuilder().bind(
-        key="note",
+        key=@moondsp.Control::Note,
         node_index=1,
         slot=@moondsp.GraphParamSlot::Value0,
       ),
@@ -970,7 +970,7 @@ test "process_block: gate fraction ends a note before its next onset" {
 test "process_block: pan key applies per-voice pan" {
   let (pool, sched, left, right) = make_test_sched()
   let pat = @pattern.controls(
-    @pattern.ControlMap::single("note", 60.0).set("pan", -1.0),
+    @pattern.ControlMap::single(Note, 60.0).set(Pan, -1.0),
   )
   sched.process_block(pat, left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
@@ -1004,7 +1004,7 @@ test "process_block: stolen voice gate-off is harmless" {
       @moondsp.AnalyzedGraph::analyze(template),
       ctx,
       @moondsp.ControlBindingBuilder().bind(
-        key="note",
+        key=@moondsp.Control::Note,
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
       ),
@@ -1080,7 +1080,7 @@ test "process_block note pattern produces non-zero output" {
 test "process_block: pan=-1 routes signal to left buffer only" {
   let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.controls(
-    @pattern.ControlMap::single("note", 60.0).set("pan", -1.0),
+    @pattern.ControlMap::single(Note, 60.0).set(Pan, -1.0),
   )
   // Run 4 blocks so the ADSR attack accumulates audible energy; matches
   // the existing `process_block: produces non-zero output` test shape.
@@ -1100,7 +1100,7 @@ test "process_block: pan=-1 routes signal to left buffer only" {
 test "process_block: pan=+1 routes signal to right buffer only" {
   let (_, sched, left, right) = make_test_sched()
   let pat = @pattern.controls(
-    @pattern.ControlMap::single("note", 60.0).set("pan", 1.0),
+    @pattern.ControlMap::single(Note, 60.0).set(Pan, 1.0),
   )
   for _i = 0; _i < 4; _i = _i + 1 {
     sched.process_block(pat, left, right)
@@ -1135,7 +1135,7 @@ test "Switching send output leaves dry playback and transport unchanged" {
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("send-toggle"),
     pat=@pattern.controls(
-      @pattern.ControlMap::single("note", 60.0).set("room", 0.5),
+      @pattern.ControlMap::single(Note, 60.0).set(Room, 0.5),
     ),
   ).lower()
   sched.queue_pattern_snapshot(snapshot)
@@ -1172,9 +1172,7 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("room-send"),
     pat=@pattern.controls(
-      @pattern.ControlMap::single("note", 60.0)
-      .set("pan", -0.4)
-      .set("room", 0.5),
+      @pattern.ControlMap::single(Note, 60.0).set(Pan, -0.4).set(Room, 0.5),
     ),
   ).lower()
   sched.queue_pattern_snapshot(snapshot)
@@ -1300,8 +1298,8 @@ test "Retune changes only its instrument's voices" {
     max_voices=4,
   )
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-    (@scheduler.ControlEquals("note", 62.0), other),
-    (@scheduler.HasControl("note"), synth),
+    (@scheduler.ControlEquals(Note, 62.0), other),
+    (@scheduler.HasControl(Note), synth),
   ])
   let root = pid("two-instruments")
   let doc = @pattern.PatternDoc::stack(id=root, docs=[
@@ -1342,7 +1340,7 @@ test "an active note of an unknown instrument is rejected" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls({ "note": 69.0 }).unwrap()
+  let handle = pool.note_on_controls(Map([(Note, 69.0)])).unwrap()
   @debug.assert_eq(
     sched.push_active_note(1, handle, @pattern.Rational::from_int(1)),
     Err(@scheduler.UnknownInstrument(1)),

@@ -326,13 +326,13 @@ pub fn GraphIndexMap::set_param(
 }
 
 ///|
-pub fn GraphIndexMap::bind_control(
+pub fn[K] GraphIndexMap::bind_control(
   self : GraphIndexMap,
-  builder : ControlBindingBuilder,
-  key : String,
+  builder : ControlBindingBuilder[K],
+  key : K,
   id : @identity.GraphNodeId,
   slot : GraphParamSlot,
-) -> ControlBindingBuilder? {
+) -> ControlBindingBuilder[K]? {
   self.raw
   .bind_control(builder.raw, key, id, slot.to_model())
   .map(ControlBindingBuilder::from_internal)

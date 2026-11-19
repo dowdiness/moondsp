@@ -51,7 +51,7 @@ pub fn GraphDocument::rewire_input(Self, @identity.GraphNodeId, @staging.GraphTo
 pub struct GraphIndexMap {
   // private fields
 }
-pub fn GraphIndexMap::bind_control(Self, @binding.ControlBindingBuilder, String, @identity.GraphNodeId, @model.GraphParamSlot) -> @binding.ControlBindingBuilder?
+pub fn[K] GraphIndexMap::bind_control(Self, @binding.ControlBindingBuilder[K], K, @identity.GraphNodeId, @model.GraphParamSlot) -> @binding.ControlBindingBuilder[K]?
 pub fn GraphIndexMap::delete_chain(Self, @identity.GraphNodeId, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
 pub fn GraphIndexMap::delete_node(Self, @identity.GraphNodeId, @identity.GraphNodeId, @staging.GraphTopologyInputSlot, @identity.GraphNodeId) -> @staging.GraphTopologyEdit?
 pub fn GraphIndexMap::gate_off(Self, @identity.GraphNodeId) -> @model.GraphControl?

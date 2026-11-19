@@ -17,7 +17,7 @@ priv enum PatternDocNode[A] {
   Runtime(Pat[A])
   /// A continuous control as both its query form and its allocation-free
   /// time function `(cycles) -> value` for one key.
-  Continuous(Pat[A], String, (Double) -> Double)
+  Continuous(Pat[A], @control.Control, (Double) -> Double)
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
@@ -1388,7 +1388,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let keys = []
       control_keys(nodes, right_id, controls_of, keys)
       let buses = left.buses.copy()
-      let provided : Array[(String, Int32)] = []
+      let provided : Array[(@control.Control, Int32)] = []
       let chained : Map[Int32, Int32] = Map([])
       for key in keys {
         let signal = compile_signal(nodes, right_id, Some(key), controls_of)
@@ -1900,7 +1900,7 @@ pub fn[A] PatternDoc::atom(
 pub fn PatternDoc::control_atom(
   id~ : @identity.PatternNodeId,
   source_atom? : @identity.SourceAtomId,
-  key~ : String,
+  key~ : @control.Control,
   value~ : Double,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
@@ -1912,7 +1912,7 @@ pub fn PatternDoc::control_atom(
         control(key, value),
         ControlMap::single(key, value),
         source_atom,
-        if key == "note" {
+        if key == Note {
           value
         } else {
           @double.not_a_number
@@ -1988,7 +1988,7 @@ pub fn[A] PatternDoc::from_pattern(
 /// when queried as a pattern; its bus evaluates `f` at exact time.
 pub fn PatternDoc::continuous(
   id~ : @identity.PatternNodeId,
-  key~ : String,
+  key~ : @control.Control,
   f~ : (Double) -> Double,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(

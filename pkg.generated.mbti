@@ -2,6 +2,7 @@
 package "dowdiness/moondsp"
 
 import {
+  "dowdiness/moondsp/control",
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/engine",
   "dowdiness/moondsp/graph",
@@ -60,6 +61,8 @@ pub using @voice {type BoundVoicePool}
 pub using @voice {type BoundVoicePoolError}
 
 pub using @dsp {type Clip}
+
+pub using @control {type Control}
 
 pub using @graph {type ControlBinding}
 

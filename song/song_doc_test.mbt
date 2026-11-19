@@ -97,11 +97,11 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   assert_true(events[0].occurrence() == occurrence_id)
   assert_true(events[0].section() == section_id)
   assert_true(events[0].layer() == lead_id)
-  assert_true(events[0].event().value.get("note") == Some(60.0))
+  assert_true(events[0].event().value.get(Note) == Some(60.0))
   assert_true(events[1].occurrence() == occurrence_id)
   assert_true(events[1].section() == section_id)
   assert_true(events[1].layer() == pad_id)
-  assert_true(events[1].event().value.get("note") == Some(67.0))
+  assert_true(events[1].event().value.get(Note) == Some(67.0))
 }
 
 ///|
@@ -360,7 +360,7 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     ),
   )
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(61.0))
+  assert_true(events[0].value.get(Note) == Some(61.0))
 }
 
 ///|
@@ -403,13 +403,13 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
       @pattern.PatternDoc::control_atom(
         id=@identity.PatternNodeId::from_string("source:c"),
         source_atom=c,
-        key="note",
+        key=Note,
         value=60.0,
       ),
       @pattern.PatternDoc::control_atom(
         id=@identity.PatternNodeId::from_string("source:g"),
         source_atom=g,
-        key="note",
+        key=Note,
         value=67.0,
       ),
     ],
@@ -443,7 +443,7 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
       }
       assert_true(origin.atom() == atom)
       assert_true(
-        event.event().value.get("note") ==
+        event.event().value.get(Note) ==
         Some(if index == 0 { 60.0 } else { 67.0 }),
       )
     }
@@ -474,7 +474,7 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
   ]).lower()
   for event in anonymous.query_sourced_events(arc) {
     assert_true(event.source_origin() is None)
-    assert_true(event.event().value.get("note") == Some(72.0))
+    assert_true(event.event().value.get(Note) == Some(72.0))
   }
 }
 
@@ -490,10 +490,10 @@ test "song events read their buses on the song clock" {
     left=@pattern.PatternDoc::control_atom(
       id=id("note"),
       source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7002L), 1L),
-      key="note",
+      key=Note,
       value=60.0,
     ),
-    right=@pattern.PatternDoc::continuous(id=id("ramp"), key="lpf", f=t => {
+    right=@pattern.PatternDoc::continuous(id=id("ramp"), key=Lpf, f=t => {
       100.0 * t
     }),
   ).lower_with_origins()

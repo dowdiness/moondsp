@@ -7,7 +7,7 @@ test "bench/control_bus/per_block" (b : @bench.T) {
       _ => abort("id")
     }
   }
-  let sweep = @pattern.PatternDoc::continuous(id=id("sweep"), key="lpf", f=t => {
+  let sweep = @pattern.PatternDoc::continuous(id=id("sweep"), key=Lpf, f=t => {
     200.0 + 3800.0 * t
   })
   let chord = @pattern.PatternDoc::from_pattern(
@@ -35,7 +35,7 @@ test "bench/control_bus/per_block" (b : @bench.T) {
   })
   let read = snapshot.query_sourced_events(arcs[0])[0]
     .buses()
-    .reader("lpf")
+    .reader(Lpf)
     .unwrap()
   b.bench(name="one compiled bus signal per block", () => {
     let mut sum = 0.0

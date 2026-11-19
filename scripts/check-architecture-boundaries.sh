@@ -99,22 +99,25 @@ check_manifest() {
 
 # Public package dependency rules. These reflect the current layered package
 # architecture plus the facade exceptions documented in ADR-0001 and ADR-0015.
+# `control` is the closed control vocabulary (ADR-0020): a leaf that pattern,
+# Mini, voice, and scheduler share; graph stays generic over its keys.
 check_manifest \
   "moon.pkg" \
-  '^(dowdiness/moondsp/(dsp|graph|identity|voice|engine))$' \
+  '^(dowdiness/moondsp/(control|dsp|graph|identity|voice|engine))$' \
   '^(dowdiness/moondsp/(mini|pattern))$'
 check_manifest "dsp/moon.pkg" '^$'
 check_manifest "identity/moon.pkg" '^$'
-check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/identity)$'
+check_manifest "control/moon.pkg" '^$'
+check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/(control|identity))$'
 check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
-check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
+check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(control|identity|pattern|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
-check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(dsp|graph))$'
+check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(control|dsp|graph))$'
 # Shared lifecycle and primitive browser adapter; see docs/engine-architecture.md.
 check_manifest "engine/moon.pkg" '^(dowdiness/moondsp/(dsp|graph|engine/lifecycle))$'
 check_manifest "engine/lifecycle/moon.pkg" '^(dowdiness/moondsp/dsp)$'
 check_manifest "graph/browser/moon.pkg" '^(dowdiness/moondsp/(dsp|engine/lifecycle|graph/internal/(model|template|runtime)))$'
-check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
+check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(control|identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(graph/browser|scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "cmd/main/moon.pkg" '^$'

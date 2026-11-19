@@ -18,7 +18,7 @@ test "prepared song respects section boundaries differing periods and finite end
   let snapshot = song_update_snapshot(song)
   let span = cycle_span(0, 5)
   let events = snapshot.query(span)
-  assert_eq(events.map(e => e.value.get("note")), [
+  assert_eq(events.map(e => e.value.get(Note)), [
     Some(60.0),
     Some(72.0),
     Some(74.0),
@@ -49,7 +49,7 @@ test "snapshot thinning is deterministic across query partitions" {
     let events = snapshot.query(cycle_span(cycle, cycle + 1))
     for event in events {
       assert_eq(event.part, whole[count].part)
-      assert_eq(event.value.get("note"), whole[count].value.get("note"))
+      assert_eq(event.value.get(Note), whole[count].value.get(Note))
       count = count + 1
     }
   }

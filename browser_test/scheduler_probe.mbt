@@ -94,7 +94,7 @@ fn init_scheduler_probe_graph_with_waveform(
       @moondsp.AnalyzedGraph::analyze(scheduler_probe_synth_template(waveform)),
       ctx,
       @moondsp.ControlBindingBuilder().bind(
-        key="note",
+        key=@moondsp.Control::Note,
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
       ),
@@ -222,7 +222,7 @@ fn scheduler_probe_start_notes(
     return true
   }
   for freq in notes {
-    let controls : Map[String, Double] = { "note": freq }
+    let controls : Map[@moondsp.Control, Double] = Map([(Note, freq)])
     if runtime.pool.note_on_controls(controls) is None {
       scheduler_probe_last_error.val = "browser_test scheduler comparison note_on failed"
       return false

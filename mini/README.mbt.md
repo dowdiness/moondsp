@@ -83,10 +83,10 @@ test "parse a layered mini pattern" {
   let events = pat.query(cycle)
 
   assert_eq(events.length(), 4)
-  assert_true(events[0].value.get("sound") == Some(36.0))
-  assert_true(events[1].value.get("sound") == Some(38.0))
-  assert_true(events[2].value.get("note") == Some(60.0))
-  assert_true(events[3].value.get("note") == Some(64.0))
+  assert_true(events[0].value.get(Sound) == Some(36.0))
+  assert_true(events[1].value.get(Sound) == Some(38.0))
+  assert_true(events[2].value.get(Note) == Some(60.0))
+  assert_true(events[3].value.get(Note) == Some(64.0))
 }
 ```
 

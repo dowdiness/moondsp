@@ -1,7 +1,7 @@
 ///|
 struct ExternalLoweredGraphFixture {
   nodes : Array[@moondsp.DspNode]
-  bindings : @moondsp.ControlBindingBuilder
+  bindings : @moondsp.ControlBindingBuilder[String]
 }
 
 ///|

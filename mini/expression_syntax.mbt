@@ -28,18 +28,20 @@ priv enum MiniFilterKind {
 }
 
 ///|
-fn MiniFilterKind::control_key(self : MiniFilterKind) -> String {
+fn MiniFilterKind::control_key(self : MiniFilterKind) -> @control.Control {
   match self {
-    LowPass => "lpf"
-    HighPass => "hpf"
+    LowPass => Lpf
+    HighPass => Hpf
   }
 }
 
 ///|
-fn MiniFilterKind::resonance_control_key(self : MiniFilterKind) -> String {
+fn MiniFilterKind::resonance_control_key(
+  self : MiniFilterKind,
+) -> @control.Control {
   match self {
-    LowPass => "lpf_resonance"
-    HighPass => "hpf_resonance"
+    LowPass => LpfResonance
+    HighPass => HpfResonance
   }
 }
 
@@ -139,7 +141,7 @@ priv enum MiniTransform {
   Gate(@pattern.Rational)
   Rev
   Degrade(Double)
-  Control(String, MiniValue)
+  Control(@control.Control, MiniValue)
   Filter(MiniFilterKind, MiniValue, MiniValue?)
   Every(Int32, MiniCallback)
   Jux(MiniCallback)
@@ -418,26 +420,19 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.expect_char(')')
       Filter(kind, frequency_hz, resonance)
     }
-    "attack" | "hold" | "release" => {
-      let seconds = self.read_method_control_argument(name)
-      guard seconds.all(s => {
-        !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 86400.0
-      }) else {
-        raise ParseError(
-          "position \{method_start}: \{name}() expects seconds between 0 and 86400",
-        )
-      }
-      Control(name, seconds)
-    }
-    "gain" | "pan" => Control(name, self.read_method_control_argument(name))
+    "attack" => self.read_seconds_control(Attack, method_start)
+    "hold" => self.read_seconds_control(Hold, method_start)
+    "release" => self.read_seconds_control(Release, method_start)
+    "gain" => Control(Gain, self.read_method_control_argument(Gain))
+    "pan" => Control(Pan, self.read_method_control_argument(Pan))
     "room" => {
-      let send = self.read_method_control_argument("room")
+      let send = self.read_method_control_argument(Room)
       guard send.all(s => !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 1.0) else {
         raise ParseError(
           "position \{method_start}: room() expects a send between 0 and 1",
         )
       }
-      Control("room", send)
+      Control(Room, send)
     }
     "every" => {
       self.expect_char('(')

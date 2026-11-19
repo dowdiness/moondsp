@@ -12,7 +12,7 @@ fn onset_test_origin() -> @pattern.EventOrigin {
   let doc = @pattern.PatternDoc::control_atom(
     id=node,
     source_atom=atom,
-    key="note",
+    key=Note,
     value=60.0,
   )
   let snapshot = doc.lower_with_origins() catch {

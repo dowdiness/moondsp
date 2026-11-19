@@ -91,8 +91,8 @@ test "bounded play source preserves ordinary musical output" {
       ),
     )
   assert_eq(events.length(), 4)
-  assert_eq(events[0].value.get("note"), Some(60.0))
-  assert_eq(events[1].value.get("note"), Some(64.0))
+  assert_eq(events[0].value.get(Note), Some(60.0))
+  assert_eq(events[1].value.get(Note), Some(64.0))
 }
 
 ///|

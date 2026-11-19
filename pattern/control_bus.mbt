@@ -22,11 +22,22 @@ priv enum Nesting {
 }
 
 ///|
-fn Nesting::of(key : String) -> Nesting {
-  if key == "gain" {
-    Multiply
-  } else {
-    Override
+fn Nesting::of(key : @control.Control) -> Nesting {
+  match key {
+    Gain => Multiply
+    Note
+    | Sound
+    | Pan
+    | Room
+    | Lpf
+    | LpfResonance
+    | Hpf
+    | HpfResonance
+    | Attack
+    | Decay
+    | Sustain
+    | Hold
+    | Release => Override
   }
 }
 
@@ -47,7 +58,7 @@ fn Nesting::signal(
 ///|
 /// The bus one control key reads. Shared and never mutated.
 priv struct BusBinding {
-  key : String
+  key : @control.Control
   bus : Int32
   /// The payload's own value under a `Multiply` key that no inner bus
   /// provides; the bus combines with it. Always `None` for `Override` keys,
@@ -59,7 +70,7 @@ priv struct BusBinding {
 /// Bind `key` to `bus` over `payload`, the controls the event carries before
 /// this merge. The only constructor, so `inner` follows the key's nesting.
 fn BusBinding::new(
-  key : String,
+  key : @control.Control,
   bus : Int32,
   payload : ControlMap,
 ) -> BusBinding {
@@ -85,7 +96,7 @@ let no_bus_bindings : FixedArray[BusBinding] = []
 ///|
 fn bus_binding_for(
   bindings : FixedArray[BusBinding],
-  key : String,
+  key : @control.Control,
 ) -> BusBinding? {
   for binding in bindings {
     if binding.key == key {
@@ -99,7 +110,7 @@ fn bus_binding_for(
 /// One bus of a compiled subtree: the signal one `MergeControl` gives `key`,
 /// and how that merge writes a value into the payload.
 priv struct ControlBus[A] {
-  key : String
+  key : @control.Control
   signal : BusSignal
   apply : (A, ControlMap) -> A
 }
@@ -120,34 +131,24 @@ fn[A] ControlBus::map_signal(
 /// across rests.
 fn bind_buses(
   bindings : FixedArray[BusBinding],
-  provided : Array[(String, Int32)],
+  provided : Array[(@control.Control, Int32)],
   chained : Map[Int32, Int32],
   payload : ControlMap,
 ) -> FixedArray[BusBinding] {
-  let mut added = 0
-  for pair in provided {
-    if bus_binding_for(bindings, pair.0) is None {
-      added += 1
+  let fresh = provided.filter(pair => bus_binding_for(bindings, pair.0) is None)
+  let inner = bindings.length()
+  FixedArray::makei(inner + fresh.length(), i => {
+    if i < inner {
+      let binding = bindings[i]
+      match chained.get(binding.bus) {
+        Some(bus) => { ..binding, bus, }
+        None => binding
+      }
+    } else {
+      let (key, bus) = fresh[i - inner]
+      BusBinding::new(key, bus, payload)
     }
-  }
-  let result = FixedArray::make(
-    bindings.length() + added,
-    BusBinding::new("", 0, ControlMap::empty()),
-  )
-  for i, binding in bindings {
-    result[i] = match chained.get(binding.bus) {
-      Some(bus) => { ..binding, bus, }
-      None => binding
-    }
-  }
-  let mut next = bindings.length()
-  for pair in provided {
-    if bus_binding_for(bindings, pair.0) is None {
-      result[next] = BusBinding::new(pair.0, pair.1, payload)
-      next += 1
-    }
-  }
-  result
+  })
 }
 
 ///|
@@ -276,7 +277,7 @@ fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
 /// nothing. `None` when `key` follows no bus.
 pub fn EventBuses::reader(
   self : EventBuses,
-  key : String,
+  key : @control.Control,
 ) -> ((Int64, Int64) -> Double)? {
   bus_binding_for(self.bindings, key).map(binding => {
     let placed = self.place(binding.signal(self.table[binding.bus]))
@@ -289,7 +290,7 @@ pub fn EventBuses::reader(
 /// constant bus needs no reader: the value set at note-on already holds.
 pub fn EventBuses::each_reader(
   self : EventBuses,
-  f : (String, (Int64, Int64) -> Double) -> Unit,
+  f : (@control.Control, (Int64, Int64) -> Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
     let signal = binding.signal(self.table[binding.bus])
@@ -555,12 +556,12 @@ fn[A] control_keys(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   controls_of : (A) -> ControlMap,
-  keys : Array[String],
+  keys : Array[@control.Control],
 ) -> Unit raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise PatternDocError::MissingNode(id.value())
   }
-  fn add(key : String) {
+  fn add(key : @control.Control) {
     if !keys.contains(key) {
       keys.push(key)
     }
@@ -600,7 +601,7 @@ fn[A] control_keys(
 fn[A] compile_signal(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
-  key : String?,
+  key : @control.Control?,
   controls_of : (A) -> ControlMap,
 ) -> BusSignal raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {

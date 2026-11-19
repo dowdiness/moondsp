@@ -15,8 +15,8 @@ fn unwrap_graph_control(control : @graph.GraphControl?) -> @graph.GraphControl {
 
 ///|
 fn unwrap_binding_builder(
-  builder : @graph.ControlBindingBuilder?,
-) -> @graph.ControlBindingBuilder {
+  builder : @graph.ControlBindingBuilder[String]?,
+) -> @graph.ControlBindingBuilder[String] {
   match builder {
     Some(builder) => builder
     None => abort("expected control binding builder")

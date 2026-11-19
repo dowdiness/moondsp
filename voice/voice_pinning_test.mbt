@@ -190,7 +190,7 @@ test "A3: missing Output replacement fails with CompileRejected" {
 fn pr2_a4_closure(
   nodes : Array[DspNode],
   ctx : DspContext,
-  builder : ControlBindingBuilder,
+  builder : ControlBindingBuilder[@control.Control],
   max_voices : Int32,
 ) -> Result[@voice.BoundVoicePool, @voice.BoundVoicePoolError] {
   Ok(

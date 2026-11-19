@@ -262,7 +262,7 @@ fn Parser::read_number(self : Parser) -> Double raise ParseError {
 ///|
 fn Parser::read_method_control_argument(
   self : Parser,
-  key : String,
+  key : @control.Control,
 ) -> MiniValue raise ParseError {
   self.expect_char('(')
   let value = self.read_control_value(key)
@@ -272,11 +272,27 @@ fn Parser::read_method_control_argument(
 }
 
 ///|
+/// A control in seconds: `attack`, `hold`, or `release`.
+fn Parser::read_seconds_control(
+  self : Parser,
+  key : @control.Control,
+  method_start : Int32,
+) -> MiniTransform raise ParseError {
+  let seconds = self.read_method_control_argument(key)
+  guard seconds.all(s => !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 86400.0) else {
+    raise ParseError(
+      "position \{method_start}: \{key}() expects seconds between 0 and 86400",
+    )
+  }
+  Control(key, seconds)
+}
+
+///|
 /// A control argument: a number, a quoted Mini pattern of numbers such as
 /// `"0.3 <0.6 0.9>"`, or a signal such as `sine.range(200, 4000).slow(4)`.
 fn Parser::read_control_value(
   self : Parser,
-  key : String,
+  key : @control.Control,
 ) -> MiniValue raise ParseError {
   self.skip_whitespace()
   let start = self.pos

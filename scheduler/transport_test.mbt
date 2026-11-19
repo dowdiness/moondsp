@@ -25,25 +25,17 @@ fn transport_fixture(
     template,
     ctx,
     @moondsp.ControlBindingBuilder()
-    .bind_voice(key="pan", param=Pan)
+    .bind_voice(key=@moondsp.Control::Pan, param=Pan)
     .bind(
-      key="attack",
+      key=Attack,
       node_index=1,
       slot=@moondsp.GraphParamSlot::Value0,
       unit=SecondsToMs,
     )
+    .bind(key=Decay, node_index=1, slot=@moondsp.GraphParamSlot::Value1)
+    .bind(key=Sustain, node_index=1, slot=@moondsp.GraphParamSlot::Value2)
     .bind(
-      key="envelope_decay",
-      node_index=1,
-      slot=@moondsp.GraphParamSlot::Value1,
-    )
-    .bind(
-      key="envelope_sustain",
-      node_index=1,
-      slot=@moondsp.GraphParamSlot::Value2,
-    )
-    .bind(
-      key="release",
+      key=Release,
       node_index=1,
       slot=@moondsp.GraphParamSlot::Value3,
       unit=SecondsToMs,
@@ -186,14 +178,14 @@ test "set_tempo rejects atomically when an endpoint is unrepresentable" {
 test "physical envelope lasts thirteen seconds across a tempo change" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
   let control = @pattern.ControlMap::empty()
-    .set("attack", 2.0)
-    .set("hold", 3.0)
-    .set("release", 8.0)
+    .set(Attack, 2.0)
+    .set(Hold, 3.0)
+    .set(Release, 8.0)
   // Half a cycle at 120 BPM lasts one second.
   let song = single_span(
     @pattern.Rational::from_int(0),
     @pattern.Rational(1L, 2L),
-    control=control.set("pan", -1.0),
+    control=control.set(Pan, -1.0),
   )
   // Levels at each second: attack reaches its peak at 2s, hold ends at 5s,
   // and release reaches silence at 13s. The section itself ends at 1s.
@@ -213,12 +205,12 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
 ///|
 test "zero hold finishes immediately and invalid hold does not start a voice" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
-  let silent = @pattern.Pat::pure(@pattern.ControlMap::empty().set("hold", 0.0))
+  let silent = @pattern.Pat::pure(@pattern.ControlMap::empty().set(Hold, 0.0))
   sched.process_block(silent, left, right)
   assert_eq(left.get(0), 0.0)
   assert_eq(sched.active_note_count(), 0)
   let invalid = @pattern.Pat::pure(
-    @pattern.ControlMap::empty().set("attack", 2.0).set("hold", -1.0),
+    @pattern.ControlMap::empty().set(Attack, 2.0).set(Hold, -1.0),
   )
   sched.process_block(invalid, left, right)
   assert_eq(sched.active_note_count(), 0)
@@ -231,7 +223,7 @@ test "without hold the event end releases an unfinished attack" {
   let song = single_span(
     @pattern.Rational::from_int(0),
     @pattern.Rational(1L, 4L),
-    control=@pattern.ControlMap::empty().set("attack", 2.0).set("release", 1.0),
+    control=@pattern.ControlMap::empty().set(Attack, 2.0).set(Release, 1.0),
   )
   // A quarter cycle at 120 BPM: the gate closes after half a second, during
   // the attack.
@@ -318,7 +310,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
     @pattern.Rational::from_int(1),
   )
   assert_eq(
-    second.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+    second.accepted_snapshot().unwrap().query(arc)[0].value.get(Note),
     Some(60.0),
   )
   second.render_block(left, right)
@@ -328,7 +320,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(second.sample_counter(), 0L)
   assert_eq(second.pending_material_change_count(), 0)
   assert_eq(
-    second.accepted_snapshot().unwrap().query(arc)[0].value.get("note"),
+    second.accepted_snapshot().unwrap().query(arc)[0].value.get(Note),
     Some(80.0),
   )
 }

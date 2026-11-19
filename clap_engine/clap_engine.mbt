@@ -105,11 +105,11 @@ pub struct ClapSynthEngine {
 
 ///|
 /// The voice parameters host automation drives, by binding key.
-let voice_buses : Array[(String, Int32)] = [
-  ("gain", CLAP_PARAM_VOICE_GAIN),
-  ("cutoff", CLAP_PARAM_CUTOFF_HZ),
-  ("q", CLAP_PARAM_RESONANCE),
-  ("pan", CLAP_PARAM_PAN),
+let voice_buses : Array[(@moondsp.Control, Int32)] = [
+  (Gain, CLAP_PARAM_VOICE_GAIN),
+  (Lpf, CLAP_PARAM_CUTOFF_HZ),
+  (LpfResonance, CLAP_PARAM_RESONANCE),
+  (Pan, CLAP_PARAM_PAN),
 ]
 
 ///|
@@ -270,25 +270,26 @@ pub fn default_synth_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn synth_bindings() -> @moondsp.ControlBindingBuilder {
-  @moondsp.ControlBindingBuilder()
+fn synth_bindings() -> @moondsp.ControlBindingBuilder[@moondsp.Control] {
+  let bindings : @moondsp.ControlBindingBuilder[@moondsp.Control] = @moondsp.ControlBindingBuilder()
+  bindings
   .bind(
-    key="note",
+    key=Note,
     node_index=NOTE_NODE_INDEX,
     slot=@moondsp.GraphParamSlot::Value0,
   )
   .bind(
-    key="cutoff",
+    key=Lpf,
     node_index=FILTER_NODE_INDEX,
     slot=@moondsp.GraphParamSlot::Value0,
   )
   .bind(
-    key="q",
+    key=LpfResonance,
     node_index=FILTER_NODE_INDEX,
     slot=@moondsp.GraphParamSlot::Value1,
   )
-  .bind_voice(key="gain", param=Gain)
-  .bind_voice(key="pan", param=Pan)
+  .bind_voice(key=Gain, param=Gain)
+  .bind_voice(key=Pan, param=Pan)
 }
 
 ///|

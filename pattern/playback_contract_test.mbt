@@ -8,7 +8,7 @@ test "document control merge preserves material clocks and broad voice scopes" {
   ])
   let controls = @pattern.PatternDoc::control_atom(
     id=pid("gain"),
-    key="gain",
+    key=Gain,
     value=0.0,
   )
   let snapshot = @pattern.PatternDoc::merge_control(
@@ -25,19 +25,14 @@ test "document control merge preserves material clocks and broad voice scopes" {
   @debug.assert_eq(
     snapshot
     .query(arc)
-    .map(e => (e.whole, e.part, e.value.get("note"), e.value.get("gain"))),
+    .map(e => (e.whole, e.part, e.value.get(Note), e.value.get(Gain))),
     expected,
   )
   let scoped = snapshot.query_sourced_events(arc)
   @debug.assert_eq(
     scoped.map(e => {
       let event = e.event()
-      (
-        event.whole,
-        event.part,
-        event.value.get("note"),
-        event.value.get("gain"),
-      )
+      (event.whole, event.part, event.value.get(Note), event.value.get(Gain))
     }),
     expected,
   )
@@ -67,8 +62,8 @@ test "document control merge preserves material clocks and broad voice scopes" {
     @debug.assert_eq(
       snapshot
       .query_sourced_events_for_entry(i, arc)
-      .map(e => e.event().value.get("note")),
-      raw[i].query(arc).map(e => e.value.get("note")),
+      .map(e => e.event().value.get(Note)),
+      raw[i].query(arc).map(e => e.value.get(Note)),
     )
   }
 }
@@ -103,7 +98,7 @@ test "document jux preserves atomic material pan precedence and its content" {
     @pattern.PatternDoc::from_pattern(
       id=pid("left"),
       pat=@pattern.controls(
-        @pattern.ControlMap::single("note", 60.0).set("pan", 0.25),
+        @pattern.ControlMap::single(Note, 60.0).set(Pan, 0.25),
       ),
     ),
     @pattern.PatternDoc::from_pattern(id=pid("right"), pat=@pattern.note(64.0)),
@@ -113,7 +108,7 @@ test "document jux preserves atomic material pan precedence and its content" {
     .lower()
   let events = snapshot.query_sourced_events(doc_span(0, 1, 1, 1))
   @debug.assert_eq(
-    events.map(e => (e.event().value.get("note"), e.event().value.get("pan"))),
+    events.map(e => (e.event().value.get(Note), e.event().value.get(Pan))),
     [
       (Some(60.0), Some(-1.0)),
       (Some(64.0), Some(-1.0)),

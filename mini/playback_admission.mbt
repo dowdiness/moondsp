@@ -205,6 +205,7 @@ fn PlaybackAdmission::PlaybackAdmission(width : Double) -> PlaybackAdmission {
 /// with one event per cycle, like a scalar.
 fn MiniValue::merge_work(
   self : MiniValue,
+  key : @control.Control,
   child : MiniQueryWork,
 ) -> MiniQueryWork raise ParseError {
   match self {
@@ -213,7 +214,7 @@ fn MiniValue::merge_work(
       let notation = NotationParser(
         content,
         sound=false,
-        control="",
+        control=key,
         assess=true,
       )
       ignore(notation.parse_notation())
@@ -278,11 +279,11 @@ fn PlaybackAdmission::expression(
           )
         Gate(_) | Degrade(_) => MapEvents(child)
         Rev => Split(child)
-        Control(_, value) => value.merge_work(child)
-        Filter(_, frequency_hz, resonance) => {
-          let filtered = frequency_hz.merge_work(child)
+        Control(key, value) => value.merge_work(key, child)
+        Filter(kind, frequency_hz, resonance) => {
+          let filtered = frequency_hz.merge_work(kind.control_key(), child)
           match resonance {
-            Some(q) => q.merge_work(filtered)
+            Some(q) => q.merge_work(kind.resonance_control_key(), filtered)
             None => filtered
           }
         }

@@ -51,7 +51,7 @@ test "wire roundtrip preserves named routes and frozen source identity" {
     right.origin().bindings()[0].reference(),
   )
   assert_true(draft.locate_origin(left.origin()) is Located(_, _))
-  assert_eq(left.event().value.get("note"), Some(60.0))
+  assert_eq(left.event().value.get(Note), Some(60.0))
 }
 
 ///|

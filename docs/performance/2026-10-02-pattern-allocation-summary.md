@@ -91,6 +91,40 @@ shared orb with one run per side: it supports that removing the provider
 queries outweighs the root fill, not a stable speedup figure. Allocation
 counts and the Worklet path were not measured.
 
+## 2026-11-19: typed control keys (ADR-0020 step 2)
+
+`ControlMap` and the bus bindings moved from `String` keys to the closed
+`Control` enum. Measured with the 2026-11-01 method: a temporary
+`moon bench --release` (native, Moon 0.1.20261117 `eb64713`, MoonBit
+0.10.21, Linux x64 orb) querying `query_sourced_events` and `pat().query`
+over 750 blocks of 128 samples at 48 kHz. The baseline was `03e1a05` plus
+the uncommitted work up to ADR-0020 step 1, in a separate worktree; the two
+sides alternated for three rounds.
+
+The first comparison was 2–6% slower in 8 of 9 pairs. An isolated map
+benchmark (2,000 rounds of five inserts, a copy, and five lookups) traced it
+to the derived `Hash`, which runs the full `Hasher`: `Map[Control, Double]`
+took 2.29 ms against 1.68 ms for `Map[String, Double]`. Hashing the variant's
+position directly brought it to 1.40 ms. With that hash, the means of the
+three rounds were:
+
+| Mini source | Before | After |
+|---|---:|---:|
+| `note("C4 E4 G4 B4").gain(0.5).lpf(1200).pan(-0.3).room(0.2)` | 11.25 ms | 10.54 ms |
+| `chord("Dm9 Bbmaj7").slow(2).lpf(saw.range(200, 4000).slow(4)).gain("1 0.6").pan(sine)` | 41.31 ms | 39.21 ms |
+| `s("hh*16").gain("1 0.4 0.7 0.4")` | 5.53 ms | 5.47 ms |
+
+Browser host output over 400 blocks (both channels hashed per sample) was
+identical to the baseline for ten scores: the seven 2026-11-01 scores,
+`note("C3").gain(saw).gain("1 ~")`, `note("C3").gain(0.5).gain(0.25)`, and
+`note("C3 E3").hold(0.2).release(0.1)`, whose output differs from the same
+score without `hold`, so the renamed `Decay`/`Sustain` envelope bindings were
+exercised. Against `03e1a05` only the two nested-`gain` scores differ, as the
+gain multiplication intends; `03e1a05`'s hash for the first matches the
+2026-11-01 "after" value. This is one shared orb: it supports "no
+regression", not a speedup figure. Allocation counts and the Worklet path
+were not measured.
+
 ## Provenance and reproduction limits
 
 Optimization toolchain: Moon 0.1.20260920 (`914d7da`), Node 24.14.1, Python 3.14.2, Binaryen 125, WSL2 x64. Direct Moon commands used `NEW_MOON_MOD=0`.

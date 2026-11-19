@@ -67,9 +67,9 @@ test "envelope seconds change content without stretching the source period" {
   assert_eq(events.length(), original.length())
   for i in 0..<events.length() {
     assert_true(events[i].whole == original[i].whole)
-    assert_eq(events[i].value.get("attack"), Some(2.0))
-    assert_eq(events[i].value.get("hold"), Some(3.0))
-    assert_eq(events[i].value.get("release"), Some(8.0))
+    assert_eq(events[i].value.get(Attack), Some(2.0))
+    assert_eq(events[i].value.get(Hold), Some(3.0))
+    assert_eq(events[i].value.get(Release), Some(8.0))
   }
   for method_name in ["attack", "hold", "release"] {
     assert_true(@mini.parse(text + ".\{method_name}(0)") is Ok(_))

@@ -159,12 +159,12 @@ test "resolve a named control at note-on" {
     @graph.DspNode::output(0),
   ])
   let bindings = @graph.ControlBindingBuilder().bind(
-    key="note",
+    key=@control.Control::Note,
     node_index=0,
     slot=@graph.GraphParamSlot::Value0,
   )
   let pool = @voice.BoundVoicePool(template, context, bindings, max_voices=4)
-  let handle = pool.note_on_controls({ "note": 330.0 })
+  let handle = pool.note_on_controls(Map([(Note, 330.0)]))
 
   assert_true(handle is Some(_))
   assert_eq(pool.active_voice_count(), 1)

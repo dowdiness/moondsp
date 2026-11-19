@@ -1,6 +1,6 @@
 # ADR-0020: Controls are typed signals with one representation
 
-- **Status:** Accepted 2026-11-19. Migration step 1 (`BusValue`, `BusSignal::Absent`) is implemented; steps 2–5 remain.
+- **Status:** Accepted 2026-11-19. Migration steps 1 (`BusValue`, `BusSignal::Absent`) and 2 (`Control`, typed pool bindings) are implemented; steps 3–5 remain.
 - **Date:** 2026-11-19
 - **Supersedes:** in [ADR-0019](0019-automatic-control-buses.md), the event
   binding mechanism of Decision 2 and the rejected alternative "a new signal
@@ -63,21 +63,33 @@ a closed set the engine knows how to apply.
 
 ### 1. A closed, typed control key
 
-`Control` is an enum of the controls the engine applies, parsed once where
-text enters (Mini, `PatternDoc` control atoms, host bindings):
+`Control` is an enum of the controls the engine applies. Text names a
+control only where it enters, in Mini's method names; everything past the
+parser, including `PatternDoc` control atoms and host bindings, takes
+`Control`. There is no string-to-`Control` parser beside Mini's:
 
 ```text
 Note | Sound | Gain | Pan | Room | Lpf | LpfResonance | Hpf | HpfResonance
-| Attack | Hold | Release
+| Attack | Decay | Sustain | Hold | Release
 ```
 
-This is the set Mini emits today (`mini/expression_syntax.mbt`) and the
-voice applies (`voice/voice.mbt`). Each variant states its nesting rule
-(`Gain` multiplies, the rest override), its unit, and whether it is a
-voice-frame parameter or a graph binding target. Pool bindings target a
-`Control`, not a string. There is no open `Named(String)` case: adding a
-control means adding a variant, which a new control needs anyway for its
-unit and nesting rule.
+This is the set Mini emits (`mini/expression_syntax.mbt`) plus `Decay` and
+`Sustain`, which the voice writes itself to turn the envelope into a hold
+envelope for `hold` (`BoundVoicePool::note_on_controls`). `Control` lives in
+its own leaf package, `control`, so `pattern` and `voice` share it without
+depending on each other. `Nesting::of(Control)` states each variant's
+nesting rule (`Gain` multiplies, the rest override) by an exhaustive match.
+Pool bindings target a `Control`, not a string. There is no open
+`Named(String)` case: adding a control means adding a variant, which a new
+control needs anyway for its nesting rule.
+
+The graph binding types stay below this vocabulary: `ControlBindingBuilder[K]`
+and `ControlBindingMap[K]` are generic over their key. A voice pool binds
+`Control`; external graph authoring (ADR-0010) binds as many parameters as
+its graph has, named by `String`, which a closed set cannot name. A
+binding's unit stays on the binding, not on the variant, because it belongs
+to the target: the browser synth converts `Note` with `MidiToHz`, the CLAP
+synth binds it linearly.
 
 ### 2. An event's controls are signals, and only signals
 
@@ -164,7 +176,13 @@ reads it instead of hard-coding `gain`.
    compile to `f64` (wasm-gc), a number (JS), and `double` (native), with no
    allocation in its body; `NaN` remains only inside `BusValue` and at
    `EventBuses::reader`.
-2. `Control` enum and typed pool bindings.
+2. `Control` enum and typed pool bindings. Done: `ControlMap` and every
+   pattern, Mini, scheduler, and voice API that named a key take `Control`;
+   graph bindings are generic over their key. Measured against step 1:
+   no query-benchmark regression once `Control` hashes its variant's
+   position (the derived hash was slower than `String`'s), and
+   identical browser output hashes for ten scores
+   ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
 3. `Controls` replaces payload plus bindings in lowering; delete
    `fill_bound_controls`, `unbind_keys`, `BusBinding`.
 4. Voice and scheduler read `Controls`; delete `note_on_controls` and

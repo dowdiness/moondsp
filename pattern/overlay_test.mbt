@@ -5,7 +5,7 @@ test "overlay associativity preserves ordered events content and entry addresses
   let c = @pattern.note(72.0)
   let flat = @pattern.stack([a, b, c])
   let arc = span(0, 1, 2, 1)
-  assert_eq(flat.query(arc).map(e => e.value.get("note")), [
+  assert_eq(flat.query(arc).map(e => e.value.get(Note)), [
     Some(48.0),
     Some(48.0),
     Some(60.0),
@@ -42,7 +42,7 @@ test "overlay removes anonymous silence but owns inputs and preserves duplicates
   let inputs = [a, silent, a]
   let combined = @pattern.stack(inputs)
   inputs[0] = @pattern.note(72.0)
-  assert_eq(combined.query(span(0, 1, 1, 1)).map(e => e.value.get("note")), [
+  assert_eq(combined.query(span(0, 1, 1, 1)).map(e => e.value.get(Note)), [
     Some(60.0),
     Some(60.0),
   ])
@@ -63,7 +63,7 @@ test "normalization does not rebuild reverse queries from entry projections" {
       (e.whole, e.part, e.value.entries())
     }),
   )
-  assert_eq(actual.map(e => e.value.get("note")), [
+  assert_eq(actual.map(e => e.value.get(Note)), [
     Some(60.0),
     Some(72.0),
     Some(60.0),

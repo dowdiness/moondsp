@@ -2,6 +2,7 @@
 package "dowdiness/moondsp/scheduler"
 
 import {
+  "dowdiness/moondsp/control",
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/identity",
@@ -51,8 +52,8 @@ pub struct BlockFrame {
 #derive(Eq, @debug.Debug)
 pub(all) enum InstrumentSelector {
   AllEvents
-  HasControl(String)
-  ControlEquals(String, Double)
+  HasControl(@control.Control)
+  ControlEquals(@control.Control, Double)
 }
 pub fn InstrumentSelector::equal(Self, Self) -> Bool
 pub fn InstrumentSelector::not_equal(Self, Self) -> Bool

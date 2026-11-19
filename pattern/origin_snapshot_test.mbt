@@ -17,7 +17,7 @@ fn origin_note(
   @pattern.PatternDoc::control_atom(
     id=pid(name),
     source_atom=atom_id(serial),
-    key="note",
+    key=Note,
     value=pitch,
   )
 }
@@ -46,7 +46,9 @@ fn resolved_use(
 ///|
 fn musical_rows(
   events : Array[@pattern.Event[@pattern.ControlMap]],
-) -> Array[(@pattern.TimeSpan?, @pattern.TimeSpan, Map[String, Double])] {
+) -> Array[
+  (@pattern.TimeSpan?, @pattern.TimeSpan, Map[@control.Control, Double]),
+] {
   events.map(event => (event.whole, event.part, event.value.entries()))
 }
 
@@ -110,7 +112,7 @@ test "exact compiler shares musical kernels without changing material metadata" 
       general.query_sourced_events(arc).map(event => event.pattern_node_path()),
     )
     for event in events {
-      let expected = if event.event().value.get("note") == Some(60.0) {
+      let expected = if event.event().value.get(Note) == Some(60.0) {
         atom_id(1L)
       } else {
         atom_id(2L)
@@ -154,8 +156,8 @@ test "control providers keep left origin and overlap precedence including zero g
   let provider = @pattern.PatternDoc::reference(
     id=pid("provider"),
     definition=@pattern.PatternDoc::stack(id=pid("controls"), docs=[
-      @pattern.PatternDoc::control_atom(id=pid("loud"), key="gain", value=0.8),
-      @pattern.PatternDoc::control_atom(id=pid("muted"), key="gain", value=0.0),
+      @pattern.PatternDoc::control_atom(id=pid("loud"), key=Gain, value=0.8),
+      @pattern.PatternDoc::control_atom(id=pid("muted"), key=Gain, value=0.0),
     ]),
   )
   let doc = @pattern.PatternDoc::merge_control(
@@ -166,7 +168,7 @@ test "control providers keep left origin and overlap precedence including zero g
   let snapshot = doc.lower_with_origins()
   let events = snapshot.query(doc_span(1, 4, 3, 4))
   guard events is [event] else { fail("expected one primary note") }
-  @debug.assert_eq(event.event().value.get("gain"), Some(0.0))
+  @debug.assert_eq(event.event().value.get(Gain), Some(0.0))
   @debug.assert_eq(event.event().whole, Some(doc_span(0, 1, 1, 1)))
   @debug.assert_eq(event.event().part, doc_span(1, 4, 3, 4))
   @debug.assert_eq(event.origin().atom(), atom_id(1L))
@@ -183,9 +185,9 @@ test "filtering changes values but retains source" {
     origin_note("tone-e", 1L, 64.0),
     origin_note("other", 2L, 67.0),
   ]).filter_map(id=pid("filter"), f=cm => {
-    match cm.get("note") {
+    match cm.get(Note) {
       Some(64.0) => None
-      Some(pitch) => Some(cm.set("note", pitch + 12.0))
+      Some(pitch) => Some(cm.set(Note, pitch + 12.0))
       None => None
     }
   })
@@ -197,7 +199,7 @@ test "filtering changes values but retains source" {
   @debug.assert_eq(event.pattern_node_path().nodes().map(id => id.value()), [
     "filter", "chord", "tone-c",
   ])
-  @debug.assert_eq(event.event().value.get("note"), Some(72.0))
+  @debug.assert_eq(event.event().value.get(Note), Some(72.0))
   @debug.assert_eq(
     snapshot.query_for_entry(1, doc_span(0, 1, 1, 1)).length(),
     0,

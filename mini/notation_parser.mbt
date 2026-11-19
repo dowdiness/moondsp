@@ -78,7 +78,7 @@ priv struct NotationParser {
   sound : Bool
   chord : Bool
   /// Numbers only, each the value of this control key.
-  control : String?
+  control : @control.Control?
   /// Every number read in control mode, for range checks.
   control_values : Array[Double]
   source_offset : Int32
@@ -98,7 +98,7 @@ fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
   chord~ : Bool = false,
-  control? : String,
+  control? : @control.Control,
   source_offset~ : Int32 = 0,
   assess~ : Bool = false,
   recognized_atoms~ : Array[RecognizedAtom]? = None,

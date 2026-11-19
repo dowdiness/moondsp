@@ -59,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `note_off`, `kill`, and `set_voice_pan` wrappers on `VoicePool` and
   `BoundVoicePool` are removed; use their `_result` forms. No compatibility
   aliases.
+- **Breaking MoonBit API:** control keys are a closed enum, `@control.Control`
+  (re-exported as `@moondsp.Control`), parsed once where Mini text enters
+  (ADR-0020 step 2). `ControlMap`, `control`, `continuous`, `select_control`,
+  `PatternDoc::control_atom`, `PatternDoc::continuous`,
+  `MiniDocBuilder::control`, `EventBuses::reader`, `InstrumentSelector`, and
+  `BoundVoicePool`'s `note_on_controls`, `note_gate`, `follower`, and
+  `binding` take `Control` instead of `String`. The graph binding types are
+  generic over their key (`ControlBindingBuilder[K]`, `ControlBindingMap[K]`,
+  `ControlBinding[K]`, `ControlBindingError[K]`): voice pools bind
+  `Control`, and external graph authoring keeps naming its own parameters
+  with `String`. The envelope keys the voice writes for `hold` are
+  `Decay` and `Sustain` (formerly `envelope_decay` and `envelope_sustain`),
+  and the CLAP engine's filter buses are `Lpf` and `LpfResonance` (formerly
+  `cutoff` and `q`). Mini syntax and content signatures do not change.
 - **Breaking MoonBit API:** one `PatternScheduler(bpm~, ctx~, instruments~)`
   drives every instrument pool. Each event plays on the first instrument whose
   `InstrumentSelector` matches its controls, so an event carrying both `sound`

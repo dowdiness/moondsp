@@ -228,7 +228,7 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   )
   let right = @pattern.PatternDoc::control_atom(
     id=pid("merge-right"),
-    key="lpf",
+    key=Lpf,
     value=800.0,
   )
   let doc = unwrap_doc(() => {
@@ -239,8 +239,8 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   )
   @debug.assert_eq(events.length(), 1)
   assert_pattern_event_path(events[0], ["merge", "merge-left", "merge-right"])
-  assert_true(events[0].event().value.get("note") == Some(60.0))
-  assert_true(events[0].event().value.get("lpf") == Some(800.0))
+  assert_true(events[0].event().value.get(Note) == Some(60.0))
+  assert_true(events[0].event().value.get(Lpf) == Some(800.0))
 }
 
 ///|
@@ -639,7 +639,7 @@ test "PatternDoc::jux lowers through control-map runtime combinator" {
   let events = unwrap_snapshot(() => juxed.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="4")
   let (pan_neg1, pan_pos1) = for event in events; neg = 0, pos = 0 {
-    match event.value.get("pan") {
+    match event.value.get(Pan) {
       Some(-1.0) => continue neg + 1, pos
       Some(1.0) => continue neg, pos + 1
       _ => continue neg, pos
@@ -659,7 +659,7 @@ test "PatternDoc::merge_control lowers through control-map runtime combinator" {
   )
   let gain_doc = @pattern.PatternDoc::control_atom(
     id=pid("gain"),
-    key="gain",
+    key=Gain,
     value=0.5,
   )
   let merged = unwrap_doc(() => {
@@ -672,8 +672,8 @@ test "PatternDoc::merge_control lowers through control-map runtime combinator" {
   inspect(merged.revision().value(), content="1")
   let events = unwrap_snapshot(() => merged.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get("note") == Some(60.0))
-  assert_true(events[0].value.get("gain") == Some(0.5))
+  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.get(Gain) == Some(0.5))
 }
 
 ///|
@@ -693,12 +693,12 @@ test "PatternDoc::merge_control revision changes when lower-revision input chang
   })
   let gain_doc = @pattern.PatternDoc::pure(
     id=pid("gain"),
-    value=@pattern.ControlMap::single("gain", 0.5),
+    value=@pattern.ControlMap::single(Gain, 0.5),
   )
   let edited_gain_doc = unwrap_doc(() => {
     gain_doc.replace_with_pure(
       id=pid("gain"),
-      value=@pattern.ControlMap::single("gain", 0.75),
+      value=@pattern.ControlMap::single(Gain, 0.75),
     )
   })
   let base = unwrap_doc(() => {
@@ -717,7 +717,7 @@ test "PatternDoc::merge_control revision changes when lower-revision input chang
   })
   assert_true(base.revision() != edited.revision())
   let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
-  assert_true(events[0].value.get("gain") == Some(0.75))
+  assert_true(events[0].value.get(Gain) == Some(0.75))
 }
 
 ///|

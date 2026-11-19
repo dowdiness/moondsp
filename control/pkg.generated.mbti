@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/control"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+#derive(Eq, @debug.Debug)
+pub(all) enum Control {
+  Note
+  Sound
+  Gain
+  Pan
+  Room
+  Lpf
+  LpfResonance
+  Hpf
+  HpfResonance
+  Attack
+  Decay
+  Sustain
+  Hold
+  Release
+}
+pub fn Control::name(Self) -> String
+pub impl Hash for Control
+pub impl Show for Control
+
+// Type aliases
+
+// Traits

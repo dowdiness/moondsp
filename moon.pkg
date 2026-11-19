@@ -1,4 +1,5 @@
 import {
+  "dowdiness/moondsp/control",
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/engine",

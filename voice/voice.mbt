@@ -96,7 +96,7 @@ pub(all) suberror BoundVoicePoolError {
   InvalidMaxVoices
   OrphanAdsr
   CompileRejected
-  Binding(ControlBindingError)
+  Binding(ControlBindingError[@control.Control])
 }
 
 ///|
@@ -432,14 +432,14 @@ fn VoicePool::next_template_generation(self : VoicePool) -> Int32 {
 ///|
 pub struct BoundVoicePool {
   priv pool : VoicePool
-  priv mut bindings : ControlBindingMap
+  priv mut bindings : ControlBindingMap[@control.Control]
 }
 
 ///|
 pub fn BoundVoicePool::BoundVoicePool(
   compiled_template : AnalyzedGraph,
   context : DspContext,
-  bindings : ControlBindingBuilder,
+  bindings : ControlBindingBuilder[@control.Control],
   max_voices~ : Int32 = 32,
 ) -> BoundVoicePool raise BoundVoicePoolError {
   let pool = VoicePool(compiled_template, context, max_voices~) catch {
@@ -457,7 +457,10 @@ pub fn BoundVoicePool::BoundVoicePool(
 ///|
 /// A voice follows at most one bus per bound key, so reserving that many
 /// entries keeps `follow` from allocating on the audio thread.
-fn reserve_follows(pool : VoicePool, bindings : ControlBindingMap) -> Unit {
+fn reserve_follows(
+  pool : VoicePool,
+  bindings : ControlBindingMap[@control.Control],
+) -> Unit {
   for slot in pool.slots {
     slot.follows.reserve_capacity(bindings.length())
     slot.follow_last.reserve_capacity(bindings.length())
@@ -468,7 +471,7 @@ fn reserve_follows(pool : VoicePool, bindings : ControlBindingMap) -> Unit {
 pub fn BoundVoicePool::set_template(
   self : BoundVoicePool,
   compiled_template : AnalyzedGraph,
-  bindings : ControlBindingBuilder,
+  bindings : ControlBindingBuilder[@control.Control],
 ) -> Result[Unit, BoundVoicePoolError] {
   let prepared = match
     prepare_voice_template(compiled_template, self.pool.compile_context) {
@@ -490,7 +493,7 @@ pub fn BoundVoicePool::set_template(
 /// pool does not bind `key`.
 pub fn BoundVoicePool::follower(
   self : BoundVoicePool,
-  key : String,
+  key : @control.Control,
   read : (Int64, Int64) -> Double,
 ) -> VoiceFollower? {
   guard self.bindings.binding(key) is Some(binding) else { return None }
@@ -535,8 +538,8 @@ pub fn BoundVoicePool::follow(
 /// Keys this pool does not bind are ignored.
 pub fn BoundVoicePool::note_on_controls(
   self : BoundVoicePool,
-  controls : Map[String, Double],
-  follow~ : Array[(String, (Int64, Int64) -> Double)] = [],
+  controls : Map[@control.Control, Double],
+  follow~ : Array[(@control.Control, (Int64, Int64) -> Double)] = [],
 ) -> VoiceHandle? {
   let resolved = match self.note_gate(controls) {
     InvalidDuration => return None
@@ -544,8 +547,8 @@ pub fn BoundVoicePool::note_on_controls(
     AfterSeconds(_) => {
       // Resolve a private copy so callers can reuse their control map.
       let held = controls.copy()
-      held["envelope_decay"] = 0.0
-      held["envelope_sustain"] = 1.0
+      held[Decay] = 0.0
+      held[Sustain] = 1.0
       self.bindings.resolve_controls(held)
     }
   }
@@ -774,8 +777,8 @@ pub fn BoundVoicePool::apply_voice_controls_result(
 /// The graph parameter this pool's template binds `key` to, if any.
 pub fn BoundVoicePool::binding(
   self : BoundVoicePool,
-  key : String,
-) -> @graph.ControlBinding? {
+  key : @control.Control,
+) -> @graph.ControlBinding[@control.Control]? {
   self.bindings.binding(key)
 }
 
@@ -1398,19 +1401,19 @@ pub extend NoteGate with Eq::{not_equal, equal}
 /// Instruments without all four envelope bindings retain their event gate.
 pub fn BoundVoicePool::note_gate(
   self : BoundVoicePool,
-  controls : Map[String, Double],
+  controls : Map[@control.Control, Double],
 ) -> NoteGate {
-  let hold = match controls.get("hold") {
+  let hold = match controls.get(Hold) {
     Some(seconds) => seconds
     None => return EventEnd
   }
-  let default_attack = match self.bindings.default_value("attack") {
-    Some(attack) if self.bindings.default_value("envelope_decay") is Some(_) &&
-      self.bindings.default_value("envelope_sustain") is Some(_) &&
-      self.bindings.default_value("release") is Some(_) => attack
+  let default_attack = match self.bindings.default_value(Attack) {
+    Some(attack) if self.bindings.default_value(Decay) is Some(_) &&
+      self.bindings.default_value(Sustain) is Some(_) &&
+      self.bindings.default_value(Release) is Some(_) => attack
     _ => return EventEnd
   }
-  let attack = controls.get("attack").unwrap_or(default_attack)
+  let attack = controls.get(Attack).unwrap_or(default_attack)
   if hold.is_nan() ||
     hold.is_inf() ||
     hold < 0.0 ||

@@ -3,6 +3,7 @@ package "dowdiness/moondsp/pattern"
 
 import {
   "dowdiness/incr/types",
+  "dowdiness/moondsp/control",
   "dowdiness/moondsp/identity",
   "moonbitlang/core/debug",
 }
@@ -12,9 +13,9 @@ pub fn chord(String, octave? : Int32) -> Pat[ControlMap]
 
 pub fn chord_notes(String, octave? : Int32) -> Array[Double]?
 
-pub fn continuous(String, (Double) -> Double) -> Pat[ControlMap]
+pub fn continuous(@control.Control, (Double) -> Double) -> Pat[ControlMap]
 
-pub fn control(String, Double) -> Pat[ControlMap]
+pub fn control(@control.Control, Double) -> Pat[ControlMap]
 
 pub fn controls(ControlMap) -> Pat[ControlMap]
 
@@ -64,14 +65,14 @@ pub fn PatternDocError::to_repr(Self) -> @debug.Repr
 pub struct ControlMap {
   // private fields
 }
-pub fn ControlMap::each(Self, (String, Double) -> Unit) -> Unit
+pub fn ControlMap::each(Self, (@control.Control, Double) -> Unit) -> Unit
 pub fn ControlMap::empty() -> Self
-pub fn ControlMap::entries(Self) -> Map[String, Double]
-pub fn ControlMap::get(Self, String) -> Double?
+pub fn ControlMap::entries(Self) -> Map[@control.Control, Double]
+pub fn ControlMap::get(Self, @control.Control) -> Double?
 pub fn ControlMap::merge(Self, Self) -> Self
 pub fn ControlMap::output(Self, &Logger) -> Unit
-pub fn ControlMap::set(Self, String, Double) -> Self
-pub fn ControlMap::single(String, Double) -> Self
+pub fn ControlMap::set(Self, @control.Control, Double) -> Self
+pub fn ControlMap::single(@control.Control, Double) -> Self
 pub fn ControlMap::to_repr(Self) -> @debug.Repr
 pub fn ControlMap::to_string(Self) -> String
 pub impl Show for ControlMap
@@ -92,10 +93,10 @@ pub impl[A : @debug.Debug] Show for Event[A]
 pub struct EventBuses {
   // private fields
 }
-pub fn EventBuses::each_reader(Self, (String, (Int64, Int64) -> Double) -> Unit) -> Unit
+pub fn EventBuses::each_reader(Self, (@control.Control, (Int64, Int64) -> Double) -> Unit) -> Unit
 pub fn EventBuses::none() -> Self
 pub fn EventBuses::placed(Self, Placement) -> Self
-pub fn EventBuses::reader(Self, String) -> ((Int64, Int64) -> Double)?
+pub fn EventBuses::reader(Self, @control.Control) -> ((Int64, Int64) -> Double)?
 
 #derive(Eq, @debug.Debug)
 pub struct EventOrigin {
@@ -139,7 +140,7 @@ pub fn[A] Pat::pure(A) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
 pub fn[A] Pat::same_content(Self[A], Self[A]) -> Bool
-pub fn Pat::select_control(Self[ControlMap], String, value? : Double) -> Self[ControlMap]
+pub fn Pat::select_control(Self[ControlMap], @control.Control, value? : Double) -> Self[ControlMap]
 pub fn[A] Pat::silence() -> Self[A]
 pub fn[A] Pat::slow(Self[A], Rational) -> Self[A]
 pub impl[A] Add for Pat[A]
@@ -151,8 +152,8 @@ pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom~ : @identi
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
-pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : String, f~ : (Double) -> Double) -> Self[ControlMap]
-pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : String, value~ : Double) -> Self[ControlMap]
+pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double) -> Double) -> Self[ControlMap]
+pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : @control.Control, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int32) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int32, n~ : Int32, rotation? : Int32) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::every(Self[A], id~ : @identity.PatternNodeId, n~ : Int32, transform~ : TimeTransform) -> Self[A] raise PatternDocError

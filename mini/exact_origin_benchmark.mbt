@@ -24,7 +24,9 @@ fn bench_origin_arc(index : Int32) -> @pattern.TimeSpan {
 ///|
 fn bench_origin_rows(
   events : Array[@pattern.Event[@pattern.ControlMap]],
-) -> Array[(@pattern.TimeSpan?, @pattern.TimeSpan, Map[String, Double])] {
+) -> Array[
+  (@pattern.TimeSpan?, @pattern.TimeSpan, Map[@control.Control, Double]),
+] {
   events.map(event => (event.whole, event.part, event.value.entries()))
 }
 

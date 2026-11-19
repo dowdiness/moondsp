@@ -66,21 +66,21 @@ pub extend BindingTarget with Eq::{not_equal, equal}
 
 ///|
 #derive(Debug, Eq)
-priv struct ControlBinding {
-  key : String
+priv struct ControlBinding[K] {
+  key : K
   target : BindingTarget
   unit : ControlUnit
 }
 
 ///|
 #derive(Debug, Eq)
-pub enum ControlBindingError {
+pub enum ControlBindingError[K] {
   InvalidNodeIndex(Int32)
   InvalidSlotForNode(Int32, @model.GraphParamSlot)
-  DuplicateKey(String)
+  DuplicateKey(K)
   /// Binding (key, node_index) targets a template node that
   /// optimize_graph eliminated. Prevents silent set_param no-ops.
-  OrphanBinding(String, Int32)
+  OrphanBinding(K, Int32)
 }
 
 ///|
@@ -91,26 +91,28 @@ pub extend ControlBindingError with Eq::{not_equal, equal}
 
 ///|
 #derive(Debug)
-pub struct ControlBindingBuilder {
-  priv bindings : Array[ControlBinding]
+pub struct ControlBindingBuilder[K] {
+  priv bindings : Array[ControlBinding[K]]
 }
 
 ///|
 pub extend ControlBindingBuilder with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
-pub fn ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder {
+pub fn[K] ControlBindingBuilder::ControlBindingBuilder() -> ControlBindingBuilder[
+  K,
+] {
   { bindings: [], }
 }
 
 ///|
 /// Add a binding. Mutates internal array, returns self for chaining.
-pub fn ControlBindingBuilder::bind(
-  self : ControlBindingBuilder,
-  key~ : String,
+pub fn[K] ControlBindingBuilder::bind(
+  self : ControlBindingBuilder[K],
+  key~ : K,
   target~ : BindingTarget,
   unit~ : ControlUnit,
-) -> ControlBindingBuilder {
+) -> ControlBindingBuilder[K] {
   self.bindings.push({ key, target, unit, })
   self
 }
@@ -130,8 +132,8 @@ pub fn ControlBindingBuilder::bind(
 /// ControlBindingMap whenever the template changes. Structural staleness
 /// detection is tracked as a follow-up.
 #derive(Debug, Eq)
-pub struct ControlBindingMap {
-  priv bindings : Array[ControlBinding]
+pub struct ControlBindingMap[K] {
+  priv bindings : Array[ControlBinding[K]]
   priv defaults : Array[Double]
 }
 
@@ -143,7 +145,7 @@ pub extend ControlBindingMap with Eq::{not_equal, equal}
 
 ///|
 /// Number of validated bindings in this map.
-pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int32 {
+pub fn[K] ControlBindingMap::length(self : ControlBindingMap[K]) -> Int32 {
   self.bindings.length()
 }
 
@@ -153,12 +155,12 @@ pub fn ControlBindingMap::length(self : ControlBindingMap) -> Int32 {
 /// node index bounds, slot compatibility with the authoring node kind,
 /// post-optimization liveness (rejects bindings on nodes eliminated by
 /// optimize_graph), and key uniqueness. Returns the first error found.
-pub fn ControlBindingBuilder::build(
-  self : ControlBindingBuilder,
+pub fn[K : Eq + Hash] ControlBindingBuilder::build(
+  self : ControlBindingBuilder[K],
   compiled_template : @template.AnalyzedGraph,
-) -> Result[ControlBindingMap, ControlBindingError] {
+) -> Result[ControlBindingMap[K], ControlBindingError[K]] {
   let defaults : Array[Double] = []
-  let seen_keys : Map[String, Bool] = Map([])
+  let seen_keys : Map[K, Bool] = Map([])
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
     if seen_keys.contains(binding.key) {
@@ -211,9 +213,9 @@ pub fn ControlBindingBuilder::build(
 /// found in the input map, in binding insertion order. Missing keys are
 /// skipped; unrecognized keys and voice-frame keys are ignored. Values are
 /// passed through without domain validation.
-pub fn ControlBindingMap::resolve_controls(
-  self : ControlBindingMap,
-  controls : Map[String, Double],
+pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(
+  self : ControlBindingMap[K],
+  controls : Map[K, Double],
 ) -> Array[@model.GraphControl] {
   let result : Array[@model.GraphControl] = []
   result.reserve_capacity(self.bindings.length())
@@ -236,9 +238,9 @@ pub fn ControlBindingMap::resolve_controls(
 
 ///|
 /// Visit each voice-frame-bound key found in `controls`, in binding order.
-pub fn ControlBindingMap::each_voice_value(
-  self : ControlBindingMap,
-  controls : Map[String, Double],
+pub fn[K : Eq + Hash] ControlBindingMap::each_voice_value(
+  self : ControlBindingMap[K],
+  controls : Map[K, Double],
   f : (VoiceParam, Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
@@ -251,9 +253,9 @@ pub fn ControlBindingMap::each_voice_value(
 
 ///|
 /// The target and unit `key` is bound to, if any.
-pub fn ControlBindingMap::binding(
-  self : ControlBindingMap,
-  key : String,
+pub fn[K : Eq] ControlBindingMap::binding(
+  self : ControlBindingMap[K],
+  key : K,
 ) -> (BindingTarget, ControlUnit)? {
   for binding in self.bindings {
     if binding.key == key {
@@ -266,9 +268,9 @@ pub fn ControlBindingMap::binding(
 ///|
 /// Read the default captured when these bindings were validated, in score
 /// units.
-pub fn ControlBindingMap::default_value(
-  self : ControlBindingMap,
-  key : String,
+pub fn[K : Eq] ControlBindingMap::default_value(
+  self : ControlBindingMap[K],
+  key : K,
 ) -> Double? {
   for i in 0..<self.bindings.length() {
     if self.bindings[i].key == key {

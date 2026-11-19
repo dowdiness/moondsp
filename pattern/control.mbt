@@ -3,7 +3,7 @@
 /// Values are immutable to callers; entries() returns an owned copy.
 #derive(Debug)
 pub struct ControlMap {
-  priv values : Map[String, Double]
+  priv values : Map[@control.Control, Double]
 }
 
 ///|
@@ -17,29 +17,29 @@ pub fn ControlMap::empty() -> ControlMap {
 }
 
 ///|
-pub fn ControlMap::single(key : String, value : Double) -> ControlMap {
-  let m : Map[String, Double] = Map([])
+pub fn ControlMap::single(key : @control.Control, value : Double) -> ControlMap {
+  let m : Map[@control.Control, Double] = Map([])
   m[key] = value
   { values: m, }
 }
 
 ///|
-pub fn ControlMap::get(self : ControlMap, key : String) -> Double? {
+pub fn ControlMap::get(self : ControlMap, key : @control.Control) -> Double? {
   self.values.get(key)
 }
 
 ///|
 pub fn ControlMap::each(
   self : ControlMap,
-  f : (String, Double) -> Unit,
+  f : (@control.Control, Double) -> Unit,
 ) -> Unit {
   self.values.each(f)
 }
 
 ///|
 /// Return a fresh map snapshot of this control map.
-pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
-  let result : Map[String, Double] = Map([])
+pub fn ControlMap::entries(self : ControlMap) -> Map[@control.Control, Double] {
+  let result : Map[@control.Control, Double] = Map([])
   self.values.each(fn(k, v) { result[k] = v })
   result
 }
@@ -48,7 +48,7 @@ pub fn ControlMap::entries(self : ControlMap) -> Map[String, Double] {
 /// Return a new control map with this value replaced; leave self unchanged.
 pub fn ControlMap::set(
   self : ControlMap,
-  key : String,
+  key : @control.Control,
   value : Double,
 ) -> ControlMap {
   let result = self.entries()
@@ -67,7 +67,10 @@ pub fn ControlMap::merge(self : ControlMap, other : ControlMap) -> ControlMap {
 ///|
 /// A continuous control: `key` is `f(t)` at the start of every queried part,
 /// with no onsets. `f` must not allocate when it drives a control bus.
-pub fn continuous(key : String, f : (Double) -> Double) -> Pat[ControlMap] {
+pub fn continuous(
+  key : @control.Control,
+  f : (Double) -> Double,
+) -> Pat[ControlMap] {
   Pat::from_query(arc => {
     [
       {
@@ -81,13 +84,13 @@ pub fn continuous(key : String, f : (Double) -> Double) -> Pat[ControlMap] {
 
 ///|
 pub fn note(n : Double) -> Pat[ControlMap] {
-  control("note", n)
+  control(Note, n)
 }
 
 ///|
 /// Create a sound control pattern from a MIDI drum number.
 pub fn sound(midi : Double) -> Pat[ControlMap] {
-  control("sound", midi)
+  control(Sound, midi)
 }
 
 ///|
@@ -150,34 +153,34 @@ fn parse_note_name(name : String) -> Double {
 
 ///|
 pub fn s_lpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
-  let cutoff = ControlMap::single("lpf", frequency_hz)
+  let cutoff = ControlMap::single(Lpf, frequency_hz)
   controls(
     match resonance {
       None => cutoff
-      Some(q) => cutoff.set("lpf_resonance", q)
+      Some(q) => cutoff.set(LpfResonance, q)
     },
   )
 }
 
 ///|
 pub fn s_hpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
-  let cutoff = ControlMap::single("hpf", frequency_hz)
+  let cutoff = ControlMap::single(Hpf, frequency_hz)
   controls(
     match resonance {
       None => cutoff
-      Some(q) => cutoff.set("hpf_resonance", q)
+      Some(q) => cutoff.set(HpfResonance, q)
     },
   )
 }
 
 ///|
 pub fn s_gain(g : Double) -> Pat[ControlMap] {
-  control("gain", g)
+  control(Gain, g)
 }
 
 ///|
 pub fn s_pan(p : Double) -> Pat[ControlMap] {
-  control("pan", p)
+  control(Pan, p)
 }
 
 ///|
@@ -317,7 +320,7 @@ fn[A] bind_control_kernel(
 
 ///|
 /// A scalar control source whose content is tracked automatically.
-pub fn control(key : String, value : Double) -> Pat[ControlMap] {
+pub fn control(key : @control.Control, value : Double) -> Pat[ControlMap] {
   controls(ControlMap::single(key, value))
 }
 
@@ -329,7 +332,8 @@ pub fn controls(values : ControlMap) -> Pat[ControlMap] {
   let pat = Pat::pure(values)
   let parts : Array[String] = []
   values.values.each((key, value) => {
-    parts.push("control:\{key.length()}:\{key}:\{value}")
+    let name = key.name()
+    parts.push("control:\{name.length()}:\{name}:\{value}")
   })
   make_pat(
     pat.query,
@@ -344,7 +348,7 @@ pub fn controls(values : ControlMap) -> Pat[ControlMap] {
 /// Select events carrying a control; optionally require an exact value.
 pub fn Pat::select_control(
   self : Pat[ControlMap],
-  key : String,
+  key : @control.Control,
   value? : Double,
 ) -> Pat[ControlMap] {
   select_control_kernel(self, cm => cm, key, value)
@@ -354,7 +358,7 @@ pub fn Pat::select_control(
 fn[A] select_control_kernel(
   pat : Pat[A],
   controls : (A) -> ControlMap,
-  key : String,
+  key : @control.Control,
   value : Double?,
 ) -> Pat[A] {
   let condition = match value {
@@ -373,7 +377,7 @@ fn[A] select_control_kernel(
           }
       }
     },
-    "select:\{key.length()}:\{key}:" + condition,
+    "select:\{key.name().length()}:\{key.name()}:" + condition,
   )
 }
 

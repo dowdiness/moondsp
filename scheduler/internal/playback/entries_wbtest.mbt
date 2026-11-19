@@ -72,7 +72,7 @@ fn notes(
   events.sort_by((a, b) => {
     a.whole.unwrap().begin.compare(b.whole.unwrap().begin)
   })
-  events.map(e => e.value.get("note").unwrap().to_int())
+  events.map(e => e.value.get(Note).unwrap().to_int())
 }
 
 ///|
@@ -481,7 +481,7 @@ test "exact pattern origins survive admission and active queries" {
   let doc = @pattern.PatternDoc::control_atom(
     id=@identity.PatternNodeId::from_string("exact-origin"),
     source_atom=@identity.SourceAtomId::SourceAtomId(epoch, 1L),
-    key="note",
+    key=Note,
     value=60.0,
   )
   let snapshot = PlaybackSnapshot::pattern_with_origins(
@@ -509,7 +509,7 @@ test "origin-only edits update retained material provenance" {
     let doc = @pattern.PatternDoc::control_atom(
       id=@identity.PatternNodeId::from_string("same-material"),
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
-      key="note",
+      key=Note,
       value=60.0,
     )
     PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
@@ -539,7 +539,7 @@ test "pending material retains old exact origins until its musical boundary" {
     let doc = @pattern.PatternDoc::control_atom(
       id=@identity.PatternNodeId::from_string("tone"),
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
-      key="note",
+      key=Note,
       value=note,
     ).slow(
       id=@identity.PatternNodeId::from_string("phrase"),
@@ -564,8 +564,8 @@ test "pending material retains old exact origins until its musical boundary" {
     next.source_origin() is Some(next_origin) else {
     fail("expected old and pending exact material")
   }
-  assert_eq(old.event().value.get("note"), Some(60.0))
-  assert_eq(next.event().value.get("note"), Some(72.0))
+  assert_eq(old.event().value.get(Note), Some(60.0))
+  assert_eq(next.event().value.get(Note), Some(72.0))
   assert_eq(old_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 1L))
   assert_eq(next_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 2L))
   assert_eq(next.event().whole.unwrap().begin, @pattern.Rational::from_int(3))

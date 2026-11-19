@@ -66,7 +66,7 @@ test "Section::from_pattern wraps a pattern with identity scope" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
 }
 
 ///|
@@ -298,7 +298,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     ),
   )
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(64.0))
+  assert_true(events[0].value.get(Note) == Some(64.0))
 }
 
 ///|
@@ -370,8 +370,8 @@ test "SectionBody::layers stacks ordered named layers" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(36.0))
-  assert_true(events[1].value.get("note") == Some(64.0))
+  assert_true(events[0].value.get(Note) == Some(36.0))
+  assert_true(events[1].value.get(Note) == Some(64.0))
 }
 
 ///|
@@ -391,7 +391,7 @@ test "Section constructor accepts pattern body wrapper" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
 }
 
 ///|
@@ -407,8 +407,8 @@ test "Section::layer converts single body to named layers" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(48.0))
-  assert_true(events[1].value.get("note") == Some(55.0))
+  assert_true(events[0].value.get(Note) == Some(48.0))
+  assert_true(events[1].value.get(Note) == Some(55.0))
 }
 
 ///|
@@ -422,7 +422,7 @@ test "Section::layer replaces existing layer by name" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get("note") == Some(60.0))
+  assert_true(events[0].value.get(Note) == Some(60.0))
 }
 
 ///|
@@ -452,8 +452,8 @@ test "Section::apply_patch set layer replaces existing layer" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get("note") == Some(48.0))
-  assert_true(events[1].value.get("note") == Some(67.0))
+  assert_true(events[0].value.get(Note) == Some(48.0))
+  assert_true(events[1].value.get(Note) == Some(67.0))
 }
 
 ///|
