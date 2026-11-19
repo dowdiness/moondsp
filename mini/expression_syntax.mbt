@@ -407,7 +407,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       let resonance = if !self.at_end() && self.input[self.pos] == ',' {
         self.pos += 1
         let q = self.read_control_value(kind.resonance_control_key())
-        guard q.all(q => !q.is_nan() && !q.is_inf() && q > 0.0) else {
+        guard q.all(q => kind.resonance_control_key().admits(q)) else {
           raise ParseError(
             "position \{method_start}: \{name}() expects finite resonance above 0",
           )
@@ -427,7 +427,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
     "pan" => Control(Pan, self.read_method_control_argument(Pan))
     "room" => {
       let send = self.read_method_control_argument(Room)
-      guard send.all(s => !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 1.0) else {
+      guard send.all(s => @control.Control::Room.admits(s)) else {
         raise ParseError(
           "position \{method_start}: room() expects a send between 0 and 1",
         )

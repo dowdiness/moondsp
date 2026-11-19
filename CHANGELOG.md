@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking MoonBit API:** each control's domain is stated once, in
+  `@control.Control::admits(value)`. Mini checks it for the keys it parses
+  with a range, and `note_gate` checks `attack` and `hold`.
+  `NoteGate::AfterSeconds` carries a `@voice.GateSeconds` that only
+  `note_gate` creates, so the scheduler no longer checks the duration again.
 - **Breaking MoonBit API:** a voice reads a note's controls through one
   source, `@control.ControlSource` (ADR-0020 step 4).
   `BoundVoicePool::note_on(controls)` replaces `note_on_controls(map, follow~)`:

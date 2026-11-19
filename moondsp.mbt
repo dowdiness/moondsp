@@ -124,6 +124,7 @@ pub using @voice {
   type BoundVoicePool,
   type BoundVoicePoolError,
   type NoteGate,
+  type GateSeconds,
   type VoiceControlError,
   type VoiceFollower,
   type VoiceHandle,

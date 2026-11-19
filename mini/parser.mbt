@@ -279,9 +279,9 @@ fn Parser::read_seconds_control(
   method_start : Int32,
 ) -> MiniTransform raise ParseError {
   let seconds = self.read_method_control_argument(key)
-  guard seconds.all(s => !s.is_nan() && !s.is_inf() && s >= 0.0 && s <= 86400.0) else {
+  guard seconds.all(s => key.admits(s)) else {
     raise ParseError(
-      "position \{method_start}: \{key}() expects seconds between 0 and 86400",
+      "position \{method_start}: \{key}() expects seconds between 0 and \{@control.MAX_SECONDS}",
     )
   }
   Control(key, seconds)

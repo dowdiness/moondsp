@@ -73,9 +73,15 @@ pub fn BoundVoicePool::update_follows(Self, Int64, Int64) -> Unit
 pub fn BoundVoicePool::voice_state(Self, VoiceHandle) -> VoiceState
 
 #derive(Eq, @debug.Debug)
+pub struct GateSeconds {
+  // private fields
+}
+pub fn GateSeconds::seconds(Self) -> Double
+
+#derive(Eq, @debug.Debug)
 pub(all) enum NoteGate {
   EventEnd
-  AfterSeconds(Double)
+  AfterSeconds(GateSeconds)
   InvalidDuration
 }
 pub fn NoteGate::equal(Self, Self) -> Bool

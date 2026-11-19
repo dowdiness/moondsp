@@ -6,6 +6,7 @@ import {
 }
 
 // Values
+pub const MAX_SECONDS : Double = 86400.0
 
 // Errors
 
@@ -27,6 +28,7 @@ pub(all) enum Control {
   Hold
   Release
 }
+pub fn Control::admits(Self, Double) -> Bool
 pub fn Control::all() -> FixedArray[Self]
 pub fn Control::name(Self) -> String
 pub fn Control::nesting(Self) -> Nesting

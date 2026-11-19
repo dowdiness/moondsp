@@ -141,3 +141,20 @@ pub fn Control::nesting(self : Control) -> Nesting {
     | Release => Override
   }
 }
+
+///|
+/// The longest duration a seconds control (`attack`, `hold`, `release`) takes.
+pub const MAX_SECONDS : Double = 86400.0
+
+///|
+/// Whether `value` lies in this control's domain; the only place that states
+/// one. Mini checks it for the keys it parses with a range, and a voice where
+/// it reads one it relies on (`hold`, `attack`). `NaN` is in no domain.
+pub fn Control::admits(self : Control, value : Double) -> Bool {
+  match self {
+    Attack | Hold | Release => value >= 0.0 && value <= MAX_SECONDS
+    Room => value >= 0.0 && value <= 1.0
+    LpfResonance | HpfResonance => value > 0.0 && !value.is_inf()
+    Note | Sound | Gain | Pan | Lpf | Hpf | Decay | Sustain => !value.is_nan()
+  }
+}

@@ -178,11 +178,11 @@ fn PatternScheduler::process_single_event(
         let gate = pool.note_gate(controls)
         let endpoint = match gate {
           EventEnd => self.clock.sample_at(whole.end_)
-          AfterSeconds(seconds) =>
+          AfterSeconds(gate) =>
             physical_gate_end(
               self.clock,
               whole.begin,
-              seconds,
+              gate,
               self.ctx.sample_rate(),
             )
           InvalidDuration => Err(@transport.TransportError::TimeOutOfRange)
@@ -581,12 +581,10 @@ pub fn PatternScheduler::process_song_block(
 fn physical_gate_end(
   clock : @transport.Clock,
   onset : @pattern.Rational,
-  seconds : Double,
+  gate : @moondsp.GateSeconds,
   sample_rate : Double,
 ) -> Result[Int64, @transport.TransportError] {
-  if seconds.is_nan() || seconds.is_inf() || seconds < 0.0 || seconds > 172800.0 {
-    return Err(@transport.TransportError::TimeOutOfRange)
-  }
+  let seconds = gate.seconds()
   let start = match clock.sample_at(onset) {
     Ok(sample) => sample
     Err(error) => return Err(error)

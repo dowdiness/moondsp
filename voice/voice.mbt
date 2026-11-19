@@ -1388,8 +1388,21 @@ pub fn VoicePool::process_with_send(
 #derive(Debug, Eq)
 pub(all) enum NoteGate {
   EventEnd
-  AfterSeconds(Double)
+  AfterSeconds(GateSeconds)
   InvalidDuration
+}
+
+///|
+/// A held note's gate length: `attack + hold`, both in their control's domain,
+/// so at most `2 × MAX_SECONDS`. Only `note_gate` makes one.
+#derive(Debug, Eq)
+pub struct GateSeconds {
+  priv seconds : Double
+}
+
+///|
+pub fn GateSeconds::seconds(self : GateSeconds) -> Double {
+  self.seconds
 }
 
 ///|
@@ -1417,15 +1430,9 @@ pub fn[C : @control.ControlSource] BoundVoicePool::note_gate(
     _ => return EventEnd
   }
   let attack = controls.value(Attack).get().unwrap_or(default_attack)
-  if hold.is_inf() ||
-    hold < 0.0 ||
-    hold > 86400.0 ||
-    attack.is_nan() ||
-    attack.is_inf() ||
-    attack < 0.0 ||
-    attack + hold > 172800.0 {
+  guard @control.Control::Hold.admits(hold) &&
+    @control.Control::Attack.admits(attack) else {
     InvalidDuration
-  } else {
-    AfterSeconds(attack + hold)
   }
+  AfterSeconds({ seconds: attack + hold, })
 }

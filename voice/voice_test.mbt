@@ -1236,7 +1236,7 @@ test "instrument gate follows template changes without mutating note controls" {
   let ctx = DspContext(sample_rate=128.0, block_size=128)
   let pool = @voice.BoundVoicePool(template(1000.0), ctx, bindings())
   let controls : Map[@control.Control, Double] = Map([(Hold, 2.0)])
-  assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(3.0))
+  assert_eq(gate_seconds(pool.note_gate(controls)), Some(3.0))
   assert_true(pool.note_on(controls) is Some(_))
   assert_eq(controls.length(), 1)
   assert_eq(controls.get(Hold), Some(2.0))
@@ -1252,14 +1252,14 @@ test "instrument gate follows template changes without mutating note controls" {
   )
   assert_true(pool.note_on(fixed([(Hold, -1.0)])) is None)
   pool.set_template(template(2000.0), bindings()).unwrap()
-  assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(4.0))
+  assert_eq(gate_seconds(pool.note_gate(controls)), Some(4.0))
   let invalid = ControlBindingBuilder().bind(
     key=@control.Control::Attack,
     node_index=99,
     slot=GraphParamSlot::Value0,
   )
   assert_true(pool.set_template(template(0.0), invalid) is Err(_))
-  assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(4.0))
+  assert_eq(gate_seconds(pool.note_gate(controls)), Some(4.0))
   pool.set_template(template(0.0), ControlBindingBuilder()).unwrap()
   assert_eq(pool.note_gate(controls), @voice.NoteGate::EventEnd)
 }
@@ -1370,4 +1370,12 @@ impl @control.ControlSource for GainRamp with fn each_varying(_, f) {
   f(Gain, (num, den) => {
     @control.ControlValue::of(num.to_double() / den.to_double())
   })
+}
+
+///|
+fn gate_seconds(gate : @voice.NoteGate) -> Double? {
+  match gate {
+    AfterSeconds(gate) => Some(gate.seconds())
+    _ => None
+  }
 }
