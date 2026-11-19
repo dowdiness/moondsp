@@ -232,12 +232,8 @@ view.dispatch({
 });
 
 /** Play the editor's score from the beginning. */
-function restart({ draft, playback }: Tools): void {
-  try {
-    void playback.restart(draft.prepare()).catch(error => playback.report(error));
-  } catch (error) {
-    playback.reportDraftFailure(error);
-  }
+function restart({ playback }: Tools): void {
+  void playback.restart().catch(error => playback.report(error));
 }
 
 dom.transport.start.addEventListener("click", () => {

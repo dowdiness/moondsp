@@ -1,5 +1,5 @@
 import type { AudioEngine, AudioEvent, AudioSession, AudioStatus } from "./audio";
-import { Draft, PlaybackInput, type DraftState } from "./authoring";
+import { Draft, PlaybackInput, playerWindow, type DraftState, type PlayerWindow } from "./authoring";
 import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
 import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
@@ -69,14 +69,24 @@ export class Player {
   private draftState: DraftState;
 
   constructor(
-    private readonly engine: Pick<AudioEngine, "openSession">,
+    private readonly engine: Pick<AudioEngine, "openSession" | "plannedFormat">,
     initial: { draft: Draft },
     private readonly present: (view: PlaybackView) => void,
   ) {
     this.draft = initial.draft;
     this.draftState = this.draft.state();
     this.diagnostic = draftDiagnostic(this.draftState);
+    // A configured format no player can run gets no early check; opening audio reports it.
+    const planned = engine.plannedFormat === undefined ? undefined : playerWindow(engine.plannedFormat);
+    if (planned?.kind === "runs") this.checkDraftWithin(planned.window);
     this.render();
+  }
+
+  /** From now on the draft also reports what the player, running in `format`, would refuse. */
+  private checkDraftWithin(window: PlayerWindow): void {
+    this.draftState = this.draft.checkWithin(window);
+    this.diagnostic = draftDiagnostic(this.draftState);
+    this.feedback = draftFeedback(this.draftState);
   }
 
   view(): PlaybackView {
@@ -159,11 +169,19 @@ export class Player {
     return this.send("update", input);
   }
 
-  async restart(input: PlaybackInput): Promise<PlayerReceipt> {
+  /** Play the current draft from the beginning. It is prepared once audio is open, so the player's limits apply. */
+  async restart(): Promise<PlayerReceipt> {
     this.cancelAutomatic();
     const intent = ++this.intent;
     const session = await this.open();
     if (intent !== this.intent) throw new DOMException("Restart cancelled", "AbortError");
+    let input: PlaybackInput;
+    try {
+      input = this.draft.prepare();
+    } catch (error) {
+      this.reportDraftFailure(error);
+      throw error;
+    }
     const result = await this.send("restart", input);
     if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
     return result;
@@ -262,7 +280,11 @@ export class Player {
       if (opened.kind !== "opened") {
         throw new Error(opened.kind === "failed" ? opened.message : "Audio owner is busy");
       }
+      // The worklet built its player for this format, so a player can run it.
+      const running = playerWindow(opened.session.format);
+      if (running.kind === "unsupported") throw new Error(`Worklet reported an unplayable format: ${running.message}`);
       this.connection = { kind: "open", session: opened.session };
+      this.checkDraftWithin(running.window);
       this.render();
       return opened.session;
     }).catch(error => {

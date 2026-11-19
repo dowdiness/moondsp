@@ -3,9 +3,12 @@ package "dowdiness/moondsp/browser_authoring"
 
 import {
   "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
 }
 
 // Values
+pub fn check_draft_within(@mini.Draft, @pattern.QueryWindow) -> String
+
 pub fn create_draft(String, (@mini.Draft) -> Unit, (String) -> Unit) -> Unit
 
 pub fn dispose_draft(@mini.Draft) -> Unit
@@ -15,6 +18,8 @@ pub fn draft_state(@mini.Draft) -> String
 pub fn edit_draft(@mini.Draft, String) -> String
 
 pub fn locate_onsets(@mini.Draft, String) -> String
+
+pub fn player_query_window(Double, Int32, (@pattern.QueryWindow) -> Unit, (String) -> Unit) -> Unit
 
 pub fn prepare_playback(@mini.Draft) -> String
 

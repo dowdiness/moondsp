@@ -60,6 +60,20 @@ A later cache comparison used that cold-origin implementation as its baseline. I
 
 Paired AB/BA cold preparation improved 15.0–16.4% at 512 paths and 6.7–10.3% at 128 paths, but regressed 1.6–7.9% at 32 paths. The original nested workload added 0.3–0.6 µs. This is a scalability tradeoff, not a universal speedup. Integrated Worklet arms accepted 40 updates and drained pending state; reported render maxima of 1–3 ms cannot establish exact deadline misses or compliance with an integer-ms clock. Retained heap, allocated bytes and GC-pause costs were not measured.
 
+## Draft edit cost
+
+Measured 2026-11-19 in the Linux x64 orb with Node v26.13.1 and Moon 0.1.20261117 (eb64713), release JS (the live editor's target). [`mini/draft_edit_benchmark.mbt`](../../mini/draft_edit_benchmark.mbt) toggles one atom spelling per `Draft::edit`, which is what the editor pays on each committed keystroke. Baseline: a clean `HEAD` worktree with the same benchmark copied in, compared against an intermediate version of this change that also ran `lower_with_origins` on every edit.
+
+| Workload, mean µs/edit | Baseline | Eager exact lowering | Adopted (syntax) | Adopted (player at 48 kHz) |
+|---|---:|---:|---:|---:|
+| direct | 20.4 | 43.3 | 20.4 | 23.2 |
+| default example | 231.6 | 482.7 | 202.8 | 250.8 |
+| nested reused | 60.8 | 180.5 | 52.0 | 62.8 |
+| 32 shared paths | 56.8 | 773.2 | 58.0 | 64.4 |
+| 4-section song | 131.9 | 153.1 | 144.9 | 149.7 |
+
+Eager lowering cost 1.2–13.6× per edit, worst for shared references. The parser already rejects every control pattern lowering cannot compile (for example `gain("0.5?")`), so a lowering failure is a compiler bug, not an author error. It was dropped from the Draft and remains in `PlaybackInput::compile`. Playback admission over the player's window adds about 10–20% per edit. Adopted and baseline syntax-only numbers overlap within run-to-run spread; this is not a speedup. Single sequential runs on a shared orb; GC and main-thread input latency were not measured.
+
 ## Evidence omitted
 
 Generic post-change full-suite timing dumps and validation-only reports had no controlled before/after baseline or additional decision-bearing conclusion. They were removed rather than copied into this summary. In-tree benchmarks remain available for new measurements; old test-pass counts are not evidence that the current checkout was tested during this documentation change.

@@ -169,6 +169,7 @@ test "sequential song sections are admitted one occurrence at a time" {
   let song = "song(" + sections.join(",") + "," + parts.join(",") + ")"
   assert_true(parse_play_source(song, query_window=window) is Ok(_))
   let draft = Draft(song)
+  assert_true(draft.check_playback_within(window).diagnostic() is None)
   guard draft.prepare_playback() is Ok(input) else { fail("prepare") }
   assert_true(input.compile(query_window=window) is Ok(_))
   // Occurrences that sound together are still bounded together.
@@ -178,6 +179,31 @@ test "sequential song sections are admitted one occurrence at a time" {
     parts.map(part => part.replace(old=")", new=",0)")).join(",") +
     ")"
   assert_true(parse_play_source(layered, query_window=window) is Err(_))
+  // The editor reports the player's rejection before Play is pressed.
+  guard draft.edit(
+      EditTransaction(base=draft.state().version(), edits=[
+        TextEdit(from=0, to=song.length(), inserted=layered),
+      ]),
+    )
+    is Ok(state) else {
+    fail("edit")
+  }
+  guard state.diagnostic() is Some(diagnostic) else {
+    fail("expected admission diagnostic")
+  }
+  assert_eq(
+    diagnostic.message(),
+    "playback arrangement exceeds the query expansion limit",
+  )
+  assert_true(draft.prepare_playback() is Err(_))
+  // A Draft that learns its player later reports the same, at the same version.
+  let late = Draft(layered)
+  let unchecked = late.state()
+  assert_true(unchecked.diagnostic() is None)
+  let checked = late.check_playback_within(window)
+  assert_eq(checked.version(), unchecked.version())
+  assert_true(checked.diagnostic() is Some(_))
+  assert_true(late.prepare_playback() is Err(_))
 }
 
 ///|

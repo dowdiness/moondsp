@@ -106,7 +106,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.graphBlockSize = ok ? blockSize : 0;
     if (ok) {
       this.wasm.player_onset_enable(this.onsets ? 1 : 0);
-      this.port.postMessage({ type: "ready", mode: "scheduler-dsp" });
+      // The page checks sources against the format the player really runs in.
+      this.port.postMessage({ type: "ready", mode: "scheduler-dsp", sampleRate, blockSize });
       this.applySchedulerState();
     } else if (!this.reportedInitError) {
       this.reportedInitError = true;

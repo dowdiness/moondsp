@@ -1,6 +1,7 @@
 import {
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/scheduler",
   "moonbitlang/core/json",
 }
 
@@ -12,6 +13,8 @@ options(
       "format": "esm",
       "exports": [
         "create_draft",
+        "player_query_window",
+        "check_draft_within",
         "draft_state",
         "edit_draft",
         "prepare_playback",

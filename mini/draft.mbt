@@ -739,6 +739,8 @@ pub struct Draft {
   /// What the current text means for playback, or why it cannot be played.
   priv mut analysis : DraftAnalysis
   priv mut last_valid_doc : @pattern.PatternDoc[@pattern.ControlMap]?
+  /// The window of the player the text is checked for, once that is known.
+  priv mut query_window : @pattern.QueryWindow?
 }
 
 ///|
@@ -803,6 +805,7 @@ fn draft_analysis(
   mode : DraftTracking,
   sources : SourceMap,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  query_window : @pattern.QueryWindow?,
 ) -> DraftAnalysis {
   let payload = match mode {
     Pattern => PlaybackPayload::Pattern(at, sources)
@@ -822,7 +825,7 @@ fn draft_analysis(
     parse_play_source_with_origins(
       input,
       previous,
-      None,
+      query_window,
       origins=Some(sources),
       syntax_depth_limit=Some(32),
     ) {
@@ -833,7 +836,17 @@ fn draft_analysis(
 }
 
 ///|
+/// Draft checks syntax; `check_playback_within` adds the
+/// player's limits once the player is known.
 pub fn Draft::Draft(input : String) -> Draft raise DraftEditError {
+  Draft::starting_with(input, None)
+}
+
+///|
+fn Draft::starting_with(
+  input : String,
+  query_window : @pattern.QueryWindow?,
+) -> Draft raise DraftEditError {
   let epoch = next_draft_epoch()
   let facts = draft_recognize(input)
   let mode = draft_tracking(facts, Pattern)
@@ -843,7 +856,7 @@ pub fn Draft::Draft(input : String) -> Draft raise DraftEditError {
     _ => empty
   }
   let at = DraftVersion(epoch, 0L)
-  let analysis = draft_analysis(input, at, mode, sources, None)
+  let analysis = draft_analysis(input, at, mode, sources, None, query_window)
   {
     input,
     at,
@@ -851,12 +864,35 @@ pub fn Draft::Draft(input : String) -> Draft raise DraftEditError {
     sources,
     analysis,
     last_valid_doc: analysis.pattern_doc(),
+    query_window,
   }
 }
 
 ///|
 pub fn Draft::state(self : Draft) -> DraftState {
   DraftState(self.input, self.at, self.mode, self.analysis.diagnostic())
+}
+
+///|
+/// From now on, also reject what a player querying at most `window` would
+/// refuse. The text is checked again but keeps its version, as it is unchanged.
+pub fn Draft::check_playback_within(
+  self : Draft,
+  window : @pattern.QueryWindow,
+) -> DraftState {
+  self.query_window = Some(window)
+  self.analysis = draft_analysis(
+    self.input,
+    self.at,
+    self.mode,
+    self.sources,
+    self.last_valid_doc,
+    self.query_window,
+  )
+  if self.analysis.pattern_doc() is Some(doc) {
+    self.last_valid_doc = Some(doc)
+  }
+  self.state()
 }
 
 ///|
@@ -938,7 +974,14 @@ fn Draft::edit_checked(
     _ => baseline
   }
   let at = DraftVersion(self.at.epoch, self.at.revision + 1L)
-  let analysis = draft_analysis(input, at, mode, sources, self.last_valid_doc)
+  let analysis = draft_analysis(
+    input,
+    at,
+    mode,
+    sources,
+    self.last_valid_doc,
+    self.query_window,
+  )
   // Commit only after all validation and checked identity allocation succeeded.
   self.input = input
   self.at = at
@@ -970,7 +1013,7 @@ pub fn Draft::reset(
   input : String,
 ) -> Result[DraftState, DraftEditError] {
   guard self.mode != Disposed else { return Err(Disposed) }
-  try Draft(input) catch {
+  try Draft::starting_with(input, self.query_window) catch {
     error => Err(error)
   } noraise {
     fresh => {

@@ -1322,7 +1322,9 @@ Message responsibilities:
   receipts; it does not retain public tokens or wait for rendering.
 - Each worklet owns WASM initialization, graph initialization, sample copying,
   readiness and runtime errors. The dedicated scheduler reports `ready` after
-  graph initialization and refreshes Player status every 32 rendered quanta.
+  graph initialization, carrying the `sampleRate` and `blockSize` it built the
+  player for; the page checks drafts against that format. It refreshes Player
+  status every 32 rendered quanta.
 - `set-scheduler-gain` is handled by the worklets, not the shared controller.
 - `processor.js` additionally handles demo controls such as `set-freq`,
   `set-gain`, `set-pan`, `set-delay-samples`, `set-cutoff`, and graph queue

@@ -31,8 +31,11 @@ export type PlayerReceipt = PlayerSnapshot & Readonly<{ id: RequestId; operation
   | Readonly<{ kind: "accepted" }>
   | Readonly<{ kind: "rejected"; restartRequired: boolean; message: string }>
 );
+/** How the player's audio arrives: blocks of `blockSize` frames at `sampleRate`. */
+export type AudioFormat = Readonly<{ sampleRate: number; blockSize: number }>;
+
 export type WorkletMessage =
-  | { kind: "ready" }
+  | { kind: "ready"; format: AudioFormat }
   | { kind: "receipt"; receipt: PlayerReceipt }
   | ({ kind: "status" } & PlayerSnapshot)
   | { kind: "runtime-error"; message: string }
@@ -68,7 +71,13 @@ function snapshot(value: Record<string, unknown>): PlayerSnapshot | null {
 
 export function decodeWorkletMessage(value: unknown): WorkletMessage {
   if (!record(value)) return { kind: "protocol-error", message: "worklet reply is not an object" };
-  if (value.type === "ready") return { kind: "ready" };
+  if (value.type === "ready") {
+    const { sampleRate, blockSize } = value;
+    return typeof sampleRate === "number" && Number.isFinite(sampleRate) && sampleRate > 0 &&
+      typeof blockSize === "number" && Number.isSafeInteger(blockSize) && blockSize > 0
+      ? { kind: "ready", format: { sampleRate, blockSize } }
+      : { kind: "protocol-error", message: "worklet ready without its audio format" };
+  }
   if (value.type === "error" && typeof value.message === "string") return { kind: "runtime-error", message: value.message };
   if (value.type === "player-status") {
     const view = snapshot(value);

@@ -1642,7 +1642,11 @@ The scheduler owns the window. `@scheduler.max_query_window_for(sample_rate~,
 block_size~)` returns a `@pattern.QueryWindow`, which is always positive, or
 fails when the scheduler cannot run that format. A `PatternScheduler` computes
 its own window once, when it is created, and the player reads it with
-`max_query_window()`.
+`max_query_window()`. The live editor gets the same window for the player's
+format through `Draft::check_playback_within`. With a configured sample rate
+the page knows that format from the start; with the native rate, it learns it
+when audio opens, from the format the worklet reports in its `ready` message.
+From then on the editor's diagnostic matches the player's verdict before Play.
 
 Source entry counts are checked even while Ready, before publication. For a live
 Update, `PatternScheduler::accept_playback` prepares the proposed tempo,

@@ -2,12 +2,15 @@ import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
 import { Player } from "../src/playback";
 import { Draft, PlaybackInput } from "../src/authoring";
-import type { AudioEvent, AudioSession, OpenSessionResult } from "../src/audio";
+import type { AudioEvent, AudioFormat, AudioSession, OpenSessionResult } from "../src/audio";
 import { RequestId } from "../src/playback-protocol";
 import type { PlayerOperation, PlayState } from "../src/playback-protocol";
 
 type Command = { id: number; operation: PlayerOperation; input?: string };
-function harness(deferred = false, delayedClose = false, cancellable = false) {
+const PLAYER_FORMAT: AudioFormat = { sampleRate: 48000, blockSize: 128 };
+type Setup = { plannedFormat?: AudioFormat; sessionFormat?: AudioFormat; text?: string };
+function harness(deferred = false, delayedClose = false, cancellable = false,
+  { plannedFormat, sessionFormat = PLAYER_FORMAT, text = 'note("60")' }: Setup = {}) {
   const commands: Command[] = [];
   let deliver: (event: AudioEvent) => void = () => {};
   const opening = Promise.withResolvers<OpenSessionResult>();
@@ -23,6 +26,7 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
   };
   const closing = Promise.withResolvers<{ kind: "closed" }>();
   const session: AudioSession = {
+    format: sessionFormat,
     fadeIn: () => "issued",
     close: async () => {
       owner = null;
@@ -35,7 +39,7 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
     play: id => issue(id, "play"),
     pause: id => issue(id, "pause"),
   };
-  const engine = { openSession: async (next: (event: AudioEvent) => void, signal?: AbortSignal): Promise<OpenSessionResult> => {
+  const engine = { plannedFormat, openSession: async (next: (event: AudioEvent) => void, signal?: AbortSignal): Promise<OpenSessionResult> => {
     if (busy()) return { kind: "busy" };
     deliver = next;
     const shouldDefer = deferred && firstOpening;
@@ -56,7 +60,7 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
       });
     });
   } };
-  const draft = new Draft('note("60")');
+  const draft = new Draft(text);
   const player = new Player(engine, { draft }, () => {});
   const reply = (command: Command, accepted = true, state: PlayState = "Playing") => {
     const draftVersion = command.input === undefined ? null : JSON.parse(command.input).version ?? null;
@@ -83,6 +87,38 @@ function harness(deferred = false, delayedClose = false, cancellable = false) {
     whenClosing: closingStarted.promise,
     fail: () => deliver({ kind: "failed", message: "worklet failed" }) };
 }
+
+test("the draft reports what the player would refuse as soon as the player's format is known", async () => {
+  const layered = (parts: number) =>
+    `song(section("a",4,s("bd*256")),${Array.from({ length: parts }, (_, i) => `part("p${i}","a",0)`).join(",")})`;
+  const limit = "playback arrangement exceeds the query expansion limit";
+  // A configured sample rate is known before audio starts.
+  const configured = harness(false, false, false, { plannedFormat: PLAYER_FORMAT, text: layered(96) });
+  expect(configured.player.view().diagnostic?.message).toBe(limit);
+  const fitting = harness(false, false, false, { plannedFormat: PLAYER_FORMAT, text: layered(32) });
+  expect(fitting.player.view().diagnostic).toBeNull();
+  // A native rate is known once audio opens, and Play then sends nothing the player would refuse.
+  const native = harness(false, false, false, { text: layered(96) });
+  expect(native.player.view().diagnostic).toBeNull();
+  await expect(native.player.play()).rejects.toThrow(limit);
+  expect(native.commands).toHaveLength(0);
+  expect(native.player.view().diagnostic?.message).toBe(limit);
+  const restarted = harness(false, false, false, { text: layered(96) });
+  await expect(restarted.player.restart()).rejects.toThrow(limit);
+  expect(restarted.commands).toHaveLength(0);
+  await Promise.all([configured.player.close(), fitting.player.close(), native.player.close(), restarted.player.close()]);
+});
+
+test("a format no player can run gets no early check, and an unplayable session is a fault", async () => {
+  const unrunnable: AudioFormat = { sampleRate: 768000, blockSize: 128 };
+  const planned = harness(false, false, false, { plannedFormat: unrunnable });
+  expect(planned.player.view().diagnostic).toBeNull();
+  const reported = harness(false, false, false, { sessionFormat: unrunnable });
+  await expect(reported.player.play()).rejects.toThrow(/unplayable format/);
+  expect(reported.commands).toHaveLength(0);
+  expect(reported.player.view().state).toBe("Fault");
+  await Promise.all([planned.player.close(), reported.player.close()]);
+});
 
 test("resuming uses Current song even when the editor contains invalid source", async () => {
   const h = harness(); await h.start();
@@ -229,7 +265,7 @@ test("manual restart bypasses an automatic request and cancels older unsent work
   const automatic = await h.command(1);
   h.edit('note("64")');
   await delay(250);
-  const restarting = h.player.restart(h.draft.prepare());
+  const restarting = h.player.restart();
   const manual = await h.command(2);
   expect(manual.operation).toBe("restart");
   h.reply(manual); await restarting;

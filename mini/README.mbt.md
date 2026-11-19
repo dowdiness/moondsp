@@ -170,9 +170,18 @@ select a new mode. Current indices and the internal last-valid document are
 bounded; no per-spelling allocation history is retained. Checked serials and
 revisions never wrap. `Draft(...)` raises `DraftEditError` on epoch exhaustion;
 `edit` and `reset` return explicit errors without partially changing the draft.
+A Draft checks every problem the author can cause while the text is edited:
+syntax and, after `check_playback_within(window)`, the player's admission
+limits over that `@pattern.QueryWindow`. `prepare_playback` never finds a new
+problem. Exact lowering runs only in `PlaybackInput::compile`; the parser
+rejects every source it cannot lower, so a failure there is a compiler bug.
 
 The live editor uses the JS-target `browser_authoring` adapter to keep this Draft
-on the main thread, independent of AudioContext lifetime. CodeMirror edits,
+on the main thread, independent of AudioContext lifetime. Once the page knows
+the player's audio format, `player_query_window` parses it into the
+scheduler's window and `check_draft_within` gives that window to the Draft, so
+the editor reports oversized sources before Play.
+CodeMirror edits,
 immutable Worklet submission, version-correlated receipts, and scheduler exact
 capability retention are connected. Actual dispatched onsets now drive code and
 inline notation pulses in both Pattern and Song; see the

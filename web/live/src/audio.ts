@@ -1,6 +1,6 @@
 // Audio resource owner. Opening produces a capability tied to one playback run;
 // score/tempo operations do not exist on a stopped engine.
-import { decodeWorkletMessage } from "./playback-protocol";
+import { decodeWorkletMessage, type AudioFormat } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId } from "./playback-protocol";
 import { ONSET_BYTES, OnsetRing, type OnsetStatistics } from "../../playback-onsets.js";
@@ -57,7 +57,14 @@ export type AudioEvent =
 export type CloseSessionResult = { kind: "closed" } | { kind: "session-expired" };
 export type SessionCommandResult = "issued" | "session-expired";
 
+export type { AudioFormat };
+
+/** Web Audio's render quantum when a context does not ask for another, as this engine never does. */
+const DEFAULT_RENDER_QUANTUM_FRAMES = 128;
+
 export type AudioSession = Readonly<{
+  /** The format this session's audio actually runs in, as its worklet reported. */
+  format: AudioFormat;
   fadeIn(): SessionCommandResult;
   close(): Promise<CloseSessionResult>;
   update(id: RequestId, input: PlaybackInput): SessionCommandResult;
@@ -78,6 +85,8 @@ type Graph = Readonly<{
   gain: GainNode;
   analyser: AnalyserNode;
   onsets: OnsetRing | null;
+  /** The format its worklet reported once its player was built. */
+  format: AudioFormat;
 }>;
 type GraphRun = Readonly<{
   run: symbol;
@@ -147,11 +156,20 @@ export class AudioEngine {
     return state.graph.ctx.sampleRate;
   }
   private state: EngineState = { kind: "idle" };
+  /**
+   * The format sessions will run in, known before audio starts only when the
+   * sample rate is configured. A session's own `format` is what its worklet reports.
+   */
+  readonly plannedFormat: AudioFormat | undefined;
 
   constructor(
     private readonly wasmUrl = "/moonbit_dsp.wasm",
     private readonly options: AudioEngineOptions = {},
-  ) {}
+  ) {
+    this.plannedFormat = options.sampleRate === undefined
+      ? undefined
+      : { sampleRate: options.sampleRate, blockSize: DEFAULT_RENDER_QUANTUM_FRAMES };
+  }
 
   getStatus(): AudioStatus {
     switch (this.state.kind) {
@@ -242,6 +260,7 @@ export class AudioEngine {
     this.discardOnsets();
     graph.node.port.postMessage({ type: "set-scheduler-gain", gain: 0.6 });
     const session: AudioSession = {
+      format: graph.format,
       fadeIn: () => this.command(run, "fade-in"),
       close: () => this.close(run),
       update: (id, input) => this.command(run, { type: "player-update", id: id.value, input: input.wire }),
@@ -282,18 +301,19 @@ export class AudioEngine {
       });
       const ready = this.waitForReady(node, signal);
       node.connect(gain);
-      await ready;
+      const format = await ready;
       await abortable(() => running, signal);
-      return { ctx, node, gain, analyser, onsets };
+      return { ctx, node, gain, analyser, onsets, format };
     } catch (error) {
       await release(ctx, node, analyser, gain);
       throw error;
     }
   }
 
-  private waitForReady(node: AudioWorkletNode, signal: AbortSignal): Promise<void> {
+  /** Resolves with the format the worklet built its player for. */
+  private waitForReady(node: AudioWorkletNode, signal: AbortSignal): Promise<AudioFormat> {
     signal.throwIfAborted();
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<AudioFormat>((resolve, reject) => {
       const fail = (error: unknown) => {
         signal.removeEventListener("abort", onAbort);
         reject(error);
@@ -304,7 +324,7 @@ export class AudioEngine {
       node.port.onmessage = event => {
         const message = decodeWorkletMessage(event.data);
         switch (message.kind) {
-          case "ready": signal.removeEventListener("abort", onAbort); resolve(); break;
+          case "ready": signal.removeEventListener("abort", onAbort); resolve(message.format); break;
           case "runtime-error": case "protocol-error": fail(new Error(message.message)); break;
           case "status": break;
           case "receipt": fail(new Error("Playback receipt arrived before worklet readiness")); break;

@@ -45,6 +45,7 @@ pub struct Draft {
   // private fields
 }
 pub fn Draft::Draft(String) -> Self raise DraftEditError
+pub fn Draft::check_playback_within(Self, @pattern.QueryWindow) -> DraftState
 pub fn Draft::dispose(Self) -> Unit
 pub fn Draft::edit(Self, EditTransaction) -> Result[DraftState, DraftEditError]
 pub fn Draft::locate_frame_fields(Self, Int64, Int64) -> SourceRange?

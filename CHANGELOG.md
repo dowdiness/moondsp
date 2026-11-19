@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The live editor now reports sources the player would refuse, such as
+  arrangements whose overlapping parts exceed the query expansion limit,
+  instead of showing no diagnostic until Play. With a configured sample rate
+  it does so from the start; with the native rate, once audio has opened.
 - **Breaking MoonBit API:** `DraftDiagnosticKind::CompilerContract` is gone.
   `Draft::prepare_playback` no longer lowers the source; a lowering failure is
   a compiler bug and is reported by `PlaybackInput::compile`.
@@ -17,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `max_query_span : Rational?`. `QueryWindow::from_span` builds one only from a
   positive span. The scheduler owns the window:
   `@scheduler.max_query_window_for(sample_rate~, block_size~)` and
-  `PatternScheduler::max_query_window()`.
+  `PatternScheduler::max_query_window()`. `Draft::check_playback_within(window)`
+  adds the player's limits to a Draft. The page parses a format into a window
+  once with `browser_authoring.player_query_window` and applies it with
+  `check_draft_within`.
 - **Breaking MoonBit API:** `TransportError` gains `InvalidBlockSize`, which
   `PatternScheduler` and `max_query_window_for` now return for a block size
   outside 1–65536 instead of `TimeOutOfRange`.

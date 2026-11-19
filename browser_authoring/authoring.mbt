@@ -112,6 +112,34 @@ pub fn prepare_playback(draft : @mini.Draft) -> String {
 }
 
 ///|
+/// The window a player rendering blocks of `block_size` frames at
+/// `sample_rate` queries over, or why no player can run that format.
+pub fn player_query_window(
+  sample_rate : Double,
+  block_size : Int32,
+  on_window : (@pattern.QueryWindow) -> Unit,
+  on_unsupported : (String) -> Unit,
+) -> Unit {
+  match @scheduler.max_query_window_for(sample_rate~, block_size~) {
+    Ok(window) => on_window(window)
+    Err(_) =>
+      on_unsupported(
+        "the player cannot run \{block_size}-frame blocks at \{sample_rate} Hz",
+      )
+  }
+}
+
+///|
+/// From now on the Draft also reports what a player querying over `window`
+/// would refuse.
+pub fn check_draft_within(
+  draft : @mini.Draft,
+  window : @pattern.QueryWindow,
+) -> String {
+  state_json(draft.check_playback_within(window)).stringify()
+}
+
+///|
 pub fn dispose_draft(draft : @mini.Draft) -> Unit {
   draft.dispose()
 }

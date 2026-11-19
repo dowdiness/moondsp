@@ -22,6 +22,14 @@ test("rejects incomplete or unknown replies", () => {
   expect(RequestId.decode(Number.MAX_SAFE_INTEGER + 1)).toBeNull();
 });
 
+test("readiness carries the format the worklet built its player for", () => {
+  const ready = { type: "ready", mode: "scheduler-dsp", sampleRate: 44100, blockSize: 256 };
+  expect(decodeWorkletMessage(ready)).toEqual({ kind: "ready", format: { sampleRate: 44100, blockSize: 256 } });
+  for (const broken of [{ sampleRate: undefined }, { sampleRate: 0 }, { blockSize: 0 }, { blockSize: 127.5 }]) {
+    expect(decodeWorkletMessage({ ...ready, ...broken }).kind).toBe("protocol-error");
+  }
+});
+
 test("status requires semantic mode/state strings and finite nonnegative musical position", () => {
   const status = { type: "player-status", state: "Paused", mode: "pattern", cyclePosition: 1.25,
     samplePosition: 48000, tempo: 120, pendingCount: 1, skippedCount: 0 };
