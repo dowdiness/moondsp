@@ -74,7 +74,7 @@ fn BusBinding::new(
 /// The signal this key reads, given its bus's signal.
 fn BusBinding::signal(self : BusBinding, bus : BusSignal) -> BusSignal {
   match self.inner {
-    Some(value) => Nesting::of(self.key).signal(Const(value), bus)
+    Some(value) => Nesting::of(self.key).signal(BusSignal::of_value(value), bus)
     None => bus
   }
 }
@@ -189,8 +189,8 @@ fn[A] fill_bound_controls(
   for binding in bindings {
     let bus = buses[binding.bus]
     let v = binding.signal(bus.signal).eval(time.num, time.den, false)
-    if !v.is_nan() {
-      result = (bus.apply)(result, ControlMap::single(binding.key, v))
+    if !v.is_absent() {
+      result = (bus.apply)(result, ControlMap::single(binding.key, v.0))
     }
   }
   result
@@ -280,7 +280,7 @@ pub fn EventBuses::reader(
 ) -> ((Int64, Int64) -> Double)? {
   bus_binding_for(self.bindings, key).map(binding => {
     let placed = self.place(binding.signal(self.table[binding.bus]))
-    (num, den) => placed.eval(num, den, false)
+    (num, den) => placed.eval(num, den, false).to_double()
   })
 }
 
@@ -295,14 +295,61 @@ pub fn EventBuses::each_reader(
     let signal = binding.signal(self.table[binding.bus])
     guard !signal.is_constant() else { continue }
     let placed = self.place(signal)
-    f(binding.key, (num, den) => placed.eval(num, den, false))
+    f(binding.key, (num, den) => placed.eval(num, den, false).to_double())
   }
 }
 
 ///|
-/// A control as a function of exact time. `NaN` means "no value here".
+/// A control's value at one time, or its absence there. A single-field type,
+/// so evaluating a signal allocates nothing on any backend; its methods are
+/// the only code that knows how absence is represented.
+priv struct BusValue(Double)
+
+///|
+let absent : BusValue = BusValue(@double.not_a_number)
+
+///|
+fn BusValue::is_absent(self : BusValue) -> Bool {
+  self.0.is_nan()
+}
+
+///|
+/// This value, or `fallback` where this one is absent.
+fn BusValue::or_else(self : BusValue, fallback : BusValue) -> BusValue {
+  if self.is_absent() {
+    fallback
+  } else {
+    self
+  }
+}
+
+///|
+/// The product where both are present, else whichever is present.
+fn BusValue::times(self : BusValue, other : BusValue) -> BusValue {
+  if self.is_absent() {
+    other
+  } else if other.is_absent() {
+    self
+  } else {
+    BusValue(self.0 * other.0)
+  }
+}
+
+///|
+/// The public reading of a bus: `NaN` where the control has no value
+/// (`EventBuses::reader`).
+fn BusValue::to_double(self : BusValue) -> Double {
+  self.0
+}
+
+///|
+/// A control as a function of exact time, with gaps (`Absent`).
 priv enum BusSignal {
+  /// No value anywhere.
+  Absent
+  /// The same value everywhere; never `NaN` (see `BusSignal::of_value`).
   Const(Double)
+  /// A function of time; a `NaN` result counts as absent.
   Continuous((Double) -> Double)
   /// Local time = time × num / den.
   Fast(Int64, Int64, BusSignal)
@@ -322,7 +369,7 @@ priv enum BusSignal {
   /// `gain` merges.
   Product(BusSignal, BusSignal)
   /// `(presence, left, right)`: right-hand values override left where the
-  /// left has an event. `presence` is non-`NaN` exactly there, so a left
+  /// left has an event. `presence` is present exactly there, so a left
   /// event that does not set this key still takes the right-hand value.
   Merge(BusSignal, BusSignal, BusSignal)
 }
@@ -360,14 +407,15 @@ fn BusSignal::eval(
   num : Int64,
   den : Int64,
   left : Bool,
-) -> Double {
+) -> BusValue {
   match self {
-    Const(value) => value
-    Continuous(f) => f(num.to_double() / den.to_double())
+    Absent => absent
+    Const(value) => BusValue(value)
+    Continuous(f) => BusValue(f(num.to_double() / den.to_double()))
     Fast(fnum, fden, child) => {
       // A non-positive factor silences the pattern (`Pat::fast`/`slow`), so
       // the bus has no value; it must not divide by a zero denominator.
-      guard fnum > 0L && fden > 0L else { return @double.not_a_number }
+      guard fnum > 0L && fden > 0L else { return absent }
       let n = num * fnum
       let d = den * fden
       let g = bus_gcd(n, d)
@@ -416,36 +464,21 @@ fn BusSignal::eval(
       }
     }
     Stack(children) => {
-      let mut value = @double.not_a_number
+      let mut value = absent
       for child in children {
-        let v = child.eval(num, den, left)
-        if !v.is_nan() {
-          value = v
-        }
+        value = child.eval(num, den, left).or_else(value)
       }
       value
     }
-    Product(inner, outer) => {
-      let a = inner.eval(num, den, left)
-      let b = outer.eval(num, den, left)
-      if a.is_nan() {
-        b
-      } else if b.is_nan() {
-        a
-      } else {
-        a * b
-      }
-    }
+    Product(inner, outer) =>
+      inner.eval(num, den, left).times(outer.eval(num, den, left))
     Merge(presence, left_signal, right_signal) => {
-      if presence.eval(num, den, left).is_nan() {
-        return @double.not_a_number
+      if presence.eval(num, den, left).is_absent() {
+        return absent
       }
-      let over = right_signal.eval(num, den, left)
-      if over.is_nan() {
-        left_signal.eval(num, den, left)
-      } else {
-        over
-      }
+      right_signal
+      .eval(num, den, left)
+      .or_else(left_signal.eval(num, den, left))
     }
   }
 }
@@ -453,9 +486,18 @@ fn BusSignal::eval(
 ///|
 fn BusSignal::is_constant(self : BusSignal) -> Bool {
   match self {
-    Const(_) => true
+    Absent | Const(_) => true
     Fast(_, _, child) | Shift(_, _, child) | Rev(child) => child.is_constant()
     _ => false
+  }
+}
+
+///|
+fn BusSignal::of_value(value : Double) -> BusSignal {
+  if BusValue(value).is_absent() {
+    Absent
+  } else {
+    Const(value)
   }
 }
 
@@ -479,18 +521,12 @@ fn euclid_slots(
   hit : BusSignal,
 ) -> BusSignal {
   if n <= 0 || k <= 0 {
-    return Const(@double.not_a_number)
+    return Absent
   }
   let pattern = bjorklund(k, n)
   let r = (rotation % n + n) % n
   Sequence(
-    Array::makei(n, i => {
-      if pattern[(i + r) % n] {
-        hit
-      } else {
-        Const(@double.not_a_number)
-      }
-    }),
+    Array::makei(n, i => if pattern[(i + r) % n] { hit } else { Absent }),
   )
 }
 
@@ -500,13 +536,7 @@ fn slot_signals(
   index : Int32,
   hit : BusSignal,
 ) -> Array[BusSignal] {
-  Array::makei(count, i => {
-    if i == index {
-      hit
-    } else {
-      Const(@double.not_a_number)
-    }
-  })
+  Array::makei(count, i => if i == index { hit } else { Absent })
 }
 
 ///|
@@ -566,7 +596,7 @@ fn[A] control_keys(
 ///|
 /// Compile one key of a control-provider subtree into its signal. With
 /// `key=None`, compile its presence instead: `0` wherever the subtree has an
-/// event, whichever keys it sets, and `NaN` elsewhere.
+/// event, whichever keys it sets, and `Absent` elsewhere.
 fn[A] compile_signal(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
@@ -579,22 +609,25 @@ fn[A] compile_signal(
   fn sub(child : @identity.PatternNodeId) -> BusSignal raise PatternDocError {
     compile_signal(nodes, child, key, controls_of)
   }
-  let none = @double.not_a_number
   match entry.node {
     Reference(definition, _) =>
       compile_signal(definition.nodes, definition.root, key, controls_of)
     Continuous(_, k, f) =>
       match key {
         None => Const(0.0)
-        Some(key) => if k == key { Continuous(f) } else { Const(none) }
+        Some(key) => if k == key { Continuous(f) } else { Absent }
       }
     Pure(value) | Atom(_, value, _, _) =>
       match key {
         None => Const(0.0)
-        Some(key) => Const(controls_of(value).get(key).unwrap_or(none))
+        Some(key) =>
+          match controls_of(value).get(key) {
+            Some(v) => BusSignal::of_value(v)
+            None => Absent
+          }
       }
     Runtime(_) => raise UnsupportedControl(id)
-    Silence => Const(none)
+    Silence => Absent
     Fast(child, factor) => Fast(factor.num, factor.den, sub(child))
     Slow(child, factor) => Fast(factor.den, factor.num, sub(child))
     Rev(child) => Rev(sub(child))
