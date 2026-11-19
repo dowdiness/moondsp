@@ -15,12 +15,12 @@ priv struct SongFillSpec {
 ///|
 /// Song parse result with optional playback metadata.
 pub struct ParsedSong {
-  song : @song.Song[@pattern.ControlMap]
+  song : @song.Song
   bpm : Double?
 }
 
 ///|
-pub fn ParsedSong::song(self : ParsedSong) -> @song.Song[@pattern.ControlMap] {
+pub fn ParsedSong::song(self : ParsedSong) -> @song.Song {
   self.song
 }
 
@@ -78,7 +78,7 @@ fn Parser::parse_song_expr(
       "position \{song_start}: song() requires at least one item",
     )
   }
-  let sections : Map[String, @song.Section[@pattern.ControlMap]] = Map([])
+  let sections : Map[String, @song.Section] = Map([])
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
@@ -116,7 +116,7 @@ fn Parser::parse_song_expr(
 ///|
 fn Parser::parse_song_item(
   self : Parser,
-  sections : Map[String, @song.Section[@pattern.ControlMap]],
+  sections : Map[String, @song.Section],
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
@@ -175,7 +175,7 @@ fn Parser::parse_song_section(
   self : Parser,
   item_start : Int32,
   builder~ : MiniDocBuilder,
-) -> @song.Section[@pattern.ControlMap] raise ParseError {
+) -> @song.Section raise ParseError {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -347,9 +347,9 @@ fn parse_occurrence_id(
 
 ///|
 fn resolve_song_section(
-  sections : Map[String, @song.Section[@pattern.ControlMap]],
+  sections : Map[String, @song.Section],
   name : String,
-) -> @song.Section[@pattern.ControlMap] raise ParseError {
+) -> @song.Section raise ParseError {
   match sections.get(name) {
     Some(section) => section
     None => raise ParseError("unknown song section '\{name}'")
@@ -359,8 +359,8 @@ fn resolve_song_section(
 ///|
 fn SongPartSpec::to_part(
   self : SongPartSpec,
-  sections : Map[String, @song.Section[@pattern.ControlMap]],
-) -> @song.SongPart[@pattern.ControlMap] raise ParseError {
+  sections : Map[String, @song.Section],
+) -> @song.SongPart raise ParseError {
   let section = resolve_song_section(sections, self.section_name)
   match (self.id, self.start) {
     (Some(id), Some(start)) =>
@@ -372,9 +372,7 @@ fn SongPartSpec::to_part(
 }
 
 ///|
-fn build_song(
-  parts : Array[@song.SongPart[@pattern.ControlMap]],
-) -> @song.Song[@pattern.ControlMap] raise ParseError {
+fn build_song(parts : Array[@song.SongPart]) -> @song.Song raise ParseError {
   @song.Song(parts~) catch {
     _ => raise ParseError("song construction failed")
   }

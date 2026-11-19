@@ -13,44 +13,38 @@ pub(all) suberror PatternDocError {
 }
 
 ///|
-priv enum PatternDocNode[A] {
-  Runtime(Pat[A])
+priv enum PatternDocNode {
+  Runtime(Pat[ControlMap])
   /// A continuous control as both its query form and its allocation-free
   /// time function `(cycles) -> value` for one key.
-  Continuous(Pat[A], @control.Control, (Double) -> Double)
-  Reference(PatternDoc[A], ReferenceBinding?)
+  Continuous(Pat[ControlMap], @control.Control, (Double) -> Double)
+  Reference(PatternDoc, ReferenceBinding?)
   Silence
-  Pure(A)
+  Pure(ControlMap)
   /// A pure value; the pattern carries its content signature. Without a
   /// source atom it has no exact origin.
-  Atom(Pat[A], A, @identity.SourceAtomId?, Double)
+  Atom(Pat[ControlMap], ControlMap, @identity.SourceAtomId?, Double)
   Fast(@identity.PatternNodeId, Rational)
   Slow(@identity.PatternNodeId, Rational)
   Gate(@identity.PatternNodeId, Rational)
   Rev(@identity.PatternNodeId)
-  FilterMap(@identity.PatternNodeId, (A) -> A?)
+  FilterMap(@identity.PatternNodeId, (ControlMap) -> ControlMap?)
   Euclid(@identity.PatternNodeId, Int32, Int32, Int32)
   DegradeBy(@identity.PatternNodeId, Double, Int32)
   Every(@identity.PatternNodeId, Int32, TimeTransform)
-  Jux(@identity.PatternNodeId, TimeTransform, (A, ControlMap) -> A)
-  /// The functions write controls into the payload and view it as
-  /// controls, to derive buses.
-  MergeControl(
-    @identity.PatternNodeId,
-    @identity.PatternNodeId,
-    (A, ControlMap) -> A,
-    (A) -> ControlMap,
-  )
+  Jux(@identity.PatternNodeId, TimeTransform)
+  /// The right-hand controls merge into each left-hand event, as buses.
+  MergeControl(@identity.PatternNodeId, @identity.PatternNodeId)
   Sequence(Array[@identity.PatternNodeId])
   WeightedSequence(Array[@identity.PatternNodeId], Array[Int32])
   Stack(Array[@identity.PatternNodeId])
 }
 
 ///|
-priv struct PatternDocEntry[A] {
+priv struct PatternDocEntry {
   generation : Int64
   revision : @identity.Revision
-  node : PatternDocNode[A]
+  node : PatternDocNode
   source_frame : @identity.SourceFrameId?
 }
 
@@ -64,7 +58,7 @@ fn next_pattern_node_generation() -> Int64 {
 }
 
 ///|
-fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
+fn PatternDocNode::snapshot(self : PatternDocNode) -> PatternDocNode {
   match self {
     Runtime(pat) => Runtime(pat)
     Continuous(pat, key, f) => Continuous(pat, key, f)
@@ -80,9 +74,8 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)
     DegradeBy(child, p, seed) => DegradeBy(child, p, seed)
     Every(child, n, f) => Every(child, n, f)
-    Jux(child, transform, merge) => Jux(child, transform, merge)
-    MergeControl(left, right, f, controls_of) =>
-      MergeControl(left, right, f, controls_of)
+    Jux(child, transform) => Jux(child, transform)
+    MergeControl(left, right) => MergeControl(left, right)
     Sequence(children) => Sequence(children.copy())
     WeightedSequence(children, weights) =>
       WeightedSequence(children.copy(), weights.copy())
@@ -91,9 +84,7 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
 }
 
 ///|
-fn[A] PatternDocEntry::snapshot(
-  self : PatternDocEntry[A],
-) -> PatternDocEntry[A] {
+fn PatternDocEntry::snapshot(self : PatternDocEntry) -> PatternDocEntry {
   {
     generation: self.generation,
     revision: self.revision,
@@ -103,20 +94,20 @@ fn[A] PatternDocEntry::snapshot(
 }
 
 ///|
-fn[A] copy_pattern_nodes(
-  nodes : Map[String, PatternDocEntry[A]],
-) -> Map[String, PatternDocEntry[A]] {
-  let result : Map[String, PatternDocEntry[A]] = Map([])
+fn copy_pattern_nodes(
+  nodes : Map[String, PatternDocEntry],
+) -> Map[String, PatternDocEntry] {
+  let result : Map[String, PatternDocEntry] = Map([])
   nodes.each(fn(id, entry) { result[id] = entry.snapshot() })
   result
 }
 
 ///|
-fn[A] singleton_pattern_nodes(
+fn singleton_pattern_nodes(
   id : @identity.PatternNodeId,
-  node : PatternDocNode[A],
-) -> Map[String, PatternDocEntry[A]] {
-  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+  node : PatternDocNode,
+) -> Map[String, PatternDocEntry] {
+  let nodes : Map[String, PatternDocEntry] = Map([])
   nodes[id.value()] = {
     generation: next_pattern_node_generation(),
     revision: @identity.Revision::zero(),
@@ -127,10 +118,10 @@ fn[A] singleton_pattern_nodes(
 }
 
 ///|
-fn[A] insert_pattern_node(
-  nodes : Map[String, PatternDocEntry[A]],
+fn insert_pattern_node(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  node : PatternDocNode[A],
+  node : PatternDocNode,
   revision~ : @identity.Revision,
 ) -> Unit raise PatternDocError {
   let key = id.value()
@@ -146,9 +137,9 @@ fn[A] insert_pattern_node(
 }
 
 ///|
-fn[A] merge_pattern_nodes(
-  target : Map[String, PatternDocEntry[A]],
-  source : Map[String, PatternDocEntry[A]],
+fn merge_pattern_nodes(
+  target : Map[String, PatternDocEntry],
+  source : Map[String, PatternDocEntry],
 ) -> Unit raise PatternDocError {
   source.each((id, entry) => {
     if target.contains(id) {
@@ -159,9 +150,7 @@ fn[A] merge_pattern_nodes(
 }
 
 ///|
-fn[A] aggregate_pattern_revision(
-  docs : Array[PatternDoc[A]],
-) -> @identity.Revision {
+fn aggregate_pattern_revision(docs : Array[PatternDoc]) -> @identity.Revision {
   let mut revision = @identity.Revision::zero()
   for doc in docs {
     revision = revision.combine(doc.revision)
@@ -170,10 +159,10 @@ fn[A] aggregate_pattern_revision(
 }
 
 ///|
-fn[A] replace_pattern_node(
-  nodes : Map[String, PatternDocEntry[A]],
+fn replace_pattern_node(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  node : PatternDocNode[A],
+  node : PatternDocNode,
 ) -> Unit raise PatternDocError {
   let key = id.value()
   match nodes.get(key) {
@@ -208,8 +197,8 @@ fn pattern_cache_token_equal(left : Array[Int64], right : Array[Int64]) -> Bool 
 }
 
 ///|
-fn[A] pattern_node_cache_token_memoized(
-  nodes : Map[String, PatternDocEntry[A]],
+fn pattern_node_cache_token_memoized(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
   memo : Map[String, Array[Int64]],
 ) -> Array[Int64] raise PatternDocError {
@@ -244,12 +233,12 @@ fn[A] pattern_node_cache_token_memoized(
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
-            | Jux(child, _, _) =>
+            | Jux(child, _) =>
               append_pattern_cache_token(
                 token,
                 pattern_node_cache_token_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _, _) => {
+            MergeControl(left, right) => {
               append_pattern_cache_token(
                 token,
                 pattern_node_cache_token_memoized(nodes, left, memo),
@@ -286,8 +275,8 @@ fn[A] pattern_node_cache_token_memoized(
 }
 
 ///|
-fn[A] pattern_node_revision(
-  nodes : Map[String, PatternDocEntry[A]],
+fn pattern_node_revision(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
 ) -> @identity.Revision raise PatternDocError {
   let memo : Map[String, @identity.Revision] = Map([])
@@ -295,10 +284,10 @@ fn[A] pattern_node_revision(
 }
 
 ///|
-fn[A] copy_reachable_pattern_nodes(
-  source : Map[String, PatternDocEntry[A]],
+fn copy_reachable_pattern_nodes(
+  source : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  target : Map[String, PatternDocEntry[A]],
+  target : Map[String, PatternDocEntry],
 ) -> Unit raise PatternDocError {
   let key = id.value()
   if target.contains(key) {
@@ -323,9 +312,8 @@ fn[A] copy_reachable_pattern_nodes(
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
-        | Jux(child, _, _) =>
-          copy_reachable_pattern_nodes(source, child, target)
-        MergeControl(left, right, _, _) => {
+        | Jux(child, _) => copy_reachable_pattern_nodes(source, child, target)
+        MergeControl(left, right) => {
           copy_reachable_pattern_nodes(source, left, target)
           copy_reachable_pattern_nodes(source, right, target)
         }
@@ -339,8 +327,8 @@ fn[A] copy_reachable_pattern_nodes(
 }
 
 ///|
-fn[A] pattern_node_revision_memoized(
-  nodes : Map[String, PatternDocEntry[A]],
+fn pattern_node_revision_memoized(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
   memo : Map[String, @identity.Revision],
 ) -> @identity.Revision raise PatternDocError {
@@ -368,11 +356,11 @@ fn[A] pattern_node_revision_memoized(
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
-            | Jux(child, _, _) =>
+            | Jux(child, _) =>
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, child, memo),
               )
-            MergeControl(left, right, _, _) => {
+            MergeControl(left, right) => {
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, left, memo),
               )
@@ -490,46 +478,45 @@ fn PatternNodePath::prepend(
 }
 
 ///|
-pub struct PatternSnapshotEvent[A] {
-  priv event : Event[A]
+pub struct PatternSnapshotEvent {
+  priv event : Event[ControlMap]
   priv path : PatternNodePath
-  priv buses : EventBuses
+  priv controls : Controls
 }
 
 ///|
-fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
-  event~ : Event[A],
+fn PatternSnapshotEvent::PatternSnapshotEvent(
+  event~ : Event[ControlMap],
   path~ : PatternNodePath,
-  buses~ : EventBuses,
-) -> PatternSnapshotEvent[A] {
-  { event, path, buses, }
+  controls~ : Controls,
+) -> PatternSnapshotEvent {
+  { event, path, controls, }
 }
 
 ///|
-/// The buses this event's controls follow while it sounds.
-pub fn[A] PatternSnapshotEvent::buses(
-  self : PatternSnapshotEvent[A],
-) -> EventBuses {
-  self.buses
+/// This event's controls: its values at the onset and the buses they follow
+/// while it sounds.
+pub fn PatternSnapshotEvent::controls(self : PatternSnapshotEvent) -> Controls {
+  self.controls
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::event(
-  self : PatternSnapshotEvent[A],
-) -> Event[A] {
+pub fn PatternSnapshotEvent::event(
+  self : PatternSnapshotEvent,
+) -> Event[ControlMap] {
   self.event
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::pattern_nodes(
-  self : PatternSnapshotEvent[A],
+pub fn PatternSnapshotEvent::pattern_nodes(
+  self : PatternSnapshotEvent,
 ) -> Array[@identity.PatternNodeId] {
   self.path.nodes()
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::pattern_node_path(
-  self : PatternSnapshotEvent[A],
+pub fn PatternSnapshotEvent::pattern_node_path(
+  self : PatternSnapshotEvent,
 ) -> PatternNodePath {
   self.path
 }
@@ -662,18 +649,18 @@ pub fn EventOrigin::write_binding_serials(
 
 ///|
 /// Name resolution supplies this witness; lowering never guesses from spelling.
-pub struct ResolvedReference[A] {
-  priv definition : PatternDoc[A]
+pub struct ResolvedReference {
+  priv definition : PatternDoc
   priv binding : ReferenceBinding
 }
 
 ///|
-pub fn[A] ResolvedReference::ResolvedReference(
-  definition~ : PatternDoc[A],
+pub fn ResolvedReference::ResolvedReference(
+  definition~ : PatternDoc,
   definition_id~ : @identity.DefinitionId,
   reference~ : @identity.ReferenceId,
   binding~ : @identity.ReferenceBindingId,
-) -> ResolvedReference[A] raise @identity.StableIdError {
+) -> ResolvedReference raise @identity.StableIdError {
   guard definition_id.epoch() == reference.epoch() &&
     reference.epoch() == binding.epoch() else {
     raise @identity.InvalidId("reference binding spans source epochs")
@@ -737,8 +724,8 @@ impl DocumentOrigin for EventOrigin with fn bind_context(node, binding, context)
 }
 
 ///|
-priv struct ScopedValue[A, O] {
-  value : A
+priv struct ScopedValue[O] {
+  value : ControlMap
   scope : PatternNodePath
   origin : O
   mut source_frame : @identity.SourceFrameId?
@@ -748,25 +735,25 @@ priv struct ScopedValue[A, O] {
 }
 
 ///|
-fn[A, O] ScopedValue::ScopedValue(
-  value : A,
+fn[O] ScopedValue::ScopedValue(
+  value : ControlMap,
   scope : PatternNodePath,
   origin : O,
   source_frame~ : @identity.SourceFrameId? = None,
   source_start~ : Double = -1.0,
   source_pitch~ : Double = @double.not_a_number,
   bindings~ : FixedArray[BusBinding] = no_bus_bindings,
-) -> ScopedValue[A, O] {
+) -> ScopedValue[O] {
   { value, scope, origin, source_frame, source_start, source_pitch, bindings, }
 }
 
 ///|
-fn[A, B, O] ScopedValue::remap(
-  self : ScopedValue[A, O],
-  value : B,
+fn[O] ScopedValue::remap(
+  self : ScopedValue[O],
+  value : ControlMap,
   scope : PatternNodePath,
   bindings~ : FixedArray[BusBinding] = self.bindings,
-) -> ScopedValue[B, O] {
+) -> ScopedValue[O] {
   ScopedValue(
     value,
     scope,
@@ -779,10 +766,10 @@ fn[A, B, O] ScopedValue::remap(
 }
 
 ///|
-fn[A, O] Pat::shift_buses(
-  self : Pat[ScopedValue[A, O]],
+fn[O] Pat::shift_buses(
+  self : Pat[ScopedValue[O]],
   offset : Int32,
-) -> Pat[ScopedValue[A, O]] {
+) -> Pat[ScopedValue[O]] {
   self.map_payload(value => {
     ..value,
     bindings: shift_bus_bindings(value.bindings, offset),
@@ -790,10 +777,10 @@ fn[A, O] Pat::shift_buses(
 }
 
 ///|
-fn[A, O] ScopedValue::prepend(
-  self : ScopedValue[A, O],
+fn[O] ScopedValue::prepend(
+  self : ScopedValue[O],
   id : @identity.PatternNodeId,
-) -> ScopedValue[A, O] {
+) -> ScopedValue[O] {
   self.remap(self.value, self.scope.prepend(id))
 }
 
@@ -801,10 +788,10 @@ fn[A, O] ScopedValue::prepend(
 /// Pair each event's payload with its projection at the start of the event's
 /// fragment (`project_controls`). `buses` must be on this pattern's clock;
 /// child bodies share it.
-fn[A, O] Pat::with_projected_controls(
-  self : Pat[ScopedValue[A, O]],
-  buses : Array[ControlBus[A]],
-) -> Pat[(A, ScopedValue[A, O])] {
+fn[O] Pat::with_projected_controls(
+  self : Pat[ScopedValue[O]],
+  buses : Array[ControlBus],
+) -> Pat[(ControlMap, ScopedValue[O])] {
   self.map_events((value, time) => {
     (project_controls(value.value, value.bindings, buses, time), value)
   })
@@ -812,10 +799,10 @@ fn[A, O] Pat::with_projected_controls(
 
 ///|
 /// The payloads as controls leave lowering, at the start of each fragment.
-fn[A, O] Pat::project_controls(
-  self : Pat[ScopedValue[A, O]],
-  buses : Array[ControlBus[A]],
-) -> Pat[A] {
+fn[O] Pat::project_controls(
+  self : Pat[ScopedValue[O]],
+  buses : Array[ControlBus],
+) -> Pat[ControlMap] {
   self.map_events((value, time) => {
     project_controls(value.value, value.bindings, buses, time)
   })
@@ -852,12 +839,12 @@ fn[A, B] Pat::map_events(self : Pat[A], f : (A, Rational) -> B) -> Pat[B] {
 /// transform remaps it. Pure/Runtime cannot enter that lowering. Capture on those
 /// owned query values without another array, event, origin, or option allocation.
 /// General lowering skips this operation because Pure may share a cold payload.
-fn[A, O] Pat::capture_source_frame(
-  self : Pat[ScopedValue[A, O]],
+fn[O] Pat::capture_source_frame(
+  self : Pat[ScopedValue[O]],
   frame : @identity.SourceFrameId?,
   span : Double,
-) -> Pat[ScopedValue[A, O]] {
-  let body : PatBody[ScopedValue[A, O]] = match self.body {
+) -> Pat[ScopedValue[O]] {
+  let body : PatBody[ScopedValue[O]] = match self.body {
     Silence => Silence
     Opaque(children) =>
       Opaque(children.map(child => child.capture_source_frame(frame, span)))
@@ -887,102 +874,99 @@ fn[A, O] Pat::capture_source_frame(
 }
 
 ///|
-fn[A, O] scoped_event(
-  event : Event[ScopedValue[A, O]],
-  buses : Array[ControlBus[A]],
+fn[O] scoped_event(
+  event : Event[ScopedValue[O]],
+  buses : Array[ControlBus],
   table : Array[BusSignal],
-) -> PatternSnapshotEvent[A] {
+) -> PatternSnapshotEvent {
   let value = event.value
+  let controls = Controls::lowered(
+    value.value,
+    value.bindings,
+    buses,
+    table,
+    event.part.begin,
+  )
   PatternSnapshotEvent(
-    event={
-      whole: event.whole,
-      part: event.part,
-      value: project_controls(
-        value.value,
-        value.bindings,
-        buses,
-        event.part.begin,
-      ),
-    },
+    event={ whole: event.whole, part: event.part, value: controls.values(), },
     path=value.scope,
-    buses=EventBuses::in_snapshot(value.value, value.bindings, buses, table),
+    controls~,
   )
 }
 
 ///|
-pub struct EventWithOrigin[A] {
-  priv event : Event[A]
+pub struct EventWithOrigin {
+  priv event : Event[ControlMap]
   priv origin : EventOrigin
   priv scope : PatternNodePath
   priv source_frame : @identity.SourceFrameId?
   priv source_start : Double
   priv source_pitch : Double
-  priv buses : EventBuses
+  priv controls : Controls
 }
 
 ///|
-fn[A] EventWithOrigin::EventWithOrigin(
-  event : Event[ScopedValue[A, EventOrigin]],
-  buses : Array[ControlBus[A]],
+fn EventWithOrigin::EventWithOrigin(
+  event : Event[ScopedValue[EventOrigin]],
+  buses : Array[ControlBus],
   table : Array[BusSignal],
-) -> EventWithOrigin[A] {
+) -> EventWithOrigin {
   let value = event.value
+  let controls = Controls::lowered(
+    value.value,
+    value.bindings,
+    buses,
+    table,
+    event.part.begin,
+  )
   {
-    event: {
-      whole: event.whole,
-      part: event.part,
-      value: project_controls(
-        value.value,
-        value.bindings,
-        buses,
-        event.part.begin,
-      ),
-    },
+    event: { whole: event.whole, part: event.part, value: controls.values(), },
     origin: event.value.origin,
     scope: event.value.scope,
     source_frame: event.value.source_frame,
     source_start: event.value.source_start,
     source_pitch: event.value.source_pitch,
-    buses: EventBuses::in_snapshot(value.value, value.bindings, buses, table),
+    controls,
   }
 }
 
 ///|
-/// The buses this event's controls follow while it sounds.
-pub fn[A] EventWithOrigin::buses(self : EventWithOrigin[A]) -> EventBuses {
-  self.buses
+/// This event's controls: its values at the onset and the buses they follow
+/// while it sounds.
+pub fn EventWithOrigin::controls(self : EventWithOrigin) -> Controls {
+  self.controls
 }
 
 ///|
-pub fn[A] EventWithOrigin::event(self : EventWithOrigin[A]) -> Event[A] {
+pub fn EventWithOrigin::event(self : EventWithOrigin) -> Event[ControlMap] {
   self.event
 }
 
 ///|
-pub fn[A] EventWithOrigin::origin(self : EventWithOrigin[A]) -> EventOrigin {
+pub fn EventWithOrigin::origin(self : EventWithOrigin) -> EventOrigin {
   self.origin
 }
 
 ///|
-pub fn[A] EventWithOrigin::source_frame(
-  self : EventWithOrigin[A],
+pub fn EventWithOrigin::source_frame(
+  self : EventWithOrigin,
 ) -> @identity.SourceFrameId? {
   self.source_frame
 }
 
 ///|
-pub fn[A] EventWithOrigin::source_start(self : EventWithOrigin[A]) -> Double {
+pub fn EventWithOrigin::source_start(self : EventWithOrigin) -> Double {
   self.source_start
 }
 
 ///|
-pub fn[A] EventWithOrigin::source_pitch(self : EventWithOrigin[A]) -> Double {
+pub fn EventWithOrigin::source_pitch(self : EventWithOrigin) -> Double {
   self.source_pitch
 }
 
 ///|
-pub fn[A] EventWithOrigin::pattern_node_path(
-  self : EventWithOrigin[A],
+pub fn EventWithOrigin::pattern_node_path(
+  self : EventWithOrigin,
 ) -> PatternNodePath {
   self.scope
 }
@@ -1000,8 +984,8 @@ pub extend ReferenceBinding with Eq::{equal, not_equal}
 pub extend ReferenceBinding with Debug::{to_repr}
 
 ///|
-fn[A] append_reachable_pattern_source_ids(
-  nodes : Map[String, PatternDocEntry[A]],
+fn append_reachable_pattern_source_ids(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
   result : Array[@identity.PatternNodeId],
   seen : Map[String, Bool],
@@ -1036,9 +1020,9 @@ fn[A] append_reachable_pattern_source_ids(
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
-        | Jux(child, _, _) =>
+        | Jux(child, _) =>
           append_reachable_pattern_source_ids(nodes, child, result, seen)
-        MergeControl(left, right, _, _) => {
+        MergeControl(left, right) => {
           append_reachable_pattern_source_ids(nodes, left, result, seen)
           append_reachable_pattern_source_ids(nodes, right, result, seen)
         }
@@ -1052,8 +1036,8 @@ fn[A] append_reachable_pattern_source_ids(
 }
 
 ///|
-fn[A] pattern_source_path_for_opaque_children(
-  nodes : Map[String, PatternDocEntry[A]],
+fn pattern_source_path_for_opaque_children(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
   children : Array[@identity.PatternNodeId],
 ) -> PatternNodePath raise PatternDocError {
@@ -1067,52 +1051,52 @@ fn[A] pattern_source_path_for_opaque_children(
 }
 
 ///|
-priv struct CompiledEntry[A, O] {
+priv struct CompiledEntry[O] {
   key : String
-  source : Pat[ScopedValue[A, O]]
+  source : Pat[ScopedValue[O]]
 }
 
 ///|
-fn[A, O] CompiledEntry::CompiledEntry(
+fn[O] CompiledEntry::CompiledEntry(
   key : String,
-  source : Pat[ScopedValue[A, O]],
-) -> CompiledEntry[A, O] {
+  source : Pat[ScopedValue[O]],
+) -> CompiledEntry[O] {
   { key, source, }
 }
 
 ///|
 /// One execution kernel; raw events and scoped/origin views are projections.
 /// `buses` are in this subtree's local time; event bindings index into them.
-priv struct CompiledPattern[A, O] {
-  pat : Pat[ScopedValue[A, O]]
-  entries : Array[CompiledEntry[A, O]]
-  buses : Array[ControlBus[A]]
+priv struct CompiledPattern[O] {
+  pat : Pat[ScopedValue[O]]
+  entries : Array[CompiledEntry[O]]
+  buses : Array[ControlBus]
 }
 
 ///|
-fn[A, O] CompiledPattern::CompiledPattern(
-  pat : Pat[ScopedValue[A, O]],
-  entries : Array[CompiledEntry[A, O]],
-  buses~ : Array[ControlBus[A]] = [],
-) -> CompiledPattern[A, O] {
+fn[O] CompiledPattern::CompiledPattern(
+  pat : Pat[ScopedValue[O]],
+  entries : Array[CompiledEntry[O]],
+  buses~ : Array[ControlBus] = [],
+) -> CompiledPattern[O] {
   { pat, entries, buses, }
 }
 
 ///|
 /// Apply an enclosing node's time transform to every bus.
-fn[A, O] CompiledPattern::map_buses(
-  self : CompiledPattern[A, O],
+fn[O] CompiledPattern::map_buses(
+  self : CompiledPattern[O],
   f : (BusSignal) -> BusSignal,
-) -> CompiledPattern[A, O] {
+) -> CompiledPattern[O] {
   { ..self, buses: self.buses.map(bus => bus.map_signal(f)), }
 }
 
 ///|
 /// Renumber this child's bindings after `offset` earlier sibling buses.
-fn[A, O] CompiledPattern::shift_buses(
-  self : CompiledPattern[A, O],
+fn[O] CompiledPattern::shift_buses(
+  self : CompiledPattern[O],
   offset : Int32,
-) -> CompiledPattern[A, O] {
+) -> CompiledPattern[O] {
   if offset == 0 || self.buses.is_empty() {
     return self
   }
@@ -1128,11 +1112,11 @@ fn[A, O] CompiledPattern::shift_buses(
 ///|
 /// Concatenate sibling buses; `wrap(index, signal)` applies the parent's
 /// time partition for that child. Returns children with renumbered bindings.
-fn[A, O] concat_child_buses(
-  children : Array[CompiledPattern[A, O]],
+fn[O] concat_child_buses(
+  children : Array[CompiledPattern[O]],
   wrap : (Int32, BusSignal) -> BusSignal,
-) -> (Array[CompiledPattern[A, O]], Array[ControlBus[A]]) {
-  let buses : Array[ControlBus[A]] = []
+) -> (Array[CompiledPattern[O]], Array[ControlBus]) {
+  let buses : Array[ControlBus] = []
   let shifted = children.mapi((index, child) => {
     let offset = buses.length()
     for bus in child.buses {
@@ -1144,10 +1128,10 @@ fn[A, O] concat_child_buses(
 }
 
 ///|
-fn[A, O] CompiledPattern::single_material(
-  pat : Pat[ScopedValue[A, O]],
+fn[O] CompiledPattern::single_material(
+  pat : Pat[ScopedValue[O]],
   id : @identity.PatternNodeId,
-) -> CompiledPattern[A, O] {
+) -> CompiledPattern[O] {
   CompiledPattern(
     pat,
     pat
@@ -1157,10 +1141,10 @@ fn[A, O] CompiledPattern::single_material(
 }
 
 ///|
-fn[A, O] CompiledPattern::transform(
-  self : CompiledPattern[A, O],
-  f : (Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]],
-) -> CompiledPattern[A, O] {
+fn[O] CompiledPattern::transform(
+  self : CompiledPattern[O],
+  f : (Pat[ScopedValue[O]]) -> Pat[ScopedValue[O]],
+) -> CompiledPattern[O] {
   CompiledPattern(
     f(self.pat),
     self.entries.map(entry => CompiledEntry(entry.key, f(entry.source))),
@@ -1169,10 +1153,10 @@ fn[A, O] CompiledPattern::transform(
 }
 
 ///|
-fn[A, O] opaque_compiled_entries(
-  pat : Pat[ScopedValue[A, O]],
+fn[O] opaque_compiled_entries(
+  pat : Pat[ScopedValue[O]],
   id : @identity.PatternNodeId,
-) -> Array[CompiledEntry[A, O]] {
+) -> Array[CompiledEntry[O]] {
   pat
   .entries()
   .map(entry => {
@@ -1184,14 +1168,14 @@ fn[A, O] opaque_compiled_entries(
 }
 
 ///|
-fn[A, O : DocumentOrigin] lower_pattern_node_cached(
-  nodes : Map[String, PatternDocEntry[A]],
+fn[O : DocumentOrigin] lower_pattern_node_cached(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  cache : CompiledCache[A, O],
-  controls : CompiledCache[A, Unit],
+  cache : CompiledCache[O],
+  controls : CompiledCache[Unit],
   token_memo : Map[String, Array[Int64]],
   context : OriginBindings,
-) -> CompiledPattern[A, O] raise PatternDocError {
+) -> CompiledPattern[O] raise PatternDocError {
   let token = pattern_node_cache_token_memoized(nodes, id, token_memo)
   match cache.lookup(id, token, context) {
     Some(compiled) => compiled
@@ -1206,25 +1190,25 @@ fn[A, O : DocumentOrigin] lower_pattern_node_cached(
 }
 
 ///|
-fn[A, O : DocumentOrigin] compile_pattern_node(
-  nodes : Map[String, PatternDocEntry[A]],
+fn[O : DocumentOrigin] compile_pattern_node(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  cache : CompiledCache[A, O],
-  controls : CompiledCache[A, Unit],
+  cache : CompiledCache[O],
+  controls : CompiledCache[Unit],
   token_memo : Map[String, Array[Int64]],
   context : OriginBindings,
-) -> CompiledPattern[A, O] raise PatternDocError {
+) -> CompiledPattern[O] raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise MissingNode(id.value())
   }
   fn lower(
     child : @identity.PatternNodeId,
-  ) -> CompiledPattern[A, O] raise PatternDocError {
+  ) -> CompiledPattern[O] raise PatternDocError {
     lower_pattern_node_cached(
       nodes, child, cache, controls, token_memo, context,
     )
   }
-  fn prepend(pat : Pat[ScopedValue[A, O]]) -> Pat[ScopedValue[A, O]] {
+  fn prepend(pat : Pat[ScopedValue[O]]) -> Pat[ScopedValue[O]] {
     pat.map_payload(value => value.prepend(id))
   }
   let compiled = match entry.node {
@@ -1346,7 +1330,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let base = prepend(child.pat)
       let pat = every_known(
         n,
-        fn(p : Pat[ScopedValue[A, O]]) {
+        fn(p : Pat[ScopedValue[O]]) {
           transform
           .apply(p)
           .map_payload(value => value.remap(value.value, scope))
@@ -1376,7 +1360,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     }
     // The transformed branch reads its own copy of each bus. The fixed pan
     // overrides a pan bus.
-    Jux(child_id, transform, merge) => {
+    Jux(child_id, transform) => {
       let child = lower(child_id)
       let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])
       let offset = child.buses.length()
@@ -1387,7 +1371,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         },
         (value, pan) => {
           value.remap(
-            merge(value.value, pan),
+            value.value.merge(pan),
             value.scope,
             bindings=unbind_keys(value.bindings, pan),
           )
@@ -1405,32 +1389,30 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     // `gain` multiplies, and other keys take the outer value where it has one. The merged
     // values come from the buses at the snapshot root, on its clock, so the
     // provider is never queried.
-    MergeControl(left_id, right_id, apply, controls_of) => {
+    MergeControl(left_id, right_id) => {
       let left = lower(left_id)
       let keys = []
-      control_keys(nodes, right_id, controls_of, keys)
+      control_keys(nodes, right_id, keys)
       let buses = left.buses.copy()
       let provided : Array[(@control.Control, Int32)] = []
       let chained : Map[Int32, Int32] = Map([])
       for key in keys {
-        let signal = compile_signal(nodes, right_id, Some(key), controls_of)
+        let signal = compile_signal(nodes, right_id, Some(key))
         provided.push((key, buses.length()))
-        buses.push({ key, signal, apply, controls_of, })
+        buses.push({ key, signal, })
         for inner, bus in left.buses {
           if bus.key == key {
             chained[inner] = buses.length()
             buses.push({
               key,
               signal: nested_signal(key.nesting(), bus.signal, signal),
-              apply,
-              controls_of,
             })
           }
         }
       }
       // Control providers need no primary source atom or reference binding;
       // lowering one only gives the merge's content signature.
-      let right : CompiledPattern[A, Unit] = lower_pattern_node_cached(
+      let right : CompiledPattern[Unit] = lower_pattern_node_cached(
         nodes,
         right_id,
         controls,
@@ -1516,17 +1498,17 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
 }
 
 ///|
-priv struct CompiledCacheEntry[A, O] {
+priv struct CompiledCacheEntry[O] {
   token : Array[Int64]
   context : OriginBindings
-  compiled : CompiledPattern[A, O]
+  compiled : CompiledPattern[O]
 }
 
 ///|
 /// Keep the common single-variant case free of a secondary hash table.
-priv struct CompiledCacheVariants[A, O] {
-  first : CompiledCacheEntry[A, O]
-  mut others : Map[Int32, Array[CompiledCacheEntry[A, O]]]?
+priv struct CompiledCacheVariants[O] {
+  first : CompiledCacheEntry[O]
+  mut others : Map[Int32, Array[CompiledCacheEntry[O]]]?
 }
 
 ///|
@@ -1560,24 +1542,24 @@ fn OriginBindings::cache_hash(self : OriginBindings) -> Int32 {
 /// base with identical stable IDs and revision counters. Every replacement gets
 /// a fresh generation, and the token includes every dependency generation.
 /// Revision is an editing API value; it adds no discrimination to this key.
-priv struct CompiledCache[A, O] {
-  entries : Map[String, CompiledCacheVariants[A, O]]
+priv struct CompiledCache[O] {
+  entries : Map[String, CompiledCacheVariants[O]]
   mut hits : Int32
   mut misses : Int32
 }
 
 ///|
-fn[A, O] CompiledCache::new() -> CompiledCache[A, O] {
+fn[O] CompiledCache::new() -> CompiledCache[O] {
   { entries: {}, hits: 0, misses: 0, }
 }
 
 ///|
-fn[A, O] CompiledCache::lookup(
-  self : CompiledCache[A, O],
+fn[O] CompiledCache::lookup(
+  self : CompiledCache[O],
   id : @identity.PatternNodeId,
   token : Array[Int64],
   context : OriginBindings,
-) -> CompiledPattern[A, O]? {
+) -> CompiledPattern[O]? {
   match self.entries.get(id.value()) {
     None => {
       self.misses += 1
@@ -1609,12 +1591,12 @@ fn[A, O] CompiledCache::lookup(
 
 ///|
 /// Called only after a cache miss; the immutable dependency key is absent.
-fn[A, O] CompiledCache::store(
-  self : CompiledCache[A, O],
+fn[O] CompiledCache::store(
+  self : CompiledCache[O],
   id : @identity.PatternNodeId,
   token : Array[Int64],
   context : OriginBindings,
-  compiled : CompiledPattern[A, O],
+  compiled : CompiledPattern[O],
 ) -> Unit {
   let key = id.value()
   let entry = { token: token.copy(), context, compiled, }
@@ -1624,7 +1606,7 @@ fn[A, O] CompiledCache::store(
       let buckets = match variants.others {
         Some(buckets) => buckets
         None => {
-          let buckets : Map[Int32, Array[CompiledCacheEntry[A, O]]] = Map([])
+          let buckets : Map[Int32, Array[CompiledCacheEntry[O]]] = Map([])
           variants.others = Some(buckets)
           buckets
         }
@@ -1639,17 +1621,17 @@ fn[A, O] CompiledCache::store(
 }
 
 ///|
-fn[A, O] CompiledCache::hit_count(self : CompiledCache[A, O]) -> Int32 {
+fn[O] CompiledCache::hit_count(self : CompiledCache[O]) -> Int32 {
   self.hits
 }
 
 ///|
-fn[A, O] CompiledCache::miss_count(self : CompiledCache[A, O]) -> Int32 {
+fn[O] CompiledCache::miss_count(self : CompiledCache[O]) -> Int32 {
   self.misses
 }
 
 ///|
-fn[A, O] CompiledCache::entry_count(self : CompiledCache[A, O]) -> Int32 {
+fn[O] CompiledCache::entry_count(self : CompiledCache[O]) -> Int32 {
   let mut count = 0
   self.entries.each(fn(_, variants) {
     count += 1
@@ -1661,109 +1643,97 @@ fn[A, O] CompiledCache::entry_count(self : CompiledCache[A, O]) -> Int32 {
 }
 
 ///|
-fn[A, O] CompiledCache::reset_stats(self : CompiledCache[A, O]) -> Unit {
+fn[O] CompiledCache::reset_stats(self : CompiledCache[O]) -> Unit {
   self.hits = 0
   self.misses = 0
 }
 
 ///|
-fn[A, O] CompiledCache::clear(self : CompiledCache[A, O]) -> Unit {
+fn[O] CompiledCache::clear(self : CompiledCache[O]) -> Unit {
   self.entries.clear()
   self.reset_stats()
 }
 
 ///|
 /// Exact and general specializations never exchange cached payloads.
-pub struct PatternLoweringCache[A] {
-  priv general : CompiledCache[A, Unit]
-  priv exact : CompiledCache[A, EventOrigin]
+pub struct PatternLoweringCache {
+  priv general : CompiledCache[Unit]
+  priv exact : CompiledCache[EventOrigin]
 }
 
 ///|
-pub fn[A] PatternLoweringCache::new() -> PatternLoweringCache[A] {
+pub fn PatternLoweringCache::new() -> PatternLoweringCache {
   { general: CompiledCache::new(), exact: CompiledCache::new(), }
 }
 
 ///|
-pub fn[A] PatternLoweringCache::hit_count(
-  self : PatternLoweringCache[A],
-) -> Int32 {
+pub fn PatternLoweringCache::hit_count(self : PatternLoweringCache) -> Int32 {
   self.general.hit_count() + self.exact.hit_count()
 }
 
 ///|
-pub fn[A] PatternLoweringCache::miss_count(
-  self : PatternLoweringCache[A],
-) -> Int32 {
+pub fn PatternLoweringCache::miss_count(self : PatternLoweringCache) -> Int32 {
   self.general.miss_count() + self.exact.miss_count()
 }
 
 ///|
-pub fn[A] PatternLoweringCache::entry_count(
-  self : PatternLoweringCache[A],
-) -> Int32 {
+pub fn PatternLoweringCache::entry_count(self : PatternLoweringCache) -> Int32 {
   self.general.entry_count() + self.exact.entry_count()
 }
 
 ///|
-pub fn[A] PatternLoweringCache::reset_stats(
-  self : PatternLoweringCache[A],
-) -> Unit {
+pub fn PatternLoweringCache::reset_stats(self : PatternLoweringCache) -> Unit {
   self.general.reset_stats()
   self.exact.reset_stats()
 }
 
 ///|
-pub fn[A] PatternLoweringCache::clear(self : PatternLoweringCache[A]) -> Unit {
+pub fn PatternLoweringCache::clear(self : PatternLoweringCache) -> Unit {
   self.general.clear()
   self.exact.clear()
 }
 
 ///|
 /// Lowered pattern snapshot for scheduler/runtime consumers.
-pub struct PatternSnapshot[A] {
+pub struct PatternSnapshot {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
-  priv pat : Pat[A]
-  priv sourced : Pat[ScopedValue[A, Unit]]
-  priv entry_sourced : Array[CompiledEntry[A, Unit]]
+  priv pat : Pat[ControlMap]
+  priv sourced : Pat[ScopedValue[Unit]]
+  priv entry_sourced : Array[CompiledEntry[Unit]]
   /// The root's buses, which project payloads as controls leave lowering.
-  priv buses : Array[ControlBus[A]]
+  priv buses : Array[ControlBus]
   priv table : Array[BusSignal]
 }
 
 ///|
-pub fn[A] PatternSnapshot::root(
-  self : PatternSnapshot[A],
-) -> @identity.PatternNodeId {
+pub fn PatternSnapshot::root(self : PatternSnapshot) -> @identity.PatternNodeId {
   self.root
 }
 
 ///|
-pub fn[A] PatternSnapshot::revision(
-  self : PatternSnapshot[A],
-) -> @identity.Revision {
+pub fn PatternSnapshot::revision(self : PatternSnapshot) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {
+pub fn PatternSnapshot::pat(self : PatternSnapshot) -> Pat[ControlMap] {
   self.pat
 }
 
 ///|
-pub fn[A] PatternSnapshot::query(
-  self : PatternSnapshot[A],
+pub fn PatternSnapshot::query(
+  self : PatternSnapshot,
   arc : TimeSpan,
-) -> Array[Event[A]] {
+) -> Array[Event[ControlMap]] {
   self.pat.query(arc)
 }
 
 ///|
-pub fn[A] PatternSnapshot::query_sourced_events(
-  self : PatternSnapshot[A],
+pub fn PatternSnapshot::query_sourced_events(
+  self : PatternSnapshot,
   arc : TimeSpan,
-) -> Array[PatternSnapshotEvent[A]] {
+) -> Array[PatternSnapshotEvent] {
   self.sourced
   .query(arc)
   .map(event => scoped_event(event, self.buses, self.table))
@@ -1773,11 +1743,11 @@ pub fn[A] PatternSnapshot::query_sourced_events(
 /// Query one canonical `Pat::entries()` member with authored provenance.
 /// `source_index` is the member index retained by playback entry state.
 /// Invalid indexes return an empty result.
-pub fn[A] PatternSnapshot::query_sourced_events_for_entry(
-  self : PatternSnapshot[A],
+pub fn PatternSnapshot::query_sourced_events_for_entry(
+  self : PatternSnapshot,
   source_index : Int32,
   arc : TimeSpan,
-) -> Array[PatternSnapshotEvent[A]] {
+) -> Array[PatternSnapshotEvent] {
   match self.entry_sourced.get(source_index) {
     Some(entry) =>
       entry.source
@@ -1789,43 +1759,43 @@ pub fn[A] PatternSnapshot::query_sourced_events_for_entry(
 
 ///|
 /// A compiled pattern whose every emitted event carries an exact source origin.
-pub struct PatternSnapshotWithOrigins[A] {
+pub struct PatternSnapshotWithOrigins {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
-  priv pat : Pat[A]
-  priv sourced : Pat[ScopedValue[A, EventOrigin]]
-  priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]
+  priv pat : Pat[ControlMap]
+  priv sourced : Pat[ScopedValue[EventOrigin]]
+  priv entry_sourced : Array[CompiledEntry[EventOrigin]]
   /// The root's buses, which project payloads as controls leave lowering.
-  priv buses : Array[ControlBus[A]]
+  priv buses : Array[ControlBus]
   priv table : Array[BusSignal]
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::root(
-  self : PatternSnapshotWithOrigins[A],
+pub fn PatternSnapshotWithOrigins::root(
+  self : PatternSnapshotWithOrigins,
 ) -> @identity.PatternNodeId {
   self.root
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::revision(
-  self : PatternSnapshotWithOrigins[A],
+pub fn PatternSnapshotWithOrigins::revision(
+  self : PatternSnapshotWithOrigins,
 ) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::pat(
-  self : PatternSnapshotWithOrigins[A],
-) -> Pat[A] {
+pub fn PatternSnapshotWithOrigins::pat(
+  self : PatternSnapshotWithOrigins,
+) -> Pat[ControlMap] {
   self.pat
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::query(
-  self : PatternSnapshotWithOrigins[A],
+pub fn PatternSnapshotWithOrigins::query(
+  self : PatternSnapshotWithOrigins,
   arc : TimeSpan,
-) -> Array[EventWithOrigin[A]] {
+) -> Array[EventWithOrigin] {
   self.sourced
   .query(arc)
   .map(event => EventWithOrigin(event, self.buses, self.table))
@@ -1833,11 +1803,11 @@ pub fn[A] PatternSnapshotWithOrigins::query(
 
 ///|
 /// Query a canonical material member; invalid indexes produce no events.
-pub fn[A] PatternSnapshotWithOrigins::query_for_entry(
-  self : PatternSnapshotWithOrigins[A],
+pub fn PatternSnapshotWithOrigins::query_for_entry(
+  self : PatternSnapshotWithOrigins,
   index : Int32,
   arc : TimeSpan,
-) -> Array[EventWithOrigin[A]] {
+) -> Array[EventWithOrigin] {
   match self.entry_sourced.get(index) {
     None => []
     Some(entry) =>
@@ -1849,10 +1819,10 @@ pub fn[A] PatternSnapshotWithOrigins::query_for_entry(
 
 ///|
 /// Erase only origin capability, without compiling or interpreting time again.
-pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
-  self : PatternSnapshotWithOrigins[A],
-) -> PatternSnapshot[A] {
-  fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {
+pub fn PatternSnapshotWithOrigins::as_snapshot(
+  self : PatternSnapshotWithOrigins,
+) -> PatternSnapshot {
+  fn erase_origin(value : ScopedValue[EventOrigin]) -> ScopedValue[Unit] {
     ScopedValue(
       value.value,
       value.scope,
@@ -1877,10 +1847,10 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
 }
 
 ///|
-pub fn[A] PatternDoc::lower_with_origins(
-  self : PatternDoc[A],
-  cache~ : PatternLoweringCache[A] = PatternLoweringCache::new(),
-) -> PatternSnapshotWithOrigins[A] raise PatternDocError {
+pub fn PatternDoc::lower_with_origins(
+  self : PatternDoc,
+  cache~ : PatternLoweringCache = PatternLoweringCache::new(),
+) -> PatternSnapshotWithOrigins raise PatternDocError {
   let compiled = lower_pattern_node_cached(
     self.nodes,
     self.root,
@@ -1904,11 +1874,11 @@ pub fn[A] PatternDoc::lower_with_origins(
 
 ///|
 /// Generic values have unknown musical content, just like Pat::pure.
-pub fn[A] PatternDoc::atom(
+pub fn PatternDoc::atom(
   id~ : @identity.PatternNodeId,
   source_atom~ : @identity.SourceAtomId,
-  value~ : A,
-) -> PatternDoc[A] {
+  value~ : ControlMap,
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -1927,7 +1897,7 @@ pub fn PatternDoc::control_atom(
   source_atom? : @identity.SourceAtomId,
   key~ : @control.Control,
   value~ : Double,
-) -> PatternDoc[ControlMap] {
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -1948,10 +1918,10 @@ pub fn PatternDoc::control_atom(
 }
 
 ///|
-pub fn[A] PatternDoc::reference_with_binding(
+pub fn PatternDoc::reference_with_binding(
   id~ : @identity.PatternNodeId,
-  resolved_reference~ : ResolvedReference[A],
-) -> PatternDoc[A] {
+  resolved_reference~ : ResolvedReference,
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=resolved_reference.definition.revision,
@@ -1968,11 +1938,11 @@ pub fn[A] PatternDoc::reference_with_binding(
 /// `PatternDoc` is an immutable authoring layer above the runtime `Pat`
 /// closure model. Node storage is private so future incremental lowering can
 /// cache by stable node identity and revision without exposing storage shape.
-pub struct PatternDoc[A] {
+pub struct PatternDoc {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
   priv incr_revision : @types.Revision
-  priv nodes : Map[String, PatternDocEntry[A]]
+  priv nodes : Map[String, PatternDocEntry]
 }
 
 ///|
@@ -1988,19 +1958,19 @@ fn next_pattern_doc_incr_revision() -> @types.Revision {
 }
 
 ///|
-fn[A] PatternDoc::PatternDoc(
+fn PatternDoc::PatternDoc(
   root~ : @identity.PatternNodeId,
   revision~ : @identity.Revision,
-  nodes~ : Map[String, PatternDocEntry[A]],
-) -> PatternDoc[A] {
+  nodes~ : Map[String, PatternDocEntry],
+) -> PatternDoc {
   { root, revision, incr_revision: next_pattern_doc_incr_revision(), nodes, }
 }
 
 ///|
-pub fn[A] PatternDoc::from_pattern(
+pub fn PatternDoc::from_pattern(
   id~ : @identity.PatternNodeId,
-  pat~ : Pat[A],
-) -> PatternDoc[A] {
+  pat~ : Pat[ControlMap],
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -2015,7 +1985,7 @@ pub fn PatternDoc::continuous(
   id~ : @identity.PatternNodeId,
   key~ : @control.Control,
   f~ : (Double) -> Double,
-) -> PatternDoc[ControlMap] {
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -2024,7 +1994,7 @@ pub fn PatternDoc::continuous(
 }
 
 ///|
-pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> PatternDoc[A] {
+pub fn PatternDoc::silence(id~ : @identity.PatternNodeId) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -2033,10 +2003,10 @@ pub fn[A] PatternDoc::silence(id~ : @identity.PatternNodeId) -> PatternDoc[A] {
 }
 
 ///|
-pub fn[A] PatternDoc::pure(
+pub fn PatternDoc::pure(
   id~ : @identity.PatternNodeId,
-  value~ : A,
-) -> PatternDoc[A] {
+  value~ : ControlMap,
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
@@ -2045,12 +2015,12 @@ pub fn[A] PatternDoc::pure(
 }
 
 ///|
-pub fn[A] PatternDoc::root(self : PatternDoc[A]) -> @identity.PatternNodeId {
+pub fn PatternDoc::root(self : PatternDoc) -> @identity.PatternNodeId {
   self.root
 }
 
 ///|
-pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
+pub fn PatternDoc::revision(self : PatternDoc) -> @identity.Revision {
   self.revision
 }
 
@@ -2063,7 +2033,7 @@ pub fn[A] PatternDoc::revision(self : PatternDoc[A]) -> @identity.Revision {
 /// incr's closed `Revision` is an independent monotonic creation stamp.
 /// Semantic equality remains governed by `backdate_equal`, so reparsing an
 /// unchanged document can backdate to the previously accepted value.
-pub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @types.Revision {
+pub impl @types.HasChangedAt for PatternDoc with fn changed_at(self) -> @types.Revision {
   self.incr_revision
 }
 
@@ -2072,56 +2042,53 @@ pub impl[A] @types.HasChangedAt for PatternDoc[A] with fn changed_at(self) -> @t
 /// its derived `Eq`, so two content-distinct docs that happen to collide on
 /// `value` are still treated as changed. This is the load-bearing acceptance
 /// predicate used by `accepted_memo`.
-pub impl[A] @types.BackdateEq for PatternDoc[A] with fn backdate_equal(
-  self,
-  other,
-) -> Bool {
+pub impl @types.BackdateEq for PatternDoc with fn backdate_equal(self, other) -> Bool {
   self.revision == other.revision
 }
 
 ///|
-pub fn[A] PatternDoc::node_count(self : PatternDoc[A]) -> Int32 {
+pub fn PatternDoc::node_count(self : PatternDoc) -> Int32 {
   self.nodes.length()
 }
 
 ///|
-pub fn[A] PatternDoc::contains_node(
-  self : PatternDoc[A],
+pub fn PatternDoc::contains_node(
+  self : PatternDoc,
   id : @identity.PatternNodeId,
 ) -> Bool {
   self.nodes.contains(id.value())
 }
 
 ///|
-pub fn[A] PatternDoc::subdoc(
-  self : PatternDoc[A],
+pub fn PatternDoc::subdoc(
+  self : PatternDoc,
   root~ : @identity.PatternNodeId,
-) -> PatternDoc[A] raise PatternDocError {
-  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+) -> PatternDoc raise PatternDocError {
+  let nodes : Map[String, PatternDocEntry] = Map([])
   copy_reachable_pattern_nodes(self.nodes, root, nodes)
   PatternDoc(root~, revision=pattern_node_revision(nodes, root), nodes~)
 }
 
 ///|
-pub fn[A] PatternDoc::node_revision(
-  self : PatternDoc[A],
+pub fn PatternDoc::node_revision(
+  self : PatternDoc,
   id : @identity.PatternNodeId,
 ) -> @identity.Revision raise PatternDocError {
   pattern_node_revision(self.nodes, id)
 }
 
 ///|
-pub fn[A] PatternDoc::lower(
-  self : PatternDoc[A],
-) -> PatternSnapshot[A] raise PatternDocError {
+pub fn PatternDoc::lower(
+  self : PatternDoc,
+) -> PatternSnapshot raise PatternDocError {
   self.lower_with_cache(PatternLoweringCache::new())
 }
 
 ///|
-pub fn[A] PatternDoc::lower_with_cache(
-  self : PatternDoc[A],
-  cache : PatternLoweringCache[A],
-) -> PatternSnapshot[A] raise PatternDocError {
+pub fn PatternDoc::lower_with_cache(
+  self : PatternDoc,
+  cache : PatternLoweringCache,
+) -> PatternSnapshot raise PatternDocError {
   let compiled = lower_pattern_node_cached(
     self.nodes,
     self.root,
@@ -2144,10 +2111,10 @@ pub fn[A] PatternDoc::lower_with_cache(
 }
 
 ///|
-pub fn[A] PatternDoc::with_root(
-  self : PatternDoc[A],
+pub fn PatternDoc::with_root(
+  self : PatternDoc,
   root~ : @identity.PatternNodeId,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   if !self.nodes.contains(root.value()) {
     raise MissingNode(root.value())
   }
@@ -2159,32 +2126,32 @@ pub fn[A] PatternDoc::with_root(
 }
 
 ///|
-pub fn[A] PatternDoc::replace_with_pattern(
-  self : PatternDoc[A],
+pub fn PatternDoc::replace_with_pattern(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
-  pat~ : Pat[A],
-) -> PatternDoc[A] raise PatternDocError {
+  pat~ : Pat[ControlMap],
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Runtime(pat))
   PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
 }
 
 ///|
-pub fn[A] PatternDoc::replace_with_silence(
-  self : PatternDoc[A],
+pub fn PatternDoc::replace_with_silence(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Silence)
   PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
 }
 
 ///|
-pub fn[A] PatternDoc::replace_with_pure(
-  self : PatternDoc[A],
+pub fn PatternDoc::replace_with_pure(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
-  value~ : A,
-) -> PatternDoc[A] raise PatternDocError {
+  value~ : ControlMap,
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   replace_pattern_node(nodes, id, Pure(value))
   PatternDoc(root=self.root, revision=self.revision.next(), nodes~)
@@ -2193,10 +2160,10 @@ pub fn[A] PatternDoc::replace_with_pure(
 ///|
 /// Capture source-local coordinates before enclosing musical transformations.
 /// This does not change the pattern's timing, material keys, or musical values.
-pub fn[A] PatternDoc::with_source_frame(
-  self : PatternDoc[A],
+pub fn PatternDoc::with_source_frame(
+  self : PatternDoc,
   frame~ : @identity.SourceFrameId,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   guard nodes.get(self.root.value()) is Some(entry) else {
     raise MissingNode(self.root.value())
@@ -2211,11 +2178,11 @@ pub fn[A] PatternDoc::with_source_frame(
 }
 
 ///|
-pub fn[A] PatternDoc::fast(
-  self : PatternDoc[A],
+pub fn PatternDoc::fast(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   factor~ : Rational,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2227,11 +2194,11 @@ pub fn[A] PatternDoc::fast(
 }
 
 ///|
-pub fn[A] PatternDoc::slow(
-  self : PatternDoc[A],
+pub fn PatternDoc::slow(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   factor~ : Rational,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2243,11 +2210,11 @@ pub fn[A] PatternDoc::slow(
 }
 
 ///|
-pub fn[A] PatternDoc::gate(
-  self : PatternDoc[A],
+pub fn PatternDoc::gate(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   factor~ : Rational,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2259,21 +2226,21 @@ pub fn[A] PatternDoc::gate(
 }
 
 ///|
-pub fn[A] PatternDoc::rev(
-  self : PatternDoc[A],
+pub fn PatternDoc::rev(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(nodes, id, Rev(self.root), revision=self.revision.next())
   PatternDoc(root=id, revision=self.revision.next(), nodes~)
 }
 
 ///|
-pub fn[A] PatternDoc::filter_map(
-  self : PatternDoc[A],
+pub fn PatternDoc::filter_map(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
-  f~ : (A) -> A?,
-) -> PatternDoc[A] raise PatternDocError {
+  f~ : (ControlMap) -> ControlMap?,
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2285,13 +2252,13 @@ pub fn[A] PatternDoc::filter_map(
 }
 
 ///|
-pub fn[A] PatternDoc::euclid(
-  self : PatternDoc[A],
+pub fn PatternDoc::euclid(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   k~ : Int32,
   n~ : Int32,
   rotation~ : Int32 = 0,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2303,12 +2270,12 @@ pub fn[A] PatternDoc::euclid(
 }
 
 ///|
-pub fn[A] PatternDoc::degrade_by(
-  self : PatternDoc[A],
+pub fn PatternDoc::degrade_by(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   p~ : Double,
   seed~ : Int32 = 42,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2320,12 +2287,12 @@ pub fn[A] PatternDoc::degrade_by(
 }
 
 ///|
-pub fn[A] PatternDoc::every(
-  self : PatternDoc[A],
+pub fn PatternDoc::every(
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   n~ : Int32,
   transform~ : TimeTransform,
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
@@ -2338,15 +2305,15 @@ pub fn[A] PatternDoc::every(
 
 ///|
 pub fn PatternDoc::jux(
-  self : PatternDoc[ControlMap],
+  self : PatternDoc,
   id~ : @identity.PatternNodeId,
   transform~ : TimeTransform,
-) -> PatternDoc[ControlMap] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   let nodes = copy_pattern_nodes(self.nodes)
   insert_pattern_node(
     nodes,
     id,
-    Jux(self.root, transform, merge_maps),
+    Jux(self.root, transform),
     revision=self.revision.next(),
   )
   PatternDoc(root=id, revision=self.revision.next(), nodes~)
@@ -2355,32 +2322,27 @@ pub fn PatternDoc::jux(
 ///|
 pub fn PatternDoc::merge_control(
   id~ : @identity.PatternNodeId,
-  left~ : PatternDoc[ControlMap],
-  right~ : PatternDoc[ControlMap],
-) -> PatternDoc[ControlMap] raise PatternDocError {
+  left~ : PatternDoc,
+  right~ : PatternDoc,
+) -> PatternDoc raise PatternDocError {
   let docs = [left, right]
-  let nodes : Map[String, PatternDocEntry[ControlMap]] = Map([])
+  let nodes : Map[String, PatternDocEntry] = Map([])
   merge_pattern_nodes(nodes, left.nodes)
   merge_pattern_nodes(nodes, right.nodes)
   let revision = aggregate_pattern_revision(docs)
-  insert_pattern_node(
-    nodes,
-    id,
-    MergeControl(left.root, right.root, merge_maps, controls => controls),
-    revision~,
-  )
+  insert_pattern_node(nodes, id, MergeControl(left.root, right.root), revision~)
   PatternDoc(root=id, revision~, nodes~)
 }
 
 ///|
-pub fn[A] PatternDoc::sequence(
+pub fn PatternDoc::sequence(
   id~ : @identity.PatternNodeId,
-  docs~ : Array[PatternDoc[A]],
-) -> PatternDoc[A] raise PatternDocError {
+  docs~ : Array[PatternDoc],
+) -> PatternDoc raise PatternDocError {
   if docs.is_empty() {
     raise EmptyPatternDocs
   }
-  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+  let nodes : Map[String, PatternDocEntry] = Map([])
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
   }
@@ -2391,11 +2353,11 @@ pub fn[A] PatternDoc::sequence(
 }
 
 ///|
-pub fn[A] PatternDoc::sequence_weighted(
+pub fn PatternDoc::sequence_weighted(
   id~ : @identity.PatternNodeId,
-  docs~ : Array[PatternDoc[A]],
+  docs~ : Array[PatternDoc],
   weights~ : Array[Int32],
-) -> PatternDoc[A] raise PatternDocError {
+) -> PatternDoc raise PatternDocError {
   if docs.is_empty() {
     raise EmptyPatternDocs
   }
@@ -2412,7 +2374,7 @@ pub fn[A] PatternDoc::sequence_weighted(
       raise InvalidSequenceWeights
     }
   }
-  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+  let nodes : Map[String, PatternDocEntry] = Map([])
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
   }
@@ -2428,14 +2390,14 @@ pub fn[A] PatternDoc::sequence_weighted(
 }
 
 ///|
-pub fn[A] PatternDoc::stack(
+pub fn PatternDoc::stack(
   id~ : @identity.PatternNodeId,
-  docs~ : Array[PatternDoc[A]],
-) -> PatternDoc[A] raise PatternDocError {
+  docs~ : Array[PatternDoc],
+) -> PatternDoc raise PatternDocError {
   if docs.is_empty() {
     raise EmptyPatternDocs
   }
-  let nodes : Map[String, PatternDocEntry[A]] = Map([])
+  let nodes : Map[String, PatternDocEntry] = Map([])
   for doc in docs {
     merge_pattern_nodes(nodes, doc.nodes)
   }
@@ -2450,10 +2412,10 @@ pub fn[A] PatternDoc::stack(
 /// keeps its own node identities; combining uses does not duplicate its nodes.
 /// References cannot form cycles because construction only accepts existing
 /// immutable documents. Runtime closures remain an explicit, separate API.
-pub fn[A] PatternDoc::reference(
+pub fn PatternDoc::reference(
   id~ : @identity.PatternNodeId,
-  definition~ : PatternDoc[A],
-) -> PatternDoc[A] {
+  definition~ : PatternDoc,
+) -> PatternDoc {
   PatternDoc(
     root=id,
     revision=definition.revision,
@@ -2463,10 +2425,10 @@ pub fn[A] PatternDoc::reference(
 
 ///|
 /// Inspect the definition at a reference use site without losing its structure.
-pub fn[A] PatternDoc::referenced_definition(
-  self : PatternDoc[A],
+pub fn PatternDoc::referenced_definition(
+  self : PatternDoc,
   id : @identity.PatternNodeId,
-) -> PatternDoc[A]? {
+) -> PatternDoc? {
   match self.nodes.get(id.value()) {
     Some({ node: Reference(definition, _), .. }) => Some(definition)
     _ => None

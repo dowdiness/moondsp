@@ -101,18 +101,16 @@ fn bus_binding_for(
 ///|
 /// One bus of a compiled subtree: the signal one `MergeControl` gives `key`,
 /// and how that merge reads and writes the payload's controls.
-priv struct ControlBus[A] {
+priv struct ControlBus {
   key : @control.Control
   signal : BusSignal
-  apply : (A, ControlMap) -> A
-  controls_of : (A) -> ControlMap
 }
 
 ///|
-fn[A] ControlBus::map_signal(
-  self : ControlBus[A],
+fn ControlBus::map_signal(
+  self : ControlBus,
   f : (BusSignal) -> BusSignal,
-) -> ControlBus[A] {
+) -> ControlBus {
   { ..self, signal: f(self.signal), }
 }
 
@@ -172,24 +170,21 @@ fn unbind_keys(
 ///|
 /// `value` as controls leave lowering: each bound key takes its signal at
 /// `time`. A key whose signal has no value there keeps the own value.
-fn[A] project_controls(
-  value : A,
+fn project_controls(
+  value : ControlMap,
   bindings : FixedArray[BusBinding],
-  buses : Array[ControlBus[A]],
+  buses : Array[ControlBus],
   time : Rational,
-) -> A {
+) -> ControlMap {
   guard bindings.length() > 0 else { return value }
-  // Every bus of one snapshot reads and writes the payload the same way.
-  let { controls_of, apply, .. } = buses[bindings[0].bus]
-  let own = controls_of(value)
   let values : Map[@control.Control, Double] = Map([])
   for binding in bindings {
-    let v = binding.eval(own, buses[binding.bus].signal, time.num, time.den)
+    let v = binding.eval(value, buses[binding.bus].signal, time.num, time.den)
     if v.get() is Some(value) {
       values[binding.key] = value
     }
   }
-  apply(value, { values, })
+  value.merge({ values, })
 }
 
 ///|
@@ -207,49 +202,63 @@ fn shift_bus_bindings(
 }
 
 ///|
-/// The buses one event's controls follow, placed on the clock the event is on.
-pub struct EventBuses {
-  priv table : Array[BusSignal]
-  priv bindings : FixedArray[BusBinding]
+/// An event's controls as a voice reads them: its values at the onset, and
+/// the buses its bound keys follow while it sounds, placed on the clock the
+/// event is on. Only lowering pairs values with buses (`Controls::lowered`),
+/// so the two always belong to the same event.
+pub struct Controls {
+  /// Projected at the onset, so a bound key already holds its bus value.
+  priv values : ControlMap
   /// The event's own values, which its bound keys read under their buses.
   priv own : ControlMap
+  priv table : Array[BusSignal]
+  priv bindings : FixedArray[BusBinding]
   priv placement : Placement
 }
 
 ///|
-let no_event_buses : EventBuses = {
-  table: [],
-  bindings: no_bus_bindings,
-  own: ControlMap::empty(),
-  placement: Placement(),
-}
-
-///|
-/// For events that follow no bus.
-pub fn EventBuses::none() -> EventBuses {
-  no_event_buses
-}
-
-///|
-fn[A] EventBuses::in_snapshot(
-  value : A,
-  bindings : FixedArray[BusBinding],
-  buses : Array[ControlBus[A]],
-  table : Array[BusSignal],
-) -> EventBuses {
-  if bindings.is_empty() {
-    return no_event_buses
+/// Controls that follow no bus: every key holds its value for the whole note.
+pub fn Controls::fixed(values : ControlMap) -> Controls {
+  {
+    values,
+    own: values,
+    table: [],
+    bindings: no_bus_bindings,
+    placement: Placement(),
   }
-  let own = (buses[bindings[0].bus].controls_of)(value)
-  { ..no_event_buses, table, bindings, own, }
+}
+
+///|
+/// The controls of a lowered event whose own payload is `own`, projected at
+/// `onset`.
+fn Controls::lowered(
+  own : ControlMap,
+  bindings : FixedArray[BusBinding],
+  buses : Array[ControlBus],
+  table : Array[BusSignal],
+  onset : Rational,
+) -> Controls {
+  if bindings.is_empty() {
+    return Controls::fixed(own)
+  }
+  {
+    values: project_controls(own, bindings, buses, onset),
+    own,
+    table,
+    bindings,
+    placement: Placement(),
+  }
+}
+
+///|
+/// The values at the onset, as the event's payload holds them.
+pub fn Controls::values(self : Controls) -> ControlMap {
+  self.values
 }
 
 ///|
 /// Follow the event when `placement` moves it, as `Event::placed` does.
-pub fn EventBuses::placed(
-  self : EventBuses,
-  placement : Placement,
-) -> EventBuses {
+pub fn Controls::placed(self : Controls, placement : Placement) -> Controls {
   if self.bindings.is_empty() {
     return self
   }
@@ -258,7 +267,7 @@ pub fn EventBuses::placed(
 
 ///|
 /// `signal` on this event's clock.
-fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
+fn Controls::place(self : Controls, signal : BusSignal) -> BusSignal {
   let { origin, rate, } = self.placement
   let scaled : BusSignal = if rate == Rational::from_int(1) {
     signal
@@ -275,30 +284,14 @@ fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
 ///|
 /// The bus `key` follows, read at exact time `num / den` (`den > 0`) on this
 /// event's clock. Reading allocates nothing. `None` when `key` follows no bus.
-pub fn EventBuses::reader(
-  self : EventBuses,
+pub fn Controls::reader(
+  self : Controls,
   key : @control.Control,
 ) -> ((Int64, Int64) -> @control.ControlValue)? {
   bus_binding_for(self.bindings, key).map(binding => {
     let placed = self.place(binding.signal(self.own, self.table[binding.bus]))
     (num, den) => placed.eval(num, den, false)
   })
-}
-
-///|
-/// An event's controls as a voice reads them: its values at the onset, and
-/// the buses its bound keys follow while it sounds.
-pub struct Controls {
-  /// Projected at the onset, so a bound key already holds its bus value.
-  priv values : ControlMap
-  priv buses : EventBuses
-}
-
-///|
-/// `values` must be the event's payload as it leaves lowering, and `buses`
-/// the buses of the same event.
-pub fn Controls::Controls(values : ControlMap, buses~ : EventBuses) -> Controls {
-  { values, buses, }
 }
 
 ///|
@@ -312,11 +305,10 @@ pub impl @control.ControlSource for Controls with fn value(self, key) {
 ///|
 /// A constant bus has no reader: the onset value already holds.
 pub impl @control.ControlSource for Controls with fn each_varying(self, f) {
-  let buses = self.buses
-  for binding in buses.bindings {
-    let signal = binding.signal(buses.own, buses.table[binding.bus])
+  for binding in self.bindings {
+    let signal = binding.signal(self.own, self.table[binding.bus])
     guard !signal.is_constant() else { continue }
-    let placed = buses.place(signal)
+    let placed = self.place(signal)
     f(binding.key, (num, den) => placed.eval(num, den, false))
   }
 }
@@ -532,11 +524,9 @@ fn weight_bounds(weights : Array[Int32]) -> Array[Int64] {
 
 ///|
 /// Every key a control-provider subtree can set, in first-seen order.
-/// `controls_of` views the generic payload as the controls it carries.
-fn[A] control_keys(
-  nodes : Map[String, PatternDocEntry[A]],
+fn control_keys(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
-  controls_of : (A) -> ControlMap,
   keys : Array[@control.Control],
 ) -> Unit raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
@@ -549,10 +539,9 @@ fn[A] control_keys(
   }
   match entry.node {
     Reference(definition, _) =>
-      control_keys(definition.nodes, definition.root, controls_of, keys)
+      control_keys(definition.nodes, definition.root, keys)
     Continuous(_, key, _) => add(key)
-    Pure(value) | Atom(_, value, _, _) =>
-      controls_of(value).each((key, _) => add(key))
+    Pure(value) | Atom(_, value, _, _) => value.each((key, _) => add(key))
     Runtime(_) => raise UnsupportedControl(id)
     Silence => ()
     Fast(child, _)
@@ -563,14 +552,14 @@ fn[A] control_keys(
     | Gate(child, _)
     | DegradeBy(child, _, _)
     | FilterMap(child, _)
-    | Jux(child, _, _) => control_keys(nodes, child, controls_of, keys)
-    MergeControl(left, right, _, _) => {
-      control_keys(nodes, left, controls_of, keys)
-      control_keys(nodes, right, controls_of, keys)
+    | Jux(child, _) => control_keys(nodes, child, keys)
+    MergeControl(left, right) => {
+      control_keys(nodes, left, keys)
+      control_keys(nodes, right, keys)
     }
     Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
       for child in children {
-        control_keys(nodes, child, controls_of, keys)
+        control_keys(nodes, child, keys)
       }
   }
 }
@@ -579,21 +568,20 @@ fn[A] control_keys(
 /// Compile one key of a control-provider subtree into its signal. With
 /// `key=None`, compile its presence instead: `0` wherever the subtree has an
 /// event, whichever keys it sets, and `Absent` elsewhere.
-fn[A] compile_signal(
-  nodes : Map[String, PatternDocEntry[A]],
+fn compile_signal(
+  nodes : Map[String, PatternDocEntry],
   id : @identity.PatternNodeId,
   key : @control.Control?,
-  controls_of : (A) -> ControlMap,
 ) -> BusSignal raise PatternDocError {
   guard nodes.get(id.value()) is Some(entry) else {
     raise PatternDocError::MissingNode(id.value())
   }
   fn sub(child : @identity.PatternNodeId) -> BusSignal raise PatternDocError {
-    compile_signal(nodes, child, key, controls_of)
+    compile_signal(nodes, child, key)
   }
   match entry.node {
     Reference(definition, _) =>
-      compile_signal(definition.nodes, definition.root, key, controls_of)
+      compile_signal(definition.nodes, definition.root, key)
     Continuous(_, k, f) =>
       match key {
         None => Const(0.0)
@@ -603,7 +591,7 @@ fn[A] compile_signal(
       match key {
         None => Const(0.0)
         Some(key) =>
-          match controls_of(value).get(key) {
+          match value.get(key) {
             Some(v) => BusSignal::of_value(v)
             None => Absent
           }
@@ -626,19 +614,19 @@ fn[A] compile_signal(
     WeightedSequence(children, weights) =>
       Weighted(children.map(sub), weight_bounds(weights))
     Stack(children) => Stack(children.map(sub))
-    MergeControl(left, right, _, _) =>
+    MergeControl(left, right) =>
       match key {
         None => sub(left)
         Some(key) => {
           let inner = sub(left)
           Merge(
-            compile_signal(nodes, left, None, controls_of),
+            compile_signal(nodes, left, None),
             inner,
             nested_signal(key.nesting(), inner, sub(right)),
           )
         }
       }
-    Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _, _) =>
+    Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _) =>
       raise UnsupportedControl(id)
   }
 }

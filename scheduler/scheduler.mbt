@@ -155,7 +155,7 @@ fn PatternScheduler::process_single_event(
   source_frame : @identity.SourceFrameId?,
   source_start : Double,
   source_pitch : Double,
-  buses : @pattern.EventBuses,
+  controls : @pattern.Controls,
   onset_sample : Int64,
   arc : @pattern.TimeSpan,
 ) -> Unit {
@@ -174,7 +174,6 @@ fn PatternScheduler::process_single_event(
         ()
       } else {
         // The pool's bindings decide what each key sets and in which unit.
-        let controls = @pattern.Controls(event.value, buses~)
         let gate = pool.note_gate(controls)
         let endpoint = match gate {
           EventEnd => self.clock.sample_at(whole.end_)
@@ -242,7 +241,7 @@ fn PatternScheduler::process_events_with_origin(
       None,
       -1.0,
       -1.0,
-      @pattern.EventBuses::none(),
+      @pattern.Controls::fixed(event.value),
       -1L,
       arc,
     )
@@ -369,7 +368,7 @@ fn PatternScheduler::process_block_events(
             sourced.source_frame(),
             sourced.source_start(),
             sourced.source_pitch(),
-            sourced.buses(),
+            sourced.controls(),
             frame.sample_begin,
             @pattern.TimeSpan(whole.begin, whole.end_),
           )
@@ -409,7 +408,7 @@ fn PatternScheduler::process_block_events(
         sourced.source_frame(),
         sourced.source_start(),
         sourced.source_pitch(),
-        sourced.buses(),
+        sourced.controls(),
         start,
         frame.logical_arc,
       )
@@ -527,7 +526,7 @@ fn PatternScheduler::render_snapshot_outputs(
 /// while keeping the scheduler's logical frame unchanged.
 pub fn PatternScheduler::process_section_block(
   self : PatternScheduler,
-  section : @song.Section[@pattern.ControlMap],
+  section : @song.Section,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
@@ -555,7 +554,7 @@ pub fn PatternScheduler::process_section_block(
 /// scheduler frame's logical arc.
 pub fn PatternScheduler::process_song_block(
   self : PatternScheduler,
-  song : @song.Song[@pattern.ControlMap],
+  song : @song.Song,
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {

@@ -192,7 +192,7 @@ fn pid(value : String) -> @identity.PatternNodeId {
 fn note_snapshot(
   id_value : String,
   note_value : Double,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+) -> @pattern.PatternSnapshot {
   let doc = @pattern.PatternDoc::from_pattern(
     id=pid(id_value),
     pat=@pattern.note(note_value),
@@ -203,12 +203,8 @@ fn note_snapshot(
 }
 
 ///|
-fn silence_snapshot(
-  id_value : String,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
-  let doc : @pattern.PatternDoc[@pattern.ControlMap] = @pattern.PatternDoc::silence(
-    id=pid(id_value),
-  )
+fn silence_snapshot(id_value : String) -> @pattern.PatternSnapshot {
+  let doc : @pattern.PatternDoc = @pattern.PatternDoc::silence(id=pid(id_value))
   doc.lower() catch {
     _ => abort("expected pattern snapshot")
   }
@@ -240,7 +236,7 @@ fn scheduler_section_doc(
   id_value : String,
   name : String,
   midi : Double,
-) -> @song.SectionDoc[@pattern.ControlMap] {
+) -> @song.SectionDoc {
   @song.SectionDoc::single(
     id=sid(id_value),
     name~,
@@ -255,17 +251,15 @@ fn scheduler_section_doc(
 
 ///|
 fn scheduler_song_doc(
-  occurrences : Array[@song.SongOccurrenceDoc[@pattern.ControlMap]],
-) -> @song.SongDoc[@pattern.ControlMap] {
+  occurrences : Array[@song.SongOccurrenceDoc],
+) -> @song.SongDoc {
   @song.SongDoc(parts=occurrences) catch {
     _ => abort("expected song doc")
   }
 }
 
 ///|
-fn song_snapshot(
-  doc : @song.SongDoc[@pattern.ControlMap],
-) -> @song.SongSnapshot[@pattern.ControlMap] {
+fn song_snapshot(doc : @song.SongDoc) -> @song.SongSnapshot {
   doc.lower() catch {
     _ => abort("expected song snapshot")
   }

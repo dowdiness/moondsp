@@ -35,7 +35,7 @@ surface:
 - **Upstream consumers**: Web editors (e.g. `web/live/`), REPLs, and live-coding
   interfaces pass text code directly to `mini`.
 - **Downstream dependencies**: [`pattern/`](../pattern/) provides `Pat[ControlMap]`,
-  `Rational`, and `PatternDoc`; [`song/`](../song/) provides `Song[ControlMap]`
+  `Rational`, and `PatternDoc`; [`song/`](../song/) provides `Song`
   layouts; [`identity/`](../identity/) supplies node IDs for live-editing trees.
   `mini` has zero dependencies on audio buffers, DSP, or voice pools.
 
@@ -60,7 +60,7 @@ origins; `Draft` adds them.
 | Function | Use it when you need |
 |---|---|
 | `parse` | The lowered `Pat[ControlMap]` of `parse_snapshot` |
-| `parse_song` | A `Song[ControlMap]` layout plus its authored BPM metadata |
+| `parse_song` | A `Song` layout plus its authored BPM metadata |
 | `parse_doc` | A general graph document, optionally reusing previous subtrees |
 | `parse_snapshot` | A parsed and lowered document snapshot |
 | `Draft` | Causal atom/reference identities across valid and invalid edits, frozen playback input, and current source locations |
@@ -211,7 +211,7 @@ Select Song mode in the browser editor before playing one.
 
 ## Live-editing documents
 
-`parse_doc` creates a `PatternDoc[ControlMap]` with deterministic graph IDs, not
+`parse_doc` creates a `PatternDoc` with deterministic graph IDs, not
 causal source identities. Pass the previous successful document back through
 `previous` to reuse unchanged subtrees:
 

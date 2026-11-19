@@ -1,7 +1,7 @@
 ///|
 /// Numeric control map — the contract between Pattern and DSP engines.
 /// Values are immutable to callers; entries() returns an owned copy.
-#derive(Debug)
+#derive(Debug, Eq)
 pub struct ControlMap {
   priv values : Map[@control.Control, Double]
 }

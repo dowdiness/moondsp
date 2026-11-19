@@ -31,7 +31,7 @@ priv struct PreparedSong {
   source : String
   tempo : @scheduler.Tempo
   layout : PlaybackLayout
-  doc : @pattern.PatternDoc[@pattern.ControlMap]?
+  doc : @pattern.PatternDoc?
   snapshot : @scheduler.PlaybackSnapshot
   span : PlaybackSpan
 }
@@ -145,10 +145,7 @@ fn Player::check_repeat_span(
 }
 
 ///|
-fn song_layout(
-  song : @song.Song[@pattern.ControlMap],
-  repeated : Bool,
-) -> PlaybackLayout {
+fn song_layout(song : @song.Song, repeated : Bool) -> PlaybackLayout {
   SongLayout(
     song
     .occurrences()
@@ -165,9 +162,7 @@ fn song_layout(
 }
 
 ///|
-fn song_update_snapshot(
-  song : @song.Song[@pattern.ControlMap],
-) -> @song.SongSnapshot[@pattern.ControlMap] raise {
+fn song_update_snapshot(song : @song.Song) -> @song.SongSnapshot raise {
   let parts = song
     .occurrences()
     .map(o => {

@@ -9,8 +9,8 @@ fn projection_boundary_pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 fn projection_boundary_doc(
-  result : Result[@pattern.PatternDoc[@pattern.ControlMap], String],
-) -> @pattern.PatternDoc[@pattern.ControlMap] {
+  result : Result[@pattern.PatternDoc, String],
+) -> @pattern.PatternDoc {
   match result {
     Ok(doc) => doc
     Err(msg) => abort("expected PatternDoc, got " + msg)
@@ -20,10 +20,10 @@ fn projection_boundary_doc(
 ///|
 fn projection_boundary_snapshot(
   result : Result[
-    @pattern.PatternSnapshot[@pattern.ControlMap],
+    @pattern.PatternSnapshot,
     @pattern.PatternDocError,
   ],
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+) -> @pattern.PatternSnapshot {
   match result {
     Ok(snapshot) => snapshot
     Err(_) => abort("expected lowered PatternDoc snapshot")
@@ -33,7 +33,7 @@ fn projection_boundary_snapshot(
 ///|
 fn projection_boundary_draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+) -> @pattern.PatternSnapshot {
   match draft.prepare_playback() {
     Ok(input) =>
       match input.compile() {
@@ -78,7 +78,7 @@ fn projection_boundary_mini_draft_snapshot(
   old_start~ : Int,
   old_end~ : Int,
   new_end~ : Int,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+) -> @pattern.PatternSnapshot {
   let draft = try! @mini.Draft(input)
   projection_boundary_edit_draft(
     draft,
@@ -99,7 +99,7 @@ fn projection_boundary_one_cycle() -> @pattern.TimeSpan {
 
 ///|
 fn projection_boundary_leaf_ids(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshot,
 ) -> Array[String] {
   let events = snapshot.query_sourced_events(projection_boundary_one_cycle())
   let ids : Array[String] = []
@@ -111,7 +111,7 @@ fn projection_boundary_leaf_ids(
 
 ///|
 fn projection_boundary_leaf_ids_from_doc(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  doc : @pattern.PatternDoc,
 ) -> Array[String] {
   projection_boundary_leaf_ids(projection_boundary_snapshot(try? doc.lower()))
 }
@@ -174,7 +174,7 @@ priv struct BoundaryEvent {
 /// Canonicalize a lowered snapshot's sourced events over the fixed parity window
 /// for value-level differential parity (Phase 2 plan Step 2).
 fn projection_boundary_value_events(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshot,
 ) -> Array[BoundaryEvent] {
   let events = snapshot.query_sourced_events(
     projection_boundary_parity_window(),
@@ -195,7 +195,7 @@ fn projection_boundary_value_events(
 
 ///|
 fn projection_boundary_value_events_from_doc(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  doc : @pattern.PatternDoc,
 ) -> Array[BoundaryEvent] {
   projection_boundary_value_events(
     projection_boundary_snapshot(try? doc.lower()),
@@ -303,7 +303,7 @@ fn projection_boundary_assert_control_method_cache_reused_after_edit(
 ) -> Unit {
   let projection = LoomMiniAtomProjection::new(input)
   let initial_doc = projection_boundary_doc(projection.parse_doc())
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   ignore(projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)))
   cache.reset_stats()
   projection.apply_edit(edit, edited)

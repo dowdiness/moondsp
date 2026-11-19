@@ -40,7 +40,7 @@ fn section_test_section_doc(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> SectionDoc[@pattern.ControlMap] {
+) -> SectionDoc {
   SectionDoc::single(
     id=section_id,
     name~,

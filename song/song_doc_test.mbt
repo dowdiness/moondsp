@@ -25,7 +25,7 @@ fn song_doc_test_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.SectionDoc[@pattern.ControlMap] {
+) -> @song.SectionDoc {
   @song.SectionDoc::single(
     id=song_doc_test_section_id(id),
     name~,
@@ -40,26 +40,22 @@ fn song_doc_test_section(
 
 ///|
 fn song_doc_test_doc(
-  occurrences : Array[@song.SongOccurrenceDoc[@pattern.ControlMap]],
-) -> @song.SongDoc[@pattern.ControlMap] {
+  occurrences : Array[@song.SongOccurrenceDoc],
+) -> @song.SongDoc {
   @song.SongDoc(parts=occurrences) catch {
     _ => abort("song doc creation failed")
   }
 }
 
 ///|
-fn song_doc_test_song(
-  doc : @song.SongDoc[@pattern.ControlMap],
-) -> @song.Song[@pattern.ControlMap] {
+fn song_doc_test_song(doc : @song.SongDoc) -> @song.Song {
   doc.to_song() catch {
     _ => abort("song lowering failed")
   }
 }
 
 ///|
-fn song_doc_test_snapshot(
-  doc : @song.SongDoc[@pattern.ControlMap],
-) -> @song.SongSnapshot[@pattern.ControlMap] {
+fn song_doc_test_snapshot(doc : @song.SongDoc) -> @song.SongSnapshot {
   doc.lower() catch {
     _ => abort("song snapshot lowering failed")
   }
@@ -520,12 +516,12 @@ test "song events read their buses on the song clock" {
     @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
   )
   @debug.assert_eq(events.length(), 1)
-  let reader = events[0].buses().reader(Lpf).unwrap()
+  let reader = events[0].controls().reader(Lpf).unwrap()
   // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
   @debug.assert_eq("\{reader(13L, 4L)} \{reader(17L, 5L)}", "50 80")
   // An entry that starts the song at playback time 1 adds 1, after the rate.
   let entry = @pattern.Placement(origin=@pattern.Rational::from_int(1))
-  let placed = events[0].buses().placed(entry).reader(Lpf).unwrap()
+  let placed = events[0].controls().placed(entry).reader(Lpf).unwrap()
   @debug.assert_eq("\{placed(17L, 4L)} \{placed(22L, 5L)}", "50 80")
   @debug.assert_eq(
     events[0].event().placed(entry).part,

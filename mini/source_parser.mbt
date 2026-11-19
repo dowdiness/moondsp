@@ -2,8 +2,8 @@
 /// The source accepted by the player, after pattern bindings and declarations
 /// have been separated from the playable body.
 pub enum PlayBody {
-  Pattern(@pattern.PatternDoc[@pattern.ControlMap])
-  Arrangement(@song.Song[@pattern.ControlMap], Bool)
+  Pattern(@pattern.PatternDoc)
+  Arrangement(@song.Song, Bool)
 }
 
 ///|
@@ -58,7 +58,7 @@ fn parse_play_bpm_declaration(parser : Parser) -> Double raise ParseError {
 /// including future conditional branches; no pattern queries are executed.
 pub fn parse_play_source(
   input : String,
-  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  previous~ : @pattern.PatternDoc? = None,
   query_window? : @pattern.QueryWindow,
 ) -> Result[PlaySource, String] {
   parse_play_source_with_origins(
@@ -73,7 +73,7 @@ pub fn parse_play_source(
 ///|
 fn parse_play_source_with_origins(
   input : String,
-  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  previous : @pattern.PatternDoc?,
   query_window : @pattern.QueryWindow?,
   origins~ : SourceMap? = None,
   syntax_depth_limit~ : Int32? = None,

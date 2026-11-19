@@ -24,7 +24,7 @@ fn make_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.Section[@pattern.ControlMap] {
+) -> @song.Section {
   @song.Section(
     name~,
     length_cycles=length,
@@ -41,7 +41,7 @@ fn make_scoped_section(
   length : @pattern.Rational,
   scope : @song.TimeScope,
   midi : Double,
-) -> @song.Section[@pattern.ControlMap] {
+) -> @song.Section {
   @song.Section(
     name~,
     length_cycles=length,
@@ -60,9 +60,7 @@ fn fast_scope(n : Int32) -> @song.TimeScope {
 }
 
 ///|
-fn make_song(
-  parts : Array[SongPart[@pattern.ControlMap]],
-) -> Song[@pattern.ControlMap] {
+fn make_song(parts : Array[SongPart]) -> Song {
   Song(parts~) catch {
     _ => abort("song creation failed")
   }
@@ -98,7 +96,7 @@ test "Song constructor computes contiguous duration and occurrences" {
 
 ///|
 test "Song constructor rejects empty layout" {
-  let parts : Array[SongPart[@pattern.ControlMap]] = []
+  let parts : Array[SongPart] = []
   try Song(parts~) catch {
     SongBuildError::EmptySong => ()
     _ => assert_true(false)

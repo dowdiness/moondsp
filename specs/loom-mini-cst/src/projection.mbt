@@ -120,10 +120,10 @@ pub struct LoomMiniAtomProjection {
   priv edit : @incr.Input[@core.Edit?]
   priv source_before_edit : @incr.Input[String?]
   priv watch : @incr.Watch[
-    Result[@pattern.PatternDoc[@pattern.ControlMap], String],
+    Result[@pattern.PatternDoc, String],
   ]
   priv accepted : @incr.AcceptedDerived[
-    @pattern.PatternDoc[@pattern.ControlMap],
+    @pattern.PatternDoc,
     String,
   ]
 }
@@ -151,7 +151,7 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
     None,
     label="loom-mini-atom-projection.source-before-edit",
   )
-  let mut previous_doc : @pattern.PatternDoc[@pattern.ControlMap]? = None
+  let mut previous_doc : @pattern.PatternDoc? = None
   let identity_tracker : @loom.ProjectionIdentityTracker[String] = @loom.ProjectionIdentityTracker()
   let projected = scope.derived_no_backdate(
     fn() {
@@ -214,14 +214,14 @@ pub fn LoomMiniAtomProjection::new(input : String) -> LoomMiniAtomProjection {
 /// `None` until the first successful parse.
 pub fn LoomMiniAtomProjection::accepted_doc(
   self : LoomMiniAtomProjection,
-) -> @pattern.PatternDoc[@pattern.ControlMap]? {
+) -> @pattern.PatternDoc? {
   self.accepted.accepted_or_abort()
 }
 
 ///|
 pub fn LoomMiniAtomProjection::parse_doc(
   self : LoomMiniAtomProjection,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   self.watch.read_or_abort()
 }
 
@@ -1094,7 +1094,7 @@ fn loom_mini_build_projected_doc(
   builder : @mini.MiniDocBuilder,
   expr : LoomMiniExpr,
   atoms : Array[LoomMiniProjectedAtom],
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   let cursor = LoomMiniProjectedCursor::new(atoms)
   let doc = match loom_mini_lower_expr(builder, expr, cursor) {
     Ok(doc) => doc
@@ -1111,14 +1111,14 @@ fn loom_mini_lower_expr(
   builder : @mini.MiniDocBuilder,
   expr : LoomMiniExpr,
   cursor : LoomMiniProjectedCursor,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   match expr {
     NotationExpr(layers) => {
       cursor.degrade_steps = 0
       loom_mini_lower_notation(builder, layers, cursor)
     }
     StackExpr(children) => {
-      let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+      let docs : Array[@pattern.PatternDoc] = []
       for child in children {
         match loom_mini_lower_expr(builder, child, cursor) {
           Ok(doc) => docs.push(doc)
@@ -1140,9 +1140,9 @@ fn loom_mini_lower_expr(
 ///|
 fn loom_mini_apply_method_chain(
   builder : @mini.MiniDocBuilder,
-  base_doc : @pattern.PatternDoc[@pattern.ControlMap],
+  base_doc : @pattern.PatternDoc,
   methods : Array[LoomMiniMethodCall],
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   let doc = for call_ir in methods; doc = base_doc {
     match call_ir {
       FastMethod(factor) =>
@@ -1215,8 +1215,8 @@ fn loom_mini_lower_notation(
   builder : @mini.MiniDocBuilder,
   layers : Array[Array[LoomMiniNotationElement]],
   cursor : LoomMiniProjectedCursor,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+) -> Result[@pattern.PatternDoc, String] {
+  let docs : Array[@pattern.PatternDoc] = []
   for layer in layers {
     match loom_mini_lower_layer(builder, layer, cursor) {
       Ok(doc) => docs.push(doc)
@@ -1231,8 +1231,8 @@ fn loom_mini_lower_layer(
   builder : @mini.MiniDocBuilder,
   elements : Array[LoomMiniNotationElement],
   cursor : LoomMiniProjectedCursor,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
-  let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
+) -> Result[@pattern.PatternDoc, String] {
+  let docs : Array[@pattern.PatternDoc] = []
   for element in elements {
     match loom_mini_lower_element(builder, element, cursor) {
       Ok(doc) => docs.push(doc)
@@ -1247,7 +1247,7 @@ fn loom_mini_lower_element(
   builder : @mini.MiniDocBuilder,
   element : LoomMiniNotationElement,
   cursor : LoomMiniProjectedCursor,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   match element {
     AtomElement(raw) => {
       if cursor.offset >= cursor.atoms.length() {
@@ -1274,10 +1274,10 @@ fn loom_mini_lower_element(
 ///|
 fn loom_mini_apply_postfixes(
   builder : @mini.MiniDocBuilder,
-  base_doc : @pattern.PatternDoc[@pattern.ControlMap],
+  base_doc : @pattern.PatternDoc,
   postfixes : Array[LoomMiniAtomPostfix],
   cursor : LoomMiniProjectedCursor,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   let doc = for postfix in postfixes; doc = base_doc {
     match postfix {
       StarPostfix(factor) =>
@@ -1314,7 +1314,7 @@ fn loom_mini_apply_postfixes(
 fn loom_mini_atom_doc(
   builder : @mini.MiniDocBuilder,
   atom : LoomMiniProjectedAtom,
-) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String] {
+) -> Result[@pattern.PatternDoc, String] {
   let id = match loom_mini_pattern_node_id(atom.id) {
     Ok(id) => id
     Err(msg) => return Err(msg)
@@ -1339,7 +1339,7 @@ fn loom_mini_pattern_node_id(
 // -- Song-level projection (Phase 2 Piece 2) ---------------------------------
 //
 // Materialize a `song(...)` CST (parsed by `song_grammar`) into a real
-// `@song.Song[ControlMap]` + optional bpm, reusing the mini song models and the
+// `@song.Song` + optional bpm, reusing the mini song models and the
 // doc-level section-body lowering proven in Piece 1. Section bodies are lowered
 // through the SAME raw-projection + doc-build path used by `parse_doc`, applied
 // directly to each `SongSectionBodyNode` subtree (its direct children are the
@@ -1365,14 +1365,14 @@ priv struct LoomSongFillSpec {
 ///|
 /// Song parse result mirroring `@mini.ParsedSong` (layout + optional tempo).
 pub struct LoomMiniParsedSong {
-  priv song : @song.Song[@pattern.ControlMap]
+  priv song : @song.Song
   priv bpm : Double?
 }
 
 ///|
 pub fn LoomMiniParsedSong::song(
   self : LoomMiniParsedSong,
-) -> @song.Song[@pattern.ControlMap] {
+) -> @song.Song {
   self.song
 }
 
@@ -1411,7 +1411,7 @@ pub fn loom_mini_parse_song(
     [node, ..] => node
     [] => return Err("loom song projection expected song(...)")
   }
-  let sections : Map[String, @song.Section[@pattern.ControlMap]] = {}
+  let sections : Map[String, @song.Section] = {}
   let part_specs : Array[LoomSongPartSpec] = []
   let fill_specs : Array[LoomSongFillSpec] = []
   let bpm_values : Array[Double] = []
@@ -1451,7 +1451,7 @@ pub fn loom_mini_parse_song(
       }
     }
   }
-  let parts : Array[@song.SongPart[@pattern.ControlMap]] = []
+  let parts : Array[@song.SongPart] = []
   for spec in part_specs {
     match loom_song_spec_to_part(sections, spec) {
       Ok(part) => parts.push(part)
@@ -1481,7 +1481,7 @@ pub fn loom_mini_parse_song(
 fn loom_song_collect_section(
   input : String,
   node : @seam.SyntaxNode,
-) -> Result[@song.Section[@pattern.ControlMap], String] {
+) -> Result[@song.Section, String] {
   let name = match node.direct_children_of_kind(SongStringNode.to_raw()) {
     [string, ..] =>
       match loom_song_string_value(input, string) {
@@ -1657,9 +1657,9 @@ fn loom_song_optional_start(
 
 ///|
 fn loom_song_spec_to_part(
-  sections : Map[String, @song.Section[@pattern.ControlMap]],
+  sections : Map[String, @song.Section],
   spec : LoomSongPartSpec,
-) -> Result[@song.SongPart[@pattern.ControlMap], String] {
+) -> Result[@song.SongPart, String] {
   let section = match sections.get(spec.section_name) {
     Some(section) => section
     None => return Err("unknown song section '\{spec.section_name}'")

@@ -35,26 +35,28 @@ pub(all) suberror SectionDocEditError {
 ///
 /// Layers are ordered by their array position so stacked playback is
 /// deterministic. Names are for addressing and replacement.
-pub struct SectionLayer[A] {
+pub struct SectionLayer {
   priv name : String
-  priv body : @pattern.Pat[A]
+  priv body : @pattern.Pat[@pattern.ControlMap]
 }
 
 ///|
-pub fn[A] SectionLayer::SectionLayer(
+pub fn SectionLayer::SectionLayer(
   name~ : String,
-  body~ : @pattern.Pat[A],
-) -> SectionLayer[A] {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> SectionLayer {
   { name, body, }
 }
 
 ///|
-pub fn[A] SectionLayer::name(self : SectionLayer[A]) -> String {
+pub fn SectionLayer::name(self : SectionLayer) -> String {
   self.name
 }
 
 ///|
-pub fn[A] SectionLayer::body(self : SectionLayer[A]) -> @pattern.Pat[A] {
+pub fn SectionLayer::body(
+  self : SectionLayer,
+) -> @pattern.Pat[@pattern.ControlMap] {
   self.body
 }
 
@@ -64,20 +66,20 @@ pub fn[A] SectionLayer::body(self : SectionLayer[A]) -> @pattern.Pat[A] {
 /// The display `name` can change without changing `id` or `revision`. Replacing
 /// the body advances only this layer's revision; containing section documents
 /// decide whether that layer change also advances the section revision.
-pub struct SectionLayerDoc[A] {
+pub struct SectionLayerDoc {
   priv id : @identity.SectionLayerId
   priv name : String
   priv revision : @identity.Revision
-  priv body : @pattern.Pat[A]
-  priv source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
+  priv body : @pattern.Pat[@pattern.ControlMap]
+  priv source_snapshot : @pattern.PatternSnapshotWithOrigins?
 }
 
 ///|
-pub fn[A] SectionLayerDoc::SectionLayerDoc(
+pub fn SectionLayerDoc::SectionLayerDoc(
   id~ : @identity.SectionLayerId,
   name~ : String,
-  body~ : @pattern.Pat[A],
-) -> SectionLayerDoc[A] {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> SectionLayerDoc {
   {
     id,
     name,
@@ -88,34 +90,32 @@ pub fn[A] SectionLayerDoc::SectionLayerDoc(
 }
 
 ///|
-pub fn[A] SectionLayerDoc::id(
-  self : SectionLayerDoc[A],
-) -> @identity.SectionLayerId {
+pub fn SectionLayerDoc::id(self : SectionLayerDoc) -> @identity.SectionLayerId {
   self.id
 }
 
 ///|
-pub fn[A] SectionLayerDoc::name(self : SectionLayerDoc[A]) -> String {
+pub fn SectionLayerDoc::name(self : SectionLayerDoc) -> String {
   self.name
 }
 
 ///|
-pub fn[A] SectionLayerDoc::revision(
-  self : SectionLayerDoc[A],
-) -> @identity.Revision {
+pub fn SectionLayerDoc::revision(self : SectionLayerDoc) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn[A] SectionLayerDoc::body(self : SectionLayerDoc[A]) -> @pattern.Pat[A] {
+pub fn SectionLayerDoc::body(
+  self : SectionLayerDoc,
+) -> @pattern.Pat[@pattern.ControlMap] {
   self.body
 }
 
 ///|
-pub fn[A] SectionLayerDoc::rename(
-  self : SectionLayerDoc[A],
+pub fn SectionLayerDoc::rename(
+  self : SectionLayerDoc,
   name~ : String,
-) -> SectionLayerDoc[A] {
+) -> SectionLayerDoc {
   {
     id: self.id,
     name,
@@ -126,10 +126,10 @@ pub fn[A] SectionLayerDoc::rename(
 }
 
 ///|
-pub fn[A] SectionLayerDoc::replace_body(
-  self : SectionLayerDoc[A],
-  body~ : @pattern.Pat[A],
-) -> SectionLayerDoc[A] {
+pub fn SectionLayerDoc::replace_body(
+  self : SectionLayerDoc,
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> SectionLayerDoc {
   {
     id: self.id,
     name: self.name,
@@ -140,9 +140,7 @@ pub fn[A] SectionLayerDoc::replace_body(
 }
 
 ///|
-pub fn[A] SectionLayerDoc::to_layer(
-  self : SectionLayerDoc[A],
-) -> SectionLayer[A] {
+pub fn SectionLayerDoc::to_layer(self : SectionLayerDoc) -> SectionLayer {
   SectionLayer(name=self.name, body=self.body)
 }
 
@@ -151,9 +149,9 @@ pub fn[A] SectionLayerDoc::to_layer(
 ///
 /// `Single` keeps the initial identity-section API compact. `Layers` is the
 /// first named structure needed for later variation and addressing APIs.
-pub enum SectionBody[A] {
-  Single(@pattern.Pat[A])
-  Layers(Array[SectionLayer[A]])
+pub enum SectionBody {
+  Single(@pattern.Pat[@pattern.ControlMap])
+  Layers(Array[SectionLayer])
 }
 
 ///|
@@ -162,29 +160,29 @@ pub enum SectionBody[A] {
 /// This intentionally covers only layer add/replace operations. Addressing,
 /// ranges, and boundary operations need a song-layout model and should be
 /// layered on later.
-pub enum SectionPatch[A] {
-  SetLayer(String, @pattern.Pat[A])
-  AddLayer(String, @pattern.Pat[A])
+pub enum SectionPatch {
+  SetLayer(String, @pattern.Pat[@pattern.ControlMap])
+  AddLayer(String, @pattern.Pat[@pattern.ControlMap])
 }
 
 ///|
-pub fn[A] SectionPatch::set_layer(
+pub fn SectionPatch::set_layer(
   name : String,
-  body : @pattern.Pat[A],
-) -> SectionPatch[A] {
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionPatch {
   SetLayer(name, body)
 }
 
 ///|
-pub fn[A] SectionPatch::add_layer(
+pub fn SectionPatch::add_layer(
   name : String,
-  body : @pattern.Pat[A],
-) -> SectionPatch[A] {
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionPatch {
   AddLayer(name, body)
 }
 
 ///|
-fn[A] SectionBody::snapshot(self : SectionBody[A]) -> SectionBody[A] {
+fn SectionBody::snapshot(self : SectionBody) -> SectionBody {
   match self {
     Single(body) => Single(body)
     Layers(layers) => Layers(layers.copy())
@@ -192,19 +190,21 @@ fn[A] SectionBody::snapshot(self : SectionBody[A]) -> SectionBody[A] {
 }
 
 ///|
-pub fn[A] SectionBody::single(body : @pattern.Pat[A]) -> SectionBody[A] {
+pub fn SectionBody::single(
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionBody {
   Single(body)
 }
 
 ///|
-pub fn[A] SectionBody::layers(
-  layers : Array[SectionLayer[A]],
-) -> SectionBody[A] {
+pub fn SectionBody::layers(layers : Array[SectionLayer]) -> SectionBody {
   Layers(layers.copy())
 }
 
 ///|
-pub fn[A] SectionBody::to_pattern(self : SectionBody[A]) -> @pattern.Pat[A] {
+pub fn SectionBody::to_pattern(
+  self : SectionBody,
+) -> @pattern.Pat[@pattern.ControlMap] {
   match self {
     Single(body) => body
     Layers(layers) => @pattern.stack(layers.map(layer => layer.body()))
@@ -212,7 +212,7 @@ pub fn[A] SectionBody::to_pattern(self : SectionBody[A]) -> @pattern.Pat[A] {
 }
 
 ///|
-pub fn[A] SectionBody::layer_count(self : SectionBody[A]) -> Int32 {
+pub fn SectionBody::layer_count(self : SectionBody) -> Int32 {
   match self {
     Single(_) => 1
     Layers(layers) => layers.length()
@@ -220,10 +220,10 @@ pub fn[A] SectionBody::layer_count(self : SectionBody[A]) -> Int32 {
 }
 
 ///|
-pub fn[A] SectionBody::get_layer(
-  self : SectionBody[A],
+pub fn SectionBody::get_layer(
+  self : SectionBody,
   name : String,
-) -> @pattern.Pat[A]? {
+) -> @pattern.Pat[@pattern.ControlMap]? {
   match self {
     Single(body) => if name == DEFAULT_LAYER_NAME { Some(body) } else { None }
     Layers(layers) => {
@@ -243,27 +243,25 @@ pub fn[A] SectionBody::get_layer(
 /// `Single` keeps an explicit layer identity for the default single-pattern
 /// path. `Layers` preserves ordered playback while allowing layer IDs to remain
 /// stable across display-name edits.
-pub enum SectionDocBody[A] {
-  Single(SectionLayerDoc[A])
-  Layers(Array[SectionLayerDoc[A]])
+pub enum SectionDocBody {
+  Single(SectionLayerDoc)
+  Layers(Array[SectionLayerDoc])
 }
 
 ///|
-pub fn[A] SectionDocBody::single(
-  layer : SectionLayerDoc[A],
-) -> SectionDocBody[A] {
+pub fn SectionDocBody::single(layer : SectionLayerDoc) -> SectionDocBody {
   Single(layer)
 }
 
 ///|
-pub fn[A] SectionDocBody::layers(
-  layers : Array[SectionLayerDoc[A]],
-) -> SectionDocBody[A] {
+pub fn SectionDocBody::layers(
+  layers : Array[SectionLayerDoc],
+) -> SectionDocBody {
   Layers(layers.copy())
 }
 
 ///|
-fn[A] SectionDocBody::snapshot(self : SectionDocBody[A]) -> SectionDocBody[A] {
+fn SectionDocBody::snapshot(self : SectionDocBody) -> SectionDocBody {
   match self {
     Single(layer) => Single(layer)
     Layers(layers) => Layers(layers.copy())
@@ -271,9 +269,7 @@ fn[A] SectionDocBody::snapshot(self : SectionDocBody[A]) -> SectionDocBody[A] {
 }
 
 ///|
-fn[A] SectionDocBody::to_section_body(
-  self : SectionDocBody[A],
-) -> SectionBody[A] {
+fn SectionDocBody::to_section_body(self : SectionDocBody) -> SectionBody {
   match self {
     Single(layer) => SectionBody::single(layer.body())
     Layers(layers) => SectionBody::layers(layers.map(layer => layer.to_layer()))
@@ -281,7 +277,7 @@ fn[A] SectionDocBody::to_section_body(
 }
 
 ///|
-pub fn[A] SectionDocBody::layer_count(self : SectionDocBody[A]) -> Int32 {
+pub fn SectionDocBody::layer_count(self : SectionDocBody) -> Int32 {
   match self {
     Single(_) => 1
     Layers(layers) => layers.length()
@@ -289,10 +285,10 @@ pub fn[A] SectionDocBody::layer_count(self : SectionDocBody[A]) -> Int32 {
 }
 
 ///|
-pub fn[A] SectionDocBody::get_layer(
-  self : SectionDocBody[A],
+pub fn SectionDocBody::get_layer(
+  self : SectionDocBody,
   id : @identity.SectionLayerId,
-) -> SectionLayerDoc[A]? {
+) -> SectionLayerDoc? {
   match self {
     Single(layer) => if layer.id() == id { Some(layer) } else { None }
     Layers(layers) => {
@@ -307,8 +303,8 @@ pub fn[A] SectionDocBody::get_layer(
 }
 
 ///|
-fn[A] section_doc_body_has_layer_name_except(
-  body : SectionDocBody[A],
+fn section_doc_body_has_layer_name_except(
+  body : SectionDocBody,
   name : String,
   id : @identity.SectionLayerId,
 ) -> Bool {
@@ -320,8 +316,8 @@ fn[A] section_doc_body_has_layer_name_except(
 }
 
 ///|
-fn[A] validate_section_doc_body(
-  body : SectionDocBody[A],
+fn validate_section_doc_body(
+  body : SectionDocBody,
 ) -> Unit raise SectionDocBuildError {
   match body {
     Single(_) => ()
@@ -347,12 +343,12 @@ fn[A] validate_section_doc_body(
 }
 
 ///|
-fn[A] SectionBody::upsert_layer(
-  self : SectionBody[A],
+fn SectionBody::upsert_layer(
+  self : SectionBody,
   name : String,
-  body : @pattern.Pat[A],
-) -> SectionBody[A] {
-  let result : Array[SectionLayer[A]] = []
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionBody {
+  let result : Array[SectionLayer] = []
   match self {
     Single(existing) =>
       if name == DEFAULT_LAYER_NAME {
@@ -381,11 +377,11 @@ fn[A] SectionBody::upsert_layer(
 }
 
 ///|
-fn[A] SectionBody::add_layer(
-  self : SectionBody[A],
+fn SectionBody::add_layer(
+  self : SectionBody,
   name : String,
-  body : @pattern.Pat[A],
-) -> SectionBody[A] raise SectionPatchError {
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionBody raise SectionPatchError {
   match self.get_layer(name) {
     Some(_) => raise DuplicateLayer(name)
     None => self.upsert_layer(name, body)
@@ -393,12 +389,12 @@ fn[A] SectionBody::add_layer(
 }
 
 ///|
-fn[A] SectionBody::set_layer(
-  self : SectionBody[A],
+fn SectionBody::set_layer(
+  self : SectionBody,
   name : String,
-  body : @pattern.Pat[A],
-) -> SectionBody[A] raise SectionPatchError {
-  let result : Array[SectionLayer[A]] = []
+  body : @pattern.Pat[@pattern.ControlMap],
+) -> SectionBody raise SectionPatchError {
+  let result : Array[SectionLayer] = []
   match self {
     Single(_) =>
       if name == DEFAULT_LAYER_NAME {
@@ -426,27 +422,22 @@ fn[A] SectionBody::set_layer(
 }
 
 ///|
-/// Named long-form region over a pattern body.
-///
-/// `Section` is polymorphic for the same reason `Pat[A]` is polymorphic:
-/// structure, addressing, UI rendering, and future analysis should not be tied
-/// to DSP control maps. Scheduler integration specializes this to
-/// `Section[ControlMap]`.
-pub struct Section[A] {
+/// Named long-form region over a `ControlMap` pattern body.
+pub struct Section {
   priv name : String
   priv length_cycles : @pattern.Rational
   priv scope : TimeScope
-  priv body : SectionBody[A]
-  priv source_snapshot : @pattern.PatternSnapshotWithOrigins[A]?
+  priv body : SectionBody
+  priv source_snapshot : @pattern.PatternSnapshotWithOrigins?
 }
 
 ///|
-pub fn[A] Section::Section(
+pub fn Section::Section(
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
-  body~ : SectionBody[A],
-) -> Section[A] raise SectionBuildError {
+  body~ : SectionBody,
+) -> Section raise SectionBuildError {
   if length_cycles.num <= 0L {
     raise NonPositiveLength
   } else {
@@ -463,12 +454,12 @@ pub fn[A] Section::Section(
 ///|
 /// Compile-time provenance for a single pattern section. The runtime body is
 /// derived from the snapshot, so its events cannot disagree with its origins.
-pub fn[A] Section::with_origins(
+pub fn Section::with_origins(
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
-  snapshot~ : @pattern.PatternSnapshotWithOrigins[A],
-) -> Section[A] raise SectionBuildError {
+  snapshot~ : @pattern.PatternSnapshotWithOrigins,
+) -> Section raise SectionBuildError {
   if length_cycles.num <= 0L {
     raise NonPositiveLength
   }
@@ -482,35 +473,35 @@ pub fn[A] Section::with_origins(
 }
 
 ///|
-pub fn[A] Section::source_snapshot(
-  self : Section[A],
-) -> @pattern.PatternSnapshotWithOrigins[A]? {
+pub fn Section::source_snapshot(
+  self : Section,
+) -> @pattern.PatternSnapshotWithOrigins? {
   self.source_snapshot
 }
 
 ///|
 /// Identity-bearing authoring section for incremental song edits.
 ///
-/// This document lowers to the existing `Section[A]` playback value. Display
+/// This document lowers to the `Section` playback value. Display
 /// renames keep stable IDs and revisions; body, length, and scope edits advance
 /// revision tokens so future song snapshots can invalidate the right boundary.
-pub struct SectionDoc[A] {
+pub struct SectionDoc {
   priv id : @identity.SectionId
   priv name : String
   priv length_cycles : @pattern.Rational
   priv scope : TimeScope
   priv revision : @identity.Revision
-  priv body : SectionDocBody[A]
+  priv body : SectionDocBody
 }
 
 ///|
-pub fn[A] SectionDoc::SectionDoc(
+pub fn SectionDoc::SectionDoc(
   id~ : @identity.SectionId,
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
-  body~ : SectionDocBody[A],
-) -> SectionDoc[A] raise SectionDocBuildError {
+  body~ : SectionDocBody,
+) -> SectionDoc raise SectionDocBuildError {
   if length_cycles.num <= 0L {
     raise NonPositiveSectionLength
   }
@@ -526,14 +517,14 @@ pub fn[A] SectionDoc::SectionDoc(
 }
 
 ///|
-pub fn[A] SectionDoc::single(
+pub fn SectionDoc::single(
   id~ : @identity.SectionId,
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
   layer_id~ : @identity.SectionLayerId,
-  body~ : @pattern.Pat[A],
-) -> SectionDoc[A] raise SectionDocBuildError {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> SectionDoc raise SectionDocBuildError {
   SectionDoc(
     id~,
     name~,
@@ -546,14 +537,14 @@ pub fn[A] SectionDoc::single(
 }
 
 ///|
-pub fn[A] SectionDoc::single_with_origins(
+pub fn SectionDoc::single_with_origins(
   id~ : @identity.SectionId,
   name~ : String,
   length_cycles~ : @pattern.Rational,
   scope~ : TimeScope,
   layer_id~ : @identity.SectionLayerId,
-  snapshot~ : @pattern.PatternSnapshotWithOrigins[A],
-) -> SectionDoc[A] raise SectionDocBuildError {
+  snapshot~ : @pattern.PatternSnapshotWithOrigins,
+) -> SectionDoc raise SectionDocBuildError {
   SectionDoc(
     id~,
     name~,
@@ -570,53 +561,50 @@ pub fn[A] SectionDoc::single_with_origins(
 }
 
 ///|
-pub fn[A] SectionDoc::id(self : SectionDoc[A]) -> @identity.SectionId {
+pub fn SectionDoc::id(self : SectionDoc) -> @identity.SectionId {
   self.id
 }
 
 ///|
-pub fn[A] SectionDoc::name(self : SectionDoc[A]) -> String {
+pub fn SectionDoc::name(self : SectionDoc) -> String {
   self.name
 }
 
 ///|
-pub fn[A] SectionDoc::length_cycles(self : SectionDoc[A]) -> @pattern.Rational {
+pub fn SectionDoc::length_cycles(self : SectionDoc) -> @pattern.Rational {
   self.length_cycles
 }
 
 ///|
-pub fn[A] SectionDoc::scope(self : SectionDoc[A]) -> TimeScope {
+pub fn SectionDoc::scope(self : SectionDoc) -> TimeScope {
   self.scope
 }
 
 ///|
-pub fn[A] SectionDoc::revision(self : SectionDoc[A]) -> @identity.Revision {
+pub fn SectionDoc::revision(self : SectionDoc) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn[A] SectionDoc::body(self : SectionDoc[A]) -> SectionDocBody[A] {
+pub fn SectionDoc::body(self : SectionDoc) -> SectionDocBody {
   self.body.snapshot()
 }
 
 ///|
-pub fn[A] SectionDoc::layer_count(self : SectionDoc[A]) -> Int32 {
+pub fn SectionDoc::layer_count(self : SectionDoc) -> Int32 {
   self.body.layer_count()
 }
 
 ///|
-pub fn[A] SectionDoc::get_layer(
-  self : SectionDoc[A],
+pub fn SectionDoc::get_layer(
+  self : SectionDoc,
   id : @identity.SectionLayerId,
-) -> SectionLayerDoc[A]? {
+) -> SectionLayerDoc? {
   self.body.get_layer(id)
 }
 
 ///|
-pub fn[A] SectionDoc::rename(
-  self : SectionDoc[A],
-  name~ : String,
-) -> SectionDoc[A] {
+pub fn SectionDoc::rename(self : SectionDoc, name~ : String) -> SectionDoc {
   {
     id: self.id,
     name,
@@ -628,10 +616,10 @@ pub fn[A] SectionDoc::rename(
 }
 
 ///|
-pub fn[A] SectionDoc::with_length(
-  self : SectionDoc[A],
+pub fn SectionDoc::with_length(
+  self : SectionDoc,
   length_cycles~ : @pattern.Rational,
-) -> SectionDoc[A] raise SectionDocBuildError {
+) -> SectionDoc raise SectionDocBuildError {
   if length_cycles.num <= 0L {
     raise NonPositiveSectionLength
   }
@@ -646,10 +634,10 @@ pub fn[A] SectionDoc::with_length(
 }
 
 ///|
-pub fn[A] SectionDoc::with_scope(
-  self : SectionDoc[A],
+pub fn SectionDoc::with_scope(
+  self : SectionDoc,
   scope~ : TimeScope,
-) -> SectionDoc[A] {
+) -> SectionDoc {
   {
     id: self.id,
     name: self.name,
@@ -661,11 +649,11 @@ pub fn[A] SectionDoc::with_scope(
 }
 
 ///|
-pub fn[A] SectionDoc::rename_layer(
-  self : SectionDoc[A],
+pub fn SectionDoc::rename_layer(
+  self : SectionDoc,
   id : @identity.SectionLayerId,
   name~ : String,
-) -> SectionDoc[A] raise SectionDocEditError {
+) -> SectionDoc raise SectionDocEditError {
   let (body, found) = match self.body {
     Single(layer) =>
       if layer.id() == id {
@@ -674,7 +662,7 @@ pub fn[A] SectionDoc::rename_layer(
         (self.body.snapshot(), false)
       }
     Layers(layers) => {
-      let result : Array[SectionLayerDoc[A]] = []
+      let result : Array[SectionLayerDoc] = []
       let found = for layer in layers; did_find = false {
         if layer.id() == id {
           if section_doc_body_has_layer_name_except(self.body, name, id) {
@@ -705,11 +693,11 @@ pub fn[A] SectionDoc::rename_layer(
 }
 
 ///|
-pub fn[A] SectionDoc::replace_layer_body(
-  self : SectionDoc[A],
+pub fn SectionDoc::replace_layer_body(
+  self : SectionDoc,
   id : @identity.SectionLayerId,
-  body~ : @pattern.Pat[A],
-) -> SectionDoc[A] raise SectionDocEditError {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> SectionDoc raise SectionDocEditError {
   let (doc_body, found) = match self.body {
     Single(layer) =>
       if layer.id() == id {
@@ -718,7 +706,7 @@ pub fn[A] SectionDoc::replace_layer_body(
         (self.body.snapshot(), false)
       }
     Layers(layers) => {
-      let result : Array[SectionLayerDoc[A]] = []
+      let result : Array[SectionLayerDoc] = []
       let found = for layer in layers; did_find = false {
         if layer.id() == id {
           result.push(layer.replace_body(body~))
@@ -746,7 +734,7 @@ pub fn[A] SectionDoc::replace_layer_body(
 }
 
 ///|
-pub fn[A] SectionDoc::to_section(self : SectionDoc[A]) -> Section[A] {
+pub fn SectionDoc::to_section(self : SectionDoc) -> Section {
   {
     name: self.name,
     length_cycles: self.length_cycles,
@@ -760,10 +748,10 @@ pub fn[A] SectionDoc::to_section(self : SectionDoc[A]) -> Section[A] {
 }
 
 ///|
-pub fn[A] Section::from_pattern(
+pub fn Section::from_pattern(
   name~ : String,
-  body~ : @pattern.Pat[A],
-) -> Section[A] {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> Section {
   {
     name,
     length_cycles: @pattern.Rational::from_int(1),
@@ -774,22 +762,22 @@ pub fn[A] Section::from_pattern(
 }
 
 ///|
-pub fn[A] Section::name(self : Section[A]) -> String {
+pub fn Section::name(self : Section) -> String {
   self.name
 }
 
 ///|
-pub fn[A] Section::length_cycles(self : Section[A]) -> @pattern.Rational {
+pub fn Section::length_cycles(self : Section) -> @pattern.Rational {
   self.length_cycles
 }
 
 ///|
-pub fn[A] Section::scope(self : Section[A]) -> TimeScope {
+pub fn Section::scope(self : Section) -> TimeScope {
   self.scope
 }
 
 ///|
-pub fn[A] Section::body(self : Section[A]) -> @pattern.Pat[A] {
+pub fn Section::body(self : Section) -> @pattern.Pat[@pattern.ControlMap] {
   self.body.to_pattern()
 }
 
@@ -800,10 +788,10 @@ pub fn[A] Section::body(self : Section[A]) -> @pattern.Pat[A] {
 /// `Section::body()` intentionally exposes the raw unscoped pattern for
 /// structural callers. Playback and song layout should use this method so
 /// non-identity scopes can map event spans without changing occurrence layout.
-pub fn[A] Section::query(
-  self : Section[A],
+pub fn Section::query(
+  self : Section,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[A]] {
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
   let body = self.body.to_pattern()
   if self.scope.is_identity() {
     body.query(arc)
@@ -813,29 +801,29 @@ pub fn[A] Section::query(
 }
 
 ///|
-pub fn[A] Section::section_body(self : Section[A]) -> SectionBody[A] {
+pub fn Section::section_body(self : Section) -> SectionBody {
   self.body.snapshot()
 }
 
 ///|
-pub fn[A] Section::get_layer(
-  self : Section[A],
+pub fn Section::get_layer(
+  self : Section,
   name : String,
-) -> @pattern.Pat[A]? {
+) -> @pattern.Pat[@pattern.ControlMap]? {
   self.body.get_layer(name)
 }
 
 ///|
-pub fn[A] Section::layer_count(self : Section[A]) -> Int32 {
+pub fn Section::layer_count(self : Section) -> Int32 {
   self.body.layer_count()
 }
 
 ///|
-pub fn[A] Section::layer(
-  self : Section[A],
+pub fn Section::layer(
+  self : Section,
   name~ : String,
-  body~ : @pattern.Pat[A],
-) -> Section[A] {
+  body~ : @pattern.Pat[@pattern.ControlMap],
+) -> Section {
   {
     name: self.name,
     length_cycles: self.length_cycles,
@@ -846,10 +834,10 @@ pub fn[A] Section::layer(
 }
 
 ///|
-pub fn[A] Section::apply_patch(
-  self : Section[A],
-  patch : SectionPatch[A],
-) -> Section[A] raise SectionPatchError {
+pub fn Section::apply_patch(
+  self : Section,
+  patch : SectionPatch,
+) -> Section raise SectionPatchError {
   let body = match patch {
     SetLayer(name, body) => self.body.set_layer(name, body)
     AddLayer(name, body) => self.body.add_layer(name, body)

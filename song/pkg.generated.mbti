@@ -89,137 +89,137 @@ pub fn TimeScopeBuildError::not_equal(Self, Self) -> Bool
 pub fn TimeScopeBuildError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
-pub struct Section[A] {
+pub struct Section {
   // private fields
 }
-pub fn[A] Section::Section(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody[A]) -> Self[A] raise SectionBuildError
-pub fn[A] Section::apply_patch(Self[A], SectionPatch[A]) -> Self[A] raise SectionPatchError
-pub fn[A] Section::body(Self[A]) -> @pattern.Pat[A]
-pub fn[A] Section::from_pattern(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] Section::get_layer(Self[A], String) -> @pattern.Pat[A]?
-pub fn[A] Section::layer(Self[A], name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] Section::layer_count(Self[A]) -> Int32
-pub fn[A] Section::length_cycles(Self[A]) -> @pattern.Rational
-pub fn[A] Section::name(Self[A]) -> String
-pub fn[A] Section::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
-pub fn[A] Section::scope(Self[A]) -> TimeScope
-pub fn[A] Section::section_body(Self[A]) -> SectionBody[A]
-pub fn[A] Section::source_snapshot(Self[A]) -> @pattern.PatternSnapshotWithOrigins[A]?
-pub fn[A] Section::with_origins(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, snapshot~ : @pattern.PatternSnapshotWithOrigins[A]) -> Self[A] raise SectionBuildError
+pub fn Section::Section(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody) -> Self raise SectionBuildError
+pub fn Section::apply_patch(Self, SectionPatch) -> Self raise SectionPatchError
+pub fn Section::body(Self) -> @pattern.Pat[@pattern.ControlMap]
+pub fn Section::from_pattern(name~ : String, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn Section::get_layer(Self, String) -> @pattern.Pat[@pattern.ControlMap]?
+pub fn Section::layer(Self, name~ : String, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn Section::layer_count(Self) -> Int32
+pub fn Section::length_cycles(Self) -> @pattern.Rational
+pub fn Section::name(Self) -> String
+pub fn Section::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn Section::scope(Self) -> TimeScope
+pub fn Section::section_body(Self) -> SectionBody
+pub fn Section::source_snapshot(Self) -> @pattern.PatternSnapshotWithOrigins?
+pub fn Section::with_origins(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, snapshot~ : @pattern.PatternSnapshotWithOrigins) -> Self raise SectionBuildError
 
-pub enum SectionBody[A] {
-  Single(@pattern.Pat[A])
-  Layers(Array[SectionLayer[A]])
+pub enum SectionBody {
+  Single(@pattern.Pat[@pattern.ControlMap])
+  Layers(Array[SectionLayer])
 }
-pub fn[A] SectionBody::get_layer(Self[A], String) -> @pattern.Pat[A]?
-pub fn[A] SectionBody::layer_count(Self[A]) -> Int32
-pub fn[A] SectionBody::layers(Array[SectionLayer[A]]) -> Self[A]
-pub fn[A] SectionBody::single(@pattern.Pat[A]) -> Self[A]
-pub fn[A] SectionBody::to_pattern(Self[A]) -> @pattern.Pat[A]
+pub fn SectionBody::get_layer(Self, String) -> @pattern.Pat[@pattern.ControlMap]?
+pub fn SectionBody::layer_count(Self) -> Int32
+pub fn SectionBody::layers(Array[SectionLayer]) -> Self
+pub fn SectionBody::single(@pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn SectionBody::to_pattern(Self) -> @pattern.Pat[@pattern.ControlMap]
 
-pub struct SectionDoc[A] {
+pub struct SectionDoc {
   // private fields
 }
-pub fn[A] SectionDoc::SectionDoc(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionDocBody[A]) -> Self[A] raise SectionDocBuildError
-pub fn[A] SectionDoc::body(Self[A]) -> SectionDocBody[A]
-pub fn[A] SectionDoc::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
-pub fn[A] SectionDoc::id(Self[A]) -> @identity.SectionId
-pub fn[A] SectionDoc::layer_count(Self[A]) -> Int32
-pub fn[A] SectionDoc::length_cycles(Self[A]) -> @pattern.Rational
-pub fn[A] SectionDoc::name(Self[A]) -> String
-pub fn[A] SectionDoc::rename(Self[A], name~ : String) -> Self[A]
-pub fn[A] SectionDoc::rename_layer(Self[A], @identity.SectionLayerId, name~ : String) -> Self[A] raise SectionDocEditError
-pub fn[A] SectionDoc::replace_layer_body(Self[A], @identity.SectionLayerId, body~ : @pattern.Pat[A]) -> Self[A] raise SectionDocEditError
-pub fn[A] SectionDoc::revision(Self[A]) -> @identity.Revision
-pub fn[A] SectionDoc::scope(Self[A]) -> TimeScope
-pub fn[A] SectionDoc::single(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, layer_id~ : @identity.SectionLayerId, body~ : @pattern.Pat[A]) -> Self[A] raise SectionDocBuildError
-pub fn[A] SectionDoc::single_with_origins(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, layer_id~ : @identity.SectionLayerId, snapshot~ : @pattern.PatternSnapshotWithOrigins[A]) -> Self[A] raise SectionDocBuildError
-pub fn[A] SectionDoc::to_section(Self[A]) -> Section[A]
-pub fn[A] SectionDoc::with_length(Self[A], length_cycles~ : @pattern.Rational) -> Self[A] raise SectionDocBuildError
-pub fn[A] SectionDoc::with_scope(Self[A], scope~ : TimeScope) -> Self[A]
+pub fn SectionDoc::SectionDoc(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionDocBody) -> Self raise SectionDocBuildError
+pub fn SectionDoc::body(Self) -> SectionDocBody
+pub fn SectionDoc::get_layer(Self, @identity.SectionLayerId) -> SectionLayerDoc?
+pub fn SectionDoc::id(Self) -> @identity.SectionId
+pub fn SectionDoc::layer_count(Self) -> Int32
+pub fn SectionDoc::length_cycles(Self) -> @pattern.Rational
+pub fn SectionDoc::name(Self) -> String
+pub fn SectionDoc::rename(Self, name~ : String) -> Self
+pub fn SectionDoc::rename_layer(Self, @identity.SectionLayerId, name~ : String) -> Self raise SectionDocEditError
+pub fn SectionDoc::replace_layer_body(Self, @identity.SectionLayerId, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self raise SectionDocEditError
+pub fn SectionDoc::revision(Self) -> @identity.Revision
+pub fn SectionDoc::scope(Self) -> TimeScope
+pub fn SectionDoc::single(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, layer_id~ : @identity.SectionLayerId, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self raise SectionDocBuildError
+pub fn SectionDoc::single_with_origins(id~ : @identity.SectionId, name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, layer_id~ : @identity.SectionLayerId, snapshot~ : @pattern.PatternSnapshotWithOrigins) -> Self raise SectionDocBuildError
+pub fn SectionDoc::to_section(Self) -> Section
+pub fn SectionDoc::with_length(Self, length_cycles~ : @pattern.Rational) -> Self raise SectionDocBuildError
+pub fn SectionDoc::with_scope(Self, scope~ : TimeScope) -> Self
 
-pub enum SectionDocBody[A] {
-  Single(SectionLayerDoc[A])
-  Layers(Array[SectionLayerDoc[A]])
+pub enum SectionDocBody {
+  Single(SectionLayerDoc)
+  Layers(Array[SectionLayerDoc])
 }
-pub fn[A] SectionDocBody::get_layer(Self[A], @identity.SectionLayerId) -> SectionLayerDoc[A]?
-pub fn[A] SectionDocBody::layer_count(Self[A]) -> Int32
-pub fn[A] SectionDocBody::layers(Array[SectionLayerDoc[A]]) -> Self[A]
-pub fn[A] SectionDocBody::single(SectionLayerDoc[A]) -> Self[A]
+pub fn SectionDocBody::get_layer(Self, @identity.SectionLayerId) -> SectionLayerDoc?
+pub fn SectionDocBody::layer_count(Self) -> Int32
+pub fn SectionDocBody::layers(Array[SectionLayerDoc]) -> Self
+pub fn SectionDocBody::single(SectionLayerDoc) -> Self
 
-pub struct SectionLayer[A] {
+pub struct SectionLayer {
   // private fields
 }
-pub fn[A] SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] SectionLayer::body(Self[A]) -> @pattern.Pat[A]
-pub fn[A] SectionLayer::name(Self[A]) -> String
+pub fn SectionLayer::SectionLayer(name~ : String, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn SectionLayer::body(Self) -> @pattern.Pat[@pattern.ControlMap]
+pub fn SectionLayer::name(Self) -> String
 
-pub struct SectionLayerDoc[A] {
+pub struct SectionLayerDoc {
   // private fields
 }
-pub fn[A] SectionLayerDoc::SectionLayerDoc(id~ : @identity.SectionLayerId, name~ : String, body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] SectionLayerDoc::body(Self[A]) -> @pattern.Pat[A]
-pub fn[A] SectionLayerDoc::id(Self[A]) -> @identity.SectionLayerId
-pub fn[A] SectionLayerDoc::name(Self[A]) -> String
-pub fn[A] SectionLayerDoc::rename(Self[A], name~ : String) -> Self[A]
-pub fn[A] SectionLayerDoc::replace_body(Self[A], body~ : @pattern.Pat[A]) -> Self[A]
-pub fn[A] SectionLayerDoc::revision(Self[A]) -> @identity.Revision
-pub fn[A] SectionLayerDoc::to_layer(Self[A]) -> SectionLayer[A]
+pub fn SectionLayerDoc::SectionLayerDoc(id~ : @identity.SectionLayerId, name~ : String, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn SectionLayerDoc::body(Self) -> @pattern.Pat[@pattern.ControlMap]
+pub fn SectionLayerDoc::id(Self) -> @identity.SectionLayerId
+pub fn SectionLayerDoc::name(Self) -> String
+pub fn SectionLayerDoc::rename(Self, name~ : String) -> Self
+pub fn SectionLayerDoc::replace_body(Self, body~ : @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn SectionLayerDoc::revision(Self) -> @identity.Revision
+pub fn SectionLayerDoc::to_layer(Self) -> SectionLayer
 
-pub struct SectionOccurrence[A] {
+pub struct SectionOccurrence {
   // private fields
 }
-pub fn[A] SectionOccurrence::end_(Self[A]) -> @pattern.Rational
-pub fn[A] SectionOccurrence::id(Self[A]) -> @identity.OccurrenceId
-pub fn[A] SectionOccurrence::name(Self[A]) -> String
-pub fn[A] SectionOccurrence::section(Self[A]) -> Section[A]
-pub fn[A] SectionOccurrence::span(Self[A]) -> @pattern.TimeSpan
-pub fn[A] SectionOccurrence::start(Self[A]) -> @pattern.Rational
+pub fn SectionOccurrence::end_(Self) -> @pattern.Rational
+pub fn SectionOccurrence::id(Self) -> @identity.OccurrenceId
+pub fn SectionOccurrence::name(Self) -> String
+pub fn SectionOccurrence::section(Self) -> Section
+pub fn SectionOccurrence::span(Self) -> @pattern.TimeSpan
+pub fn SectionOccurrence::start(Self) -> @pattern.Rational
 
-pub enum SectionPatch[A] {
-  SetLayer(String, @pattern.Pat[A])
-  AddLayer(String, @pattern.Pat[A])
+pub enum SectionPatch {
+  SetLayer(String, @pattern.Pat[@pattern.ControlMap])
+  AddLayer(String, @pattern.Pat[@pattern.ControlMap])
 }
-pub fn[A] SectionPatch::add_layer(String, @pattern.Pat[A]) -> Self[A]
-pub fn[A] SectionPatch::set_layer(String, @pattern.Pat[A]) -> Self[A]
+pub fn SectionPatch::add_layer(String, @pattern.Pat[@pattern.ControlMap]) -> Self
+pub fn SectionPatch::set_layer(String, @pattern.Pat[@pattern.ControlMap]) -> Self
 
-pub struct Song[A] {
+pub struct Song {
   // private fields
 }
-pub fn[A] Song::Song(parts~ : Array[SongPart[A]]) -> Self[A] raise SongBuildError
-pub fn[A] Song::duration(Self[A]) -> @pattern.Rational
-pub fn[A] Song::fill_gaps(Self[A], prefix~ : String, section~ : Section[A]) -> Self[A] raise SongBuildError
-pub fn[A] Song::from_sections(Array[Section[A]]) -> Self[A] raise SongBuildError
-pub fn[A] Song::gap_spans(Self[A]) -> Array[@pattern.TimeSpan]
-pub fn[A] Song::get_occurrence(Self[A], String) -> SectionOccurrence[A]?
-pub fn[A] Song::get_occurrence_by_id(Self[A], @identity.OccurrenceId) -> SectionOccurrence[A]?
-pub fn[A] Song::occurrence(Self[A], Int32) -> SectionOccurrence[A]?
-pub fn[A] Song::occurrence_at(Self[A], @pattern.Rational) -> SectionOccurrence[A]?
-pub fn[A] Song::occurrence_count(Self[A]) -> Int32
-pub fn[A] Song::occurrences(Self[A]) -> Array[SectionOccurrence[A]]
-pub fn[A] Song::occurrences_at(Self[A], @pattern.Rational) -> Array[SectionOccurrence[A]]
-pub fn[A] Song::occurrences_intersecting(Self[A], @pattern.TimeSpan) -> Array[SectionOccurrence[A]]
-pub fn[A] Song::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
+pub fn Song::Song(parts~ : Array[SongPart]) -> Self raise SongBuildError
+pub fn Song::duration(Self) -> @pattern.Rational
+pub fn Song::fill_gaps(Self, prefix~ : String, section~ : Section) -> Self raise SongBuildError
+pub fn Song::from_sections(Array[Section]) -> Self raise SongBuildError
+pub fn Song::gap_spans(Self) -> Array[@pattern.TimeSpan]
+pub fn Song::get_occurrence(Self, String) -> SectionOccurrence?
+pub fn Song::get_occurrence_by_id(Self, @identity.OccurrenceId) -> SectionOccurrence?
+pub fn Song::occurrence(Self, Int32) -> SectionOccurrence?
+pub fn Song::occurrence_at(Self, @pattern.Rational) -> SectionOccurrence?
+pub fn Song::occurrence_count(Self) -> Int32
+pub fn Song::occurrences(Self) -> Array[SectionOccurrence]
+pub fn Song::occurrences_at(Self, @pattern.Rational) -> Array[SectionOccurrence]
+pub fn Song::occurrences_intersecting(Self, @pattern.TimeSpan) -> Array[SectionOccurrence]
+pub fn Song::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
 
-pub struct SongDoc[A] {
+pub struct SongDoc {
   // private fields
 }
-pub fn[A] SongDoc::SongDoc(parts~ : Array[SongOccurrenceDoc[A]]) -> Self[A] raise SongDocBuildError
-pub fn[A] SongDoc::clear_occurrence_start(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::get_occurrence(Self[A], @identity.OccurrenceId) -> SongOccurrenceDoc[A]?
-pub fn[A] SongDoc::insert_occurrence(Self[A], index~ : Int32, occurrence~ : SongOccurrenceDoc[A]) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::layout_revision(Self[A]) -> @identity.Revision
-pub fn[A] SongDoc::lower(Self[A]) -> SongSnapshot[A] raise SongBuildError
-pub fn[A] SongDoc::move_occurrence(Self[A], @identity.OccurrenceId, index~ : Int32) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::occurrence(Self[A], Int32) -> SongOccurrenceDoc[A]?
-pub fn[A] SongDoc::occurrence_count(Self[A]) -> Int32
-pub fn[A] SongDoc::occurrences(Self[A]) -> Array[SongOccurrenceDoc[A]]
-pub fn[A] SongDoc::remove_occurrence(Self[A], @identity.OccurrenceId) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::rename_occurrence(Self[A], @identity.OccurrenceId, name~ : String) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::replace_occurrence_section(Self[A], @identity.OccurrenceId, section~ : SectionDoc[A]) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::revision(Self[A]) -> @identity.Revision
-pub fn[A] SongDoc::set_occurrence_start(Self[A], @identity.OccurrenceId, start~ : @pattern.Rational) -> Self[A] raise SongDocEditError
-pub fn[A] SongDoc::to_song(Self[A]) -> Song[A] raise SongBuildError
+pub fn SongDoc::SongDoc(parts~ : Array[SongOccurrenceDoc]) -> Self raise SongDocBuildError
+pub fn SongDoc::clear_occurrence_start(Self, @identity.OccurrenceId) -> Self raise SongDocEditError
+pub fn SongDoc::get_occurrence(Self, @identity.OccurrenceId) -> SongOccurrenceDoc?
+pub fn SongDoc::insert_occurrence(Self, index~ : Int32, occurrence~ : SongOccurrenceDoc) -> Self raise SongDocEditError
+pub fn SongDoc::layout_revision(Self) -> @identity.Revision
+pub fn SongDoc::lower(Self) -> SongSnapshot raise SongBuildError
+pub fn SongDoc::move_occurrence(Self, @identity.OccurrenceId, index~ : Int32) -> Self raise SongDocEditError
+pub fn SongDoc::occurrence(Self, Int32) -> SongOccurrenceDoc?
+pub fn SongDoc::occurrence_count(Self) -> Int32
+pub fn SongDoc::occurrences(Self) -> Array[SongOccurrenceDoc]
+pub fn SongDoc::remove_occurrence(Self, @identity.OccurrenceId) -> Self raise SongDocEditError
+pub fn SongDoc::rename_occurrence(Self, @identity.OccurrenceId, name~ : String) -> Self raise SongDocEditError
+pub fn SongDoc::replace_occurrence_section(Self, @identity.OccurrenceId, section~ : SectionDoc) -> Self raise SongDocEditError
+pub fn SongDoc::revision(Self) -> @identity.Revision
+pub fn SongDoc::set_occurrence_start(Self, @identity.OccurrenceId, start~ : @pattern.Rational) -> Self raise SongDocEditError
+pub fn SongDoc::to_song(Self) -> Song raise SongBuildError
 
 #derive(Eq, @debug.Debug)
 pub struct SongEventOrigin {
@@ -232,58 +232,58 @@ pub fn SongEventOrigin::occurrence(Self) -> @identity.OccurrenceId
 pub fn SongEventOrigin::section(Self) -> @identity.SectionId
 pub fn SongEventOrigin::to_repr(Self) -> @debug.Repr
 
-pub struct SongOccurrenceDoc[A] {
+pub struct SongOccurrenceDoc {
   // private fields
 }
-pub fn[A] SongOccurrenceDoc::SongOccurrenceDoc(id~ : @identity.OccurrenceId, name~ : String, section~ : SectionDoc[A]) -> Self[A]
-pub fn[A] SongOccurrenceDoc::at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : SectionDoc[A]) -> Self[A]
-pub fn[A] SongOccurrenceDoc::clear_start(Self[A]) -> Self[A]
-pub fn[A] SongOccurrenceDoc::id(Self[A]) -> @identity.OccurrenceId
-pub fn[A] SongOccurrenceDoc::layout_revision(Self[A]) -> @identity.Revision
-pub fn[A] SongOccurrenceDoc::name(Self[A]) -> String
-pub fn[A] SongOccurrenceDoc::rename(Self[A], name~ : String) -> Self[A]
-pub fn[A] SongOccurrenceDoc::replace_section(Self[A], section~ : SectionDoc[A]) -> Self[A]
-pub fn[A] SongOccurrenceDoc::revision(Self[A]) -> @identity.Revision
-pub fn[A] SongOccurrenceDoc::section(Self[A]) -> SectionDoc[A]
-pub fn[A] SongOccurrenceDoc::start(Self[A]) -> @pattern.Rational?
-pub fn[A] SongOccurrenceDoc::with_start(Self[A], start~ : @pattern.Rational) -> Self[A]
+pub fn SongOccurrenceDoc::SongOccurrenceDoc(id~ : @identity.OccurrenceId, name~ : String, section~ : SectionDoc) -> Self
+pub fn SongOccurrenceDoc::at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : SectionDoc) -> Self
+pub fn SongOccurrenceDoc::clear_start(Self) -> Self
+pub fn SongOccurrenceDoc::id(Self) -> @identity.OccurrenceId
+pub fn SongOccurrenceDoc::layout_revision(Self) -> @identity.Revision
+pub fn SongOccurrenceDoc::name(Self) -> String
+pub fn SongOccurrenceDoc::rename(Self, name~ : String) -> Self
+pub fn SongOccurrenceDoc::replace_section(Self, section~ : SectionDoc) -> Self
+pub fn SongOccurrenceDoc::revision(Self) -> @identity.Revision
+pub fn SongOccurrenceDoc::section(Self) -> SectionDoc
+pub fn SongOccurrenceDoc::start(Self) -> @pattern.Rational?
+pub fn SongOccurrenceDoc::with_start(Self, start~ : @pattern.Rational) -> Self
 
-pub struct SongPart[A] {
+pub struct SongPart {
   // private fields
 }
-pub fn[A] SongPart::SongPart(name~ : String, section~ : Section[A]) -> Self[A]
-pub fn[A] SongPart::at(start~ : @pattern.Rational, name~ : String, section~ : Section[A]) -> Self[A]
-pub fn[A] SongPart::id(Self[A]) -> @identity.OccurrenceId?
-pub fn[A] SongPart::name(Self[A]) -> String
-pub fn[A] SongPart::section(Self[A]) -> Section[A]
-pub fn[A] SongPart::start(Self[A]) -> @pattern.Rational?
-pub fn[A] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[A]) -> Self[A]
-pub fn[A] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[A]) -> Self[A]
+pub fn SongPart::SongPart(name~ : String, section~ : Section) -> Self
+pub fn SongPart::at(start~ : @pattern.Rational, name~ : String, section~ : Section) -> Self
+pub fn SongPart::id(Self) -> @identity.OccurrenceId?
+pub fn SongPart::name(Self) -> String
+pub fn SongPart::section(Self) -> Section
+pub fn SongPart::start(Self) -> @pattern.Rational?
+pub fn SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section) -> Self
+pub fn SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section) -> Self
 
-pub struct SongSnapshot[A] {
+pub struct SongSnapshot {
   // private fields
 }
-pub fn[A] SongSnapshot::layout_revision(Self[A]) -> @identity.Revision
-pub fn[A] SongSnapshot::query(Self[A], @pattern.TimeSpan) -> Array[@pattern.Event[A]]
-pub fn[A] SongSnapshot::query_sourced_events(Self[A], @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
-pub fn[A] SongSnapshot::query_sourced_events_for_entry(Self[A], Int32, @pattern.TimeSpan) -> Array[SongSnapshotEvent[A]]
-pub fn[A] SongSnapshot::revision(Self[A]) -> @identity.Revision
-pub fn[A] SongSnapshot::section_id_for_occurrence(Self[A], @identity.OccurrenceId) -> @identity.SectionId?
-pub fn[A] SongSnapshot::song(Self[A]) -> Song[A]
+pub fn SongSnapshot::layout_revision(Self) -> @identity.Revision
+pub fn SongSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn SongSnapshot::query_sourced_events(Self, @pattern.TimeSpan) -> Array[SongSnapshotEvent]
+pub fn SongSnapshot::query_sourced_events_for_entry(Self, Int32, @pattern.TimeSpan) -> Array[SongSnapshotEvent]
+pub fn SongSnapshot::revision(Self) -> @identity.Revision
+pub fn SongSnapshot::section_id_for_occurrence(Self, @identity.OccurrenceId) -> @identity.SectionId?
+pub fn SongSnapshot::song(Self) -> Song
 
-pub struct SongSnapshotEvent[A] {
+pub struct SongSnapshotEvent {
   // private fields
 }
-pub fn[A] SongSnapshotEvent::buses(Self[A]) -> @pattern.EventBuses
-pub fn[A] SongSnapshotEvent::event(Self[A]) -> @pattern.Event[A]
-pub fn[A] SongSnapshotEvent::layer(Self[A]) -> @identity.SectionLayerId
-pub fn[A] SongSnapshotEvent::occurrence(Self[A]) -> @identity.OccurrenceId
-pub fn[A] SongSnapshotEvent::origin(Self[A]) -> SongEventOrigin
-pub fn[A] SongSnapshotEvent::section(Self[A]) -> @identity.SectionId
-pub fn[A] SongSnapshotEvent::source_frame(Self[A]) -> @identity.SourceFrameId?
-pub fn[A] SongSnapshotEvent::source_origin(Self[A]) -> @pattern.EventOrigin?
-pub fn[A] SongSnapshotEvent::source_pitch(Self[A]) -> Double
-pub fn[A] SongSnapshotEvent::source_start(Self[A]) -> Double
+pub fn SongSnapshotEvent::controls(Self) -> @pattern.Controls
+pub fn SongSnapshotEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
+pub fn SongSnapshotEvent::layer(Self) -> @identity.SectionLayerId
+pub fn SongSnapshotEvent::occurrence(Self) -> @identity.OccurrenceId
+pub fn SongSnapshotEvent::origin(Self) -> SongEventOrigin
+pub fn SongSnapshotEvent::section(Self) -> @identity.SectionId
+pub fn SongSnapshotEvent::source_frame(Self) -> @identity.SourceFrameId?
+pub fn SongSnapshotEvent::source_origin(Self) -> @pattern.EventOrigin?
+pub fn SongSnapshotEvent::source_pitch(Self) -> Double
+pub fn SongSnapshotEvent::source_start(Self) -> Double
 
 pub struct TimeScope {
   // private fields

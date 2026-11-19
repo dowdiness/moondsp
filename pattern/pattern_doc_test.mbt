@@ -19,26 +19,26 @@ fn doc_span(
 }
 
 ///|
-fn[A] unwrap_doc(
-  build : () -> @pattern.PatternDoc[A] raise @pattern.PatternDocError,
-) -> @pattern.PatternDoc[A] {
+fn unwrap_doc(
+  build : () -> @pattern.PatternDoc raise @pattern.PatternDocError,
+) -> @pattern.PatternDoc {
   build() catch {
     _ => abort("expected pattern doc")
   }
 }
 
 ///|
-fn[A] unwrap_snapshot(
-  build : () -> @pattern.PatternSnapshot[A] raise @pattern.PatternDocError,
-) -> @pattern.PatternSnapshot[A] {
+fn unwrap_snapshot(
+  build : () -> @pattern.PatternSnapshot raise @pattern.PatternDocError,
+) -> @pattern.PatternSnapshot {
   build() catch {
     _ => abort("expected pattern snapshot")
   }
 }
 
 ///|
-fn[A] assert_pattern_event_path(
-  event : @pattern.PatternSnapshotEvent[A],
+fn assert_pattern_event_path(
+  event : @pattern.PatternSnapshotEvent,
   expected : Array[String],
 ) -> Unit {
   let nodes = event.pattern_nodes()
@@ -62,15 +62,12 @@ fn unwrap_revision(
 }
 
 ///|
-fn edited_leaf_doc(
-  edit_count : Int32,
-  value : Int32,
-) -> @pattern.PatternDoc[Int32] {
+fn edited_leaf_doc(edit_count : Int32, value : Int32) -> @pattern.PatternDoc {
   let count = edit_count.abs() % 8 + 1
-  let mut doc = @pattern.PatternDoc::pure(id=pid("leaf"), value~)
+  let mut doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(value))
   for i in 0..<count {
     doc = unwrap_doc(() => {
-      doc.replace_with_pure(id=pid("leaf"), value=value + i)
+      doc.replace_with_pure(id=pid("leaf"), value=n(value + i))
     })
   }
   doc
@@ -81,11 +78,11 @@ fn revisioned_leaf_doc(
   id_value : String,
   revision : Int32,
   value : Int32,
-) -> @pattern.PatternDoc[Int32] {
-  let mut doc = @pattern.PatternDoc::pure(id=pid(id_value), value~)
+) -> @pattern.PatternDoc {
+  let mut doc = @pattern.PatternDoc::pure(id=pid(id_value), value=n(value))
   for i in 0..<revision {
     doc = unwrap_doc(() => {
-      doc.replace_with_pure(id=pid(id_value), value=value + i + 1)
+      doc.replace_with_pure(id=pid(id_value), value=n(value + i + 1))
     })
   }
   doc
@@ -93,19 +90,19 @@ fn revisioned_leaf_doc(
 
 ///|
 test "PatternDoc::pure lowers to runtime Pat" {
-  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=7)
+  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(7))
   let snapshot = unwrap_snapshot(() => doc.lower())
   inspect(snapshot.revision().value(), content="0")
   inspect(snapshot.root().value(), content="leaf")
   let events = snapshot.query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="1")
-  inspect(events[0].value, content="7")
+  @debug.assert_eq(events[0].value, n(7))
 }
 
 ///|
 test "PatternDoc::fast adds stable root and bumps revision" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=7).fast(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(7)).fast(
       id=pid("fast"),
       factor=@pattern.Rational::from_int(2),
     )
@@ -121,7 +118,7 @@ test "PatternDoc::fast adds stable root and bumps revision" {
 ///|
 test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=7).fast(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(7)).fast(
       id=pid("fast"),
       factor=@pattern.Rational::from_int(2),
     )
@@ -140,8 +137,8 @@ test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
 
 ///|
 test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
-  let left = @pattern.PatternDoc::pure(id=pid("left"), value=1)
-  let right = @pattern.PatternDoc::pure(id=pid("right"), value=2)
+  let left = @pattern.PatternDoc::pure(id=pid("left"), value=n(1))
+  let right = @pattern.PatternDoc::pure(id=pid("right"), value=n(2))
   let seq = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
@@ -151,12 +148,12 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
   @debug.assert_eq(seq_events.length(), 2)
   assert_pattern_event_path(seq_events[0], ["seq", "left"])
   assert_pattern_event_path(seq_events[1], ["seq", "right"])
-  assert_true(seq_events[0].event().value == 1)
-  assert_true(seq_events[1].event().value == 2)
+  assert_true(seq_events[0].event().value == n(1))
+  assert_true(seq_events[1].event().value == n(2))
   let stack = unwrap_doc(() => {
     @pattern.PatternDoc::stack(id=pid("stack"), docs=[
-      @pattern.PatternDoc::pure(id=pid("stack-left"), value=3),
-      @pattern.PatternDoc::pure(id=pid("stack-right"), value=4),
+      @pattern.PatternDoc::pure(id=pid("stack-left"), value=n(3)),
+      @pattern.PatternDoc::pure(id=pid("stack-right"), value=n(4)),
     ])
   })
   let stack_events = unwrap_snapshot(() => stack.lower()).query_sourced_events(
@@ -171,8 +168,8 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
 test "PatternSnapshot::query_sourced_events covers every callback subtrees" {
   let child = unwrap_doc(() => {
     @pattern.PatternDoc::stack(id=pid("every-stack"), docs=[
-      @pattern.PatternDoc::pure(id=pid("every-left"), value=1),
-      @pattern.PatternDoc::pure(id=pid("every-right"), value=2),
+      @pattern.PatternDoc::pure(id=pid("every-left"), value=n(1)),
+      @pattern.PatternDoc::pure(id=pid("every-right"), value=n(2)),
     ])
   })
   let doc = unwrap_doc(() => {
@@ -246,42 +243,48 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
 ///|
 test "PatternDoc edit preserves ids and changes lowered future events" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).fast(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).fast(
       id=pid("fast"),
       factor=@pattern.Rational::from_int(2),
     )
   })
-  let edited = unwrap_doc(() => doc.replace_with_pure(id=pid("leaf"), value=2))
+  let edited = unwrap_doc(() => {
+    doc.replace_with_pure(id=pid("leaf"), value=n(2))
+  })
   inspect(edited.root().value(), content="fast")
   inspect(edited.revision().value(), content="2")
   assert_true(edited.contains_node(pid("leaf")))
   let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="2")
-  inspect(events[1].value, content="2")
+  @debug.assert_eq(events[0].value, n(2))
+  @debug.assert_eq(events[1].value, n(2))
 }
 
 ///|
 test "PatternDoc snapshot remains stable after document edit" {
-  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   let snapshot = unwrap_snapshot(() => doc.lower())
-  let edited = unwrap_doc(() => doc.replace_with_pure(id=pid("leaf"), value=2))
+  let edited = unwrap_doc(() => {
+    doc.replace_with_pure(id=pid("leaf"), value=n(2))
+  })
   let old_events = snapshot.query(doc_span(0, 1, 1, 1))
   let new_events = unwrap_snapshot(() => edited.lower()).query(
     doc_span(0, 1, 1, 1),
   )
-  inspect(old_events[0].value, content="1")
-  inspect(new_events[0].value, content="2")
+  @debug.assert_eq(old_events[0].value, n(1))
+  @debug.assert_eq(new_events[0].value, n(2))
 }
 
 ///|
 test "PatternDoc node revisions invalidate ancestors but not siblings" {
-  let left = @pattern.PatternDoc::pure(id=pid("left"), value=1)
-  let right = @pattern.PatternDoc::pure(id=pid("right"), value=2)
+  let left = @pattern.PatternDoc::pure(id=pid("left"), value=n(1))
+  let right = @pattern.PatternDoc::pure(id=pid("right"), value=n(2))
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let edited = unwrap_doc(() => base.replace_with_pure(id=pid("left"), value=3))
+  let edited = unwrap_doc(() => {
+    base.replace_with_pure(id=pid("left"), value=n(3))
+  })
   let base_left = unwrap_revision(() => base.node_revision(pid("left")))
   let edited_left = unwrap_revision(() => edited.node_revision(pid("left")))
   let base_right = unwrap_revision(() => base.node_revision(pid("right")))
@@ -295,18 +298,18 @@ test "PatternDoc node revisions invalidate ancestors but not siblings" {
 
 ///|
 test "PatternLoweringCache reuses unchanged child after pattern edit" {
-  let left = @pattern.PatternDoc::pure(id=pid("left"), value=1)
-  let right = @pattern.PatternDoc::pure(id=pid("right"), value=2)
+  let left = @pattern.PatternDoc::pure(id=pid("left"), value=n(1))
+  let right = @pattern.PatternDoc::pure(id=pid("right"), value=n(2))
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   ignore(unwrap_snapshot(() => base.lower_with_cache(cache)))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="3")
   inspect(cache.entry_count(), content="3")
   let edited_left = unwrap_doc(() => {
-    left.replace_with_pure(id=pid("left"), value=3)
+    left.replace_with_pure(id=pid("left"), value=n(3))
   })
   let edited = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[edited_left, right])
@@ -315,8 +318,8 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
   let snapshot = unwrap_snapshot(() => edited.lower_with_cache(cache))
   let events = snapshot.query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="3")
-  inspect(events[1].value, content="2")
+  @debug.assert_eq(events[0].value, n(3))
+  @debug.assert_eq(events[1].value, n(2))
   inspect(cache.hit_count(), content="1")
   inspect(cache.miss_count(), content="2")
   inspect(cache.entry_count(), content="5")
@@ -328,14 +331,14 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
 
 ///|
 test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
-  let first = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
-  let second = @pattern.PatternDoc::pure(id=pid("leaf"), value=2)
-  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
+  let first = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
+  let second = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(2))
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
-  inspect(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, content="1")
+  @debug.assert_eq(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, n(1))
   cache.reset_stats()
   let second_snapshot = unwrap_snapshot(() => second.lower_with_cache(cache))
-  inspect(second_snapshot.query(doc_span(0, 1, 1, 1))[0].value, content="2")
+  @debug.assert_eq(second_snapshot.query(doc_span(0, 1, 1, 1))[0].value, n(2))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="1")
   inspect(cache.entry_count(), content="2")
@@ -343,23 +346,27 @@ test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
 
 ///|
 test "PatternLoweringCache does not reuse divergent replacements" {
-  let left = @pattern.PatternDoc::pure(id=pid("left"), value=1)
-  let right = @pattern.PatternDoc::pure(id=pid("right"), value=2)
+  let left = @pattern.PatternDoc::pure(id=pid("left"), value=n(1))
+  let right = @pattern.PatternDoc::pure(id=pid("right"), value=n(2))
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let first = unwrap_doc(() => base.replace_with_pure(id=pid("left"), value=3))
-  let second = unwrap_doc(() => base.replace_with_pure(id=pid("left"), value=4))
-  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
+  let first = unwrap_doc(() => {
+    base.replace_with_pure(id=pid("left"), value=n(3))
+  })
+  let second = unwrap_doc(() => {
+    base.replace_with_pure(id=pid("left"), value=n(4))
+  })
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
   let first_events = first_snapshot.query(doc_span(0, 1, 1, 1))
-  inspect(first_events[0].value, content="3")
-  inspect(first_events[1].value, content="2")
+  @debug.assert_eq(first_events[0].value, n(3))
+  @debug.assert_eq(first_events[1].value, n(2))
   cache.reset_stats()
   let second_snapshot = unwrap_snapshot(() => second.lower_with_cache(cache))
   let second_events = second_snapshot.query(doc_span(0, 1, 1, 1))
-  inspect(second_events[0].value, content="4")
-  inspect(second_events[1].value, content="2")
+  @debug.assert_eq(second_events[0].value, n(4))
+  @debug.assert_eq(second_events[1].value, n(2))
   inspect(cache.hit_count(), content="1")
   inspect(cache.miss_count(), content="2")
   inspect(cache.entry_count(), content="5")
@@ -367,25 +374,25 @@ test "PatternLoweringCache does not reuse divergent replacements" {
 
 ///|
 test "PatternDoc::replace_with_pattern swaps runtime body under stable id" {
-  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   let edited = unwrap_doc(() => {
     doc.replace_with_pattern(
       id=pid("leaf"),
-      pat=@pattern.sequence([@pattern.Pat::pure(2), @pattern.Pat::pure(3)]),
+      pat=@pattern.sequence([@pattern.Pat::pure(n(2)), @pattern.Pat::pure(n(3))]),
     )
   })
   inspect(edited.root().value(), content="leaf")
   inspect(edited.revision().value(), content="1")
   let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="2")
-  inspect(events[1].value, content="3")
+  @debug.assert_eq(events[0].value, n(2))
+  @debug.assert_eq(events[1].value, n(3))
 }
 
 ///|
 test "PatternDoc::sequence combines child documents" {
-  let a = @pattern.PatternDoc::pure(id=pid("a"), value=1)
-  let b = @pattern.PatternDoc::pure(id=pid("b"), value=2)
+  let a = @pattern.PatternDoc::pure(id=pid("a"), value=n(1))
+  let b = @pattern.PatternDoc::pure(id=pid("b"), value=n(2))
   let doc = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[a, b])
   })
@@ -394,29 +401,29 @@ test "PatternDoc::sequence combines child documents" {
   inspect(doc.revision().value(), content="1")
   let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="1")
-  inspect(events[1].value, content="2")
+  @debug.assert_eq(events[0].value, n(1))
+  @debug.assert_eq(events[1].value, n(2))
 }
 
 ///|
 test "PatternDoc::stack combines child documents in parallel" {
-  let a = @pattern.PatternDoc::pure(id=pid("a"), value=1)
-  let b = @pattern.PatternDoc::pure(id=pid("b"), value=2)
+  let a = @pattern.PatternDoc::pure(id=pid("a"), value=n(1))
+  let b = @pattern.PatternDoc::pure(id=pid("b"), value=n(2))
   let doc = unwrap_doc(() => {
     @pattern.PatternDoc::stack(id=pid("stack"), docs=[a, b])
   })
   inspect(doc.revision().value(), content="1")
   let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="1")
-  inspect(events[1].value, content="2")
+  @debug.assert_eq(events[0].value, n(1))
+  @debug.assert_eq(events[1].value, n(2))
 }
 
 ///|
 test "PatternDoc aggregate revisions preserve child edits" {
-  let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+  let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   let edited_child = unwrap_doc(() => {
-    base_child.replace_with_pure(id=pid("leaf"), value=2)
+    base_child.replace_with_pure(id=pid("leaf"), value=n(2))
   })
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[base_child])
@@ -426,9 +433,9 @@ test "PatternDoc aggregate revisions preserve child edits" {
   })
   inspect(base.revision().value(), content="1")
   inspect(edited.revision().value(), content="2")
-  inspect(
+  @debug.assert_eq(
     unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))[0].value,
-    content="2",
+    n(2),
   )
 }
 
@@ -436,7 +443,7 @@ test "PatternDoc aggregate revisions preserve child edits" {
 test "prop: aggregate sequence revision advances with child revisions" {
   @qc.quick_check_fn(
     fn(raw : Int32) {
-      let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+      let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
       let edited_child = edited_leaf_doc(raw, 2)
       let base = unwrap_doc(() => {
         @pattern.PatternDoc::sequence(id=pid("seq"), docs=[base_child])
@@ -455,7 +462,7 @@ test "prop: aggregate sequence revision advances with child revisions" {
 test "prop: aggregate stack revision advances with child revisions" {
   @qc.quick_check_fn(
     fn(raw : Int32) {
-      let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+      let base_child = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
       let edited_child = edited_leaf_doc(raw, 2)
       let base = unwrap_doc(() => {
         @pattern.PatternDoc::stack(id=pid("stack"), docs=[base_child])
@@ -473,21 +480,21 @@ test "prop: aggregate stack revision advances with child revisions" {
 ///|
 test "PatternDoc aggregate revisions distinguish shifted child revisions" {
   let left_one = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("left"), value=1).replace_with_pure(
+    @pattern.PatternDoc::pure(id=pid("left"), value=n(1)).replace_with_pure(
       id=pid("left"),
-      value=2,
+      value=n(2),
     )
   })
   let right_one = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("right"), value=10).replace_with_pure(
+    @pattern.PatternDoc::pure(id=pid("right"), value=n(10)).replace_with_pure(
       id=pid("right"),
-      value=11,
+      value=n(11),
     )
   })
   let left_two = unwrap_doc(() => {
-    left_one.replace_with_pure(id=pid("left"), value=3)
+    left_one.replace_with_pure(id=pid("left"), value=n(3))
   })
-  let right_zero = @pattern.PatternDoc::pure(id=pid("right"), value=10)
+  let right_zero = @pattern.PatternDoc::pure(id=pid("right"), value=n(10))
   let first = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left_one, right_one])
   })
@@ -538,7 +545,7 @@ test "prop: aggregate sequence revisions distinguish child revision vectors" {
 ///|
 test "PatternDoc::with_root selects an existing stable node" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).fast(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).fast(
       id=pid("fast"),
       factor=@pattern.Rational::from_int(2),
     )
@@ -555,7 +562,7 @@ test "PatternDoc::with_root selects an existing stable node" {
 ///|
 test "PatternDoc::slow and rev lower through runtime combinators" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).slow(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).slow(
       id=pid("slow"),
       factor=@pattern.Rational::from_int(2),
     )
@@ -570,21 +577,27 @@ test "PatternDoc::slow and rev lower through runtime combinators" {
 ///|
 test "PatternDoc::filter_map lowers through runtime combinator" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=2).filter_map(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(2)).filter_map(
       id=pid("filter"),
-      f=fn(value) { if value > 1 { Some(value * 10) } else { None } },
+      f=fn(value) {
+        if value.get(Note) is Some(note) && note > 1.0 {
+          Some(value.set(Note, note * 10.0))
+        } else {
+          None
+        }
+      },
     )
   })
   inspect(doc.revision().value(), content="1")
   let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="1")
-  inspect(events[0].value, content="20")
+  @debug.assert_eq(events[0].value, n(20))
 }
 
 ///|
 test "PatternDoc::euclid lowers through runtime combinator" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).euclid(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).euclid(
       id=pid("euclid"),
       k=3,
       n=8,
@@ -601,7 +614,7 @@ test "PatternDoc::euclid lowers through runtime combinator" {
 ///|
 test "PatternDoc::degrade_by lowers through runtime combinator" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).degrade_by(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).degrade_by(
       id=pid("drop"),
       p=1.0,
       seed=7,
@@ -615,7 +628,7 @@ test "PatternDoc::degrade_by lowers through runtime combinator" {
 ///|
 test "PatternDoc::every lowers through runtime combinator" {
   let doc = unwrap_doc(() => {
-    @pattern.PatternDoc::pure(id=pid("leaf"), value=1).every(
+    @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1)).every(
       id=pid("every"),
       n=2,
       transform=@pattern.TimeTransform::Fast(@pattern.Rational::from_int(2)),
@@ -722,7 +735,7 @@ test "PatternDoc::merge_control revision changes when lower-revision input chang
 
 ///|
 test "PatternDoc rejects duplicate node ids" {
-  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   try doc.fast(id=pid("leaf"), factor=@pattern.Rational::from_int(2)) catch {
     @pattern.PatternDocError::DuplicateNodeId("leaf") => ()
     _ => abort("expected duplicate node id")
@@ -733,8 +746,8 @@ test "PatternDoc rejects duplicate node ids" {
 
 ///|
 test "PatternDoc rejects duplicate ids across combined docs" {
-  let a = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
-  let b = @pattern.PatternDoc::pure(id=pid("leaf"), value=2)
+  let a = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
+  let b = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(2))
   try @pattern.PatternDoc::sequence(id=pid("seq"), docs=[a, b]) catch {
     @pattern.PatternDocError::DuplicateNodeId("leaf") => ()
     _ => abort("expected duplicate node id")
@@ -745,7 +758,7 @@ test "PatternDoc rejects duplicate ids across combined docs" {
 
 ///|
 test "PatternDoc rejects missing edit target" {
-  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=1)
+  let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   try doc.replace_with_silence(id=pid("missing")) catch {
     @pattern.PatternDocError::MissingNode("missing") => ()
     _ => abort("expected missing node")
@@ -756,7 +769,7 @@ test "PatternDoc rejects missing edit target" {
 
 ///|
 test "PatternDoc rejects empty sequence documents" {
-  let docs : Array[@pattern.PatternDoc[Int32]] = []
+  let docs : Array[@pattern.PatternDoc] = []
   try @pattern.PatternDoc::sequence(id=pid("seq"), docs~) catch {
     @pattern.PatternDocError::EmptyPatternDocs => ()
     _ => abort("expected empty pattern docs")
@@ -769,10 +782,16 @@ test "PatternDoc rejects empty sequence documents" {
 test "PatternDoc::from_pattern wraps existing runtime patterns" {
   let doc = @pattern.PatternDoc::from_pattern(
     id=pid("runtime"),
-    pat=@pattern.sequence([@pattern.Pat::pure(1), @pattern.Pat::pure(2)]),
+    pat=@pattern.sequence([@pattern.Pat::pure(n(1)), @pattern.Pat::pure(n(2))]),
   )
   let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
-  inspect(events[0].value, content="1")
-  inspect(events[1].value, content="2")
+  @debug.assert_eq(events[0].value, n(1))
+  @debug.assert_eq(events[1].value, n(2))
+}
+
+///|
+/// A payload that stands for the number `value`, for structural tests.
+fn n(value : Int32) -> @pattern.ControlMap {
+  @pattern.ControlMap::single(Note, value.to_double())
 }

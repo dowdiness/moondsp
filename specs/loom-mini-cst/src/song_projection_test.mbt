@@ -1,7 +1,7 @@
 // Phase 2 Piece 2 — song-level differential parity harness.
 //
 // Compares the loom song projection (`loom_mini_parse_song`) against the oracle
-// (`@mini.parse_song_with_bpm`). Both build a real `@song.Song[ControlMap]`, so
+// (`@mini.parse_song_with_bpm`). Both build a real `@song.Song`, so
 // part layout, fill gaps, and occurrence ids are equal BY CONSTRUCTION when the
 // section/part/fill/bpm specs agree; divergence can only enter through parsing
 // or section-body lowering. The harness decomposes equality by NAME and lowered

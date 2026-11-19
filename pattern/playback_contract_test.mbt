@@ -71,8 +71,8 @@ test "document control merge preserves material clocks and broad voice scopes" {
 ///|
 test "document every preserves negative cycle selection and branch voice scopes" {
   let source = @pattern.PatternDoc::stack(id=pid("parts"), docs=[
-    @pattern.PatternDoc::pure(id=pid("left"), value=1),
-    @pattern.PatternDoc::pure(id=pid("right"), value=2),
+    @pattern.PatternDoc::pure(id=pid("left"), value=n(1)),
+    @pattern.PatternDoc::pure(id=pid("right"), value=n(2)),
   ])
   let snapshot = source
     .every(
@@ -82,7 +82,14 @@ test "document every preserves negative cycle selection and branch voice scopes"
     )
     .lower()
   let events = snapshot.query_sourced_events(doc_span(-1, 1, 1, 1))
-  @debug.assert_eq(events.map(e => e.event().value), [1, 2, 1, 1, 2, 2])
+  @debug.assert_eq(events.map(e => e.event().value), [
+    n(1),
+    n(2),
+    n(1),
+    n(1),
+    n(2),
+    n(2),
+  ])
   assert_pattern_event_path(events[0], ["every", "parts", "left"])
   assert_pattern_event_path(events[1], ["every", "parts", "right"])
   for i in 2..<events.length() {

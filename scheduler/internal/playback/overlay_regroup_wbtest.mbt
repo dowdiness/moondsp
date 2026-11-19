@@ -4,7 +4,7 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
     name : String,
     note : Int32,
     period : Int32,
-  ) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+  ) -> @pattern.PatternDoc raise {
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string(name),
       pat=material(name, note, period),

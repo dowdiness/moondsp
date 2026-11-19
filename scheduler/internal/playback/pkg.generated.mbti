@@ -21,25 +21,25 @@ pub(all) struct PlaybackInspection {
 }
 
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
-  Song(@song.SongSnapshot[@pattern.ControlMap])
-  RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
+  Pattern(@pattern.PatternSnapshot)
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Song(@song.SongSnapshot)
+  RepeatSong(@song.SongSnapshot)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
-pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@pattern.ControlMap]) -> Self
-pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap]) -> Self
+pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot) -> Self
+pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
-pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
+pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
-pub fn PlaybackSnapshot::song(@song.SongSnapshot[@pattern.ControlMap]) -> Self
+pub fn PlaybackSnapshot::song(@song.SongSnapshot) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
 pub struct PlaybackSourcedEvent {
   // private fields
 }
 pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@pattern.ControlMap]) -> Self
-pub fn PlaybackSourcedEvent::buses(Self) -> @pattern.EventBuses
+pub fn PlaybackSourcedEvent::controls(Self) -> @pattern.Controls
 pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
 pub fn PlaybackSourcedEvent::origin(Self) -> @model.VoiceOrigin
 pub fn PlaybackSourcedEvent::source_frame(Self) -> @identity.SourceFrameId?

@@ -17,11 +17,11 @@ pub fn drum_midi(String) -> Int32?
 
 pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
-pub fn parse_doc(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
+pub fn parse_doc(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternDoc, String]
 
-pub fn parse_play_source(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, String]
+pub fn parse_play_source(String, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, String]
 
-pub fn parse_snapshot(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
+pub fn parse_snapshot(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternSnapshot, String]
 
 pub fn parse_song(String) -> Result[ParsedSong, String]
 
@@ -108,20 +108,20 @@ pub fn EditTransaction::EditTransaction(base~ : DraftVersion, edits~ : Array[Tex
 pub struct MiniDocBuilder {
   // private fields
 }
-pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::control(Self, @pattern.PatternDoc[@pattern.ControlMap], @control.Control, Double) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc[@pattern.ControlMap], Double, step? : Int32) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc[@pattern.ControlMap], Int32, Int32, Int32) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::every(Self, @pattern.PatternDoc[@pattern.ControlMap], Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::jux(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.TimeTransform) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::rev(Self, @pattern.PatternDoc[@pattern.ControlMap]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc[@pattern.ControlMap], @pattern.Rational) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[@pattern.ControlMap]]) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
-pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc[@pattern.ControlMap]?) -> Self
+pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::control(Self, @pattern.PatternDoc, @control.Control, Double) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc, Double, step? : Int32) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc, Int32, Int32, Int32) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::every(Self, @pattern.PatternDoc, Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc, @pattern.Rational) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::jux(Self, @pattern.PatternDoc, @pattern.TimeTransform) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::rev(Self, @pattern.PatternDoc) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc]) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc, @pattern.Rational) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc]) -> Result[@pattern.PatternDoc, String]
+pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc?) -> Self
 
 #derive(Eq, @debug.Debug)
 pub(all) enum OriginLocation {
@@ -143,15 +143,15 @@ pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
 pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
 
 pub struct ParsedSong {
-  song : @song.Song[@pattern.ControlMap]
+  song : @song.Song
   bpm : Double?
 }
 pub fn ParsedSong::bpm(Self) -> Double?
-pub fn ParsedSong::song(Self) -> @song.Song[@pattern.ControlMap]
+pub fn ParsedSong::song(Self) -> @song.Song
 
 pub enum PlayBody {
-  Pattern(@pattern.PatternDoc[@pattern.ControlMap])
-  Arrangement(@song.Song[@pattern.ControlMap], Bool)
+  Pattern(@pattern.PatternDoc)
+  Arrangement(@song.Song, Bool)
 }
 
 pub struct PlaySource {
@@ -163,7 +163,7 @@ pub fn PlaySource::bpm(Self) -> Double
 pub struct PlaybackInput {
   // private fields
 }
-pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
 pub fn PlaybackInput::decode_wire(String) -> Result[Self, String]
 pub fn PlaybackInput::encode_wire(Self) -> String
 pub fn PlaybackInput::source(Self) -> String
@@ -171,7 +171,7 @@ pub fn PlaybackInput::text(String) -> Self
 pub fn PlaybackInput::version(Self) -> DraftVersion?
 
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap], Double)
+  Pattern(@pattern.PatternSnapshotWithOrigins, Double)
   Runtime(PlaySource)
 }
 

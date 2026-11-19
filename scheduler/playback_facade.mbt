@@ -7,29 +7,29 @@
 /// coherent staging boundary when higher-level live orchestration prepares the
 /// next playback state.
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
-  Song(@song.SongSnapshot[@pattern.ControlMap])
-  RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
+  Pattern(@pattern.PatternSnapshot)
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Song(@song.SongSnapshot)
+  RepeatSong(@song.SongSnapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshot,
 ) -> PlaybackSnapshot {
   Pattern(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshotWithOrigins,
 ) -> PlaybackSnapshot {
   PatternWithOrigins(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  snapshot : @song.SongSnapshot,
 ) -> PlaybackSnapshot {
   Song(snapshot)
 }
@@ -37,7 +37,7 @@ pub fn PlaybackSnapshot::song(
 ///|
 /// Repeat an arranged song without resetting the transport or releasing voices.
 pub fn PlaybackSnapshot::repeat_song(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  snapshot : @song.SongSnapshot,
 ) -> PlaybackSnapshot {
   RepeatSong(snapshot)
 }

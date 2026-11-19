@@ -12,7 +12,7 @@ fn bus_r(num : Int64, den : Int64) -> @pattern.Rational {
 
 ///|
 /// Continuous control whose value is the absolute time it is sampled at.
-fn bus_ramp(name : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
+fn bus_ramp(name : String) -> @pattern.PatternDoc {
   @pattern.PatternDoc::continuous(id=bus_id(name), key=Gain, f=t => t)
 }
 
@@ -21,7 +21,7 @@ fn bus_ramp(name : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
 fn bus_steps(
   name : String,
   values : Array[Double],
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+) -> @pattern.PatternDoc raise {
   @pattern.PatternDoc::sequence(
     id=bus_id(name),
     docs=values.mapi((i, v) => {
@@ -37,8 +37,8 @@ fn bus_steps(
 fn bus_with(
   source : String,
   name : String,
-  right : @pattern.PatternDoc[@pattern.ControlMap],
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+  right : @pattern.PatternDoc,
+) -> @pattern.PatternDoc raise {
   @pattern.PatternDoc::merge_control(
     id=bus_id(name),
     left=bus_doc(source),
@@ -47,7 +47,7 @@ fn bus_with(
 }
 
 ///|
-fn bus_doc(source : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
+fn bus_doc(source : String) -> @pattern.PatternDoc {
   match @mini.parse_doc(source) {
     Ok(doc) => doc
     Err(message) => abort(message)
@@ -55,10 +55,7 @@ fn bus_doc(source : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
 }
 
 ///|
-fn bus_with_ramp(
-  source : String,
-  name : String,
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+fn bus_with_ramp(source : String, name : String) -> @pattern.PatternDoc raise {
   bus_with(source, name, bus_ramp(name + "-ramp"))
 }
 
@@ -78,7 +75,7 @@ fn bus_first_onset(
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), end),
     )[0]
-  let read = match onset.buses().reader(key) {
+  let read = match onset.controls().reader(key) {
     Some(read) => read
     None => abort("no bus for \{key}")
   }
@@ -192,7 +189,7 @@ test "a provider that is itself a merge sets the key wherever its left has an ev
     }),
     [(Some(0.3), Some(800.0)), (Some(0.6), Some(800.0))],
   )
-  let read = events[1].buses().reader(Gain).unwrap()
+  let read = events[1].controls().reader(Gain).unwrap()
   @debug.assert_eq(read(3L, 4L).get().unwrap(), 0.9)
 }
 
@@ -207,7 +204,7 @@ test "held voice follows a stretched sweep through its bus" {
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), step),
     )[0]
-  guard onset.buses().reader(Gain) is Some(read) else { fail("no gain bus") }
+  guard onset.controls().reader(Gain) is Some(read) else { fail("no gain bus") }
   let values = []
   let mut t = bus_r(0L, 1L)
   // The voice holds for [0, 2); after slow(2) the ramp reads t / 2.
@@ -230,11 +227,11 @@ test "continuous bus signal is exact under rev and inside sequence" {
     bus_with_ramp("note(\"60 64\")", "a"),
     bus_doc("note(\"67\")"),
   ]).lower()
-  let gain_reader = (snapshot : @pattern.PatternSnapshot[@pattern.ControlMap]) => {
+  let gain_reader = (snapshot : @pattern.PatternSnapshot) => {
     snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
-    .buses()
+    .controls()
     .reader(Gain)
     .unwrap()
   }
@@ -260,7 +257,7 @@ test "filter_map that rewrites a bound value unbinds it" {
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
   @debug.assert_eq(onset.event().value.get(Gain), Some(1.0))
-  @debug.assert_eq(onset.buses().reader(Gain) is None, true)
+  @debug.assert_eq(onset.controls().reader(Gain) is None, true)
   // An unchanged value keeps following its bus.
   let kept = bus_with("note(\"60\")", "k", bus_steps("st", [0.5]))
     .filter_map(id=bus_id("f"), f=c => Some(c))
@@ -268,7 +265,7 @@ test "filter_map that rewrites a bound value unbinds it" {
   let onset = kept.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
-  @debug.assert_eq(onset.buses().reader(Gain) is Some(_), true)
+  @debug.assert_eq(onset.controls().reader(Gain) is Some(_), true)
 }
 
 ///|
@@ -282,20 +279,20 @@ test "cached subtree buses follow their new position after an edit" {
     bus_with("note(\"64\")", "b", bus_steps("sb", [0.6, 0.8])),
   ])
   fn gain_buses(
-    snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+    snapshot : @pattern.PatternSnapshot,
   ) -> Array[(Double?, Double)] {
     let arc = @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L))
     snapshot
     .query_sourced_events(arc)
     .map(event => {
-      let value = match event.buses().reader(Gain) {
+      let value = match event.controls().reader(Gain) {
         Some(read) => read(3L, 4L).get().unwrap()
         None => -1.0
       }
       (event.event().value.get(Note), value)
     })
   }
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let original = doc.lower_with_cache(cache)
   @debug.assert_eq(gain_buses(original), [(Some(60.0), 0.4), (Some(64.0), 0.8)])
   let edited = doc.replace_with_silence(id=bus_id("a"))
@@ -321,7 +318,9 @@ fn mini_control_at(
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 64L)),
     )[0]
-  guard onset.buses().reader(key) is Some(read) else { fail("no \{key} bus") }
+  guard onset.controls().reader(key) is Some(read) else {
+    fail("no \{key} bus")
+  }
   (onset.event().value.get(key), read(at.num, at.den).get().unwrap())
 }
 
@@ -431,7 +430,7 @@ test "step argument spelling does not change identity or degrade drops" {
 fn bus_gain_or_rest(
   name : String,
   values : Array[Double],
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+) -> @pattern.PatternDoc raise {
   @pattern.PatternDoc::sequence(
     id=bus_id(name),
     docs=values.mapi((i, v) => {
@@ -450,13 +449,11 @@ fn bus_gain_or_rest(
 
 ///|
 /// The first onset's `gain`, and its gain bus read at 1/4 and 3/4.
-fn bus_gain_reads(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-) -> (Double?, Array[Double]) raise {
+fn bus_gain_reads(doc : @pattern.PatternDoc) -> (Double?, Array[Double]) raise {
   let onset = doc
     .lower()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
-  let read = onset.buses().reader(Gain).unwrap()
+  let read = onset.controls().reader(Gain).unwrap()
   (
     onset.event().value.get(Gain),
     [read(1L, 4L).get().unwrap(), read(3L, 4L).get().unwrap()],
@@ -517,7 +514,7 @@ test "an overriding key falls back to the note's own value where the outer one r
     )
     .lower()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
-  let read = onset.buses().reader(Pan).unwrap()
+  let read = onset.controls().reader(Pan).unwrap()
   // The same rule as `gain`: where the outer value rests, the inner applies.
   @debug.assert_eq(
     (
@@ -557,7 +554,7 @@ test "a voice follows only the keys whose bus varies" {
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 4L)),
     )[0]
-  let controls = @pattern.Controls(onset.event().value, buses=onset.buses())
+  let controls = onset.controls()
   let followed = []
   @control.ControlSource::each_varying(controls, (key, read) => {
     followed.push("\{key} \{read(1L, 2L)}")

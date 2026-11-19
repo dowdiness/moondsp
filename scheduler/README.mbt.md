@@ -32,7 +32,7 @@ sample-accurate audio voice triggers across block boundaries:
 
 - **Upstream consumers**: `browser/internal/playback_host` drives live browser
   playback through staged snapshots; custom hosts feed `Pat[ControlMap]` or
-  `Song[ControlMap]` instances into the scheduler.
+  `Song` instances into the scheduler.
 - **Downstream dependencies**: [`voice/`](../voice/) receives dispatched note
   events, gates, and controls; [`pattern/`](../pattern/) and [`song/`](../song/)
   supply time intervals and queryable event streams; [`dsp/`](../dsp/) defines

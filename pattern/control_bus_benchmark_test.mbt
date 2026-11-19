@@ -34,7 +34,7 @@ test "bench/control_bus/per_block" (b : @bench.T) {
     }
   })
   let read = snapshot.query_sourced_events(arcs[0])[0]
-    .buses()
+    .controls()
     .reader(Lpf)
     .unwrap()
   b.bench(name="one compiled bus signal per block", () => {

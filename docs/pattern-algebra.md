@@ -137,8 +137,8 @@ rule, do not expose a generic Applicative-like API.
 
 ## `ControlMap` merging is a special operation
 
-`PatternDoc::merge_control(left~, right~)` is specific to
-`PatternDoc[ControlMap]`. It keeps events from `left` and lowers `right` to
+`PatternDoc::merge_control(left~, right~)` is specific to control patterns;
+`PatternDoc` holds only `ControlMap` events. It keeps events from `left` and lowers `right` to
 control buses that those events follow (ADR-0019). There is one merge
 semantics; the `Pat` API has no `merge_control`. Put several controls on one
 event with `controls(map)`.

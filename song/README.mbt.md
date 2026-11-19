@@ -1,7 +1,7 @@
 # Songs and sections
 
 `song` arranges patterns into named, length-bounded sections and places those
-sections on a long-form timeline. It remains generic in the event payload and
+sections on a long-form timeline. It arranges `ControlMap` patterns and
 does not depend on DSP, voices, or browser code.
 
 ## Architecture context
@@ -24,7 +24,7 @@ between pattern queries and the scheduler:
 ```
 
 - **Upstream consumers**: [`mini/`](../mini/) parses `parse_song` and
-  `parse_song` expressions into `Song[ControlMap]` layouts.
+  `parse_song` expressions into `Song` layouts.
 - **Downstream dependencies**: [`pattern/`](../pattern/) provides the underlying
   `Pat[A]`, `Rational`, and `TimeSpan` query types. `song` has zero dependencies
   on DSP buffers, synthesis graphs, or audio hardware.
@@ -33,16 +33,16 @@ between pattern queries and the scheduler:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Song Composition** | `Song[A]`, `Section[A]`, `SongPart[A]` | `Song::Song`, `Song::from_sections`, `Section::Section`, `Section::from_pattern`, `SongPart::SongPart`, `SongPart::at` |
-| **Section & Layers** | `Section[A]`, `SectionBody[A]`, `SectionLayer[A]` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
-| **Timeline & Occurrence** | `Song[A]`, `SectionOccurrence[A]` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
+| **Song Composition** | `Song`, `Section`, `SongPart` | `Song::Song`, `Song::from_sections`, `Section::Section`, `Section::from_pattern`, `SongPart::SongPart`, `SongPart::at` |
+| **Section & Layers** | `Section`, `SectionBody`, `SectionLayer` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
+| **Timeline & Occurrence** | `Song`, `SectionOccurrence` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
 | **Time Scopes** | `TimeScope` | `TimeScope::TimeScope`, `TimeScope::identity`, `TimeScope::at_rate`, `TimeScope::fast`, `TimeScope::slow` |
-| **Live Editing & Documents** | `SongDoc[A]`, `SectionDoc[A]`, `SongSnapshot[A]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::query` |
+| **Live Editing & Documents** | `SongDoc`, `SectionDoc`, `SongSnapshot` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::query` |
 | **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
 
 ## Build a section
 
-`Section[A]` gives a pattern a name, duration in cycles, and local `TimeScope`.
+`Section` gives a pattern a name, duration in cycles, and local `TimeScope`.
 `from_pattern` is the concise one-cycle constructor.
 
 ```mbt check

@@ -18,9 +18,7 @@ fn bus_id(name : String) -> @identity.PatternNodeId {
 ///|
 /// One note held for 2 cycles under `slow(2)`, with `lpf` read from `cutoff`
 /// over the first cycle before the stretch.
-fn bus_doc(
-  cutoff : (Double) -> Double,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] raise {
+fn bus_doc(cutoff : (Double) -> Double) -> @pattern.PatternSnapshot raise {
   @pattern.PatternDoc::merge_control(
     id=bus_id("merge"),
     left=@pattern.PatternDoc::control_atom(
@@ -67,9 +65,7 @@ fn bus_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool raise {
 ///|
 /// Per-block brightness (RMS of the first difference, which rises with the
 /// lowpass cutoff) of two cycles played through the scheduler.
-fn bus_brightness(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
-) -> Array[Double] raise {
+fn bus_brightness(snapshot : @pattern.PatternSnapshot) -> Array[Double] raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.InstrumentSelector::AllEvents, bus_pool(ctx)),
@@ -132,9 +128,7 @@ test "a held voice follows a stretched lpf sweep through its bus" {
 
 ///|
 /// RMS of the first block of `doc` played with gain bound to the voice frame.
-fn bus_first_block_rms(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
-) -> Double raise {
+fn bus_first_block_rms(doc : @pattern.PatternDoc) -> Double raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let pool = @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze([
@@ -167,7 +161,7 @@ test "a voice starts from its bus value, which rev defines" {
   // Reversed, the second slot's note sounds first. Its bus reads the step
   // just before the slot's end (0.9); the slot's own query samples its
   // start (0.1).
-  let doc = (gain : @pattern.PatternDoc[@pattern.ControlMap]) => {
+  let doc = (gain : @pattern.PatternDoc) => {
     @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
       @pattern.PatternDoc::control_atom(id=bus_id("other"), key=Gain, value=0.0),
       @pattern.PatternDoc::merge_control(

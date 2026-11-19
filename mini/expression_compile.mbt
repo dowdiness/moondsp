@@ -9,13 +9,13 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 
 ///|
 priv struct MiniDefinition {
-  body : @pattern.PatternDoc[@pattern.ControlMap]
+  body : @pattern.PatternDoc
   name_span : MiniSpan
 }
 
 ///|
 fn MiniDefinition::MiniDefinition(
-  body : @pattern.PatternDoc[@pattern.ControlMap],
+  body : @pattern.PatternDoc,
   name_span : MiniSpan,
 ) -> MiniDefinition {
   { body, name_span, }
@@ -70,7 +70,7 @@ fn ResolvedMiniExpr::ResolvedMiniExpr(
 fn compile_mini_doc(
   expr : ResolvedMiniExpr,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise ParseError {
+) -> @pattern.PatternDoc raise ParseError {
   match expr.node {
     Literal(kind, content, offset) => {
       let doc = match kind {

@@ -3,7 +3,7 @@
 /// edited material keeps its current interval until its next source entry.
 pub fn PatternScheduler::queue_pattern_snapshot(
   self : PatternScheduler,
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshot,
 ) -> Unit {
   self.queue_playback_snapshot(PlaybackSnapshot::pattern(snapshot))
 }
@@ -14,7 +14,7 @@ pub fn PatternScheduler::queue_pattern_snapshot(
 /// at acceptance in the next block, before all material edits may be audible.
 pub fn PatternScheduler::queue_song_snapshot(
   self : PatternScheduler,
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  snapshot : @song.SongSnapshot,
 ) -> Unit {
   self.queue_playback_snapshot(PlaybackSnapshot::song(snapshot))
 }

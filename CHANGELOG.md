@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking MoonBit API:** the pattern document layer is specialized to
+  `ControlMap`. `PatternDoc`, `PatternSnapshot`, `PatternSnapshotWithOrigins`,
+  `EventWithOrigin`, `PatternSnapshotEvent`, `ControlBus`, and the lowering
+  cache lose their payload parameter; `Pat[A]` stays generic. Song structure
+  follows: `Section`, `Song`, `SongDoc`, and the other song types hold
+  `Pat[ControlMap]` bodies.
+  `@pattern.EventBuses` is replaced by `@pattern.Controls`, read through
+  `.controls()` instead of `.buses()`.
 - **Breaking MoonBit API:** each control's domain is stated once, in
   `@control.Control::admits(value)`. Mini checks it for the keys it parses
   with a range, and `note_gate` checks `attack` and `hold`.

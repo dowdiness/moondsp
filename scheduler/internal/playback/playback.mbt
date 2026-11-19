@@ -7,7 +7,7 @@ pub struct PlaybackSourcedEvent {
   priv source_frame : @identity.SourceFrameId?
   priv source_start : Double
   priv source_pitch : Double
-  priv buses : @pattern.EventBuses
+  priv controls : @pattern.Controls
 }
 
 ///|
@@ -21,16 +21,16 @@ pub fn PlaybackSourcedEvent::anonymous(
     source_frame: None,
     source_start: -1.0,
     source_pitch: -1.0,
-    buses: @pattern.EventBuses::none(),
+    controls: @pattern.Controls::fixed(event.value),
   }
 }
 
 ///|
-/// The buses this event's controls follow, on the playback clock.
-pub fn PlaybackSourcedEvent::buses(
+/// This event's controls, on the playback clock.
+pub fn PlaybackSourcedEvent::controls(
   self : PlaybackSourcedEvent,
-) -> @pattern.EventBuses {
-  self.buses
+) -> @pattern.Controls {
+  self.controls
 }
 
 ///|
@@ -77,36 +77,36 @@ pub fn PlaybackSourcedEvent::origin(
 
 ///|
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap])
-  Song(@song.SongSnapshot[@pattern.ControlMap])
-  RepeatSong(@song.SongSnapshot[@pattern.ControlMap])
+  Pattern(@pattern.PatternSnapshot)
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Song(@song.SongSnapshot)
+  RepeatSong(@song.SongSnapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshotWithOrigins,
 ) -> PlaybackSnapshot {
   PatternWithOrigins(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
+  snapshot : @pattern.PatternSnapshot,
 ) -> PlaybackSnapshot {
   Pattern(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  snapshot : @song.SongSnapshot,
 ) -> PlaybackSnapshot {
   Song(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::repeat_song(
-  snapshot : @song.SongSnapshot[@pattern.ControlMap],
+  snapshot : @song.SongSnapshot,
 ) -> PlaybackSnapshot {
   RepeatSong(snapshot)
 }
@@ -391,7 +391,7 @@ pub fn PlaybackState::query_active_sourced_events(
           source_frame: sourced.source_frame,
           source_start: sourced.source_start,
           source_pitch: sourced.source_pitch,
-          buses: sourced.buses.placed(placement),
+          controls: sourced.controls.placed(placement),
         }
       })
   }

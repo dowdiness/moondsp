@@ -1,7 +1,5 @@
 ///|
-fn bench_origin_draft_doc(
-  text : String,
-) -> @pattern.PatternDoc[@pattern.ControlMap] {
+fn bench_origin_draft_doc(text : String) -> @pattern.PatternDoc {
   let draft = try! Draft(text)
   match draft.analysis {
     Playable(source, _) =>
@@ -32,13 +30,10 @@ fn bench_origin_rows(
 
 ///|
 fn bench_origin_check_parity(
-  doc : @pattern.PatternDoc[@pattern.ControlMap],
+  doc : @pattern.PatternDoc,
   arcs : Array[@pattern.TimeSpan],
   require_bindings : Bool,
-) -> (
-  @pattern.PatternSnapshot[@pattern.ControlMap],
-  @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
-) raise {
+) -> (@pattern.PatternSnapshot, @pattern.PatternSnapshotWithOrigins) raise {
   let ordinary = try! doc.lower()
   let exact = try! doc.lower_with_origins()
   for arc in arcs {

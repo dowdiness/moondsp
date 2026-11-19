@@ -301,7 +301,7 @@ fn PlaybackAdmission::expression(
 ///|
 fn PlaybackAdmission::arrangement(
   self : PlaybackAdmission,
-  song : @song.Song[@pattern.ControlMap],
+  song : @song.Song,
   repeating : Bool,
 ) -> Unit raise ParseError {
   let occurrences = song.occurrences()

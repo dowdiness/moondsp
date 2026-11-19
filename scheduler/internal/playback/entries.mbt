@@ -1,11 +1,8 @@
 ///|
 priv enum EntrySource {
-  Pattern(@pattern.PatternSnapshot[@pattern.ControlMap], Int32)
-  PatternWithOrigins(
-    @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap],
-    Int32,
-  )
-  Song(@song.SongSnapshot[@pattern.ControlMap], Int32)
+  Pattern(@pattern.PatternSnapshot, Int32)
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins, Int32)
+  Song(@song.SongSnapshot, Int32)
 }
 
 ///|
@@ -468,7 +465,7 @@ fn EntrySpec::query_sourced(
         source_frame: None,
         source_start: -1.0,
         source_pitch: -1.0,
-        buses: event.buses().placed(placement),
+        controls: event.controls().placed(placement),
       })
     PatternWithOrigins(snapshot, index) =>
       snapshot
@@ -480,7 +477,7 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
-        buses: event.buses().placed(placement),
+        controls: event.controls().placed(placement),
       })
     Song(snapshot, index) => {
       let source_arc = @pattern.TimeSpan(
@@ -497,7 +494,7 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
-        buses: event.buses().placed(placement),
+        controls: event.controls().placed(placement),
       })
     }
   }

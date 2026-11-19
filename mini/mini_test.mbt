@@ -187,8 +187,8 @@ fn unwrap_ok(
 
 ///|
 fn unwrap_doc(
-  result : Result[@pattern.PatternDoc[@pattern.ControlMap], String],
-) -> @pattern.PatternDoc[@pattern.ControlMap] {
+  result : Result[@pattern.PatternDoc, String],
+) -> @pattern.PatternDoc {
   match result {
     Ok(doc) => doc
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -197,8 +197,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_mini_snapshot(
-  result : Result[@pattern.PatternSnapshot[@pattern.ControlMap], String],
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  result : Result[@pattern.PatternSnapshot, String],
+) -> @pattern.PatternSnapshot {
   match result {
     Ok(snapshot) => snapshot
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -214,7 +214,7 @@ fn pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 fn assert_builder_result_error(
-  result : Result[@pattern.PatternDoc[@pattern.ControlMap], String],
+  result : Result[@pattern.PatternDoc, String],
   expected : String,
 ) -> Unit {
   match result {
@@ -472,7 +472,7 @@ test "parse_doc_reusing preserves ids across whitespace edits" {
   @debug.assert_eq(doc.root().value(), edited.root().value())
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(edited.contains_node(pid("mini:sound:sd:0")))
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
   ignore(edited.lower_with_cache(cache))
@@ -493,7 +493,7 @@ test "parse_doc_reusing lpf edit preserves sound atom id" {
   assert_true(
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:200")),
   )
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
   let snapshot = edited.lower_with_cache(cache)
@@ -571,7 +571,7 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
   assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
   assert_true(edited.contains_node(pid("mini:sound:cp:0")))
   assert_true(edited.contains_node(pid("mini:sound:hh:0")))
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   ignore(doc.lower_with_cache(cache))
   cache.reset_stats()
   let snapshot = edited.lower_with_cache(cache)
@@ -614,7 +614,7 @@ test "parse_doc_reusing insertion and removal keep surviving token ids" {
 ///|
 fn draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap] raise {
+) -> @pattern.PatternSnapshotWithOrigins raise {
   let input = match draft.prepare_playback() {
     Ok(input) => input
     Err(error) => fail(error.message())

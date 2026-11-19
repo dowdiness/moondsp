@@ -144,7 +144,7 @@ Shared authoring identity:
 | [`identity/`](../identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |
 | [`pattern/`](../pattern/README.mbt.md) | Queryable musical pattern algebra with exact `Rational` time, polyrhythmic combinators, and `ControlMap` events | `Pat[A]`, `Rational`, `TimeSpan`, `Event[A]`, `ControlMap`, `sequence`, `stack`, `controls`, `PatternDoc` |
 | [`mini/`](../mini/README.mbt.md) | Mini-notation parsing, causal draft editing, and frozen playback inputs with exact pattern origins | `parse`, `parse_song`, `parse_doc`, `parse_snapshot`, `Draft`, `PlaybackInput` |
-| [`song/`](../song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[A]`, `Section[A]`, `SongPart[A]`, `TimeScope`, `SongDoc[A]`, `SongSnapshot[A]` |
+| [`song/`](../song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song`, `Section`, `SongPart`, `TimeScope`, `SongDoc`, `SongSnapshot` |
 | [`scheduler/`](../scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
 
 ### Platform Adapters & Native Scaffolding

@@ -13,7 +13,7 @@ fn origin_note(
   name : String,
   serial : Int64,
   pitch : Double,
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise @identity.StableIdError {
+) -> @pattern.PatternDoc raise @identity.StableIdError {
   @pattern.PatternDoc::control_atom(
     id=pid(name),
     source_atom=atom_id(serial),
@@ -25,10 +25,10 @@ fn origin_note(
 ///|
 fn resolved_use(
   name : String,
-  definition : @pattern.PatternDoc[@pattern.ControlMap],
+  definition : @pattern.PatternDoc,
   reference_serial : Int64,
   binding_serial : Int64,
-) -> @pattern.PatternDoc[@pattern.ControlMap] raise @identity.StableIdError {
+) -> @pattern.PatternDoc raise @identity.StableIdError {
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
   @pattern.PatternDoc::reference_with_binding(
     id=pid(name),
@@ -261,7 +261,7 @@ test "nested reference bindings are immutable outer to inner and distinct per us
 
 ///|
 test "same music refreshes origins through reused cache without changing entry identity" {
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let before_doc = resolved_use("use", origin_note("atom", 1L, 60.0), 3L, 4L)
   let after_doc = resolved_use("use", origin_note("atom", 2L, 60.0), 3L, 5L)
   // Populate general specialization first; exact compilation must not reuse it.
@@ -308,8 +308,8 @@ test "same music refreshes origins through reused cache without changing entry i
 
 ///|
 test "exact lowering rejects missing attribution before returning a snapshot" {
-  let cache : @pattern.PatternLoweringCache[Int32] = @pattern.PatternLoweringCache::new()
-  let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=1)
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=n(1))
   ignore(runtime.lower_with_cache(cache))
   let missing_atom = try {
     ignore(runtime.lower_with_origins(cache~))
@@ -323,7 +323,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
   )
   let custom = @pattern.PatternDoc::from_pattern(
     id=pid("opaque"),
-    pat=@pattern.Pat::pure(1),
+    pat=@pattern.Pat::pure(n(1)),
   )
   let missing_opaque = try {
     ignore(custom.lower_with_origins(cache~))
@@ -340,7 +340,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     definition=@pattern.PatternDoc::atom(
       id=pid("atom"),
       source_atom=atom_id(1L),
-      value=1,
+      value=n(1),
     ),
   )
   let missing_binding = try {
@@ -353,7 +353,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     missing_binding,
     Some(@pattern.PatternDocError::MissingReferenceBinding(pid("reference"))),
   )
-  let silence : @pattern.PatternDoc[Int32] = @pattern.PatternDoc::silence(
+  let silence : @pattern.PatternDoc = @pattern.PatternDoc::silence(
     id=pid("silence"),
   )
   @debug.assert_eq(
@@ -362,13 +362,13 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
   )
   @debug.assert_eq(
     runtime.lower().query(doc_span(0, 1, 1, 1)).map(event => event.value),
-    [1],
+    [n(1)],
   )
 }
 
 ///|
 test "prepared reference contexts outlive cache clearing before their first query" {
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let definition = resolved_use("inner", origin_note("atom", 1L, 60.0), 3L, 4L)
   let standalone = definition.lower_with_origins(cache~)
   let left = resolved_use("left", definition, 5L, 6L)
@@ -403,7 +403,7 @@ test "prepared reference contexts outlive cache clearing before their first quer
 
 ///|
 test "origin cache retains full witnesses when binding serials coincide" {
-  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
   let definition = origin_note("atom", 1L, 60.0)
   let uses = [
     resolved_use("first", definition, 10L, 7L),

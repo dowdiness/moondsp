@@ -572,8 +572,8 @@ fn SourceMap::resolve_reference(
   start : Int32,
   end : Int32,
   definition_span : MiniSpan,
-  definition : @pattern.PatternDoc[@pattern.ControlMap],
-) -> @pattern.ResolvedReference[@pattern.ControlMap] raise ParseError {
+  definition : @pattern.PatternDoc,
+) -> @pattern.ResolvedReference raise ParseError {
   for reference in self.references {
     if reference.span.start == start && reference.span.end == end {
       let (binding, target) = match reference.binding {
@@ -650,7 +650,7 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 ///|
 /// Exact patterns and explicitly untracked runtime sources are distinct capabilities.
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins[@pattern.ControlMap], Double)
+  Pattern(@pattern.PatternSnapshotWithOrigins, Double)
   Runtime(PlaySource)
 }
 
@@ -659,7 +659,7 @@ pub(all) enum PreparedPlayback {
 /// A failed exact compilation never falls back to runtime-only playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
-  previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
+  previous~ : @pattern.PatternDoc? = None,
   query_window? : @pattern.QueryWindow,
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
@@ -735,7 +735,7 @@ pub struct Draft {
   priv mut sources : SourceMap
   /// What the current text means for playback, or why it cannot be played.
   priv mut analysis : DraftAnalysis
-  priv mut last_valid_doc : @pattern.PatternDoc[@pattern.ControlMap]?
+  priv mut last_valid_doc : @pattern.PatternDoc?
   /// The window of the player the text is checked for, once that is known.
   priv mut query_window : @pattern.QueryWindow?
 }
@@ -756,9 +756,7 @@ fn DraftAnalysis::diagnostic(self : DraftAnalysis) -> DraftDiagnostic? {
 }
 
 ///|
-fn DraftAnalysis::pattern_doc(
-  self : DraftAnalysis,
-) -> @pattern.PatternDoc[@pattern.ControlMap]? {
+fn DraftAnalysis::pattern_doc(self : DraftAnalysis) -> @pattern.PatternDoc? {
   match self {
     Playable(source, _) =>
       match source.body() {
@@ -801,7 +799,7 @@ fn draft_analysis(
   at : DraftVersion,
   mode : DraftTracking,
   sources : SourceMap,
-  previous : @pattern.PatternDoc[@pattern.ControlMap]?,
+  previous : @pattern.PatternDoc?,
   query_window : @pattern.QueryWindow?,
 ) -> DraftAnalysis {
   let payload = match mode {

@@ -1,7 +1,7 @@
 // Unit tests for PatternDoc's incr `BackdateEq` participation. The trait
 // methods (`changed_at` / `backdate_equal`) are exercised here against the
 // published incr pin; the full `accepted_memo` last-good round-trip lives in
-// the mini authoring pipeline tests. `PatternDoc[Int]` stands in as the
+// the mini authoring pipeline tests. `PatternDoc` stands in as the
 // non-`Eq`, revision-bearing candidate value.
 
 ///|
@@ -13,14 +13,16 @@ fn bd_pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 /// A revision-0 `pure` doc carrying `value`.
-fn bd_doc0(value : Int32) -> @pattern.PatternDoc[Int32] {
-  @pattern.PatternDoc::pure(id=bd_pid("root"), value~)
+fn bd_doc0(value : Int32) -> @pattern.PatternDoc {
+  @pattern.PatternDoc::pure(id=bd_pid("root"), value=n(value))
 }
 
 ///|
 /// A revision-1 doc (root reversed once) carrying `value`.
-fn bd_doc1(value : Int32) -> @pattern.PatternDoc[Int32] {
-  @pattern.PatternDoc::pure(id=bd_pid("root"), value~).rev(id=bd_pid("rev1")) catch {
+fn bd_doc1(value : Int32) -> @pattern.PatternDoc {
+  @pattern.PatternDoc::pure(id=bd_pid("root"), value=n(value)).rev(
+    id=bd_pid("rev1"),
+  ) catch {
     _ => abort("rev should not fail on a fresh pure doc")
   }
 }

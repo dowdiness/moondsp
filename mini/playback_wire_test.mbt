@@ -10,7 +10,7 @@ fn wire_test_input(text : String) -> @mini.PlaybackInput raise {
 ///|
 fn wire_test_snapshot(
   input : @mini.PlaybackInput,
-) -> @pattern.PatternSnapshotWithOrigins[@pattern.ControlMap] raise {
+) -> @pattern.PatternSnapshotWithOrigins raise {
   match input.compile() {
     Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) => snapshot
     _ => fail("expected exact pattern")

@@ -57,7 +57,7 @@ fn single_span(
   begin : @pattern.Rational,
   end_ : @pattern.Rational,
   control~ : @pattern.ControlMap = @pattern.ControlMap::empty(),
-) -> @song.Song[@pattern.ControlMap] raise {
+) -> @song.Song raise {
   let duration = end_ - begin
   let section = @song.Section::Section(
     name="note",
