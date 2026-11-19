@@ -13,6 +13,7 @@ import {
 pub(all) suberror TransportError {
   InvalidTempo
   InvalidSampleRate
+  InvalidBlockSize
   TimeOutOfRange
 }
 pub fn TransportError::equal(Self, Self) -> Bool

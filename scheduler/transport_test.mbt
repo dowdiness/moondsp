@@ -258,6 +258,26 @@ test "tempo sample spans preserve exact millibpm arithmetic" {
 }
 
 ///|
+test "a block's query window is its span at the fastest tempo" {
+  // 128 frames / 48000 Hz * 1000 beats/min / 60 / 4 beats per cycle = 1/90 cycle.
+  let window = @scheduler.max_query_window_for(
+    sample_rate=48000.0,
+    block_size=128,
+  ).unwrap()
+  assert_true(window.span() == @pattern.Rational(1L, 90L))
+  for block_size in [0, -1, 65537] {
+    assert_true(
+      @scheduler.max_query_window_for(sample_rate=48000.0, block_size~)
+      is Err(InvalidBlockSize),
+    )
+  }
+  assert_true(
+    @scheduler.max_query_window_for(sample_rate=44100.5, block_size=128)
+    is Err(InvalidSampleRate),
+  )
+}
+
+///|
 test "tempo sample spans reject invalid sample counts and rates" {
   let tempo = @scheduler.Tempo::from_bpm(120.0).unwrap()
   assert_true(tempo.span_for_samples(-1, sample_rate=48000.0) is Err(_))

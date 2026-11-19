@@ -35,29 +35,29 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
 
 ///|
 test "notation modifier chains and exact time factor growth reject before lowering" {
-  let span = Some(@pattern.Rational(2L, 45L))
+  let window = calibrated_window()
   let source = "note(\"60" + Array::make(1000, "*1").join("") + "\")"
-  assert_true(parse_play_source(source, max_query_span=span) is Err(_))
+  assert_true(parse_play_source(source, query_window=window) is Err(_))
   assert_true(
-    parse_play_source("note(\"60/1000000000/1000000000\")", max_query_span=span)
+    parse_play_source("note(\"60/1000000000/1000000000\")", query_window=window)
     is Err(_),
   )
   let masked = "note(\"60" + Array::make(8, "*1000000000").join("") + "(0,1)\")"
-  assert_true(parse_play_source(masked, max_query_span=span) is Err(_))
+  assert_true(parse_play_source(masked, query_window=window) is Err(_))
 }
 
 ///|
 test "block comments cannot hide recursive syntax from playback admission" {
-  let span = Some(@pattern.Rational(2L, 45L))
+  let window = calibrated_window()
   for depth in [40, 2000] {
     let source = "/* // */ " +
       Array::make(depth, "(").join("") +
       "note(\"60\")" +
       Array::make(depth, ")").join("")
-    assert_true(parse_play_source(source, max_query_span=span) is Err(_))
+    assert_true(parse_play_source(source, query_window=window) is Err(_))
   }
   let harmless = "/* " + Array::make(40, "(\"//").join("") + " */ note(\"60\")"
-  assert_true(parse_play_source(harmless, max_query_span=span) is Ok(_))
+  assert_true(parse_play_source(harmless, query_window=window) is Ok(_))
 }
 
 ///|
@@ -66,8 +66,7 @@ test "unterminated comments never publish a valid source prefix" {
     let source = "bpm(120); note(\"64\") " + suffix
     assert_true(parse_play_source(source) is Err(_))
     assert_true(
-      parse_play_source(source, max_query_span=Some(@pattern.Rational(2L, 45L)))
-      is Err(_),
+      parse_play_source(source, query_window=calibrated_window()) is Err(_),
     )
     assert_true(parse("note(\"64\") " + suffix) is Err(_))
     assert_true(parse_doc("note(\"64\") " + suffix) is Err(_))
@@ -129,7 +128,9 @@ test "generated transform compositions respect estimated events and preserve out
         let ordinary = parse(source).unwrap()
         let bounded = parse_play_source(
           source,
-          max_query_span=Some(@pattern.Rational(1L, 8L)),
+          query_window=@pattern.QueryWindow::from_span(
+            @pattern.Rational(1L, 8L),
+          ).unwrap(),
         ).unwrap()
         guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
         let snapshot = doc.lower()
@@ -154,7 +155,7 @@ test "generated transform compositions respect estimated events and preserve out
 
 ///|
 test "sequential song sections are admitted one occurrence at a time" {
-  let span = Some(@pattern.Rational::from_int(1))
+  let window = @pattern.QueryWindow::from_span(@pattern.Rational::from_int(1)).unwrap()
   let sections = [
     for name in ["bd", "sd", "hh", "cp", "oh"] => {
       "section(\"\{name}\",4,s(\"\{name}*64\"))"
@@ -166,15 +167,21 @@ test "sequential song sections are admitted one occurrence at a time" {
     }
   ]
   let song = "song(" + sections.join(",") + "," + parts.join(",") + ")"
-  assert_true(parse_play_source(song, max_query_span=span) is Ok(_))
+  assert_true(parse_play_source(song, query_window=window) is Ok(_))
   let draft = Draft(song)
   guard draft.prepare_playback() is Ok(input) else { fail("prepare") }
-  assert_true(input.compile(max_query_span=span) is Ok(_))
+  assert_true(input.compile(query_window=window) is Ok(_))
   // Occurrences that sound together are still bounded together.
   let layered = "song(" +
     sections.join(",") +
     "," +
     parts.map(part => part.replace(old=")", new=",0)")).join(",") +
     ")"
-  assert_true(parse_play_source(layered, max_query_span=span) is Err(_))
+  assert_true(parse_play_source(layered, query_window=window) is Err(_))
+}
+
+///|
+/// The 2/45-cycle window these admission bounds are calibrated against.
+fn calibrated_window() -> @pattern.QueryWindow {
+  @pattern.QueryWindow::from_span(@pattern.Rational(2L, 45L)).unwrap()
 }

@@ -78,7 +78,7 @@ test "bounded play source preserves ordinary musical output" {
   let source = "let beat = note(\"60 64\"); beat.fast(2)"
   let bounded = @mini.parse_play_source(
     source,
-    max_query_span=Some(@pattern.Rational(2L, 45L)),
+    query_window=calibrated_window(),
   ).unwrap()
   guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
   let snapshot = doc.lower()
@@ -104,10 +104,7 @@ test "bounded play source rejects amplification before querying future branches"
   ]
   for source in sources {
     assert_true(
-      @mini.parse_play_source(
-        source,
-        max_query_span=Some(@pattern.Rational(2L, 45L)),
-      )
+      @mini.parse_play_source(source, query_window=calibrated_window())
       is Err(_),
     )
   }
@@ -118,21 +115,21 @@ test "bounded play source prevents eager Euclidean allocation" {
   assert_true(
     @mini.parse_play_source(
       "s(\"bd(1,128)\")",
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
+      query_window=calibrated_window(),
     )
     is Ok(_),
   )
   assert_true(
     @mini.parse_play_source(
       "s(\"bd(1,129)\")",
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
+      query_window=calibrated_window(),
     )
     is Err(_),
   )
   assert_true(
     @mini.parse_play_source(
       "song(section(\"a\",1,s(\"bd(1,100000)\")),part(\"a1\",\"a\"))",
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
+      query_window=calibrated_window(),
     )
     is Err(_),
   )
@@ -142,34 +139,22 @@ test "bounded play source prevents eager Euclidean allocation" {
 test "bounded play source accounts for cumulative layers and repeated occurrences" {
   let layer = "note(\"60\").fast(1000)"
   assert_true(
-    @mini.parse_play_source(
-      layer,
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
-    )
-    is Ok(_),
+    @mini.parse_play_source(layer, query_window=calibrated_window()) is Ok(_),
   )
   let layers = Array::make(6, layer).join(" + ")
   assert_true(
-    @mini.parse_play_source(
-      layers,
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
-    )
-    is Err(_),
+    @mini.parse_play_source(layers, query_window=calibrated_window()) is Err(_),
   )
   let song = "song(section(\"a\",1," +
     layer +
     "),part(\"a1\",\"a\"),part(\"a2\",\"a\"),part(\"a3\",\"a\"))"
   assert_true(
-    @mini.parse_play_source(
-      song,
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
-    )
-    is Ok(_),
+    @mini.parse_play_source(song, query_window=calibrated_window()) is Ok(_),
   )
   assert_true(
     @mini.parse_play_source(
       song + ".repeat()",
-      max_query_span=Some(@pattern.Rational(2L, 45L)),
+      query_window=calibrated_window(),
     )
     is Err(_),
   )
@@ -177,20 +162,26 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
 
 ///|
 test "bounded play source rejects source size and recursive depth before parsing" {
-  let span = Some(@pattern.Rational(2L, 45L))
+  let window = calibrated_window()
   let oversized = "note(\"60\")" + Array::make(8192, " ").join("")
-  assert_true(@mini.parse_play_source(oversized, max_query_span=span) is Err(_))
+  assert_true(@mini.parse_play_source(oversized, query_window=window) is Err(_))
   let nested = Array::make(40, "(").join("") +
     "note(\"60\")" +
     Array::make(40, ")").join("")
-  assert_true(@mini.parse_play_source(nested, max_query_span=span) is Err(_))
+  assert_true(@mini.parse_play_source(nested, query_window=window) is Err(_))
   let misleading_comment = "// " + Array::make(40, ")").join("") + "\n"
   assert_true(
-    @mini.parse_play_source(misleading_comment + nested, max_query_span=span)
+    @mini.parse_play_source(misleading_comment + nested, query_window=window)
     is Err(_),
   )
   assert_true(
-    @mini.parse_play_source("// ((( ignored\nnote(\"60\")", max_query_span=span)
+    @mini.parse_play_source("// ((( ignored\nnote(\"60\")", query_window=window)
     is Ok(_),
   )
+}
+
+///|
+/// The 2/45-cycle window these admission bounds are calibrated against.
+fn calibrated_window() -> @pattern.QueryWindow {
+  @pattern.QueryWindow::from_span(@pattern.Rational(2L, 45L)).unwrap()
 }

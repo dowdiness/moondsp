@@ -211,20 +211,8 @@ fn Player::prepare(
     None => None
   }
   // Admission covers every supported future tempo, including the demo control.
-  let maximum_tempo = match @scheduler.Tempo::from_bpm(1000.0) {
-    Ok(tempo) => tempo
-    Err(_) => return Err(TransportRange)
-  }
-  let max_query_span = match
-    maximum_tempo.span_for_samples(
-      self.context.block_size(),
-      sample_rate=self.context.sample_rate(),
-    ) {
-    Ok(span) => span
-    Err(_) => return Err(TransportRange)
-  }
   let prepared = match
-    input.compile(max_query_span=Some(max_query_span), previous~) {
+    input.compile(query_window=self.scheduler.max_query_window(), previous~) {
     Ok(prepared) => prepared
     Err(message) => return Err(InvalidSource(message))
   }

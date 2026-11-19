@@ -53,18 +53,18 @@ fn parse_play_bpm_declaration(parser : Parser) -> Double raise ParseError {
 ///
 /// A top-level `bpm(number);` is optional. A song may also contain its
 /// historical `bpm(number)` item, but declaring both is rejected.
-/// Supplying `max_query_span` enables conservative browser playback admission.
-/// It bounds source construction and every query window up to that duration,
+/// Supplying `query_window` enables conservative browser playback admission.
+/// It bounds source construction and every query up to that window,
 /// including future conditional branches; no pattern queries are executed.
 pub fn parse_play_source(
   input : String,
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
-  max_query_span~ : @pattern.Rational? = None,
+  query_window? : @pattern.QueryWindow,
 ) -> Result[PlaySource, String] {
   parse_play_source_with_origins(
     input,
     previous,
-    max_query_span,
+    query_window,
     origins=None,
     syntax_depth_limit=None,
   )
@@ -74,7 +74,7 @@ pub fn parse_play_source(
 fn parse_play_source_with_origins(
   input : String,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
-  max_query_span : @pattern.Rational?,
+  query_window : @pattern.QueryWindow?,
   origins~ : SourceMap? = None,
   syntax_depth_limit~ : Int32? = None,
 ) -> Result[PlaySource, String] {
@@ -84,14 +84,13 @@ fn parse_play_source_with_origins(
       ParseError(message) => return Err(message)
     }
   }
-  let admission = match max_query_span {
+  let admission = match query_window {
     None => None
-    Some(span) => {
+    Some(window) => {
       check_playback_source_size(input) catch {
         ParseError(message) => return Err(message)
       }
-      guard span.num > 0L else { return Err("query span must be positive") }
-      Some(PlaybackAdmission(span.to_double()))
+      Some(PlaybackAdmission(window.span().to_double()))
     }
   }
   let parser = Parser(input, admission~, syntax_depth_limit~)

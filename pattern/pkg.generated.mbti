@@ -242,6 +242,12 @@ pub struct Placement {
 pub fn Placement::Placement(origin? : Rational, rate? : Rational) -> Self
 pub fn Placement::local_span(Self, TimeSpan) -> TimeSpan
 
+pub struct QueryWindow {
+  // private fields
+}
+pub fn QueryWindow::from_span(Rational) -> Self?
+pub fn QueryWindow::span(Self) -> Rational
+
 #derive(Eq, @debug.Debug)
 pub struct Rational {
   num : Int64

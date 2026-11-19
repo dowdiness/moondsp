@@ -664,11 +664,11 @@ pub(all) enum PreparedPlayback {
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
   previous~ : @pattern.PatternDoc[@pattern.ControlMap]? = None,
-  max_query_span~ : @pattern.Rational? = None,
+  query_window? : @pattern.QueryWindow,
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
     Text =>
-      parse_play_source(self.input, previous~, max_query_span~).map(source => {
+      parse_play_source(self.input, previous~, query_window?).map(source => {
         Runtime(source)
       })
     Song(_, origins) => {
@@ -676,7 +676,7 @@ pub fn PlaybackInput::compile(
         parse_play_source_with_origins(
           self.input,
           previous,
-          max_query_span,
+          query_window,
           origins=Some(origins),
           syntax_depth_limit=Some(32),
         ) {
@@ -693,7 +693,7 @@ pub fn PlaybackInput::compile(
         parse_play_source_with_origins(
           self.input,
           None,
-          max_query_span,
+          query_window,
           origins=Some(origins),
           syntax_depth_limit=Some(32),
         ) {

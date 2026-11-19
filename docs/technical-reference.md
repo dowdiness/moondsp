@@ -1636,7 +1636,13 @@ therefore cannot bypass admission. The same canonical conversion checks repeat
 periods without reconstructing millibpm in the browser host. Limits also apply
 to intermediate expressions and can reject sources whose final transform would
 reduce their cost. Direct Mini parsers remain unrestricted unless
-`parse_play_source(..., max_query_span=Some(span))` is requested.
+`parse_play_source(..., query_window=window)` is requested.
+
+The scheduler owns the window. `@scheduler.max_query_window_for(sample_rate~,
+block_size~)` returns a `@pattern.QueryWindow`, which is always positive, or
+fails when the scheduler cannot run that format. A `PatternScheduler` computes
+its own window once, when it is created, and the player reads it with
+`max_query_window()`.
 
 Source entry counts are checked even while Ready, before publication. For a live
 Update, `PatternScheduler::accept_playback` prepares the proposed tempo,

@@ -91,7 +91,8 @@ this change does not establish an allocation-free audio callback.
 
 The clock accepts 0.001–1000 BPM and rounds to the nearest 0.001 BPM (ties
 upward). Sample rates must be integral, from 1 through 384000 Hz; block sizes
-must be 1–65536. These are numeric implementation bounds, not musical units.
+must be 1–65536, or construction returns `InvalidSampleRate` or
+`InvalidBlockSize`. These are numeric implementation bounds, not musical units.
 BPM counts beats, and one source cycle is four beats (a 4/4 bar): 120 BPM
 advances 0.5 cycles per second, so a four-step pattern plays quarter notes.
 

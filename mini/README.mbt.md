@@ -148,7 +148,7 @@ An exact compilation failure never falls back to untracked playback.
 returns a `Result`, validating bounded source/wire sizes, safe integer identities,
 and complete source witnesses without inferring identity continuity. It does
 not replace `compile()` or host workload admission. `compile` accepts optional
-`previous` and `max_query_span` arguments; only explicit text input reuses the
+`previous` and `query_window` arguments; only explicit text input reuses the
 previous general document. A transported Song input must still parse as a song.
 
 `locate_origin(origin)` returns `Located(atom_range, reference_ranges)` with

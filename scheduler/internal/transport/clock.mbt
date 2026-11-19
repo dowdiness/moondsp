@@ -3,6 +3,7 @@
 pub(all) suberror TransportError {
   InvalidTempo
   InvalidSampleRate
+  InvalidBlockSize
   TimeOutOfRange
 }
 

@@ -18,7 +18,7 @@ pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
 pub fn parse_doc(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternDoc[@pattern.ControlMap], String]
 
-pub fn parse_play_source(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, max_query_span? : @pattern.Rational?) -> Result[PlaySource, String]
+pub fn parse_play_source(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, String]
 
 pub fn parse_snapshot(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 
@@ -168,7 +168,7 @@ pub fn PlaySource::bpm(Self) -> Double
 pub struct PlaybackInput {
   // private fields
 }
-pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, max_query_span? : @pattern.Rational?) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc[@pattern.ControlMap]?, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
 pub fn PlaybackInput::decode_wire(String) -> Result[Self, String]
 pub fn PlaybackInput::encode_wire(Self) -> String
 pub fn PlaybackInput::source(Self) -> String

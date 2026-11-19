@@ -38,6 +38,8 @@ fn InstrumentSelector::selects(
 ///|
 pub struct PatternScheduler {
   priv mut clock : @transport.Clock
+  /// The longest span one of its blocks can query, at any tempo it accepts.
+  priv max_query_window : @pattern.QueryWindow
   priv mut last_error : @transport.TransportError?
   priv contexts : Array[@moondsp.DspContext]
   priv scratch_left : @moondsp.AudioBuffer
@@ -65,11 +67,13 @@ pub fn PatternScheduler::PatternScheduler(
 ) -> PatternScheduler raise @transport.TransportError {
   let tempo = @transport.Tempo::from_bpm(bpm).unwrap_or_error()
   let clock = @transport.Clock::at_start(tempo, ctx.sample_rate()).unwrap_or_error()
-  if ctx.block_size() <= 0 || ctx.block_size() > 65536 {
-    raise @transport.TransportError::TimeOutOfRange
-  }
+  let max_query_window = max_query_window_for(
+    sample_rate=ctx.sample_rate(),
+    block_size=ctx.block_size(),
+  ).unwrap_or_error()
   {
     clock,
+    max_query_window,
     last_error: None,
     contexts: Array::makei(ctx.block_size() + 1, n => {
       @moondsp.DspContext(sample_rate=ctx.sample_rate(), block_size=n)
@@ -87,6 +91,15 @@ pub fn PatternScheduler::PatternScheduler(
     playback_state: @playback.PlaybackState(),
     onsets: None,
   }
+}
+
+///|
+/// The longest span one of this scheduler's blocks can query, at any tempo it
+/// accepts. Playback admission bounds sources over it.
+pub fn PatternScheduler::max_query_window(
+  self : PatternScheduler,
+) -> @pattern.QueryWindow {
+  self.max_query_window
 }
 
 ///|

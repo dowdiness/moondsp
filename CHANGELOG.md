@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Breaking MoonBit API:** `parse_play_source` and `PlaybackInput::compile`
+  take `query_window : @pattern.QueryWindow` instead of
+  `max_query_span : Rational?`. `QueryWindow::from_span` builds one only from a
+  positive span. The scheduler owns the window:
+  `@scheduler.max_query_window_for(sample_rate~, block_size~)` and
+  `PatternScheduler::max_query_window()`.
+- **Breaking MoonBit API:** `TransportError` gains `InvalidBlockSize`, which
+  `PatternScheduler` and `max_query_window_for` now return for a block size
+  outside 1–65536 instead of `TimeOutOfRange`.
+
 ### Changed
 
 - **Breaking tempo semantics:** BPM now counts beats with four beats per cycle

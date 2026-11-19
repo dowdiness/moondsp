@@ -13,6 +13,7 @@ import {
 }
 
 // Values
+pub fn max_query_window_for(sample_rate~ : Double, block_size~ : Int32) -> Result[@pattern.QueryWindow, @transport.TransportError]
 
 // Errors
 
@@ -85,6 +86,7 @@ pub fn PatternScheduler::expire_notes(Self, @pattern.TimeSpan) -> Result[Unit, @
 pub fn PatternScheduler::expire_notes_at(Self, PerformanceTime) -> Unit
 pub fn PatternScheduler::kill_all_voices(Self) -> Unit
 pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
+pub fn PatternScheduler::max_query_window(Self) -> @pattern.QueryWindow
 pub fn PatternScheduler::pending_material_change_count(Self) -> Int32
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan) -> Unit

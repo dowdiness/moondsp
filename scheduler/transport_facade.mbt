@@ -53,6 +53,42 @@ pub fn Tempo::span_for_samples(
 }
 
 ///|
+/// The fastest tempo the transport accepts.
+const FASTEST_BPM : Double = 1000.0
+
+///|
+/// The largest audio block a scheduler renders at once.
+const LARGEST_BLOCK_SIZE : Int32 = 65536
+
+///|
+/// The longest span one block of `block_size` frames at `sample_rate` can
+/// query: its span at the fastest tempo, so no later tempo change exceeds it.
+/// Fails when the scheduler cannot run blocks of that size at that rate.
+pub fn max_query_window_for(
+  sample_rate~ : Double,
+  block_size~ : Int32,
+) -> Result[@pattern.QueryWindow, TransportError] {
+  guard block_size >= 1 && block_size <= LARGEST_BLOCK_SIZE else {
+    return Err(InvalidBlockSize)
+  }
+  let fastest_tempo = match @transport.Tempo::from_bpm(FASTEST_BPM) {
+    Ok(tempo) => tempo
+    Err(error) => return Err(error)
+  }
+  let block_span = match
+    @transport.Clock::at_start(fastest_tempo, sample_rate).bind(clock => {
+      clock.position(block_size.to_int64())
+    }) {
+    Ok(span) => span
+    Err(error) => return Err(error)
+  }
+  guard @pattern.QueryWindow::from_span(block_span) is Some(window) else {
+    abort("a block of at least one frame spans positive musical time")
+  }
+  Ok(window)
+}
+
+///|
 /// Audio-block frame derived from the scheduler clock.
 ///
 /// `logical_arc` is the rational musical span on the current anchored clock;
