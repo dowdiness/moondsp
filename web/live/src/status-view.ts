@@ -7,7 +7,7 @@ import type { PlaybackView } from "./playback";
 
 export type StatusInput = Pick<PlaybackView,
   | "state" | "currentSource" | "acceptedVersion" | "draftVersion" | "inFlightVersions" | "draftStatus"
-  | "tempoText" | "samplePosition" | "mode" | "cyclePosition" | "pendingCount" | "skippedCount">;
+  | "tempo" | "samplePosition" | "mode" | "cyclePosition" | "pendingCount" | "skippedCount">;
 
 export type StatusTone = "error" | "ok" | "neutral";
 
@@ -15,9 +15,9 @@ export type StatusView = Readonly<{
   /** Transport label and whether the transport is moving. */
   label: string;
   playing: boolean;
-  /** The engine's sample clock and tempo, exposed as data attributes for observation. */
+  /** The engine's sample clock and tempo, exposed as data attributes for observation; no tempo until the engine reports one. */
   samplePosition: string;
-  tempoValue: string;
+  tempoValue: string | null;
   position: string;
   tempo: string;
   action: "play" | "pause";
@@ -90,9 +90,9 @@ export function statusView(state: StatusInput): StatusView {
     label: state.state === "Empty" ? "Ready" : state.state,
     playing: state.state === "Playing",
     samplePosition: String(state.samplePosition),
-    tempoValue: state.tempoText,
+    tempoValue: state.tempo === null ? null : String(state.tempo),
     position: `Position: ${state.cyclePosition.toFixed(2)} cycles`,
-    tempo: state.mode === "none" ? "" : `${state.tempoText} BPM`,
+    tempo: state.mode === "none" || state.tempo === null ? "" : `${state.tempo} BPM`,
     action: moving ? "pause" : "play",
     actionLabel: moving ? "Pause" : "Play",
     restoreHidden: state.currentSource === null || !draftFailed,

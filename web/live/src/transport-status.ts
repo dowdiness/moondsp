@@ -35,7 +35,8 @@ export function writeStatus(elements: TransportElements, status: StatusView): vo
   const e = elements;
   setText(e.status, status.label);
   e.status.dataset.samplePosition = status.samplePosition;
-  e.status.dataset.tempo = status.tempoValue;
+  if (status.tempoValue === null) delete e.status.dataset.tempo;
+  else e.status.dataset.tempo = status.tempoValue;
   setText(e.position, status.position);
   setText(e.tempo, status.tempo);
   e.restoreScore.hidden = status.restoreHidden;

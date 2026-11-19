@@ -627,7 +627,7 @@ pub fn player_skipped_count() -> Int32 {
 pub fn scheduler_bpm() -> Double {
   match player.val {
     Some(owner) => owner.view().bpm
-    None => 60.0
+    None => 0.0
   }
 }
 

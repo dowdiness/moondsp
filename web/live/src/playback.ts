@@ -14,7 +14,8 @@ export type PlaybackView = Readonly<{
   draftVersion: DraftVersion;
   inFlightVersions: readonly DraftVersion[];
   draftStatus: DraftStatus;
-  tempoText: string;
+  /** Accepted tempo in BPM; null until the engine first reports one. */
+  tempo: number | null;
   samplePosition: number;
   mode: PlayerSnapshot["mode"];
   cyclePosition: number;
@@ -29,7 +30,9 @@ type Pending = {
   resolve: (receipt: PlayerReceipt) => void;
   reject: (error: Error) => void;
 };
-const EMPTY: PlayerSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: 60, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+/** The engine's latest report, or the empty state before it reports a tempo. */
+type HeldSnapshot = Omit<PlayerSnapshot, "tempo"> & Readonly<{ tempo: number | null }>;
+const EMPTY: HeldSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: null, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
 
 /** The draft's own parse error, shown until the draft changes or audio reports another. */
 function draftDiagnostic(state: DraftState): Diagnostic | null {
@@ -45,7 +48,7 @@ type Connection =
   | { kind: "open"; session: AudioSession };
 export class Player {
   private connection: Connection = { kind: "closed" };
-  private snapshot: PlayerSnapshot = EMPTY;
+  private snapshot: HeldSnapshot = EMPTY;
   private readonly draft: Draft;
   private currentSource: string | null = null;
   private acceptedVersion: DraftVersion | null = null;
@@ -95,7 +98,7 @@ export class Player {
     else if (sameDraftVersion(this.acceptedVersion, draftState.version)) draftStatus = "accepted";
     return { ...this.snapshot, state, status, currentSource: this.currentSource,
       draftVersion: draftState.version, acceptedVersion: this.acceptedVersion, inFlightVersions, draftStatus,
-      tempoText: String(this.snapshot.tempo), feedback: this.feedback, diagnostic: this.diagnostic };
+      feedback: this.feedback, diagnostic: this.diagnostic };
   }
   private render(): void { this.present(this.view()); }
   private refreshDraft(): void {

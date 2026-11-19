@@ -7,7 +7,7 @@ function playback(overrides: Partial<PlaybackView> = {}): PlaybackView {
   return {
     status: { kind: "running" }, state: "Playing", currentSource: 'note("60")',
     acceptedVersion: [1, 2], draftVersion: [1, 2], inFlightVersions: [], draftStatus: "accepted",
-    tempoText: "120", samplePosition: 0, mode: "pattern", cyclePosition: 0,
+    tempo: 120, samplePosition: 0, mode: "pattern", cyclePosition: 0,
     pendingCount: 0, skippedCount: 0, feedback: null, diagnostic: null,
     ...overrides,
   };

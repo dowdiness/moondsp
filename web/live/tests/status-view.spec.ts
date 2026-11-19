@@ -8,7 +8,7 @@ const base: StatusInput = {
   draftVersion: [3, 4],
   inFlightVersions: [],
   draftStatus: "accepted",
-  tempoText: "96",
+  tempo: 96,
   samplePosition: 4800,
   mode: "pattern",
   cyclePosition: 1.256,
@@ -51,6 +51,7 @@ test("an empty player reads as ready with nothing accepted", () => {
     acceptedVersion: null,
     draftStatus: "unsubmitted",
     mode: "none",
+    tempo: null,
     pendingCount: 2,
   });
   expect(view).toMatchObject({
@@ -65,6 +66,7 @@ test("an empty player reads as ready with nothing accepted", () => {
     versions: "No accepted draft",
     materials: "No accepted score",
     timingHidden: true,
+    tempoValue: null,
     tempo: "",
   });
   // With nothing accepted there is no earlier score to restore, even after an error.
