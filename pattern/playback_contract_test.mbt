@@ -62,12 +62,8 @@ test "document control merge preserves material clocks and broad voice scopes" {
     snapshot.pat().entries()[0].entry_key() !=
     snapshot.pat().entries()[1].entry_key(),
   )
-  let raw = @pattern.merge_control(
-    @pattern.stack([bass, lead]),
-    @pattern.s_gain(0.0),
-  ).entries()
+  let raw = @pattern.stack([bass, lead]).entries()
   for i in 0..<entries.length() {
-    assert_true(entries[i].same_content(raw[i]))
     @debug.assert_eq(
       snapshot
       .query_sourced_events_for_entry(i, arc)
@@ -106,7 +102,9 @@ test "document jux preserves atomic material pan precedence and its content" {
   let source = @pattern.PatternDoc::stack(id=pid("parts"), docs=[
     @pattern.PatternDoc::from_pattern(
       id=pid("left"),
-      pat=@pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(0.25)),
+      pat=@pattern.controls(
+        @pattern.ControlMap::single("note", 60.0).set("pan", 0.25),
+      ),
     ),
     @pattern.PatternDoc::from_pattern(id=pid("right"), pat=@pattern.note(64.0)),
   ])

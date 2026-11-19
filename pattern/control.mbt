@@ -150,20 +150,24 @@ fn parse_note_name(name : String) -> Double {
 
 ///|
 pub fn s_lpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
-  let cutoff = control("lpf", frequency_hz)
-  match resonance {
-    None => cutoff
-    Some(q) => merge_control(cutoff, control("lpf_resonance", q))
-  }
+  let cutoff = ControlMap::single("lpf", frequency_hz)
+  controls(
+    match resonance {
+      None => cutoff
+      Some(q) => cutoff.set("lpf_resonance", q)
+    },
+  )
 }
 
 ///|
 pub fn s_hpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
-  let cutoff = control("hpf", frequency_hz)
-  match resonance {
-    None => cutoff
-    Some(q) => merge_control(cutoff, control("hpf_resonance", q))
-  }
+  let cutoff = ControlMap::single("hpf", frequency_hz)
+  controls(
+    match resonance {
+      None => cutoff
+      Some(q) => cutoff.set("hpf_resonance", q)
+    },
+  )
 }
 
 ///|
@@ -240,7 +244,7 @@ fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
 }
 
 ///|
-/// Merge overlapping right-hand payloads into each left-hand event.
+/// Merge overlapping right-hand payloads into each left-hand event (`jux`).
 fn[A, B] merge_control_kernel(
   a : Pat[A],
   b : Pat[B],
@@ -312,24 +316,27 @@ fn[A] bind_control_kernel(
 }
 
 ///|
-/// Merge controls: for each event in pattern a, merge all overlapping b events.
-pub fn merge_control(
-  a : Pat[ControlMap],
-  b : Pat[ControlMap],
-) -> Pat[ControlMap] {
-  merge_control_kernel(a, b, merge_maps)
+/// A scalar control source whose content is tracked automatically.
+pub fn control(key : String, value : Double) -> Pat[ControlMap] {
+  controls(ControlMap::single(key, value))
 }
 
 ///|
-/// A scalar control source whose content is tracked automatically.
-pub fn control(key : String, value : Double) -> Pat[ControlMap] {
-  let pat = Pat::pure(ControlMap::single(key, value))
+/// A source carrying several controls on one event, whose content is tracked
+/// automatically. Combine controls on one event here; nested controls that
+/// follow their own timing belong to `PatternDoc::merge_control`.
+pub fn controls(values : ControlMap) -> Pat[ControlMap] {
+  let pat = Pat::pure(values)
+  let parts : Array[String] = []
+  values.values.each((key, value) => {
+    parts.push("control:\{key.length()}:\{key}:\{value}")
+  })
   make_pat(
     pat.query,
     pat.metadata.period,
     pat.body,
     pat.metadata.scope,
-    "control:\{key.length()}:\{key}:\{value}",
+    parts.join("+"),
   )
 }
 

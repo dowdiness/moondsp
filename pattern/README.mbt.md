@@ -37,7 +37,7 @@ streams, situated between text notation and audio-rate scheduling:
 |---|---|---|
 | **Musical Time** | `Rational`, `TimeSpan`, `TimeTransform` | `Rational::from_int`, `Rational::to_double`, `TimeSpan::duration`, `TimeSpan::contains`, `TimeSpan::intersect`, `TimeSpan::shift`, `TimeTransform::apply` |
 | **Core Query & Events** | `Pat[A]`, `Event[A]` | `Pat::pure`, `Pat::silence`, `Pat::from_query`, `Pat::query`, `Pat::same_content`, `Event::shift` |
-| **Combinators** | `sequence`, `stack`, `merge_control`, `+` | `sequence`, `stack`, `merge_control`, `Pat::entries`, `Pat::material`, `Pat::select_control` |
+| **Combinators** | `sequence`, `stack`, `controls`, `+` | `sequence`, `stack`, `controls`, `Pat::entries`, `Pat::material`, `Pat::select_control` |
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
 | **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
 | **Document & Identity** | `PatternDoc[A]`, `PatternSnapshot[A]`, `PatternLoweringCache[A]` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
@@ -157,18 +157,20 @@ test "overlay keeps separate events" {
 `p + q` is the concise form of `stack([p, q])`. Overlay preserves both events;
 it does not merge their values.
 
-Use `merge_control` when one `Pat[ControlMap]` should add controls to another:
+Use `controls` to put several controls on one event. Controls that follow
+their own timing over another pattern, such as `.gain("0.3 0.6")`, belong to
+`PatternDoc::merge_control`, which lowers them to control buses (ADR-0019).
 
 ```mbt check
 ///|
-test "merge control shapes one event" {
-  let note = @pattern.note(60.0)
-  let pan = @pattern.s_pan(-0.5)
+test "controls shapes one event" {
   let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
-  let events = @pattern.merge_control(note, pan).query(cycle)
+  let events = @pattern.controls(
+    @pattern.ControlMap::single("note", 60.0).set("pan", -0.5),
+  ).query(cycle)
 
   assert_eq(events.length(), 1)
   assert_true(events[0].value.get("note") == Some(60.0))
@@ -176,7 +178,7 @@ test "merge control shapes one event" {
 }
 ```
 
-Right-hand controls replace matching keys. `ControlMap::set` and
+`ControlMap::set` and
 `ControlMap::merge` return new values, and `entries()` returns an owned copy.
 
 ## Transform time
@@ -262,7 +264,7 @@ voice scope. Returned binding arrays are defensive copies. `pat()` and
 periods, musical signatures, and degradation seeds never include source IDs.
 
 Lowering also derives automatic control buses ([ADR-0019](../docs/decisions/0019-automatic-control-buses.md)):
-one per `merge_control` and control key. An event's `buses()` carries the
+one per `PatternDoc::merge_control` and control key. An event's `buses()` carries the
 buses its keys follow, placed on the clock the event is on; `reader(key)`
 returns an allocation-free reader of exact time, and `each_reader` visits the
 keys whose bus changes over time. A

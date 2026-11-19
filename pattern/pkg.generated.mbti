@@ -16,9 +16,9 @@ pub fn continuous(String, (Double) -> Double) -> Pat[ControlMap]
 
 pub fn control(String, Double) -> Pat[ControlMap]
 
-pub fn[A] every(Int32, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
+pub fn controls(ControlMap) -> Pat[ControlMap]
 
-pub fn merge_control(Pat[ControlMap], Pat[ControlMap]) -> Pat[ControlMap]
+pub fn[A] every(Int32, (Pat[A]) -> Pat[A], Pat[A]) -> Pat[A]
 
 pub fn note(Double) -> Pat[ControlMap]
 

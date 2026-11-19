@@ -107,9 +107,8 @@ test "each event plays on the first instrument that selects it" {
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
-  let pitched_drum = @pattern.merge_control(
-    @pattern.sound(36.0),
-    @pattern.note(60.0),
+  let pitched_drum = @pattern.controls(
+    @pattern.ControlMap::single("sound", 36.0).set("note", 60.0),
   )
   sched.process_events(pitched_drum.query(arc), arc)
   sched.process_events(@pattern.sound(38.0).query(arc), arc)
@@ -970,7 +969,9 @@ test "process_block: gate fraction ends a note before its next onset" {
 ///|
 test "process_block: pan key applies per-voice pan" {
   let (pool, sched, left, right) = make_test_sched()
-  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
+  let pat = @pattern.controls(
+    @pattern.ControlMap::single("note", 60.0).set("pan", -1.0),
+  )
   sched.process_block(pat, left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -1078,7 +1079,9 @@ test "process_block note pattern produces non-zero output" {
 ///|
 test "process_block: pan=-1 routes signal to left buffer only" {
   let (_, sched, left, right) = make_test_sched()
-  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-1.0))
+  let pat = @pattern.controls(
+    @pattern.ControlMap::single("note", 60.0).set("pan", -1.0),
+  )
   // Run 4 blocks so the ADSR attack accumulates audible energy; matches
   // the existing `process_block: produces non-zero output` test shape.
   for _i = 0; _i < 4; _i = _i + 1 {
@@ -1096,7 +1099,9 @@ test "process_block: pan=-1 routes signal to left buffer only" {
 ///|
 test "process_block: pan=+1 routes signal to right buffer only" {
   let (_, sched, left, right) = make_test_sched()
-  let pat = @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(1.0))
+  let pat = @pattern.controls(
+    @pattern.ControlMap::single("note", 60.0).set("pan", 1.0),
+  )
   for _i = 0; _i < 4; _i = _i + 1 {
     sched.process_block(pat, left, right)
   }
@@ -1129,9 +1134,8 @@ test "Switching send output leaves dry playback and transport unchanged" {
   let (_, dry_sched, dry_left, dry_right) = make_test_sched()
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("send-toggle"),
-    pat=@pattern.merge_control(
-      @pattern.note(60.0),
-      @pattern.control("room", 0.5),
+    pat=@pattern.controls(
+      @pattern.ControlMap::single("note", 60.0).set("room", 0.5),
     ),
   ).lower()
   sched.queue_pattern_snapshot(snapshot)
@@ -1167,9 +1171,10 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
   let (_, sched, left, right) = make_test_sched()
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=pid("room-send"),
-    pat=@pattern.merge_control(
-      @pattern.merge_control(@pattern.note(60.0), @pattern.s_pan(-0.4)),
-      @pattern.control("room", 0.5),
+    pat=@pattern.controls(
+      @pattern.ControlMap::single("note", 60.0)
+      .set("pan", -0.4)
+      .set("room", 0.5),
     ),
   ).lower()
   sched.queue_pattern_snapshot(snapshot)

@@ -137,15 +137,17 @@ rule, do not expose a generic Applicative-like API.
 
 ## `ControlMap` merging is a special operation
 
-`merge_control(a, b)` is specific to `Pat[ControlMap]`. It keeps events from
-`a`, finds overlapping events from `b`, and merges right-hand controls into the
-left event's `ControlMap`.
+`PatternDoc::merge_control(left~, right~)` is specific to
+`PatternDoc[ControlMap]`. It keeps events from `left` and lowers `right` to
+control buses that those events follow (ADR-0019). There is one merge
+semantics; the `Pat` API has no `merge_control`. Put several controls on one
+event with `controls(map)`.
 
 That is intentionally not generic overlay:
 
 - `stack([a, b])` preserves both events as separate layers;
-- `merge_control(a, b)` shapes `a` with overlapping controls from `b`;
-- key conflicts use `ControlMap::merge`, so right-hand controls override
+- `PatternDoc::merge_control` shapes `left` with the controls of `right`;
+- key conflicts use `ControlMap::merge`, so the outer controls override
   matching keys.
 
 This operation is useful for controls such as `.gain`, `.cutoff`, `.pan`, and

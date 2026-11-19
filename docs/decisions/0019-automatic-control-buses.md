@@ -103,10 +103,9 @@ value, whatever the query length and under `rev`. A key whose bus has no
 value there keeps the event's own value. A `filter_map` reads its child's
 bound keys the same way, on the child's clock, before its function runs.
 
-`merge_control_kernel` remains the merge of the `Pat` API, which has no buses.
-It merges the right-hand events whose part contains the left fragment's
-`part.begin`; under `rev` it sees the mirrored fragment, so its value can
-differ from the signal there.
+`merge_control_kernel` remains only inside `jux`, which merges a fixed pan;
+the `Pat` API no longer has a `merge_control`, so control merging has one
+semantics, the bus lowering.
 
 ### 5. Signals come from a closed set of control nodes
 

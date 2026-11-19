@@ -34,13 +34,17 @@ test "note_name a4 = 69" {
 }
 
 ///|
-test "merge_control combines note and explicit filters" {
-  let merged = @pattern.merge_control(
-    @pattern.merge_control(
-      @pattern.note(60.0),
-      @pattern.s_lpf(800.0, resonance=2.0),
-    ),
-    @pattern.s_hpf(120.0, resonance=0.5),
+test "s_lpf and s_hpf carry cutoff and resonance on one event" {
+  let lpf = @pattern.s_lpf(800.0, resonance=2.0).query(span(0, 1, 1, 1))
+  let hpf = @pattern.s_hpf(120.0).query(span(0, 1, 1, 1))
+  @debug.assert_eq(lpf.length(), 1)
+  @debug.assert_eq(lpf[0].value.get("lpf_resonance"), Some(2.0))
+  @debug.assert_eq(hpf[0].value.get("hpf_resonance"), None)
+  let merged = @pattern.controls(
+    @pattern.ControlMap::single("note", 60.0)
+    .merge(lpf[0].value)
+    .set("hpf", 120.0)
+    .set("hpf_resonance", 0.5),
   )
   let events = merged.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 1)
@@ -49,15 +53,6 @@ test "merge_control combines note and explicit filters" {
   @debug.assert_eq(events[0].value.get("lpf_resonance"), Some(2.0))
   @debug.assert_eq(events[0].value.get("hpf"), Some(120.0))
   @debug.assert_eq(events[0].value.get("hpf_resonance"), Some(0.5))
-}
-
-///|
-test "merge_control right-biased on conflict" {
-  let a = @pattern.note(60.0)
-  let b = @pattern.note(72.0)
-  let merged = @pattern.merge_control(a, b)
-  let events = merged.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get("note"), Some(72.0))
 }
 
 ///|
@@ -84,10 +79,14 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   // Use a multi-key pattern so the comparison loop catches any bug that
   // drops a control key while routing through merge_control. Without
   // a non-pan secondary key, the test only proves part+sound parity.
-  let pat = @pattern.merge_control(
-    @pattern.sequence([@pattern.sound(36.0), @pattern.sound(38.0)]),
-    @pattern.s_lpf(800.0),
-  )
+  let pat = @pattern.sequence([
+    @pattern.controls(
+      @pattern.ControlMap::single("sound", 36.0).set("lpf", 800.0),
+    ),
+    @pattern.controls(
+      @pattern.ControlMap::single("sound", 38.0).set("lpf", 800.0),
+    ),
+  ])
   let result = pat.jux(fn(p) { p.rev() })
   let arc = span(0, 1, 1, 1)
   let combined = result.query(arc)
@@ -128,7 +127,9 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
 ///|
 test "jux: overrides pre-existing pan" {
   // Pre-pan to 0.5, then jux — result should have only ±1 pan values.
-  let pat = @pattern.merge_control(@pattern.sound(36.0), @pattern.s_pan(0.5))
+  let pat = @pattern.controls(
+    @pattern.ControlMap::single("sound", 36.0).set("pan", 0.5),
+  )
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
   // Guard against a vacuously-passing empty result.
@@ -199,20 +200,4 @@ test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   @debug.assert_eq(events[0].part.end_, @pattern.Rational(1L, 6L))
   @debug.assert_eq(events[5].part.begin, @pattern.Rational(5L, 6L))
   @debug.assert_eq(events[5].part.end_, @pattern.Rational(1L, 1L))
-}
-
-///|
-test "merge_control samples the control at the fragment start" {
-  let pat = @pattern.merge_control(
-    @pattern.note(60.0),
-    @pattern.sequence([
-      @pattern.control("gain", 0.3),
-      @pattern.control("gain", 0.6),
-    ]),
-  )
-  // The same onset gets the same value however long the query arc is.
-  @debug.assert_eq(pat.query(span(0, 1, 1, 8))[0].value.get("gain"), Some(0.3))
-  @debug.assert_eq(pat.query(span(0, 1, 1, 1))[0].value.get("gain"), Some(0.3))
-  // A fragment that starts mid-note follows the value at that time.
-  @debug.assert_eq(pat.query(span(5, 8, 6, 8))[0].value.get("gain"), Some(0.6))
 }

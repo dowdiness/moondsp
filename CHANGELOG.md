@@ -44,7 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
-- **Breaking MoonBit API:** `@mini.parse_song` returns `ParsedSong` (layout
+- **Breaking MoonBit API:** control merging has one semantics, the
+  `PatternDoc::merge_control` bus lowering. The runtime `@pattern.merge_control`
+  is removed; put several controls on one event with the new
+  `@pattern.controls(map)`. `@mini.parse_song` returns `ParsedSong` (layout
   plus BPM) and replaces `parse_song_with_bpm`. The deprecated
   `note_off`, `kill`, and `set_voice_pan` wrappers on `VoicePool` and
   `BoundVoicePool` are removed; use their `_result` forms. No compatibility
