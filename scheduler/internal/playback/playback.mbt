@@ -79,8 +79,59 @@ pub fn PlaybackSourcedEvent::origin(
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot)
   PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
-  Song(@song.SongSnapshot)
-  RepeatSong(@song.SongSnapshot)
+  Song(SongMaterial)
+  RepeatSong(SongMaterial)
+}
+
+///|
+/// A lowered song the scheduler can play. Its sections hold either anonymous
+/// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
+pub(all) enum SongMaterial {
+  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+}
+
+///|
+fn SongMaterial::revision(self : SongMaterial) -> @identity.Revision {
+  match self {
+    Runtime(snapshot) => snapshot.revision()
+    Exact(snapshot) => snapshot.revision()
+  }
+}
+
+///|
+fn SongMaterial::layout_revision(self : SongMaterial) -> @identity.Revision {
+  match self {
+    Runtime(snapshot) => snapshot.layout_revision()
+    Exact(snapshot) => snapshot.layout_revision()
+  }
+}
+
+///|
+fn SongMaterial::duration(self : SongMaterial) -> @pattern.Rational {
+  match self {
+    Runtime(snapshot) => snapshot.song().duration()
+    Exact(snapshot) => snapshot.song().duration()
+  }
+}
+
+///|
+fn SongMaterial::entry_count(self : SongMaterial) -> Int32 {
+  match self {
+    Runtime(snapshot) => snapshot.entries().length()
+    Exact(snapshot) => snapshot.entries().length()
+  }
+}
+
+///|
+fn SongMaterial::query(
+  self : SongMaterial,
+  arc : @pattern.TimeSpan,
+) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  match self {
+    Runtime(snapshot) => snapshot.song().query(arc)
+    Exact(snapshot) => snapshot.song().query(arc)
+  }
 }
 
 ///|
@@ -98,15 +149,13 @@ pub fn PlaybackSnapshot::pattern(
 }
 
 ///|
-pub fn PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot,
-) -> PlaybackSnapshot {
+pub fn PlaybackSnapshot::song(snapshot : SongMaterial) -> PlaybackSnapshot {
   Song(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::repeat_song(
-  snapshot : @song.SongSnapshot,
+  snapshot : SongMaterial,
 ) -> PlaybackSnapshot {
   RepeatSong(snapshot)
 }
@@ -118,7 +167,7 @@ pub fn PlaybackSnapshot::revision(
   match self {
     Pattern(snapshot) => snapshot.revision()
     PatternWithOrigins(snapshot) => snapshot.revision()
-    Song(snapshot) | RepeatSong(snapshot) => snapshot.revision()
+    Song(song) | RepeatSong(song) => song.revision()
   }
 }
 
@@ -128,7 +177,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
 ) -> @identity.Revision? {
   match self {
     Pattern(_) | PatternWithOrigins(_) => None
-    Song(snapshot) | RepeatSong(snapshot) => Some(snapshot.layout_revision())
+    Song(song) | RepeatSong(song) => Some(song.layout_revision())
   }
 }
 
@@ -138,18 +187,7 @@ pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   match self {
     Pattern(snapshot) => snapshot.pat().entries().length()
     PatternWithOrigins(snapshot) => snapshot.pat().entries().length()
-    Song(snapshot) | RepeatSong(snapshot) =>
-      for occurrence in snapshot.song().occurrences(); count = 0 {
-        continue count +
-          occurrence
-          .section()
-          .body()
-          .fast(occurrence.section().scope().rate())
-          .entries()
-          .length()
-      } nobreak {
-        count
-      }
+    Song(song) | RepeatSong(song) => song.entry_count()
   }
 }
 
@@ -159,9 +197,8 @@ fn PlaybackSnapshot::cycle_at(
   now : @pattern.Rational,
 ) -> Int64 {
   match self {
-    RepeatSong(snapshot) if snapshot.song().duration() >
-      @pattern.Rational::from_int(0) =>
-      (now / snapshot.song().duration()).floor()
+    RepeatSong(song) if song.duration() > @pattern.Rational::from_int(0) =>
+      (now / song.duration()).floor()
     _ => 0L
   }
 }
@@ -172,8 +209,7 @@ fn PlaybackSnapshot::offset_at(
   cycle : Int64,
 ) -> @pattern.Rational {
   match self {
-    RepeatSong(snapshot) =>
-      snapshot.song().duration() * @pattern.Rational(cycle, 1L)
+    RepeatSong(song) => song.duration() * @pattern.Rational(cycle, 1L)
     _ => @pattern.Rational::from_int(0)
   }
 }
@@ -333,10 +369,10 @@ fn[A] PlaybackRun::query(
   query : (Array[EntryState], @pattern.TimeSpan) -> Array[A],
   shift : (A, @pattern.Rational) -> A,
 ) -> Array[A] {
-  guard self.snapshot is RepeatSong(snapshot) else {
+  guard self.snapshot is RepeatSong(song) else {
     return query(self.entries, arc)
   }
-  let duration = snapshot.song().duration()
+  let duration = song.duration()
   guard duration > @pattern.Rational::from_int(0) else { return [] }
   let result : Array[A] = []
   let mut cursor = arc.begin
@@ -406,7 +442,7 @@ pub fn PlaybackSnapshot::query_events(
     Pattern(snapshot) => snapshot.query(arc)
     PatternWithOrigins(snapshot) =>
       snapshot.query(arc).map(event => event.event())
-    Song(snapshot) => snapshot.query(arc)
+    Song(song) => song.query(arc)
     RepeatSong(_) =>
       PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(
         arc,

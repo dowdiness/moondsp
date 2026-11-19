@@ -23,7 +23,7 @@ pub fn parse_play_source(String, previous? : @pattern.PatternDoc?, query_window?
 
 pub fn parse_snapshot(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternSnapshot, String]
 
-pub fn parse_song(String) -> Result[ParsedSong, String]
+pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@pattern.ControlMap]], String]
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
@@ -142,16 +142,17 @@ pub fn OriginUnavailable::equal(Self, Self) -> Bool
 pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
 pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
 
-pub struct ParsedSong {
-  song : @song.Song
+pub struct ParsedSong[C] {
+  song : @song.Song[C]
   bpm : Double?
 }
-pub fn ParsedSong::bpm(Self) -> Double?
-pub fn ParsedSong::song(Self) -> @song.Song
+pub fn[C] ParsedSong::bpm(Self[C]) -> Double?
+pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
 
 pub enum PlayBody {
   Pattern(@pattern.PatternDoc)
-  Arrangement(@song.Song, Bool)
+  Arrangement(@song.Song[@pattern.Pat[@pattern.ControlMap]], Bool)
+  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins], Bool)
 }
 
 pub struct PlaySource {

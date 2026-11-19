@@ -91,15 +91,15 @@ pub fn PatternScheduler::max_query_window(Self) -> @pattern.QueryWindow
 pub fn PatternScheduler::pending_material_change_count(Self) -> Int32
 pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan) -> Unit
-pub fn PatternScheduler::process_section_block(Self, @song.Section, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn PatternScheduler::process_song_block(Self, @song.Song, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn[C : @song.SongContent] PatternScheduler::process_section_block(Self, @song.Section[C], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn[C : @song.SongContent] PatternScheduler::process_song_block(Self, @song.Song[C], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, Int32, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::push_active_note_until(Self, Int32, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot) -> Unit
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
-pub fn PatternScheduler::queue_song_snapshot(Self, @song.SongSnapshot) -> Unit
-pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, @song.SongSnapshot, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_song_snapshot(Self, SongMaterial) -> Unit
+pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, SongMaterial, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queued_snapshot(Self) -> PlaybackSnapshot?
 pub fn PatternScheduler::render_block(Self, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::render_block_with_send(Self, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
@@ -133,17 +133,22 @@ pub(all) enum PlaybackAdmissionError {
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot)
   PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
-  Song(@song.SongSnapshot)
-  RepeatSong(@song.SongSnapshot)
+  Song(SongMaterial)
+  RepeatSong(SongMaterial)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot) -> Self
 pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
-pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot) -> Self
+pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
-pub fn PlaybackSnapshot::song(@song.SongSnapshot) -> Self
+pub fn PlaybackSnapshot::song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
+
+pub(all) enum SongMaterial {
+  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+}
 
 #derive(Eq, @debug.Debug)
 pub struct SongVoiceScope {

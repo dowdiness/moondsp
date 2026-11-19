@@ -524,9 +524,9 @@ fn PatternScheduler::render_snapshot_outputs(
 /// This intentionally routes through `Section::query` rather than the raw
 /// `Section::body()` pattern so non-identity `TimeScope`s affect event timing
 /// while keeping the scheduler's logical frame unchanged.
-pub fn PatternScheduler::process_section_block(
+pub fn[C : @song.SongContent] PatternScheduler::process_section_block(
   self : PatternScheduler,
-  section : @song.Section,
+  section : @song.Section[C],
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {
@@ -552,9 +552,9 @@ pub fn PatternScheduler::process_section_block(
 ///
 /// The song layer returns events in song-global logical time, matching the
 /// scheduler frame's logical arc.
-pub fn PatternScheduler::process_song_block(
+pub fn[C : @song.SongContent] PatternScheduler::process_song_block(
   self : PatternScheduler,
-  song : @song.Song,
+  song : @song.Song[C],
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {

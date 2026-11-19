@@ -25,7 +25,7 @@ fn song_doc_test_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.SectionDoc {
+) -> @song.SectionDoc[@pattern.Pat[@pattern.ControlMap]] {
   @song.SectionDoc::single(
     id=song_doc_test_section_id(id),
     name~,
@@ -39,26 +39,71 @@ fn song_doc_test_section(
 }
 
 ///|
-fn song_doc_test_doc(
-  occurrences : Array[@song.SongOccurrenceDoc],
-) -> @song.SongDoc {
+fn[C] song_doc_test_doc(
+  occurrences : Array[@song.SongOccurrenceDoc[C]],
+) -> @song.SongDoc[C] {
   @song.SongDoc(parts=occurrences) catch {
     _ => abort("song doc creation failed")
   }
 }
 
 ///|
-fn song_doc_test_song(doc : @song.SongDoc) -> @song.Song {
+fn[C] song_doc_test_song(doc : @song.SongDoc[C]) -> @song.Song[C] {
   doc.to_song() catch {
     _ => abort("song lowering failed")
   }
 }
 
 ///|
-fn song_doc_test_snapshot(doc : @song.SongDoc) -> @song.SongSnapshot {
+fn song_doc_test_snapshot(
+  doc : @song.SongDoc[@pattern.PatternSnapshotWithOrigins],
+) -> @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins] {
   doc.lower() catch {
     _ => abort("song snapshot lowering failed")
   }
+}
+
+///|
+fn song_doc_test_content(
+  name : String,
+  midi : Double,
+) -> @pattern.PatternSnapshotWithOrigins {
+  @pattern.PatternDoc::control_atom(
+    id=@identity.PatternNodeId::from_string(name),
+    source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7000L), 1L),
+    key=Note,
+    value=midi,
+  ).lower_with_origins() catch {
+    _ => abort("pattern lowering failed")
+  }
+}
+
+///|
+/// A song event as a consumer sees it: the content's own event placed back on
+/// the song clock, tagged with its song origin.
+priv struct SongDocTestEvent {
+  origin : @song.SongEventOrigin
+  source : @pattern.EventOrigin
+  event : @pattern.Event[@pattern.ControlMap]
+  controls : @pattern.Controls
+}
+
+///|
+fn song_doc_test_query(
+  slices : Array[@song.SongSlice[@pattern.PatternSnapshotWithOrigins]],
+) -> Array[SongDocTestEvent] {
+  let result : Array[SongDocTestEvent] = []
+  for slice in slices {
+    for event in slice.content().query_for_entry(slice.entry(), slice.arc()) {
+      result.push({
+        origin: slice.origin(),
+        source: event.origin(),
+        event: event.event().placed(slice.placement()),
+        controls: event.controls().placed(slice.placement()),
+      })
+    }
+  }
+  result
 }
 
 ///|
@@ -73,8 +118,16 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
     length_cycles=@pattern.Rational::from_int(1),
     scope=@song.TimeScope::identity(),
     body=@song.SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
-      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+      @song.SectionLayerDoc(
+        id=lead_id,
+        name="Lead",
+        body=song_doc_test_content("lead", 60.0),
+      ),
+      @song.SectionLayerDoc(
+        id=pad_id,
+        name="Pad",
+        body=song_doc_test_content("pad", 67.0),
+      ),
     ]),
   ) catch {
     _ => abort("section doc creation failed")
@@ -83,21 +136,23 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
     @song.SongOccurrenceDoc(id=occurrence_id, name="Sourced", section~),
   ])
   let snapshot = song_doc_test_snapshot(doc)
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan(
-      @pattern.Rational::from_int(0),
-      @pattern.Rational(1L, 100L),
+  let events = song_doc_test_query(
+    snapshot.slices(
+      @pattern.TimeSpan(
+        @pattern.Rational::from_int(0),
+        @pattern.Rational(1L, 100L),
+      ),
     ),
   )
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].occurrence() == occurrence_id)
-  assert_true(events[0].section() == section_id)
-  assert_true(events[0].layer() == lead_id)
-  assert_true(events[0].event().value.get(Note) == Some(60.0))
-  assert_true(events[1].occurrence() == occurrence_id)
-  assert_true(events[1].section() == section_id)
-  assert_true(events[1].layer() == pad_id)
-  assert_true(events[1].event().value.get(Note) == Some(67.0))
+  assert_true(events[0].origin.occurrence() == occurrence_id)
+  assert_true(events[0].origin.section() == section_id)
+  assert_true(events[0].origin.layer() == lead_id)
+  assert_true(events[0].event.value.get(Note) == Some(60.0))
+  assert_true(events[1].origin.occurrence() == occurrence_id)
+  assert_true(events[1].origin.section() == section_id)
+  assert_true(events[1].origin.layer() == pad_id)
+  assert_true(events[1].event.value.get(Note) == Some(67.0))
 }
 
 ///|
@@ -389,7 +444,7 @@ test "SongDoc rename reports missing occurrence before duplicate display name" {
 }
 
 ///|
-test "exact Song entry origins survive scoped placement but not anonymous replacement" {
+test "exact Song entry origins survive scoped placement" {
   let epoch = @identity.SourceEpoch(7001L)
   let c = @identity.SourceAtomId(epoch, 1L)
   let g = @identity.SourceAtomId(epoch, 2L)
@@ -410,15 +465,16 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
       ),
     ],
   ).lower_with_origins()
-  let layer_id = song_doc_test_layer_id("layer:exact")
-  let section = @song.SectionDoc::single_with_origins(
+  let section = @song.SectionDoc::single(
     id=song_doc_test_section_id("section:exact"),
     name="Exact",
     length_cycles=@pattern.Rational::from_int(1),
     scope=@song.TimeScope::fast(factor=@pattern.Rational::from_int(2)),
-    layer_id~,
-    snapshot=exact,
-  )
+    layer_id=song_doc_test_layer_id("layer:exact"),
+    body=exact,
+  ) catch {
+    _ => abort("section doc creation failed")
+  }
   let occurrence = @song.SongOccurrenceDoc::at(
     id=song_doc_test_occurrence_id("occurrence:exact"),
     name="Later",
@@ -431,20 +487,19 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
     @pattern.Rational(15L, 4L),
   )
   for index, atom in [c, g] {
-    let events = snapshot.query_sourced_events_for_entry(index, arc)
+    let events = song_doc_test_query(
+      snapshot.entries()[index].slice(arc).iter().collect(),
+    )
     @debug.assert_eq(events.length(), 2)
     for event in events {
-      guard event.source_origin() is Some(origin) else {
-        fail("scoped Song event lost exact origin")
-      }
-      assert_true(origin.atom() == atom)
+      assert_true(event.source.atom() == atom)
       assert_true(
-        event.event().value.get(Note) ==
+        event.event.value.get(Note) ==
         Some(if index == 0 { 60.0 } else { 67.0 }),
       )
     }
     @debug.assert_eq(
-      events[0].event().whole,
+      events[0].event.whole,
       Some(
         @pattern.TimeSpan(
           @pattern.Rational::from_int(3),
@@ -453,7 +508,7 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
       ),
     )
     @debug.assert_eq(
-      events[1].event().whole,
+      events[1].event.whole,
       Some(
         @pattern.TimeSpan(
           @pattern.Rational(7L, 2L),
@@ -461,16 +516,8 @@ test "exact Song entry origins survive scoped placement but not anonymous replac
         ),
       ),
     )
-    @debug.assert_eq(events[0].event().part.begin, arc.begin)
-    @debug.assert_eq(events[1].event().part.end_, arc.end_)
-  }
-  let replaced = section.replace_layer_body(layer_id, body=@pattern.note(72.0))
-  let anonymous = song_doc_test_doc([
-    occurrence.replace_section(section=replaced),
-  ]).lower()
-  for event in anonymous.query_sourced_events(arc) {
-    assert_true(event.source_origin() is None)
-    assert_true(event.event().value.get(Note) == Some(72.0))
+    @debug.assert_eq(events[0].event.part.begin, arc.begin)
+    @debug.assert_eq(events[1].event.part.end_, arc.end_)
   }
 }
 
@@ -494,14 +541,16 @@ test "song events read their buses on the song clock" {
     }),
   ).lower_with_origins()
   // Placed at cycle 3 and played twice as fast: local = (t - 3) × 2.
-  let section = @song.SectionDoc::single_with_origins(
+  let section = @song.SectionDoc::single(
     id=song_doc_test_section_id("section:bus"),
     name="Bus",
     length_cycles=@pattern.Rational::from_int(1),
     scope=@song.TimeScope::fast(factor=@pattern.Rational::from_int(2)),
     layer_id=song_doc_test_layer_id("layer:bus"),
-    snapshot=pattern,
-  )
+    body=pattern,
+  ) catch {
+    _ => abort("section doc creation failed")
+  }
   let snapshot = song_doc_test_snapshot(
     song_doc_test_doc([
       @song.SongOccurrenceDoc::at(
@@ -512,19 +561,21 @@ test "song events read their buses on the song clock" {
       ),
     ]),
   )
-  let events = snapshot.query_sourced_events(
-    @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
+  let events = song_doc_test_query(
+    snapshot.slices(
+      @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
+    ),
   )
   @debug.assert_eq(events.length(), 1)
-  let reader = events[0].controls().reader(Lpf).unwrap()
+  let reader = events[0].controls.reader(Lpf).unwrap()
   // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
   @debug.assert_eq("\{reader(13L, 4L)} \{reader(17L, 5L)}", "50 80")
   // An entry that starts the song at playback time 1 adds 1, after the rate.
   let entry = @pattern.Placement(origin=@pattern.Rational::from_int(1))
-  let placed = events[0].controls().placed(entry).reader(Lpf).unwrap()
+  let placed = events[0].controls.placed(entry).reader(Lpf).unwrap()
   @debug.assert_eq("\{placed(17L, 4L)} \{placed(22L, 5L)}", "50 80")
   @debug.assert_eq(
-    events[0].event().placed(entry).part,
+    events[0].event.placed(entry).part,
     @pattern.TimeSpan(@pattern.Rational(17L, 4L), @pattern.Rational(9L, 2L)),
   )
 }

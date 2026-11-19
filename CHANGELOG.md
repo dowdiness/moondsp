@@ -44,12 +44,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking MoonBit API:** song structure is generic over its content, not
+  over an event payload (ADR-0021). `Section[C]`, `Song[C]`, `SongDoc[C]`,
+  and the other song types hold one content value per layer; pattern queries
+  need `C : @song.SongContent`, implemented for `Pat[ControlMap]` and
+  `PatternSnapshotWithOrigins`. `Section::source_snapshot`,
+  `Section::with_origins`, and `SectionDoc::single_with_origins` are removed:
+  an exact song is a `Song[PatternSnapshotWithOrigins]`.
+  `Section::from_pattern` is renamed `Section::single`. `SongSnapshot` drops
+  `query`, `query_sourced_events`, `query_sourced_events_for_entry`,
+  `section_id_for_occurrence`, and `SongSnapshotEvent` for `entries()`
+  (`SongEntry`), `SongEntry::slice`, `slices`, and `SongSlice`, whose content
+  the caller queries. Song playback entries are keyed by layer identity
+  instead of stack position. Mini's `PlayBody` gains `ExactArrangement` for
+  tracked songs, and `parse_song` returns `ParsedSong[Pat[ControlMap]]`.
+  The scheduler's song snapshots take `@scheduler.SongMaterial`
+  (`Runtime` or `Exact`).
 - **Breaking MoonBit API:** the pattern document layer is specialized to
   `ControlMap`. `PatternDoc`, `PatternSnapshot`, `PatternSnapshotWithOrigins`,
   `EventWithOrigin`, `PatternSnapshotEvent`, `ControlBus`, and the lowering
-  cache lose their payload parameter; `Pat[A]` stays generic. Song structure
-  follows: `Section`, `Song`, `SongDoc`, and the other song types hold
-  `Pat[ControlMap]` bodies.
+  cache lose their payload parameter; `Pat[A]` stays generic.
   `@pattern.EventBuses` is replaced by `@pattern.Controls`, read through
   `.controls()` instead of `.buses()`.
 - **Breaking MoonBit API:** each control's domain is stated once, in

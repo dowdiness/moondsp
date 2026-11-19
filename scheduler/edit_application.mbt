@@ -38,7 +38,7 @@ pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
 ///|
 pub fn PatternScheduler::queue_song_snapshot_effect_result(
   self : PatternScheduler,
-  snapshot : @song.SongSnapshot,
+  snapshot : SongMaterial,
   scope : SongVoiceScope,
   effect : ActiveVoiceEffect,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {

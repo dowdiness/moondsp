@@ -2,7 +2,8 @@
 priv enum EntrySource {
   Pattern(@pattern.PatternSnapshot, Int32)
   PatternWithOrigins(@pattern.PatternSnapshotWithOrigins, Int32)
-  Song(@song.SongSnapshot, Int32)
+  RuntimeSong(@song.SongEventOrigin)
+  ExactSong(@song.SongEntry[@pattern.PatternSnapshotWithOrigins])
 }
 
 ///|
@@ -114,32 +115,34 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
       }
       result
     }
-    Song(snapshot) | RepeatSong(snapshot) => {
-      let result : Array[EntrySpec] = []
-      let mut index = 0
-      for occurrence in snapshot.song().occurrences() {
-        let bodies = occurrence
-          .section()
-          .body()
-          .fast(occurrence.section().scope().rate())
-          .entries()
-        for body in bodies {
-          result.push(
-            EntrySpec(
-              id="\{occurrence.id().value().length()}:\{occurrence.id().value()}/" +
-                body.entry_key(),
-              body~,
-              start=occurrence.start(),
-              end_=Some(occurrence.end_()),
-              source=Song(snapshot, index),
-            ),
-          )
-          index += 1
-        }
-      }
-      result
-    }
+    Song(Runtime(snapshot)) | RepeatSong(Runtime(snapshot)) =>
+      song_entry_specs(snapshot, entry => RuntimeSong(entry.origin()))
+    Song(Exact(snapshot)) | RepeatSong(Exact(snapshot)) =>
+      song_entry_specs(snapshot, entry => ExactSong(entry))
   }
+}
+
+///|
+/// One spec per canonical song entry, in the snapshot's entry order.
+fn[C] song_entry_specs(
+  snapshot : @song.SongSnapshot[C],
+  source : (@song.SongEntry[C]) -> EntrySource,
+) -> Array[EntrySpec] {
+  snapshot
+  .entries()
+  .map(entry => {
+    // Layer identity, not stack position, keys an entry within its occurrence.
+    let occurrence = entry.origin().occurrence().value()
+    let layer = entry.origin().layer().value()
+    EntrySpec(
+      id="\{occurrence.length()}:\{occurrence}/\{layer.length()}:\{layer}/" +
+        entry.body().entry_key(),
+      body=entry.body(),
+      start=entry.start(),
+      end_=Some(entry.end_()),
+      source=source(entry),
+    )
+  })
 }
 
 ///|
@@ -479,22 +482,34 @@ fn EntrySpec::query_sourced(
         source_pitch: event.source_pitch(),
         controls: event.controls().placed(placement),
       })
-    Song(snapshot, index) => {
+    RuntimeSong(song_origin) =>
+      query_entry(self, origin, arc).map(event => {
+        event,
+        origin: @model.VoiceOrigin::Song(song_origin),
+        source_origin: None,
+        source_frame: None,
+        source_start: -1.0,
+        source_pitch: -1.0,
+        controls: @pattern.Controls::fixed(event.value),
+      })
+    ExactSong(entry) => {
       let source_arc = @pattern.TimeSpan(
         arc.begin + self.start,
         arc.end_ + self.start,
       )
+      guard entry.slice(source_arc) is Some(slice) else { return [] }
       let placement = @pattern.Placement(origin=origin - self.start)
-      snapshot
-      .query_sourced_events_for_entry(index, source_arc)
+      slice
+      .content()
+      .query_for_entry(slice.entry(), slice.arc())
       .map(event => {
-        event: event.event().placed(placement),
-        origin: @model.VoiceOrigin::Song(event.origin()),
-        source_origin: event.source_origin(),
+        event: event.event().placed(slice.placement()).placed(placement),
+        origin: @model.VoiceOrigin::Song(slice.origin()),
+        source_origin: Some(event.origin()),
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: event.source_pitch(),
-        controls: event.controls().placed(placement),
+        controls: event.controls().placed(slice.placement()).placed(placement),
       })
     }
   }

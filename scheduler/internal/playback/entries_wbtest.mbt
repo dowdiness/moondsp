@@ -132,14 +132,16 @@ test "finite phrase keeps its current content until a new playback" {
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      @song.SongDoc(parts=[
-        @song.SongOccurrenceDoc::at(
-          id=@identity.OccurrenceId::from_string("once"),
-          start=@pattern.Rational::from_int(0),
-          name="once",
-          section~,
-        ),
-      ]).lower(),
+      Runtime(
+        @song.SongDoc(parts=[
+          @song.SongOccurrenceDoc::at(
+            id=@identity.OccurrenceId::from_string("once"),
+            start=@pattern.Rational::from_int(0),
+            name="once",
+            section~,
+          ),
+        ]).lower(),
+      ),
     )
   }
   let state = PlaybackState()
@@ -166,14 +168,16 @@ test "settling after an old finite end retains its already entered replacement" 
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      @song.SongDoc(parts=[
-        @song.SongOccurrenceDoc::at(
-          id=@identity.OccurrenceId::from_string("once"),
-          start=@pattern.Rational::from_int(0),
-          name="phrase",
-          section~,
-        ),
-      ]).lower(),
+      Runtime(
+        @song.SongDoc(parts=[
+          @song.SongOccurrenceDoc::at(
+            id=@identity.OccurrenceId::from_string("once"),
+            start=@pattern.Rational::from_int(0),
+            name="phrase",
+            section~,
+          ),
+        ]).lower(),
+      ),
     )
   }
   let state = PlaybackState()
@@ -306,7 +310,7 @@ fn finite_occurrence_score(lead_start : Int32?) -> PlaybackSnapshot raise {
       ),
     )
   }
-  PlaybackSnapshot::song(@song.SongDoc(parts~).lower())
+  PlaybackSnapshot::song(Runtime(@song.SongDoc(parts~).lower()))
 }
 
 ///|
@@ -358,14 +362,16 @@ fn finite_single_score(start : Int32, note : Int32) -> PlaybackSnapshot raise {
     body=material("moving", note, 3),
   )
   PlaybackSnapshot::song(
-    @song.SongDoc(parts=[
-      @song.SongOccurrenceDoc::at(
-        id=@identity.OccurrenceId::from_string("moving-occurrence"),
-        start=@pattern.Rational::from_int(start),
-        name="moving",
-        section~,
-      ),
-    ]).lower(),
+    Runtime(
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("moving-occurrence"),
+          start=@pattern.Rational::from_int(start),
+          name="moving",
+          section~,
+        ),
+      ]).lower(),
+    ),
   )
 }
 

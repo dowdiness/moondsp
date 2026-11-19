@@ -40,7 +40,7 @@ fn section_test_section_doc(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> SectionDoc {
+) -> SectionDoc[@pattern.Pat[@pattern.ControlMap]] {
   SectionDoc::single(
     id=section_id,
     name~,
@@ -54,9 +54,9 @@ fn section_test_section_doc(
 }
 
 ///|
-test "Section::from_pattern wraps a pattern with identity scope" {
+test "Section::single wraps a pattern with identity scope" {
   let pat = @pattern.note(60.0)
-  let section = Section::from_pattern(name="main", body=pat)
+  let section = Section::single(name="main", body=pat)
   @debug.assert_eq(section.name(), "main")
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
   assert_true(section.scope().is_identity())
@@ -317,7 +317,7 @@ test "SectionDoc length edits advance section revision and shift layout while pr
   }
   @debug.assert_eq(longer.id().value(), doc.id().value())
   assert_true(longer.revision().value() > doc.revision().value())
-  let chorus = Section::from_pattern(name="chorus", body=@pattern.note(67.0))
+  let chorus = Section::single(name="chorus", body=@pattern.note(67.0))
   let before = @song.Song(parts=[
     @song.SongPart::with_id(id=verse_id, name="Verse", section=doc.to_section()),
     @song.SongPart::with_id(id=chorus_id, name="Chorus", section=chorus),
@@ -396,7 +396,7 @@ test "Section constructor accepts pattern body wrapper" {
 
 ///|
 test "Section::layer converts single body to named layers" {
-  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@pattern.note(48.0))
   let section = base.layer(name="counter", body=@pattern.note(55.0))
   @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("main") is Some(_))
@@ -413,7 +413,7 @@ test "Section::layer converts single body to named layers" {
 
 ///|
 test "Section::layer replaces existing layer by name" {
-  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@pattern.note(48.0))
   let section = base.layer(name="main", body=@pattern.note(60.0))
   @debug.assert_eq(section.layer_count(), 1)
   let arc = @pattern.TimeSpan(
@@ -427,7 +427,7 @@ test "Section::layer replaces existing layer by name" {
 
 ///|
 test "Section::apply_patch add layer appends named layer" {
-  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@pattern.note(48.0))
   let section = base.apply_patch(
     SectionPatch::add_layer("counter", @pattern.note(55.0)),
   ) catch {
@@ -439,7 +439,7 @@ test "Section::apply_patch add layer appends named layer" {
 
 ///|
 test "Section::apply_patch set layer replaces existing layer" {
-  let single = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let single = Section::single(name="verse", body=@pattern.note(48.0))
   let base = single.layer(name="counter", body=@pattern.note(55.0))
   let section = base.apply_patch(
     SectionPatch::set_layer("counter", @pattern.note(67.0)),
@@ -458,7 +458,7 @@ test "Section::apply_patch set layer replaces existing layer" {
 
 ///|
 test "Section::apply_patch add layer rejects duplicate layer" {
-  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@pattern.note(48.0))
   try
     base.apply_patch(SectionPatch::add_layer("main", @pattern.note(55.0)))
   catch {
@@ -471,7 +471,7 @@ test "Section::apply_patch add layer rejects duplicate layer" {
 
 ///|
 test "Section::apply_patch set layer rejects missing layer" {
-  let base = Section::from_pattern(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@pattern.note(48.0))
   try
     base.apply_patch(SectionPatch::set_layer("counter", @pattern.note(55.0)))
   catch {

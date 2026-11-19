@@ -1,4 +1,26 @@
 ///|
+/// A lowered song the scheduler can play. Its sections hold either anonymous
+/// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
+pub(all) enum SongMaterial {
+  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+}
+
+///|
+fn SongMaterial::raw(self : SongMaterial) -> @playback.SongMaterial {
+  match self {
+    Runtime(snapshot) => Runtime(snapshot)
+    Exact(snapshot) => Exact(snapshot)
+  }
+}
+
+///|
+fn SongMaterial::from_raw(material : @playback.SongMaterial) -> SongMaterial {
+  match material {
+    Runtime(snapshot) => Runtime(snapshot)
+    Exact(snapshot) => Exact(snapshot)
+  }
+}
 
 ///|
 /// Prepared scheduler input for the next authoring snapshot commit.
@@ -9,8 +31,8 @@
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot)
   PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
-  Song(@song.SongSnapshot)
-  RepeatSong(@song.SongSnapshot)
+  Song(SongMaterial)
+  RepeatSong(SongMaterial)
 }
 
 ///|
@@ -28,16 +50,14 @@ pub fn PlaybackSnapshot::pattern_with_origins(
 }
 
 ///|
-pub fn PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot,
-) -> PlaybackSnapshot {
+pub fn PlaybackSnapshot::song(snapshot : SongMaterial) -> PlaybackSnapshot {
   Song(snapshot)
 }
 
 ///|
 /// Repeat an arranged song without resetting the transport or releasing voices.
 pub fn PlaybackSnapshot::repeat_song(
-  snapshot : @song.SongSnapshot,
+  snapshot : SongMaterial,
 ) -> PlaybackSnapshot {
   RepeatSong(snapshot)
 }
@@ -48,8 +68,8 @@ fn PlaybackSnapshot::raw(self : PlaybackSnapshot) -> @playback.PlaybackSnapshot 
     Pattern(snapshot) => @playback.PlaybackSnapshot::pattern(snapshot)
     PatternWithOrigins(snapshot) =>
       @playback.PlaybackSnapshot::pattern_with_origins(snapshot)
-    Song(snapshot) => @playback.PlaybackSnapshot::song(snapshot)
-    RepeatSong(snapshot) => @playback.PlaybackSnapshot::repeat_song(snapshot)
+    Song(song) => @playback.PlaybackSnapshot::song(song.raw())
+    RepeatSong(song) => @playback.PlaybackSnapshot::repeat_song(song.raw())
   }
 }
 
@@ -61,8 +81,9 @@ fn PlaybackSnapshot::from_raw(
     @playback.PlaybackSnapshot::Pattern(pattern) => Pattern(pattern)
     @playback.PlaybackSnapshot::PatternWithOrigins(pattern) =>
       PatternWithOrigins(pattern)
-    @playback.PlaybackSnapshot::Song(song) => Song(song)
-    @playback.PlaybackSnapshot::RepeatSong(song) => RepeatSong(song)
+    @playback.PlaybackSnapshot::Song(song) => Song(SongMaterial::from_raw(song))
+    @playback.PlaybackSnapshot::RepeatSong(song) =>
+      RepeatSong(SongMaterial::from_raw(song))
   }
 }
 

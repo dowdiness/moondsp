@@ -23,16 +23,16 @@ pub(all) struct PlaybackInspection {
 pub enum PlaybackSnapshot {
   Pattern(@pattern.PatternSnapshot)
   PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
-  Song(@song.SongSnapshot)
-  RepeatSong(@song.SongSnapshot)
+  Song(SongMaterial)
+  RepeatSong(SongMaterial)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot) -> Self
 pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
-pub fn PlaybackSnapshot::repeat_song(@song.SongSnapshot) -> Self
+pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
-pub fn PlaybackSnapshot::song(@song.SongSnapshot) -> Self
+pub fn PlaybackSnapshot::song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
 pub struct PlaybackSourcedEvent {
@@ -61,6 +61,11 @@ pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Ar
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
 pub fn PlaybackState::reset(Self) -> Unit
 pub fn PlaybackState::skipped_entry_count(Self) -> Int32
+
+pub(all) enum SongMaterial {
+  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+}
 
 // Type aliases
 

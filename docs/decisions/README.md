@@ -38,3 +38,4 @@ shipped plan or spec.
 - [ADR-0018 — Playback visualization follows event origins](0018-playback-visualization-origin-truth.md)
 - [ADR-0019 — Parameter automation through automatic control buses](0019-automatic-control-buses.md)
 - [ADR-0020 — Controls are typed signals with one representation](0020-controls-as-signals.md)
+- [ADR-0021 — Song structure is generic over its content](0021-song-structure-generic-over-content.md)

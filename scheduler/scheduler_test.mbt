@@ -236,7 +236,7 @@ fn scheduler_section_doc(
   id_value : String,
   name : String,
   midi : Double,
-) -> @song.SectionDoc {
+) -> @song.SectionDoc[@pattern.Pat[@pattern.ControlMap]] {
   @song.SectionDoc::single(
     id=sid(id_value),
     name~,
@@ -251,16 +251,20 @@ fn scheduler_section_doc(
 
 ///|
 fn scheduler_song_doc(
-  occurrences : Array[@song.SongOccurrenceDoc],
-) -> @song.SongDoc {
+  occurrences : Array[
+    @song.SongOccurrenceDoc[@pattern.Pat[@pattern.ControlMap]],
+  ],
+) -> @song.SongDoc[@pattern.Pat[@pattern.ControlMap]] {
   @song.SongDoc(parts=occurrences) catch {
     _ => abort("expected song doc")
   }
 }
 
 ///|
-fn song_snapshot(doc : @song.SongDoc) -> @song.SongSnapshot {
-  doc.lower() catch {
+fn song_snapshot(
+  doc : @song.SongDoc[@pattern.Pat[@pattern.ControlMap]],
+) -> @scheduler.SongMaterial {
+  Runtime(doc.lower()) catch {
     _ => abort("expected song snapshot")
   }
 }
@@ -856,7 +860,7 @@ test "process_section_block: identity section matches pattern scheduling" {
   let (pattern_pool, pattern_sched, pattern_left, pattern_right) = make_test_sched()
   let (section_pool, section_sched, section_left, section_right) = make_test_sched()
   let pat = @pattern.note(60.0)
-  let section = @song.Section::from_pattern(name="main", body=pat)
+  let section = @song.Section::single(name="main", body=pat)
   pattern_sched.process_block(pat, pattern_left, pattern_right)
   section_sched.process_section_block(section, section_left, section_right)
   @debug.assert_eq(
@@ -878,7 +882,7 @@ test "process_song_block: one-section song matches section scheduling" {
   let (section_pool, section_sched, section_left, section_right) = make_test_sched()
   let (song_pool, song_sched, song_left, song_right) = make_test_sched()
   let pat = @pattern.note(60.0)
-  let section = @song.Section::from_pattern(name="main", body=pat)
+  let section = @song.Section::single(name="main", body=pat)
   let song = @song.Song(parts=[@song.SongPart(name="main", section~)])
   section_sched.process_section_block(section, section_left, section_right)
   song_sched.process_song_block(song, song_left, song_right)

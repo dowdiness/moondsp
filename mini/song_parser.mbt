@@ -14,18 +14,18 @@ priv struct SongFillSpec {
 
 ///|
 /// Song parse result with optional playback metadata.
-pub struct ParsedSong {
-  song : @song.Song
+pub struct ParsedSong[C] {
+  song : @song.Song[C]
   bpm : Double?
 }
 
 ///|
-pub fn ParsedSong::song(self : ParsedSong) -> @song.Song {
+pub fn[C] ParsedSong::song(self : ParsedSong[C]) -> @song.Song[C] {
   self.song
 }
 
 ///|
-pub fn ParsedSong::bpm(self : ParsedSong) -> Double? {
+pub fn[C] ParsedSong::bpm(self : ParsedSong[C]) -> Double? {
   self.bpm
 }
 
@@ -42,15 +42,18 @@ pub fn ParsedSong::bpm(self : ParsedSong) -> Double? {
 ///
 /// `pattern_expr` is the existing pattern mini-notation surface, such as
 /// `s("bd sd")`, `note("60 64")`, `stack(...)`, and method chains. The result
-/// keeps the optional `bpm(number)` metadata beside the layout.
-pub fn parse_song(input : String) -> Result[ParsedSong, String] {
+/// keeps the optional `bpm(number)` metadata beside the layout. Sections are
+/// anonymous runtime patterns, without source origins.
+pub fn parse_song(
+  input : String,
+) -> Result[ParsedSong[@pattern.Pat[@pattern.ControlMap]], String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder(previous=None, origins=None)
   p.parse_bindings(builder) catch {
     ParseError(msg) => return Err(msg)
   }
-  let result = p.parse_song_expr(builder) catch {
+  let result = p.parse_song_expr(builder, lower=doc => doc.lower().pat()) catch {
     ParseError(msg) => return Err(msg)
   }
   p.skip_whitespace()
@@ -63,10 +66,12 @@ pub fn parse_song(input : String) -> Result[ParsedSong, String] {
 }
 
 ///|
-fn Parser::parse_song_expr(
+/// `lower` turns each section's compiled document into the song's content.
+fn[C] Parser::parse_song_expr(
   self : Parser,
   builder : MiniDocBuilder,
-) -> ParsedSong raise ParseError {
+  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+) -> ParsedSong[C] raise ParseError {
   self.skip_whitespace()
   let song_start = self.pos
   guard self.match_keyword("song(") else {
@@ -78,16 +83,30 @@ fn Parser::parse_song_expr(
       "position \{song_start}: song() requires at least one item",
     )
   }
-  let sections : Map[String, @song.Section] = Map([])
+  let sections : Map[String, @song.Section[C]] = Map([])
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
-  self.parse_song_item(sections, part_specs, fill_specs, bpm_values, builder~)
+  self.parse_song_item(
+    sections,
+    part_specs,
+    fill_specs,
+    bpm_values,
+    builder~,
+    lower~,
+  )
   self.skip_whitespace()
   while !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
     self.skip_whitespace()
-    self.parse_song_item(sections, part_specs, fill_specs, bpm_values, builder~)
+    self.parse_song_item(
+      sections,
+      part_specs,
+      fill_specs,
+      bpm_values,
+      builder~,
+      lower~,
+    )
     self.skip_whitespace()
   }
   self.expect_char(')')
@@ -114,18 +133,19 @@ fn Parser::parse_song_expr(
 }
 
 ///|
-fn Parser::parse_song_item(
+fn[C] Parser::parse_song_item(
   self : Parser,
-  sections : Map[String, @song.Section],
+  sections : Map[String, @song.Section[C]],
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
   builder~ : MiniDocBuilder,
+  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
 ) -> Unit raise ParseError {
   self.skip_whitespace()
   let item_start = self.pos
   if self.match_keyword("section(") {
-    let section = self.parse_song_section(item_start, builder~)
+    let section = self.parse_song_section(item_start, builder~, lower~)
     if sections.contains(section.name()) {
       raise ParseError(
         "position \{item_start}: duplicate section '\{section.name()}'",
@@ -171,11 +191,12 @@ fn Parser::parse_song_bpm(
 }
 
 ///|
-fn Parser::parse_song_section(
+fn[C] Parser::parse_song_section(
   self : Parser,
   item_start : Int32,
   builder~ : MiniDocBuilder,
-) -> @song.Section raise ParseError {
+  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+) -> @song.Section[C] raise ParseError {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -196,18 +217,14 @@ fn Parser::parse_song_section(
   let length_error = ParseError(
     "position \{item_start}: section '\{name}' requires a positive length",
   )
-  let scope = @song.TimeScope::identity()
-  if builder.origins is Some(_) {
-    let snapshot = doc.lower_with_origins() catch { _ => raise compile_error }
-    @song.Section::with_origins(name~, length_cycles~, scope~, snapshot~) catch {
-      _ => raise length_error
-    }
-  } else {
-    let snapshot = doc.lower() catch { _ => raise compile_error }
-    let body = @song.SectionBody::single(snapshot.pat())
-    @song.Section(name~, length_cycles~, scope~, body~) catch {
-      _ => raise length_error
-    }
+  let content = lower(doc) catch { _ => raise compile_error }
+  @song.Section(
+    name~,
+    length_cycles~,
+    scope=@song.TimeScope::identity(),
+    body=@song.SectionBody::single(content),
+  ) catch {
+    _ => raise length_error
   }
 }
 
@@ -346,10 +363,10 @@ fn parse_occurrence_id(
 }
 
 ///|
-fn resolve_song_section(
-  sections : Map[String, @song.Section],
+fn[C] resolve_song_section(
+  sections : Map[String, @song.Section[C]],
   name : String,
-) -> @song.Section raise ParseError {
+) -> @song.Section[C] raise ParseError {
   match sections.get(name) {
     Some(section) => section
     None => raise ParseError("unknown song section '\{name}'")
@@ -357,10 +374,10 @@ fn resolve_song_section(
 }
 
 ///|
-fn SongPartSpec::to_part(
+fn[C] SongPartSpec::to_part(
   self : SongPartSpec,
-  sections : Map[String, @song.Section],
-) -> @song.SongPart raise ParseError {
+  sections : Map[String, @song.Section[C]],
+) -> @song.SongPart[C] raise ParseError {
   let section = resolve_song_section(sections, self.section_name)
   match (self.id, self.start) {
     (Some(id), Some(start)) =>
@@ -372,7 +389,9 @@ fn SongPartSpec::to_part(
 }
 
 ///|
-fn build_song(parts : Array[@song.SongPart]) -> @song.Song raise ParseError {
+fn[C] build_song(
+  parts : Array[@song.SongPart[C]],
+) -> @song.Song[C] raise ParseError {
   @song.Song(parts~) catch {
     _ => raise ParseError("song construction failed")
   }

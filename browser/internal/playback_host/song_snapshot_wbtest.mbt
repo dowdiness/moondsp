@@ -17,7 +17,7 @@ test "prepared song respects section boundaries differing periods and finite end
     .song()
   let snapshot = song_update_snapshot(song)
   let span = cycle_span(0, 5)
-  let events = snapshot.query(span)
+  let events = snapshot.song().query(span)
   assert_eq(events.map(e => e.value.get(Note)), [
     Some(60.0),
     Some(72.0),
@@ -32,7 +32,7 @@ test "prepared song respects section boundaries differing periods and finite end
   ])
   assert_eq(events[2].part.end_, @pattern.Rational::from_int(3))
   assert_eq(events[3].part.end_, @pattern.Rational::from_int(5))
-  assert_eq(snapshot.query(cycle_span(5, 6)).length(), 0)
+  assert_eq(snapshot.song().query(cycle_span(5, 6)).length(), 0)
 }
 
 ///|
@@ -43,10 +43,10 @@ test "snapshot thinning is deterministic across query partitions" {
     .unwrap()
     .song()
   let snapshot = song_update_snapshot(song)
-  let whole = snapshot.query(cycle_span(0, 4))
+  let whole = snapshot.song().query(cycle_span(0, 4))
   let mut count = 0
   for cycle in 0..<4 {
-    let events = snapshot.query(cycle_span(cycle, cycle + 1))
+    let events = snapshot.song().query(cycle_span(cycle, cycle + 1))
     for event in events {
       assert_eq(event.part, whole[count].part)
       assert_eq(event.value.get(Note), whole[count].value.get(Note))

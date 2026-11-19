@@ -1,5 +1,7 @@
 ///|
-fn unwrap_parsed_song(result : Result[@mini.ParsedSong, String]) -> @song.Song {
+fn unwrap_parsed_song(
+  result : Result[@mini.ParsedSong[@pattern.Pat[@pattern.ControlMap]], String],
+) -> @song.Song[@pattern.Pat[@pattern.ControlMap]] {
   match result {
     Ok(parsed) => parsed.song()
     Err(msg) => abort("expected parsed song, got Err(\{msg})")

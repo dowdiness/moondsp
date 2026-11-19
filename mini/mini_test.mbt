@@ -1137,8 +1137,8 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
     fail("song must use runtime capability")
   }
   assert_eq(source.bpm(), 72.0)
-  guard source.body() is Arrangement(song, repeating) else {
-    fail("expected arrangement")
+  guard source.body() is ExactArrangement(song, repeating) else {
+    fail("expected exact arrangement")
   }
   assert_true(repeating)
   assert_eq(song.query(draft_arc())[0].value.get(Sound), Some(36.0))

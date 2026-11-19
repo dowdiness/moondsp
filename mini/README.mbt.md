@@ -43,12 +43,12 @@ surface:
 
 | Category | Types / Functions | Key operations |
 |---|---|---|
-| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ControlMap]` or `ParsedSong` |
+| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ControlMap]` or `ParsedSong[Pat[ControlMap]]` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
-| **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
+| **Song & Utilities** | `ParsedSong[C]`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
 
 ## Choose an entry point
 

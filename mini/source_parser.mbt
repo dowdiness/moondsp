@@ -1,9 +1,12 @@
 ///|
 /// The source accepted by the player, after pattern bindings and declarations
 /// have been separated from the playable body.
+/// A song's sections are lowered while parsing: to exact snapshots when the
+/// source is tracked, to anonymous runtime patterns otherwise.
 pub enum PlayBody {
   Pattern(@pattern.PatternDoc)
-  Arrangement(@song.Song, Bool)
+  Arrangement(@song.Song[@pattern.Pat[@pattern.ControlMap]], Bool)
+  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins], Bool)
 }
 
 ///|
@@ -107,34 +110,20 @@ fn parse_play_source_with_origins(
   }
   if parser.match_keyword("song(") {
     parser.pos -= 5
-    let parsed = parser.parse_song_expr(builder) catch {
-      ParseError(msg) => return Err(msg)
+    let arrangement = if origins is Some(_) {
+      parser
+      .parse_play_song(builder, admission, authored_bpm, lower=doc => {
+        doc.lower_with_origins()
+      })
+      .map(song => (ExactArrangement(song.0, song.1), song.2))
+    } else {
+      parser
+      .parse_play_song(builder, admission, authored_bpm, lower=doc => {
+        doc.lower().pat()
+      })
+      .map(song => (Arrangement(song.0, song.1), song.2))
     }
-    parser.skip_whitespace()
-    let repeating = if parser.match_keyword(".repeat()") { true } else { false }
-    parser.skip_whitespace()
-    guard parser.at_end() else {
-      return Err(
-        "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:].to_owned()}'",
-      )
-    }
-    guard !(authored_bpm is Some(_) && parsed.bpm() is Some(_)) else {
-      return Err("duplicate bpm(...)")
-    }
-    let bpm = match authored_bpm {
-      Some(value) => value
-      None =>
-        match parsed.bpm() {
-          Some(value) => value
-          None => DEFAULT_BPM
-        }
-    }
-    if admission is Some(admission) {
-      admission.arrangement(parsed.song(), repeating) catch {
-        ParseError(message) => return Err(message)
-      }
-    }
-    Ok({ body: Arrangement(parsed.song(), repeating), bpm, })
+    arrangement.map(arrangement => { body: arrangement.0, bpm: arrangement.1, })
   } else {
     guard !parser.at_end() else { return Err("empty input") }
     let doc = match mini_collect_dollar_stack_lines(input, start=parser.pos) {
@@ -159,4 +148,40 @@ fn parse_play_source_with_origins(
     }
     Ok({ body: Pattern(doc), bpm: authored_bpm.unwrap_or(DEFAULT_BPM), })
   }
+}
+
+///|
+/// Parse a `song(...)` body and its optional `.repeat()`, returning the song,
+/// whether it repeats, and its tempo.
+fn[C] Parser::parse_play_song(
+  self : Parser,
+  builder : MiniDocBuilder,
+  admission : PlaybackAdmission?,
+  authored_bpm : Double?,
+  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+) -> Result[(@song.Song[C], Bool, Double), String] {
+  let parsed = self.parse_song_expr(builder, lower~) catch {
+    ParseError(msg) => return Err(msg)
+  }
+  self.skip_whitespace()
+  let repeating = self.match_keyword(".repeat()")
+  self.skip_whitespace()
+  guard self.at_end() else {
+    return Err(
+      "position \{self.pos}: unexpected trailing input '\{self.input[self.pos:].to_owned()}'",
+    )
+  }
+  guard !(authored_bpm is Some(_) && parsed.bpm() is Some(_)) else {
+    return Err("duplicate bpm(...)")
+  }
+  let bpm = match authored_bpm {
+    Some(value) => value
+    None => parsed.bpm().unwrap_or(DEFAULT_BPM)
+  }
+  if admission is Some(admission) {
+    admission.arrangement(parsed.song(), repeating) catch {
+      ParseError(message) => return Err(message)
+    }
+  }
+  Ok((parsed.song(), repeating, bpm))
 }

@@ -8,7 +8,7 @@ test "play source parses pattern and preserves previous document" {
   let first = @mini.parse_play_source("s(\"bd\")").unwrap()
   let first_doc = match first.body() {
     Pattern(doc) => doc
-    Arrangement(_, _) => fail("expected pattern")
+    _ => fail("expected pattern")
   }
   let edited = @mini.parse_play_source(
     "// header\ns(\"sd\") // tail",
@@ -17,7 +17,7 @@ test "play source parses pattern and preserves previous document" {
   assert_eq(edited.bpm(), 120.0)
   match edited.body() {
     Pattern(_) => ()
-    Arrangement(_, _) => fail("expected pattern")
+    _ => fail("expected pattern")
   }
 }
 
@@ -27,7 +27,7 @@ test "play source parses bindings and default bpm" {
   assert_eq(pattern.bpm(), 120.0)
   match pattern.body() {
     Pattern(_) => ()
-    Arrangement(_, _) => fail("expected pattern")
+    _ => fail("expected pattern")
   }
 }
 
@@ -36,7 +36,7 @@ test "play source accepts silence pattern" {
   let parsed = @mini.parse_play_source("silence()").unwrap()
   match parsed.body() {
     Pattern(_) => ()
-    Arrangement(_, _) => fail("expected pattern")
+    _ => fail("expected pattern")
   }
 }
 
@@ -47,12 +47,12 @@ test "play source parses arrangement declaration and repeat marker" {
   assert_eq(parsed.bpm(), 96.0)
   match parsed.body() {
     Arrangement(_, repeats) => assert_true(repeats)
-    Pattern(_) => fail("expected arrangement")
+    _ => fail("expected arrangement")
   }
   let finite = @mini.parse_play_source(play_source_song()).unwrap()
   match finite.body() {
     Arrangement(_, repeats) => assert_false(repeats)
-    Pattern(_) => fail("expected arrangement")
+    _ => fail("expected arrangement")
   }
 }
 

@@ -5,7 +5,8 @@ fn bench_origin_draft_doc(text : String) -> @pattern.PatternDoc {
     Playable(source, _) =>
       match source.body() {
         Pattern(doc) => doc
-        Arrangement(_, _) => abort("expected pattern source")
+        Arrangement(_, _) | ExactArrangement(_, _) =>
+          abort("expected pattern source")
       }
     Rejected(diagnostic) =>
       abort("benchmark parse failed: \{diagnostic.message()}")

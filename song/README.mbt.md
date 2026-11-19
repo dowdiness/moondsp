@@ -1,8 +1,8 @@
 # Songs and sections
 
 `song` arranges patterns into named, length-bounded sections and places those
-sections on a long-form timeline. It arranges `ControlMap` patterns and
-does not depend on DSP, voices, or browser code.
+sections on a long-form timeline. It is generic over section content and does
+not depend on DSP, voices, or browser code.
 
 ## Architecture context
 
@@ -33,25 +33,25 @@ between pattern queries and the scheduler:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Song Composition** | `Song`, `Section`, `SongPart` | `Song::Song`, `Song::from_sections`, `Section::Section`, `Section::from_pattern`, `SongPart::SongPart`, `SongPart::at` |
-| **Section & Layers** | `Section`, `SectionBody`, `SectionLayer` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
-| **Timeline & Occurrence** | `Song`, `SectionOccurrence` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
+| **Song Composition** | `Song[C]`, `Section[C]`, `SongPart[C]`, `SongContent` | `Song::Song`, `Song::from_sections`, `Section::Section`, `Section::single`, `SongPart::SongPart`, `SongPart::at` |
+| **Section & Layers** | `Section[C]`, `SectionBody[C]`, `SectionLayer[C]` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
+| **Timeline & Occurrence** | `Song[C]`, `SectionOccurrence[C]` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
 | **Time Scopes** | `TimeScope` | `TimeScope::TimeScope`, `TimeScope::identity`, `TimeScope::at_rate`, `TimeScope::fast`, `TimeScope::slow` |
-| **Live Editing & Documents** | `SongDoc`, `SectionDoc`, `SongSnapshot` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::query` |
+| **Live Editing & Documents** | `SongDoc[C]`, `SectionDoc[C]`, `SongSnapshot[C]`, `SongSlice[C]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::entries`, `SongEntry::slice`, `SongSnapshot::slices` |
 | **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
 
 ## Build a section
 
-`Section` gives a pattern a name, duration in cycles, and local `TimeScope`.
-`from_pattern` is the concise one-cycle constructor.
+`Section[C]` gives content a name, duration in cycles, and local `TimeScope`.
+Structure never looks inside `C`; querying a section as a pattern requires
+`C : SongContent`, which runtime patterns (`Pat[ControlMap]`) and exact
+snapshots (`PatternSnapshotWithOrigins`) implement (ADR-0021).
+`single` is the concise one-cycle constructor.
 
 ```mbt check
 ///|
 test "wrap a pattern as a section" {
-  let section = @song.Section::from_pattern(
-    name="verse",
-    body=@pattern.note(60.0),
-  )
+  let section = @song.Section::single(name="verse", body=@pattern.note(60.0))
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -80,10 +80,10 @@ of adding a duplicate.
 ```mbt check
 ///|
 test "combine named section layers" {
-  let section = @song.Section::from_pattern(
-    name="groove",
-    body=@pattern.sound(36.0),
-  ).layer(name="bass", body=@pattern.note(36.0))
+  let section = @song.Section::single(name="groove", body=@pattern.sound(36.0)).layer(
+    name="bass",
+    body=@pattern.note(36.0),
+  )
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -116,10 +116,7 @@ test "arrange sections sequentially" {
     scope=@song.TimeScope::identity(),
     body=@song.SectionBody::single(@pattern.note(60.0)),
   )
-  let chorus = @song.Section::from_pattern(
-    name="chorus",
-    body=@pattern.note(67.0),
-  )
+  let chorus = @song.Section::single(name="chorus", body=@pattern.note(67.0))
   let arrangement = @song.Song::from_sections([intro, chorus])
   let events = arrangement.query(
     @pattern.TimeSpan(
@@ -147,8 +144,8 @@ gaps or overlap; `Song::query` preserves all overlapping events.
 ```mbt check
 ///|
 test "query explicitly placed occurrences" {
-  let a = @song.Section::from_pattern(name="a", body=@pattern.note(60.0))
-  let b = @song.Section::from_pattern(name="b", body=@pattern.note(64.0))
+  let a = @song.Section::single(name="a", body=@pattern.note(60.0))
+  let b = @song.Section::single(name="b", body=@pattern.note(64.0))
   let arrangement = @song.Song::Song(parts=[
     @song.SongPart::at(
       start=@pattern.Rational::from_int(0),
@@ -193,20 +190,21 @@ Interactive editors should use:
 
 Content revision and layout revision are separate. Renaming an occurrence
 changes authored content without moving it; inserting, moving, removing, or
-resizing an occurrence changes layout. `query_sourced_events` retains
-occurrence, section, and layer identity for selective live updates.
+resizing an occurrence changes layout. `entries()` lists the canonical playback
+entries; `SongEntry::slice` and `slices` return a `SongSlice` per entry: the
+content, its entry index, the content-local arc, the placement back to the song
+clock, and the occurrence, section, and layer identity used for selective live
+updates.
 
 Document edit methods return new values and reject duplicate identities, names,
 invalid indices, and removal of the final occurrence.
 
-`Section::with_origins(..., snapshot~)` derives a section body from an exact
-`PatternSnapshotWithOrigins`; it cannot pair an unrelated body with its witness.
-`SectionDoc::single_with_origins(..., snapshot~)` preserves that capability in
-the document path. `SongSnapshotEvent` carries optional source origin/frame and
-local onset/pitch alongside occurrence, section, and layer identity. Section
-rate, clipping, placement, and repeating playback change event spans without
-reinterpreting those source-local coordinates. Replacing a body with an
-anonymous runtime pattern clears its origin capability; renaming preserves it.
+Exact content is a type: a `Song[PatternSnapshotWithOrigins]` holds an exact
+snapshot in every layer, so querying a slice's content yields events with
+their source origin, frame, and local onset/pitch. Section rate, clipping,
+placement, and repeating playback change event spans without reinterpreting
+those source-local coordinates. A runtime pattern cannot replace an exact
+layer's body; choosing the content type is the only way to change kind.
 
 ## Package boundary
 

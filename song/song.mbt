@@ -14,116 +14,130 @@ pub(all) suberror SongBuildError {
 /// section body multiple times is allowed by giving each part a distinct name.
 /// Parts without an explicit start are placed at the current layout cursor;
 /// parts with an explicit start may create gaps or overlaps.
-pub struct SongPart {
+pub struct SongPart[C] {
   priv id : @identity.OccurrenceId?
   priv start : @pattern.Rational?
   priv name : String
-  priv section : Section
+  priv section : Section[C]
 }
 
 ///|
-pub fn SongPart::SongPart(name~ : String, section~ : Section) -> SongPart {
+pub fn[C] SongPart::SongPart(
+  name~ : String,
+  section~ : Section[C],
+) -> SongPart[C] {
   { id: None, start: None, name, section, }
 }
 
 ///|
-pub fn SongPart::with_id(
+pub fn[C] SongPart::with_id(
   id~ : @identity.OccurrenceId,
   name~ : String,
-  section~ : Section,
-) -> SongPart {
+  section~ : Section[C],
+) -> SongPart[C] {
   { id: Some(id), start: None, name, section, }
 }
 
 ///|
-pub fn SongPart::at(
+pub fn[C] SongPart::at(
   start~ : @pattern.Rational,
   name~ : String,
-  section~ : Section,
-) -> SongPart {
+  section~ : Section[C],
+) -> SongPart[C] {
   { id: None, start: Some(start), name, section, }
 }
 
 ///|
-pub fn SongPart::with_id_at(
+pub fn[C] SongPart::with_id_at(
   id~ : @identity.OccurrenceId,
   start~ : @pattern.Rational,
   name~ : String,
-  section~ : Section,
-) -> SongPart {
+  section~ : Section[C],
+) -> SongPart[C] {
   { id: Some(id), start: Some(start), name, section, }
 }
 
 ///|
-pub fn SongPart::id(self : SongPart) -> @identity.OccurrenceId? {
+pub fn[C] SongPart::id(self : SongPart[C]) -> @identity.OccurrenceId? {
   self.id
 }
 
 ///|
-pub fn SongPart::start(self : SongPart) -> @pattern.Rational? {
+pub fn[C] SongPart::start(self : SongPart[C]) -> @pattern.Rational? {
   self.start
 }
 
 ///|
-pub fn SongPart::name(self : SongPart) -> String {
+pub fn[C] SongPart::name(self : SongPart[C]) -> String {
   self.name
 }
 
 ///|
-pub fn SongPart::section(self : SongPart) -> Section {
+pub fn[C] SongPart::section(self : SongPart[C]) -> Section[C] {
   self.section
 }
 
 ///|
 /// Computed placement of a section in song-global logical time.
-pub struct SectionOccurrence {
+pub struct SectionOccurrence[C] {
   priv id : @identity.OccurrenceId
   priv name : String
-  priv section : Section
+  priv section : Section[C]
   priv span : @pattern.TimeSpan
 }
 
 ///|
-fn SectionOccurrence::snapshot(self : SectionOccurrence) -> SectionOccurrence {
+fn[C] SectionOccurrence::snapshot(
+  self : SectionOccurrence[C],
+) -> SectionOccurrence[C] {
   { id: self.id, name: self.name, section: self.section, span: self.span, }
 }
 
 ///|
-pub fn SectionOccurrence::id(
-  self : SectionOccurrence,
+pub fn[C] SectionOccurrence::id(
+  self : SectionOccurrence[C],
 ) -> @identity.OccurrenceId {
   self.id
 }
 
 ///|
-pub fn SectionOccurrence::name(self : SectionOccurrence) -> String {
+pub fn[C] SectionOccurrence::name(self : SectionOccurrence[C]) -> String {
   self.name
 }
 
 ///|
-pub fn SectionOccurrence::section(self : SectionOccurrence) -> Section {
+pub fn[C] SectionOccurrence::section(self : SectionOccurrence[C]) -> Section[C] {
   self.section
 }
 
 ///|
-pub fn SectionOccurrence::span(self : SectionOccurrence) -> @pattern.TimeSpan {
+pub fn[C] SectionOccurrence::span(
+  self : SectionOccurrence[C],
+) -> @pattern.TimeSpan {
   self.span
 }
 
 ///|
-pub fn SectionOccurrence::start(self : SectionOccurrence) -> @pattern.Rational {
+pub fn[C] SectionOccurrence::start(
+  self : SectionOccurrence[C],
+) -> @pattern.Rational {
   self.span.begin
 }
 
 ///|
-pub fn SectionOccurrence::end_(self : SectionOccurrence) -> @pattern.Rational {
+pub fn[C] SectionOccurrence::end_(
+  self : SectionOccurrence[C],
+) -> @pattern.Rational {
   self.span.end_
 }
 
 ///|
 /// Long-form arrangement of named section occurrences.
-pub struct Song {
-  priv occurrences : Array[SectionOccurrence]
+///
+/// `Song` is generic over the same section content `C` as `Section`
+/// (ADR-0021).
+pub struct Song[C] {
+  priv occurrences : Array[SectionOccurrence[C]]
   priv occurrence_by_id : Map[String, Int32]
   priv occurrence_by_name : Map[String, Int32]
   priv occurrence_by_start : Array[Int32]
@@ -132,8 +146,8 @@ pub struct Song {
 }
 
 ///|
-fn occurrence_id_for_part(
-  part : SongPart,
+fn[C] occurrence_id_for_part(
+  part : SongPart[C],
 ) -> @identity.OccurrenceId raise SongBuildError {
   match part.id {
     Some(id) => id
@@ -145,15 +159,15 @@ fn occurrence_id_for_part(
 }
 
 ///|
-fn copy_occurrences(
-  occurrences : Array[SectionOccurrence],
-) -> Array[SectionOccurrence] {
+fn[C] copy_occurrences(
+  occurrences : Array[SectionOccurrence[C]],
+) -> Array[SectionOccurrence[C]] {
   occurrences.map(occurrence => occurrence.snapshot())
 }
 
 ///|
-fn sorted_occurrence_indexes_by_start(
-  occurrences : Array[SectionOccurrence],
+fn[C] sorted_occurrence_indexes_by_start(
+  occurrences : Array[SectionOccurrence[C]],
 ) -> Array[Int32] {
   let result : Array[Int32] = []
   for occurrence_index in 0..<occurrences.length() {
@@ -172,8 +186,8 @@ fn sorted_occurrence_indexes_by_start(
 }
 
 ///|
-fn sorted_occurrence_indexes_by_end(
-  occurrences : Array[SectionOccurrence],
+fn[C] sorted_occurrence_indexes_by_end(
+  occurrences : Array[SectionOccurrence[C]],
 ) -> Array[Int32] {
   let result : Array[Int32] = []
   for occurrence_index in 0..<occurrences.length() {
@@ -192,8 +206,8 @@ fn sorted_occurrence_indexes_by_end(
 }
 
 ///|
-fn first_start_not_before(
-  occurrences : Array[SectionOccurrence],
+fn[C] first_start_not_before(
+  occurrences : Array[SectionOccurrence[C]],
   indexes : Array[Int32],
   time : @pattern.Rational,
 ) -> Int32 {
@@ -211,8 +225,8 @@ fn first_start_not_before(
 }
 
 ///|
-fn first_start_after(
-  occurrences : Array[SectionOccurrence],
+fn[C] first_start_after(
+  occurrences : Array[SectionOccurrence[C]],
   indexes : Array[Int32],
   time : @pattern.Rational,
 ) -> Int32 {
@@ -230,8 +244,8 @@ fn first_start_after(
 }
 
 ///|
-fn first_end_after(
-  occurrences : Array[SectionOccurrence],
+fn[C] first_end_after(
+  occurrences : Array[SectionOccurrence[C]],
   indexes : Array[Int32],
   time : @pattern.Rational,
 ) -> Int32 {
@@ -280,8 +294,8 @@ fn push_index_in_authoring_order(
 }
 
 ///|
-fn Song::occurrence_indexes_at(
-  self : Song,
+fn[C] Song::occurrence_indexes_at(
+  self : Song[C],
   time : @pattern.Rational,
 ) -> Array[Int32] {
   let result : Array[Int32] = []
@@ -315,8 +329,8 @@ fn Song::occurrence_indexes_at(
 }
 
 ///|
-fn Song::occurrence_indexes_intersecting(
-  self : Song,
+fn[C] Song::occurrence_indexes_intersecting(
+  self : Song[C],
   arc : @pattern.TimeSpan,
 ) -> Array[Int32] {
   let result : Array[Int32] = []
@@ -362,11 +376,13 @@ fn max_rational(
 }
 
 ///|
-pub fn Song::Song(parts~ : Array[SongPart]) -> Song raise SongBuildError {
+pub fn[C] Song::Song(
+  parts~ : Array[SongPart[C]],
+) -> Song[C] raise SongBuildError {
   if parts.is_empty() {
     raise EmptySong
   }
-  let occurrences : Array[SectionOccurrence] = []
+  let occurrences : Array[SectionOccurrence[C]] = []
   let by_id : Map[String, Int32] = Map([])
   let by_name : Map[String, Int32] = Map([])
   let mut cursor = @pattern.Rational::from_int(0)
@@ -402,29 +418,32 @@ pub fn Song::Song(parts~ : Array[SongPart]) -> Song raise SongBuildError {
 }
 
 ///|
-pub fn Song::from_sections(
-  sections : Array[Section],
-) -> Song raise SongBuildError {
+pub fn[C] Song::from_sections(
+  sections : Array[Section[C]],
+) -> Song[C] raise SongBuildError {
   Song(parts=sections.map(section => SongPart(name=section.name(), section~)))
 }
 
 ///|
-pub fn Song::duration(self : Song) -> @pattern.Rational {
+pub fn[C] Song::duration(self : Song[C]) -> @pattern.Rational {
   self.duration
 }
 
 ///|
-pub fn Song::occurrence_count(self : Song) -> Int32 {
+pub fn[C] Song::occurrence_count(self : Song[C]) -> Int32 {
   self.occurrences.length()
 }
 
 ///|
-pub fn Song::occurrences(self : Song) -> Array[SectionOccurrence] {
+pub fn[C] Song::occurrences(self : Song[C]) -> Array[SectionOccurrence[C]] {
   copy_occurrences(self.occurrences)
 }
 
 ///|
-pub fn Song::occurrence(self : Song, index : Int32) -> SectionOccurrence? {
+pub fn[C] Song::occurrence(
+  self : Song[C],
+  index : Int32,
+) -> SectionOccurrence[C]? {
   match self.occurrences.get(index) {
     Some(occurrence) => Some(occurrence.snapshot())
     None => None
@@ -432,10 +451,10 @@ pub fn Song::occurrence(self : Song, index : Int32) -> SectionOccurrence? {
 }
 
 ///|
-pub fn Song::occurrence_at(
-  self : Song,
+pub fn[C] Song::occurrence_at(
+  self : Song[C],
   time : @pattern.Rational,
-) -> SectionOccurrence? {
+) -> SectionOccurrence[C]? {
   let indexes = self.occurrence_indexes_at(time)
   match indexes.get(0) {
     Some(index) => self.occurrence(index)
@@ -444,27 +463,27 @@ pub fn Song::occurrence_at(
 }
 
 ///|
-pub fn Song::occurrences_at(
-  self : Song,
+pub fn[C] Song::occurrences_at(
+  self : Song[C],
   time : @pattern.Rational,
-) -> Array[SectionOccurrence] {
+) -> Array[SectionOccurrence[C]] {
   self
   .occurrence_indexes_at(time)
   .map(index => self.occurrences[index].snapshot())
 }
 
 ///|
-pub fn Song::occurrences_intersecting(
-  self : Song,
+pub fn[C] Song::occurrences_intersecting(
+  self : Song[C],
   arc : @pattern.TimeSpan,
-) -> Array[SectionOccurrence] {
+) -> Array[SectionOccurrence[C]] {
   self
   .occurrence_indexes_intersecting(arc)
   .map(index => self.occurrences[index].snapshot())
 }
 
 ///|
-pub fn Song::gap_spans(self : Song) -> Array[@pattern.TimeSpan] {
+pub fn[C] Song::gap_spans(self : Song[C]) -> Array[@pattern.TimeSpan] {
   let result : Array[@pattern.TimeSpan] = []
   let mut cursor = @pattern.Rational::from_int(0)
   for index in self.occurrence_by_start {
@@ -478,16 +497,15 @@ pub fn Song::gap_spans(self : Song) -> Array[@pattern.TimeSpan] {
 }
 
 ///|
-fn section_with_length(
-  section : Section,
+fn[C] section_with_length(
+  section : Section[C],
   length_cycles : @pattern.Rational,
-) -> Section {
+) -> Section[C] {
   {
     name: section.name(),
     length_cycles,
     scope: section.scope(),
     body: section.section_body(),
-    source_snapshot: section.source_snapshot(),
   }
 }
 
@@ -497,7 +515,7 @@ fn fill_occurrence_name(prefix : String, index : Int32) -> String {
 }
 
 ///|
-fn occurrence_to_part(occurrence : SectionOccurrence) -> SongPart {
+fn[C] occurrence_to_part(occurrence : SectionOccurrence[C]) -> SongPart[C] {
   SongPart::with_id_at(
     id=occurrence.id(),
     start=occurrence.start(),
@@ -513,11 +531,11 @@ fn occurrence_to_part(occurrence : SectionOccurrence) -> SongPart {
 /// fill names use deterministic `prefix:index` values in song-time gap order.
 /// Each fill occurrence reuses the supplied section body/scope with its length
 /// adjusted to the uncovered span.
-pub fn Song::fill_gaps(
-  self : Song,
+pub fn[C] Song::fill_gaps(
+  self : Song[C],
   prefix~ : String,
-  section~ : Section,
-) -> Song raise SongBuildError {
+  section~ : Section[C],
+) -> Song[C] raise SongBuildError {
   let parts = self.occurrences.map(occurrence_to_part)
   for index, gap in self.gap_spans() {
     parts.push(
@@ -532,7 +550,10 @@ pub fn Song::fill_gaps(
 }
 
 ///|
-pub fn Song::get_occurrence(self : Song, name : String) -> SectionOccurrence? {
+pub fn[C] Song::get_occurrence(
+  self : Song[C],
+  name : String,
+) -> SectionOccurrence[C]? {
   match self.occurrence_by_name.get(name) {
     Some(index) => self.occurrence(index)
     None => None
@@ -540,10 +561,10 @@ pub fn Song::get_occurrence(self : Song, name : String) -> SectionOccurrence? {
 }
 
 ///|
-pub fn Song::get_occurrence_by_id(
-  self : Song,
+pub fn[C] Song::get_occurrence_by_id(
+  self : Song[C],
   id : @identity.OccurrenceId,
-) -> SectionOccurrence? {
+) -> SectionOccurrence[C]? {
   match self.occurrence_by_id.get(id.value()) {
     Some(index) => self.occurrence(index)
     None => None
@@ -567,8 +588,8 @@ fn unshift_span(
 /// intended duration and is shifted without clipping. This intentionally lets
 /// notes sustain past section boundaries; clipping `whole` here would force
 /// abrupt note-offs at layout boundaries.
-pub fn Song::query(
-  self : Song,
+pub fn[C : SongContent] Song::query(
+  self : Song[C],
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@pattern.ControlMap]] {
   let result : Array[@pattern.Event[@pattern.ControlMap]] = []

@@ -299,9 +299,9 @@ fn PlaybackAdmission::expression(
 }
 
 ///|
-fn PlaybackAdmission::arrangement(
+fn[C] PlaybackAdmission::arrangement(
   self : PlaybackAdmission,
-  song : @song.Song,
+  song : @song.Song[C],
   repeating : Bool,
 ) -> Unit raise ParseError {
   let occurrences = song.occurrences()

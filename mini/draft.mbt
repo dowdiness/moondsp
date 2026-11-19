@@ -679,7 +679,7 @@ pub fn PlaybackInput::compile(
         Ok(source) => source
         Err(message) => return Err(message)
       }
-      guard source.body() is Arrangement(_, _) else {
+      guard source.body() is ExactArrangement(_, _) else {
         return Err("song input changed source mode")
       }
       Ok(Runtime(source))
@@ -761,7 +761,7 @@ fn DraftAnalysis::pattern_doc(self : DraftAnalysis) -> @pattern.PatternDoc? {
     Playable(source, _) =>
       match source.body() {
         Pattern(doc) => Some(doc)
-        Arrangement(_, _) => None
+        Arrangement(_, _) | ExactArrangement(_, _) => None
       }
     Rejected(_) => None
   }

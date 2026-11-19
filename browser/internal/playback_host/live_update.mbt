@@ -145,7 +145,7 @@ fn Player::check_repeat_span(
 }
 
 ///|
-fn song_layout(song : @song.Song, repeated : Bool) -> PlaybackLayout {
+fn[C] song_layout(song : @song.Song[C], repeated : Bool) -> PlaybackLayout {
   SongLayout(
     song
     .occurrences()
@@ -162,30 +162,50 @@ fn song_layout(song : @song.Song, repeated : Bool) -> PlaybackLayout {
 }
 
 ///|
-fn song_update_snapshot(song : @song.Song) -> @song.SongSnapshot raise {
+fn[C] live_section_doc_body(
+  body : @song.SectionBody[C],
+) -> @song.SectionDocBody[C] raise {
+  match body {
+    Single(content) =>
+      @song.SectionDocBody::single(
+        @song.SectionLayerDoc(
+          id=@identity.SectionLayerId::from_string("live:body"),
+          name="main",
+          body=content,
+        ),
+      )
+    Layers(layers) => {
+      let docs : Array[@song.SectionLayerDoc[C]] = []
+      for layer in layers {
+        docs.push(
+          @song.SectionLayerDoc(
+            id=@identity.SectionLayerId::from_string(
+              "live:layer:" + layer.name(),
+            ),
+            name=layer.name(),
+            body=layer.body(),
+          ),
+        )
+      }
+      @song.SectionDocBody::layers(docs)
+    }
+  }
+}
+
+///|
+fn[C : @song.SongContent] song_update_snapshot(
+  song : @song.Song[C],
+) -> @song.SongSnapshot[C] raise {
   let parts = song
     .occurrences()
     .map(o => {
-      let section = match o.section().source_snapshot() {
-        Some(snapshot) =>
-          @song.SectionDoc::single_with_origins(
-            id=@identity.SectionId::from_string("live:" + o.id().value()),
-            name=o.section().name(),
-            length_cycles=o.section().length_cycles(),
-            scope=o.section().scope(),
-            layer_id=@identity.SectionLayerId::from_string("live:body"),
-            snapshot~,
-          )
-        None =>
-          @song.SectionDoc::single(
-            id=@identity.SectionId::from_string("live:" + o.id().value()),
-            name=o.section().name(),
-            length_cycles=o.section().length_cycles(),
-            scope=o.section().scope(),
-            layer_id=@identity.SectionLayerId::from_string("live:body"),
-            body=o.section().body(),
-          )
-      }
+      let section = @song.SectionDoc(
+        id=@identity.SectionId::from_string("live:" + o.id().value()),
+        name=o.section().name(),
+        length_cycles=o.section().length_cycles(),
+        scope=o.section().scope(),
+        body=live_section_doc_body(o.section().section_body()),
+      )
       @song.SongOccurrenceDoc::at(
         id=o.id(),
         start=o.start(),
@@ -249,35 +269,14 @@ fn Player::prepare(
             span: Continuous,
           })
         }
-        Arrangement(song, repeated) => {
-          guard song.duration() > @pattern.Rational::from_int(0) else {
-            return Err(InvalidSource("song must end after its beginning"))
-          }
-          let span = if repeated {
-            Repeating(song.duration())
-          } else {
-            Finite(song.duration())
-          }
-          match self.check_repeat_span(span, tempo) {
-            Err(error) => return Err(error)
-            Ok(_) => ()
-          }
-          let snapshot = song_update_snapshot(song) catch {
-            error => return Err(InvalidSource(error.to_string()))
-          }
-          Ok({
-            source,
-            tempo,
-            layout: song_layout(song, repeated),
-            doc: None,
-            snapshot: if repeated {
-              @scheduler.PlaybackSnapshot::repeat_song(snapshot)
-            } else {
-              @scheduler.PlaybackSnapshot::song(snapshot)
-            },
-            span,
+        Arrangement(song, repeated) =>
+          self.prepare_arrangement(source, tempo, song, repeated, snapshot => {
+            @scheduler.SongMaterial::Runtime(snapshot)
           })
-        }
+        ExactArrangement(song, repeated) =>
+          self.prepare_arrangement(source, tempo, song, repeated, snapshot => {
+            @scheduler.SongMaterial::Exact(snapshot)
+          })
       }
     }
   }
@@ -289,6 +288,44 @@ fn Player::prepare(
     return Err(InvalidSource("playback source exceeds 256 material entries"))
   }
   Ok(song)
+}
+
+///|
+fn[C : @song.SongContent] Player::prepare_arrangement(
+  self : Player,
+  source : String,
+  tempo : @scheduler.Tempo,
+  song : @song.Song[C],
+  repeated : Bool,
+  material : (@song.SongSnapshot[C]) -> @scheduler.SongMaterial,
+) -> Result[PreparedSong, PlayerError] {
+  guard song.duration() > @pattern.Rational::from_int(0) else {
+    return Err(InvalidSource("song must end after its beginning"))
+  }
+  let span = if repeated {
+    Repeating(song.duration())
+  } else {
+    Finite(song.duration())
+  }
+  match self.check_repeat_span(span, tempo) {
+    Err(error) => return Err(error)
+    Ok(_) => ()
+  }
+  let snapshot = song_update_snapshot(song) catch {
+    error => return Err(InvalidSource(error.to_string()))
+  }
+  Ok({
+    source,
+    tempo,
+    layout: song_layout(song, repeated),
+    doc: None,
+    snapshot: if repeated {
+      @scheduler.PlaybackSnapshot::repeat_song(material(snapshot))
+    } else {
+      @scheduler.PlaybackSnapshot::song(material(snapshot))
+    },
+    span,
+  })
 }
 
 ///|

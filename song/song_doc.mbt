@@ -22,21 +22,21 @@ pub(all) suberror SongDocEditError {
 /// The display `name` can change without changing the stable `id`.
 /// `layout_revision` advances only when placement or section length can change
 /// computed song spans.
-pub struct SongOccurrenceDoc {
+pub struct SongOccurrenceDoc[C] {
   priv id : @identity.OccurrenceId
   priv name : String
   priv start : @pattern.Rational?
-  priv section : SectionDoc
+  priv section : SectionDoc[C]
   priv revision : @identity.Revision
   priv layout_revision : @identity.Revision
 }
 
 ///|
-pub fn SongOccurrenceDoc::SongOccurrenceDoc(
+pub fn[C] SongOccurrenceDoc::SongOccurrenceDoc(
   id~ : @identity.OccurrenceId,
   name~ : String,
-  section~ : SectionDoc,
-) -> SongOccurrenceDoc {
+  section~ : SectionDoc[C],
+) -> SongOccurrenceDoc[C] {
   {
     id,
     name,
@@ -48,12 +48,12 @@ pub fn SongOccurrenceDoc::SongOccurrenceDoc(
 }
 
 ///|
-pub fn SongOccurrenceDoc::at(
+pub fn[C] SongOccurrenceDoc::at(
   id~ : @identity.OccurrenceId,
   start~ : @pattern.Rational,
   name~ : String,
-  section~ : SectionDoc,
-) -> SongOccurrenceDoc {
+  section~ : SectionDoc[C],
+) -> SongOccurrenceDoc[C] {
   {
     id,
     name,
@@ -65,46 +65,50 @@ pub fn SongOccurrenceDoc::at(
 }
 
 ///|
-pub fn SongOccurrenceDoc::id(
-  self : SongOccurrenceDoc,
+pub fn[C] SongOccurrenceDoc::id(
+  self : SongOccurrenceDoc[C],
 ) -> @identity.OccurrenceId {
   self.id
 }
 
 ///|
-pub fn SongOccurrenceDoc::name(self : SongOccurrenceDoc) -> String {
+pub fn[C] SongOccurrenceDoc::name(self : SongOccurrenceDoc[C]) -> String {
   self.name
 }
 
 ///|
-pub fn SongOccurrenceDoc::start(self : SongOccurrenceDoc) -> @pattern.Rational? {
+pub fn[C] SongOccurrenceDoc::start(
+  self : SongOccurrenceDoc[C],
+) -> @pattern.Rational? {
   self.start
 }
 
 ///|
-pub fn SongOccurrenceDoc::section(self : SongOccurrenceDoc) -> SectionDoc {
+pub fn[C] SongOccurrenceDoc::section(
+  self : SongOccurrenceDoc[C],
+) -> SectionDoc[C] {
   self.section
 }
 
 ///|
-pub fn SongOccurrenceDoc::revision(
-  self : SongOccurrenceDoc,
+pub fn[C] SongOccurrenceDoc::revision(
+  self : SongOccurrenceDoc[C],
 ) -> @identity.Revision {
   self.revision.combine(self.section.revision())
 }
 
 ///|
-pub fn SongOccurrenceDoc::layout_revision(
-  self : SongOccurrenceDoc,
+pub fn[C] SongOccurrenceDoc::layout_revision(
+  self : SongOccurrenceDoc[C],
 ) -> @identity.Revision {
   self.layout_revision
 }
 
 ///|
-pub fn SongOccurrenceDoc::rename(
-  self : SongOccurrenceDoc,
+pub fn[C] SongOccurrenceDoc::rename(
+  self : SongOccurrenceDoc[C],
   name~ : String,
-) -> SongOccurrenceDoc {
+) -> SongOccurrenceDoc[C] {
   {
     id: self.id,
     name,
@@ -116,10 +120,10 @@ pub fn SongOccurrenceDoc::rename(
 }
 
 ///|
-pub fn SongOccurrenceDoc::with_start(
-  self : SongOccurrenceDoc,
+pub fn[C] SongOccurrenceDoc::with_start(
+  self : SongOccurrenceDoc[C],
   start~ : @pattern.Rational,
-) -> SongOccurrenceDoc {
+) -> SongOccurrenceDoc[C] {
   {
     id: self.id,
     name: self.name,
@@ -131,9 +135,9 @@ pub fn SongOccurrenceDoc::with_start(
 }
 
 ///|
-pub fn SongOccurrenceDoc::clear_start(
-  self : SongOccurrenceDoc,
-) -> SongOccurrenceDoc {
+pub fn[C] SongOccurrenceDoc::clear_start(
+  self : SongOccurrenceDoc[C],
+) -> SongOccurrenceDoc[C] {
   {
     id: self.id,
     name: self.name,
@@ -145,10 +149,10 @@ pub fn SongOccurrenceDoc::clear_start(
 }
 
 ///|
-pub fn SongOccurrenceDoc::replace_section(
-  self : SongOccurrenceDoc,
-  section~ : SectionDoc,
-) -> SongOccurrenceDoc {
+pub fn[C] SongOccurrenceDoc::replace_section(
+  self : SongOccurrenceDoc[C],
+  section~ : SectionDoc[C],
+) -> SongOccurrenceDoc[C] {
   let layout_revision = if self.section.length_cycles() ==
     section.length_cycles() {
     self.layout_revision
@@ -166,7 +170,7 @@ pub fn SongOccurrenceDoc::replace_section(
 }
 
 ///|
-fn SongOccurrenceDoc::to_part(self : SongOccurrenceDoc) -> SongPart {
+fn[C] SongOccurrenceDoc::to_part(self : SongOccurrenceDoc[C]) -> SongPart[C] {
   match self.start {
     Some(start) =>
       SongPart::with_id_at(
@@ -185,15 +189,15 @@ fn SongOccurrenceDoc::to_part(self : SongOccurrenceDoc) -> SongPart {
 }
 
 ///|
-fn copy_song_occurrence_docs(
-  parts : Array[SongOccurrenceDoc],
-) -> Array[SongOccurrenceDoc] {
+fn[C] copy_song_occurrence_docs(
+  parts : Array[SongOccurrenceDoc[C]],
+) -> Array[SongOccurrenceDoc[C]] {
   parts.copy()
 }
 
 ///|
-fn song_doc_find_occurrence_index(
-  parts : Array[SongOccurrenceDoc],
+fn[C] song_doc_find_occurrence_index(
+  parts : Array[SongOccurrenceDoc[C]],
   id : @identity.OccurrenceId,
 ) -> Int32? {
   for index in 0..<parts.length() {
@@ -205,16 +209,16 @@ fn song_doc_find_occurrence_index(
 }
 
 ///|
-fn song_doc_has_occurrence_id(
-  parts : Array[SongOccurrenceDoc],
+fn[C] song_doc_has_occurrence_id(
+  parts : Array[SongOccurrenceDoc[C]],
   id : @identity.OccurrenceId,
 ) -> Bool {
   song_doc_find_occurrence_index(parts, id) is Some(_)
 }
 
 ///|
-fn song_doc_has_occurrence_name_except(
-  parts : Array[SongOccurrenceDoc],
+fn[C] song_doc_has_occurrence_name_except(
+  parts : Array[SongOccurrenceDoc[C]],
   name : String,
   id : @identity.OccurrenceId,
 ) -> Bool {
@@ -222,8 +226,8 @@ fn song_doc_has_occurrence_name_except(
 }
 
 ///|
-fn validate_song_doc_parts(
-  parts : Array[SongOccurrenceDoc],
+fn[C] validate_song_doc_parts(
+  parts : Array[SongOccurrenceDoc[C]],
 ) -> Unit raise SongDocBuildError {
   if parts.is_empty() {
     raise EmptySongDoc
@@ -244,8 +248,8 @@ fn validate_song_doc_parts(
 }
 
 ///|
-fn aggregate_song_doc_revision(
-  parts : Array[SongOccurrenceDoc],
+fn[C] aggregate_song_doc_revision(
+  parts : Array[SongOccurrenceDoc[C]],
 ) -> @identity.Revision {
   let mut revision = @identity.Revision::zero()
   for part in parts {
@@ -255,8 +259,8 @@ fn aggregate_song_doc_revision(
 }
 
 ///|
-fn aggregate_song_doc_layout_revision(
-  parts : Array[SongOccurrenceDoc],
+fn[C] aggregate_song_doc_layout_revision(
+  parts : Array[SongOccurrenceDoc[C]],
 ) -> @identity.Revision {
   let mut revision = @identity.Revision::zero()
   for part in parts {
@@ -266,116 +270,108 @@ fn aggregate_song_doc_layout_revision(
 }
 
 ///|
-fn insert_song_doc_occurrence_at(
-  parts : Array[SongOccurrenceDoc],
+fn[C] insert_song_doc_occurrence_at(
+  parts : Array[SongOccurrenceDoc[C]],
   index : Int32,
-  occurrence : SongOccurrenceDoc,
-) -> Array[SongOccurrenceDoc] {
+  occurrence : SongOccurrenceDoc[C],
+) -> Array[SongOccurrenceDoc[C]] {
   [..parts[0:index], occurrence, ..parts[index:]]
 }
 
 ///|
-fn move_song_doc_occurrence_to(
-  parts : Array[SongOccurrenceDoc],
+fn[C] move_song_doc_occurrence_to(
+  parts : Array[SongOccurrenceDoc[C]],
   current_index : Int32,
   target_index : Int32,
-) -> Array[SongOccurrenceDoc] {
+) -> Array[SongOccurrenceDoc[C]] {
   let moving = parts[current_index]
   let without = [ for index, part in parts if index != current_index => part ]
   [..without[0:target_index], moving, ..without[target_index:]]
 }
 
 ///|
-priv struct SourcedSongSnapshotLayer {
-  id : @identity.SectionLayerId
-  body : @pattern.Pat[@pattern.ControlMap]
-  source_snapshot : @pattern.PatternSnapshotWithOrigins?
+/// One canonical playback entry of a lowered song: one `Pat::entries()`
+/// member of one layer of one occurrence.
+pub struct SongEntry[C] {
+  priv occurrence : SectionOccurrence[C]
+  priv origin : SongEventOrigin
+  priv content : C
+  priv index : Int32
+  priv body : @pattern.Pat[@pattern.ControlMap]
 }
 
 ///|
-priv struct SourcedSongSnapshotOccurrence {
-  occurrence : SectionOccurrence
-  section : @identity.SectionId
-  layers : Array[SourcedSongSnapshotLayer]
+pub fn[C] SongEntry::origin(self : SongEntry[C]) -> SongEventOrigin {
+  self.origin
 }
 
 ///|
-fn source_song_snapshot_occurrence(
-  occurrence : SectionOccurrence,
-  authored : SongOccurrenceDoc,
-) -> SourcedSongSnapshotOccurrence {
-  let authored_section = authored.section()
-  let layers = match
-    (authored_section.body(), occurrence.section().section_body()) {
-    (Single(authored_layer), Single(body)) =>
-      [
-        {
-          id: authored_layer.id(),
-          body,
-          source_snapshot: authored_layer.source_snapshot,
-        },
-      ]
-    (Layers(authored_layers), Layers(runtime_layers)) => {
-      guard authored_layers.length() == runtime_layers.length() else {
-        abort("lowered song layer provenance is incomplete")
-      }
-      [
-        for index, authored_layer in authored_layers => {
-          {
-            id: authored_layer.id(),
-            body: runtime_layers[index].body(),
-            source_snapshot: authored_layer.source_snapshot,
-          }
-        }
-      ]
-    }
-    _ => abort("lowered song section shape changed")
-  }
-  { occurrence, section: authored_section.id(), layers, }
+/// The entry's pattern with its section scope applied, in occurrence-local
+/// time.
+pub fn[C] SongEntry::body(
+  self : SongEntry[C],
+) -> @pattern.Pat[@pattern.ControlMap] {
+  self.body
 }
 
 ///|
-fn source_song_snapshot_occurrences(
-  song : Song,
-  authored : Array[SongOccurrenceDoc],
-) -> Array[SourcedSongSnapshotOccurrence] {
+pub fn[C] SongEntry::start(self : SongEntry[C]) -> @pattern.Rational {
+  self.occurrence.start()
+}
+
+///|
+pub fn[C] SongEntry::end_(self : SongEntry[C]) -> @pattern.Rational {
+  self.occurrence.end_()
+}
+
+///|
+/// The entry's share of a song-clock query, or `None` when its occurrence
+/// misses `arc`.
+pub fn[C] SongEntry::slice(
+  self : SongEntry[C],
+  arc : @pattern.TimeSpan,
+) -> SongSlice[C]? {
+  guard self.occurrence.span().intersect(arc) is Some(arc) else { return None }
+  let placement = @pattern.Placement(
+    origin=self.occurrence.start(),
+    rate=self.occurrence.section().scope().rate(),
+  )
+  Some({
+    content: self.content,
+    entry: self.index,
+    arc: placement.local_span(arc),
+    placement,
+    origin: self.origin,
+  })
+}
+
+///|
+fn[C : SongContent] song_entries(
+  song : Song[C],
+  authored : Array[SongOccurrenceDoc[C]],
+) -> Array[SongEntry[C]] {
   let occurrences = song.occurrences()
   guard occurrences.length() == authored.length() else {
     abort("lowered song occurrence provenance is incomplete")
   }
-  [
-    for index, part in authored => {
-      source_song_snapshot_occurrence(occurrences[index], part)
+  let result : Array[SongEntry[C]] = []
+  for index, part in authored {
+    let occurrence = occurrences[index]
+    let section = part.section()
+    let layers = match section.body() {
+      Single(layer) => [layer]
+      Layers(layers) => layers
     }
-  ]
-}
-
-///|
-priv struct SourcedSongSnapshotEntry {
-  occurrence : SectionOccurrence
-  section : @identity.SectionId
-  layer : @identity.SectionLayerId
-  body : @pattern.Pat[@pattern.ControlMap]
-  source_snapshot : @pattern.PatternSnapshotWithOrigins?
-  source_index : Int32
-}
-
-///|
-fn source_song_snapshot_entries(
-  sourced_occurrences : Array[SourcedSongSnapshotOccurrence],
-) -> Array[SourcedSongSnapshotEntry] {
-  let result : Array[SourcedSongSnapshotEntry] = []
-  for sourced in sourced_occurrences {
-    for layer in sourced.layers {
-      for source_index, body in layer.body.entries() {
-        result.push({
-          occurrence: sourced.occurrence,
-          section: sourced.section,
-          layer: layer.id,
-          body,
-          source_snapshot: layer.source_snapshot,
-          source_index,
-        })
+    let rate = section.scope().rate()
+    for layer in layers {
+      let origin = SongEventOrigin(
+        occurrence=occurrence.id(),
+        section=section.id(),
+        layer=layer.id(),
+      )
+      let content = layer.body()
+      for entry, body in content.pat().fast(rate).entries() {
+        result.push({ occurrence, origin, content, index: entry, body, })
       }
     }
   }
@@ -419,81 +415,44 @@ pub fn SongEventOrigin::layer(
 }
 
 ///|
-pub struct SongSnapshotEvent {
-  priv event : @pattern.Event[@pattern.ControlMap]
+/// One song entry's share of a song-clock query: which content entry to
+/// query, over which content-local arc, and how to place its events back on
+/// the song clock. Querying the content is the caller's job, so song structure
+/// stays independent of what the content's events carry.
+pub struct SongSlice[C] {
+  priv content : C
+  priv entry : Int32
+  priv arc : @pattern.TimeSpan
+  priv placement : @pattern.Placement
   priv origin : SongEventOrigin
-  priv source_origin : @pattern.EventOrigin?
-  priv source_frame : @identity.SourceFrameId?
-  priv source_start : Double
-  priv source_pitch : Double
-  priv controls : @pattern.Controls
 }
 
 ///|
-pub fn SongSnapshotEvent::event(
-  self : SongSnapshotEvent,
-) -> @pattern.Event[@pattern.ControlMap] {
-  self.event
+pub fn[C] SongSlice::content(self : SongSlice[C]) -> C {
+  self.content
 }
 
 ///|
-pub fn SongSnapshotEvent::origin(self : SongSnapshotEvent) -> SongEventOrigin {
+/// The content's canonical entry index.
+pub fn[C] SongSlice::entry(self : SongSlice[C]) -> Int32 {
+  self.entry
+}
+
+///|
+/// The query arc in the content's own time.
+pub fn[C] SongSlice::arc(self : SongSlice[C]) -> @pattern.TimeSpan {
+  self.arc
+}
+
+///|
+/// Maps content time back to the song clock; apply it to events and controls.
+pub fn[C] SongSlice::placement(self : SongSlice[C]) -> @pattern.Placement {
+  self.placement
+}
+
+///|
+pub fn[C] SongSlice::origin(self : SongSlice[C]) -> SongEventOrigin {
   self.origin
-}
-
-///|
-/// Exact atom and binding provenance, when this section was compiled from
-/// an origin-bearing pattern rather than an anonymous runtime pattern.
-pub fn SongSnapshotEvent::source_origin(
-  self : SongSnapshotEvent,
-) -> @pattern.EventOrigin? {
-  self.source_origin
-}
-
-///|
-pub fn SongSnapshotEvent::source_frame(
-  self : SongSnapshotEvent,
-) -> @identity.SourceFrameId? {
-  self.source_frame
-}
-
-///|
-pub fn SongSnapshotEvent::source_start(self : SongSnapshotEvent) -> Double {
-  self.source_start
-}
-
-///|
-pub fn SongSnapshotEvent::source_pitch(self : SongSnapshotEvent) -> Double {
-  self.source_pitch
-}
-
-///|
-/// This event's controls, on the song clock.
-pub fn SongSnapshotEvent::controls(
-  self : SongSnapshotEvent,
-) -> @pattern.Controls {
-  self.controls
-}
-
-///|
-pub fn SongSnapshotEvent::occurrence(
-  self : SongSnapshotEvent,
-) -> @identity.OccurrenceId {
-  self.origin.occurrence()
-}
-
-///|
-pub fn SongSnapshotEvent::section(
-  self : SongSnapshotEvent,
-) -> @identity.SectionId {
-  self.origin.section()
-}
-
-///|
-pub fn SongSnapshotEvent::layer(
-  self : SongSnapshotEvent,
-) -> @identity.SectionLayerId {
-  self.origin.layer()
 }
 
 ///|
@@ -502,179 +461,48 @@ pub fn SongSnapshotEvent::layer(
 /// `revision` tracks any authoring content change. `layout_revision` advances
 /// only when occurrence placement or section length can change computed song
 /// spans, giving schedulers a stable boundary for layout-sensitive commits.
-pub struct SongSnapshot {
+pub struct SongSnapshot[C] {
   priv revision : @identity.Revision
   priv layout_revision : @identity.Revision
-  priv song : Song
-  priv sourced_occurrences : Array[SourcedSongSnapshotOccurrence]
-  priv sourced_entries : Array[SourcedSongSnapshotEntry]
+  priv song : Song[C]
+  priv entries : Array[SongEntry[C]]
 }
 
 ///|
-pub fn SongSnapshot::revision(self : SongSnapshot) -> @identity.Revision {
+pub fn[C] SongSnapshot::revision(self : SongSnapshot[C]) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn SongSnapshot::layout_revision(self : SongSnapshot) -> @identity.Revision {
+pub fn[C] SongSnapshot::layout_revision(
+  self : SongSnapshot[C],
+) -> @identity.Revision {
   self.layout_revision
 }
 
 ///|
-pub fn SongSnapshot::song(self : SongSnapshot) -> Song {
+pub fn[C] SongSnapshot::song(self : SongSnapshot[C]) -> Song[C] {
   self.song
 }
 
 ///|
-pub fn SongSnapshot::section_id_for_occurrence(
-  self : SongSnapshot,
-  occurrence : @identity.OccurrenceId,
-) -> @identity.SectionId? {
-  for sourced in self.sourced_occurrences {
-    if sourced.occurrence.id() == occurrence {
-      return Some(sourced.section)
-    }
-  }
-  None
+/// The canonical playback entries: every content entry of every layer of
+/// every occurrence, in song order.
+pub fn[C] SongSnapshot::entries(
+  self : SongSnapshot[C],
+) -> ArrayView[SongEntry[C]] {
+  self.entries[:]
 }
 
 ///|
-fn query_scoped_snapshot_layer(
-  body : @pattern.Pat[@pattern.ControlMap],
-  scope : TimeScope,
+/// Every entry's slice that sounds within `arc`, in song order.
+pub fn[C] SongSnapshot::slices(
+  self : SongSnapshot[C],
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  if scope.is_identity() {
-    body.query(arc)
-  } else {
-    body.fast(scope.rate()).query(arc)
-  }
-}
-
-///|
-fn push_song_snapshot_events(
-  result : Array[SongSnapshotEvent],
-  body : @pattern.Pat[@pattern.ControlMap],
-  snapshot : @pattern.PatternSnapshotWithOrigins?,
-  source_index : Int32,
-  occurrence : SectionOccurrence,
-  section : @identity.SectionId,
-  layer : @identity.SectionLayerId,
-  global_arc : @pattern.TimeSpan,
-) -> Unit {
-  let origin = SongEventOrigin(occurrence=occurrence.id(), section~, layer~)
-  match snapshot {
-    Some(snapshot) => {
-      let placement = @pattern.Placement(
-        origin=occurrence.start(),
-        rate=occurrence.section().scope().rate(),
-      )
-      let query_arc = placement.local_span(global_arc)
-      let events = if source_index < 0 {
-        snapshot.query(query_arc)
-      } else {
-        snapshot.query_for_entry(source_index, query_arc)
-      }
-      for sourced in events {
-        result.push({
-          event: sourced.event().placed(placement),
-          origin,
-          source_origin: Some(sourced.origin()),
-          source_frame: sourced.source_frame(),
-          source_start: sourced.source_start(),
-          source_pitch: sourced.source_pitch(),
-          controls: sourced.controls().placed(placement),
-        })
-      }
-    }
-    None => {
-      let events = query_scoped_snapshot_layer(
-        body,
-        occurrence.section().scope(),
-        unshift_span(global_arc, occurrence.start()),
-      )
-      for event in events {
-        let event = event.shift(occurrence.start())
-        result.push({
-          event,
-          origin,
-          source_origin: None,
-          source_frame: None,
-          source_start: -1.0,
-          source_pitch: -1.0,
-          controls: @pattern.Controls::fixed(event.value),
-        })
-      }
-    }
-  }
-}
-
-///|
-pub fn SongSnapshot::query_sourced_events(
-  self : SongSnapshot,
-  arc : @pattern.TimeSpan,
-) -> Array[SongSnapshotEvent] {
-  let result : Array[SongSnapshotEvent] = []
-  for sourced in self.sourced_occurrences {
-    let occurrence = sourced.occurrence
-    match occurrence.span().intersect(arc) {
-      Some(global_arc) =>
-        for layer in sourced.layers {
-          push_song_snapshot_events(
-            result,
-            layer.body,
-            layer.source_snapshot,
-            -1,
-            occurrence,
-            sourced.section,
-            layer.id,
-            global_arc,
-          )
-        }
-      None => ()
-    }
-  }
-  result
-}
-
-///|
-/// Query one canonical playback entry with authored provenance.
-/// `source_index` is the entry index retained by playback entry state.
-/// Invalid indexes return an empty result.
-pub fn SongSnapshot::query_sourced_events_for_entry(
-  self : SongSnapshot,
-  source_index : Int32,
-  arc : @pattern.TimeSpan,
-) -> Array[SongSnapshotEvent] {
-  let source = match self.sourced_entries.get(source_index) {
-    Some(source) => source
-    None => return []
-  }
-  match source.occurrence.span().intersect(arc) {
-    None => []
-    Some(global_arc) => {
-      let result : Array[SongSnapshotEvent] = []
-      push_song_snapshot_events(
-        result,
-        source.body,
-        source.source_snapshot,
-        source.source_index,
-        source.occurrence,
-        source.section,
-        source.layer,
-        global_arc,
-      )
-      result
-    }
-  }
-}
-
-///|
-pub fn SongSnapshot::query(
-  self : SongSnapshot,
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  self.song.query(arc)
+) -> Array[SongSlice[C]] {
+  [
+    for entry in self.entries if entry.slice(arc) is Some(slice) => slice
+  ]
 }
 
 ///|
@@ -683,16 +511,16 @@ pub fn SongSnapshot::query(
 /// This authoring layer keeps stable occurrence IDs across display renames,
 /// insertion, removal, and reordering. It lowers back to the existing playback
 /// song surface so scheduler/query semantics remain unchanged.
-pub struct SongDoc {
+pub struct SongDoc[C] {
   priv revision : @identity.Revision
   priv layout_revision : @identity.Revision
-  priv parts : Array[SongOccurrenceDoc]
+  priv parts : Array[SongOccurrenceDoc[C]]
 }
 
 ///|
-pub fn SongDoc::SongDoc(
-  parts~ : Array[SongOccurrenceDoc],
-) -> SongDoc raise SongDocBuildError {
+pub fn[C] SongDoc::SongDoc(
+  parts~ : Array[SongOccurrenceDoc[C]],
+) -> SongDoc[C] raise SongDocBuildError {
   validate_song_doc_parts(parts)
   {
     revision: aggregate_song_doc_revision(parts),
@@ -702,27 +530,32 @@ pub fn SongDoc::SongDoc(
 }
 
 ///|
-pub fn SongDoc::revision(self : SongDoc) -> @identity.Revision {
+pub fn[C] SongDoc::revision(self : SongDoc[C]) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn SongDoc::layout_revision(self : SongDoc) -> @identity.Revision {
+pub fn[C] SongDoc::layout_revision(self : SongDoc[C]) -> @identity.Revision {
   self.layout_revision
 }
 
 ///|
-pub fn SongDoc::occurrence_count(self : SongDoc) -> Int32 {
+pub fn[C] SongDoc::occurrence_count(self : SongDoc[C]) -> Int32 {
   self.parts.length()
 }
 
 ///|
-pub fn SongDoc::occurrences(self : SongDoc) -> Array[SongOccurrenceDoc] {
+pub fn[C] SongDoc::occurrences(
+  self : SongDoc[C],
+) -> Array[SongOccurrenceDoc[C]] {
   copy_song_occurrence_docs(self.parts)
 }
 
 ///|
-pub fn SongDoc::occurrence(self : SongDoc, index : Int32) -> SongOccurrenceDoc? {
+pub fn[C] SongDoc::occurrence(
+  self : SongDoc[C],
+  index : Int32,
+) -> SongOccurrenceDoc[C]? {
   match self.parts.get(index) {
     Some(part) => Some(part)
     None => None
@@ -730,10 +563,10 @@ pub fn SongDoc::occurrence(self : SongDoc, index : Int32) -> SongOccurrenceDoc? 
 }
 
 ///|
-pub fn SongDoc::get_occurrence(
-  self : SongDoc,
+pub fn[C] SongDoc::get_occurrence(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
-) -> SongOccurrenceDoc? {
+) -> SongOccurrenceDoc[C]? {
   match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => Some(self.parts[index])
     None => None
@@ -741,11 +574,11 @@ pub fn SongDoc::get_occurrence(
 }
 
 ///|
-pub fn SongDoc::rename_occurrence(
-  self : SongDoc,
+pub fn[C] SongDoc::rename_occurrence(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
   name~ : String,
-) -> SongDoc raise SongDocEditError {
+) -> SongDoc[C] raise SongDocEditError {
   let index = match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => index
     None => raise MissingSongDocOccurrenceId(id.value())
@@ -763,11 +596,11 @@ pub fn SongDoc::rename_occurrence(
 }
 
 ///|
-pub fn SongDoc::replace_occurrence_section(
-  self : SongDoc,
+pub fn[C] SongDoc::replace_occurrence_section(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
-  section~ : SectionDoc,
-) -> SongDoc raise SongDocEditError {
+  section~ : SectionDoc[C],
+) -> SongDoc[C] raise SongDocEditError {
   let index = match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => index
     None => raise MissingSongDocOccurrenceId(id.value())
@@ -788,11 +621,11 @@ pub fn SongDoc::replace_occurrence_section(
 }
 
 ///|
-pub fn SongDoc::set_occurrence_start(
-  self : SongDoc,
+pub fn[C] SongDoc::set_occurrence_start(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
   start~ : @pattern.Rational,
-) -> SongDoc raise SongDocEditError {
+) -> SongDoc[C] raise SongDocEditError {
   let index = match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => index
     None => raise MissingSongDocOccurrenceId(id.value())
@@ -807,10 +640,10 @@ pub fn SongDoc::set_occurrence_start(
 }
 
 ///|
-pub fn SongDoc::clear_occurrence_start(
-  self : SongDoc,
+pub fn[C] SongDoc::clear_occurrence_start(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
-) -> SongDoc raise SongDocEditError {
+) -> SongDoc[C] raise SongDocEditError {
   let index = match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => index
     None => raise MissingSongDocOccurrenceId(id.value())
@@ -825,11 +658,11 @@ pub fn SongDoc::clear_occurrence_start(
 }
 
 ///|
-pub fn SongDoc::insert_occurrence(
-  self : SongDoc,
+pub fn[C] SongDoc::insert_occurrence(
+  self : SongDoc[C],
   index~ : Int32,
-  occurrence~ : SongOccurrenceDoc,
-) -> SongDoc raise SongDocEditError {
+  occurrence~ : SongOccurrenceDoc[C],
+) -> SongDoc[C] raise SongDocEditError {
   if index < 0 || index > self.parts.length() {
     raise InvalidSongDocOccurrenceIndex(index)
   }
@@ -851,10 +684,10 @@ pub fn SongDoc::insert_occurrence(
 }
 
 ///|
-pub fn SongDoc::remove_occurrence(
-  self : SongDoc,
+pub fn[C] SongDoc::remove_occurrence(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
-) -> SongDoc raise SongDocEditError {
+) -> SongDoc[C] raise SongDocEditError {
   let index = match song_doc_find_occurrence_index(self.parts, id) {
     Some(index) => index
     None => raise MissingSongDocOccurrenceId(id.value())
@@ -872,11 +705,11 @@ pub fn SongDoc::remove_occurrence(
 }
 
 ///|
-pub fn SongDoc::move_occurrence(
-  self : SongDoc,
+pub fn[C] SongDoc::move_occurrence(
+  self : SongDoc[C],
   id : @identity.OccurrenceId,
   index~ : Int32,
-) -> SongDoc raise SongDocEditError {
+) -> SongDoc[C] raise SongDocEditError {
   if index < 0 || index >= self.parts.length() {
     raise InvalidSongDocOccurrenceIndex(index)
   }
@@ -892,20 +725,20 @@ pub fn SongDoc::move_occurrence(
 }
 
 ///|
-pub fn SongDoc::to_song(self : SongDoc) -> Song raise SongBuildError {
+pub fn[C] SongDoc::to_song(self : SongDoc[C]) -> Song[C] raise SongBuildError {
   Song(parts=[ for part in self.parts => part.to_part() ])
 }
 
 ///|
-pub fn SongDoc::lower(self : SongDoc) -> SongSnapshot raise SongBuildError {
+pub fn[C : SongContent] SongDoc::lower(
+  self : SongDoc[C],
+) -> SongSnapshot[C] raise SongBuildError {
   let song = self.to_song()
-  let sourced_occurrences = source_song_snapshot_occurrences(song, self.parts)
   {
     revision: self.revision,
     layout_revision: self.layout_revision,
     song,
-    sourced_occurrences,
-    sourced_entries: source_song_snapshot_entries(sourced_occurrences),
+    entries: song_entries(song, self.parts),
   }
 }
 
