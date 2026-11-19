@@ -147,8 +147,8 @@ That is intentionally not generic overlay:
 
 - `stack([a, b])` preserves both events as separate layers;
 - `PatternDoc::merge_control` shapes `left` with the controls of `right`;
-- key conflicts use `ControlMap::merge`, so the outer controls override
-  matching keys.
+- a key set at both levels combines by its nesting rule: the outer value
+  overrides, except `gain`, which multiplies (ADR-0019, decision 8).
 
 This operation is useful for controls such as `.gain`, `.cutoff`, `.pan`, and
 `.jux`, but it should not be treated as the default Applicative semantics for

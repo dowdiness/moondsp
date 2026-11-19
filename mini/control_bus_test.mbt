@@ -91,8 +91,8 @@ test "a key set twice falls back to the inner value where the outer one rests" {
   // The outer "1 ~" rests over [1/2, 1), where saw reads t.
   @debug.assert_eq(
     bus_first_onset(
-      "note(\"60\").gain(saw).gain(\"1 ~\")",
-      "gain",
+      "note(\"60\").pan(saw).pan(\"1 ~\")",
+      "pan",
       bus_r(1L, 8L),
       times,
     ),
@@ -101,12 +101,55 @@ test "a key set twice falls back to the inner value where the outer one rests" {
   // Resting at the onset must not bind the voice to the inner bus alone.
   @debug.assert_eq(
     bus_first_onset(
-      "note(\"60\").gain(saw).gain(\"~ 1\")",
-      "gain",
+      "note(\"60\").pan(saw).pan(\"~ 1\")",
+      "pan",
       bus_r(1L, 8L),
       times,
     ),
     (Some(0.0), [0.25, 1.0]),
+  )
+}
+
+///|
+test "nested gain multiplies and falls back to the inner value where the outer one rests" {
+  let times = [bus_r(1L, 4L), bus_r(3L, 4L)]
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(0.5).gain(0.25)",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(0.125), [0.125, 0.125]),
+  )
+  // A third level multiplies with the product of the inner two.
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(0.5).gain(0.5).gain(0.5)",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(0.125), [0.125, 0.125]),
+  )
+  // The outer "0.5 ~" rests over [1/2, 1), where saw reads t alone.
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(saw).gain(\"0.5 ~\")",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(0.0), [0.125, 0.75]),
+  )
+  @debug.assert_eq(
+    bus_first_onset(
+      "note(\"60\").gain(saw).gain(\"~ 0.5\")",
+      "gain",
+      bus_r(1L, 8L),
+      times,
+    ),
+    (Some(0.0), [0.25, 0.375]),
   )
 }
 
@@ -374,4 +417,94 @@ test "step argument spelling does not change identity or degrade drops" {
   let (root, kept) = shape("0.3 0.8")
   @debug.assert_eq(shape("0.3   0.8"), (root, kept))
   @debug.assert_eq(shape("[0.3 0.8]").1, kept)
+}
+
+///|
+/// Gain steps where `0.0` stands for a rest.
+fn bus_gain_or_rest(
+  name : String,
+  values : Array[Double],
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
+  @pattern.PatternDoc::sequence(
+    id=bus_id(name),
+    docs=values.mapi((i, v) => {
+      let id = bus_id(name + "-" + i.to_string())
+      if v == 0.0 {
+        @pattern.PatternDoc::silence(id~)
+      } else {
+        @pattern.PatternDoc::pure(
+          id~,
+          value=@pattern.ControlMap::single("gain", v),
+        )
+      }
+    }),
+  )
+}
+
+///|
+/// The first onset's `gain`, and its gain bus read at 1/4 and 3/4.
+fn bus_gain_reads(
+  doc : @pattern.PatternDoc[@pattern.ControlMap],
+) -> (Double?, Array[Double]) raise {
+  let onset = doc
+    .lower()
+    .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
+  let read = onset.buses().reader("gain").unwrap()
+  (onset.event().value.get("gain"), [read(1L, 4L), read(3L, 4L)])
+}
+
+///|
+test "a gain in the note's own controls multiplies the merged gain" {
+  let note = @pattern.PatternDoc::pure(
+    id=bus_id("unbound-note"),
+    value=@pattern.ControlMap::single("note", 60.0).set("gain", 0.5),
+  )
+  // Where the outer "0.25 ~" rests, the note's own 0.5 applies alone.
+  @debug.assert_eq(
+    bus_gain_reads(
+      @pattern.PatternDoc::merge_control(
+        id=bus_id("unbound"),
+        left=note,
+        right=bus_gain_or_rest("unbound-g", [0.25, 0.0]),
+      ),
+    ),
+    (Some(0.125), [0.125, 0.5]),
+  )
+  // A further merge multiplies with that product.
+  @debug.assert_eq(
+    bus_gain_reads(
+      @pattern.PatternDoc::merge_control(
+        id=bus_id("unbound-outer"),
+        left=@pattern.PatternDoc::merge_control(
+          id=bus_id("unbound-inner"),
+          left=note,
+          right=bus_gain_or_rest("unbound-g1", [0.5]),
+        ),
+        right=bus_gain_or_rest("unbound-g2", [0.5]),
+      ),
+    ),
+    (Some(0.125), [0.125, 0.125]),
+  )
+}
+
+///|
+test "a provider that merges gain into gain multiplies them" {
+  let provider = (outer : Array[Double]) => {
+    @pattern.PatternDoc::merge_control(
+      id=bus_id("gp"),
+      left=@pattern.PatternDoc::pure(
+        id=bus_id("gp-inner"),
+        value=@pattern.ControlMap::single("gain", 0.5),
+      ),
+      right=bus_gain_or_rest("gp-outer", outer),
+    )
+  }
+  @debug.assert_eq(
+    bus_gain_reads(bus_with("note(\"60\")", "gp-a", provider([0.25]))),
+    (Some(0.125), [0.125, 0.125]),
+  )
+  @debug.assert_eq(
+    bus_gain_reads(bus_with("note(\"60\")", "gp-b", provider([0.25, 0.0]))),
+    (Some(0.125), [0.125, 0.5]),
+  )
 }

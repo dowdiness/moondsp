@@ -12,18 +12,84 @@
 /// share a subtree's buses wherever the subtree is reused.
 
 ///|
-/// `(key, bus)` pairs, shared and never mutated. The outermost `MergeControl`
-/// for a key wins, the same order as `ControlMap::merge`.
-let no_bus_bindings : FixedArray[(String, Int32)] = []
+/// How nested occurrences of one control key combine (ADR-0019, decision 8).
+/// `Nesting::of` is the only place that names a key's rule.
+priv enum Nesting {
+  /// The outer value replaces the inner one.
+  Override
+  /// The outer value multiplies the inner one.
+  Multiply
+}
+
+///|
+fn Nesting::of(key : String) -> Nesting {
+  if key == "gain" {
+    Multiply
+  } else {
+    Override
+  }
+}
+
+///|
+/// An outer signal over an inner one. Where the outer has no value, the inner
+/// applies alone.
+fn Nesting::signal(
+  self : Nesting,
+  inner : BusSignal,
+  outer : BusSignal,
+) -> BusSignal {
+  match self {
+    Override => Stack([inner, outer])
+    Multiply => Product(inner, outer)
+  }
+}
+
+///|
+/// The bus one control key reads. Shared and never mutated.
+priv struct BusBinding {
+  key : String
+  bus : Int32
+  /// The payload's own value under a `Multiply` key that no inner bus
+  /// provides; the bus combines with it. Always `None` for `Override` keys,
+  /// whose payload value already stands wherever the bus has none.
+  inner : Double?
+}
+
+///|
+/// Bind `key` to `bus` over `payload`, the controls the event carries before
+/// this merge. The only constructor, so `inner` follows the key's nesting.
+fn BusBinding::new(
+  key : String,
+  bus : Int32,
+  payload : ControlMap,
+) -> BusBinding {
+  let inner = match Nesting::of(key) {
+    Multiply => payload.get(key)
+    Override => None
+  }
+  { key, bus, inner, }
+}
+
+///|
+/// The signal this key reads, given its bus's signal.
+fn BusBinding::signal(self : BusBinding, bus : BusSignal) -> BusSignal {
+  match self.inner {
+    Some(value) => Nesting::of(self.key).signal(Const(value), bus)
+    None => bus
+  }
+}
+
+///|
+let no_bus_bindings : FixedArray[BusBinding] = []
 
 ///|
 fn bus_binding_for(
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
   key : String,
-) -> Int32? {
+) -> BusBinding? {
   for binding in bindings {
-    if binding.0 == key {
-      return Some(binding.1)
+    if binding.key == key {
+      return Some(binding)
     }
   }
   None
@@ -47,32 +113,37 @@ fn[A] ControlBus::map_signal(
 }
 
 ///|
-/// Bind each `(key, bus)` of `provided`. A key already bound to an inner bus
-/// moves to the bus in `chained` that falls back to that inner bus, so the
-/// outermost merge wins where it has a value. The binding does not depend on
-/// time, so a sounding voice keeps the right bus across rests.
+/// Bind each `(key, bus)` of `provided` over `payload`. A key already bound to
+/// an inner bus moves to the bus in `chained` that combines with that inner
+/// bus by the key's `Nesting`; a new key binds through `BusBinding::new`. The
+/// binding does not depend on time, so a sounding voice keeps the right bus
+/// across rests.
 fn bind_buses(
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
   provided : Array[(String, Int32)],
   chained : Map[Int32, Int32],
-) -> FixedArray[(String, Int32)] {
+  payload : ControlMap,
+) -> FixedArray[BusBinding] {
   let mut added = 0
   for pair in provided {
     if bus_binding_for(bindings, pair.0) is None {
       added += 1
     }
   }
-  let result = FixedArray::make(bindings.length() + added, ("", 0))
+  let result = FixedArray::make(
+    bindings.length() + added,
+    BusBinding::new("", 0, ControlMap::empty()),
+  )
   for i, binding in bindings {
-    result[i] = match chained.get(binding.1) {
-      Some(bus) => (binding.0, bus)
+    result[i] = match chained.get(binding.bus) {
+      Some(bus) => { ..binding, bus, }
       None => binding
     }
   }
   let mut next = bindings.length()
   for pair in provided {
     if bus_binding_for(bindings, pair.0) is None {
-      result[next] = pair
+      result[next] = BusBinding::new(pair.0, pair.1, payload)
       next += 1
     }
   }
@@ -82,22 +153,22 @@ fn bind_buses(
 ///|
 /// Drop the bindings of the keys `keys` sets to fixed values (`jux` pan).
 fn unbind_keys(
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
   keys : ControlMap,
-) -> FixedArray[(String, Int32)] {
+) -> FixedArray[BusBinding] {
   let mut kept = 0
   for binding in bindings {
-    if keys.get(binding.0) is None {
+    if keys.get(binding.key) is None {
       kept += 1
     }
   }
   if kept == bindings.length() {
     return bindings
   }
-  let result = FixedArray::make(kept, ("", 0))
+  let result = FixedArray::make(kept, bindings[0])
   let mut next = 0
   for binding in bindings {
-    if keys.get(binding.0) is None {
+    if keys.get(binding.key) is None {
       result[next] = binding
       next += 1
     }
@@ -110,16 +181,16 @@ fn unbind_keys(
 /// value there keeps the payload's own value.
 fn[A] fill_bound_controls(
   value : A,
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
   buses : Array[ControlBus[A]],
   time : Rational,
 ) -> A {
   let mut result = value
   for binding in bindings {
-    let bus = buses[binding.1]
-    let v = bus.signal.eval(time.num, time.den, false)
+    let bus = buses[binding.bus]
+    let v = binding.signal(bus.signal).eval(time.num, time.den, false)
     if !v.is_nan() {
-      result = (bus.apply)(result, ControlMap::single(binding.0, v))
+      result = (bus.apply)(result, ControlMap::single(binding.key, v))
     }
   }
   result
@@ -127,14 +198,15 @@ fn[A] fill_bound_controls(
 
 ///|
 fn shift_bus_bindings(
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
   offset : Int32,
-) -> FixedArray[(String, Int32)] {
+) -> FixedArray[BusBinding] {
   if bindings.is_empty() {
     return bindings
   }
   FixedArray::makei(bindings.length(), i => {
-    (bindings[i].0, bindings[i].1 + offset)
+    ..bindings[i],
+    bus: bindings[i].bus + offset,
   })
 }
 
@@ -142,7 +214,7 @@ fn shift_bus_bindings(
 /// The buses one event's controls follow, placed on the clock the event is on.
 pub struct EventBuses {
   priv table : Array[BusSignal]
-  priv bindings : FixedArray[(String, Int32)]
+  priv bindings : FixedArray[BusBinding]
   priv placement : Placement
 }
 
@@ -162,7 +234,7 @@ pub fn EventBuses::none() -> EventBuses {
 ///|
 fn EventBuses::in_snapshot(
   table : Array[BusSignal],
-  bindings : FixedArray[(String, Int32)],
+  bindings : FixedArray[BusBinding],
 ) -> EventBuses {
   if bindings.is_empty() {
     return no_event_buses
@@ -206,8 +278,8 @@ pub fn EventBuses::reader(
   self : EventBuses,
   key : String,
 ) -> ((Int64, Int64) -> Double)? {
-  bus_binding_for(self.bindings, key).map(bus => {
-    let placed = self.place(self.table[bus])
+  bus_binding_for(self.bindings, key).map(binding => {
+    let placed = self.place(binding.signal(self.table[binding.bus]))
     (num, den) => placed.eval(num, den, false)
   })
 }
@@ -220,10 +292,10 @@ pub fn EventBuses::each_reader(
   f : (String, (Int64, Int64) -> Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
-    let signal = self.table[binding.1]
+    let signal = binding.signal(self.table[binding.bus])
     guard !signal.is_constant() else { continue }
     let placed = self.place(signal)
-    f(binding.0, (num, den) => placed.eval(num, den, false))
+    f(binding.key, (num, den) => placed.eval(num, den, false))
   }
 }
 
@@ -246,6 +318,9 @@ priv enum BusSignal {
   Every(Int64, BusSignal, BusSignal)
   /// The last child with a value wins, like the merge fold.
   Stack(Array[BusSignal])
+  /// The product where both have a value, else whichever has one: nested
+  /// `gain` merges.
+  Product(BusSignal, BusSignal)
   /// `(presence, left, right)`: right-hand values override left where the
   /// left has an event. `presence` is non-`NaN` exactly there, so a left
   /// event that does not set this key still takes the right-hand value.
@@ -349,6 +424,17 @@ fn BusSignal::eval(
         }
       }
       value
+    }
+    Product(inner, outer) => {
+      let a = inner.eval(num, den, left)
+      let b = outer.eval(num, den, left)
+      if a.is_nan() {
+        b
+      } else if b.is_nan() {
+        a
+      } else {
+        a * b
+      }
     }
     Merge(presence, left_signal, right_signal) => {
       if presence.eval(num, den, left).is_nan() {
@@ -528,12 +614,14 @@ fn[A] compile_signal(
     MergeControl(left, right, _, _) =>
       match key {
         None => sub(left)
-        Some(_) =>
+        Some(key) => {
+          let inner = sub(left)
           Merge(
             compile_signal(nodes, left, None, controls_of),
-            sub(left),
-            sub(right),
+            inner,
+            Nesting::of(key).signal(inner, sub(right)),
           )
+        }
       }
     Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _, _) =>
       raise UnsupportedControl(id)

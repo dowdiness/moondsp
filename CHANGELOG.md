@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking behavior:** nested `gain` multiplies, as ADR-0019 decided:
+  `.gain(0.5).gain(0.25)` plays at 0.125 instead of 0.25, so fading a group
+  keeps the relative levels inside it. Where the outer gain rests, the inner
+  one applies alone. This holds for a gain already in the note's own
+  controls, and for a provider that itself merges gain into gain. Every other
+  key still takes the outermost value. The live editor no longer marks an
+  earlier gain knob as overridden.
 - **Breaking MoonBit API:** control merging has one semantics, the
   `PatternDoc::merge_control` bus lowering. The runtime `@pattern.merge_control`
   is removed; put several controls on one event with the new
@@ -76,8 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their query span from it. Controls outside the closed signal set fail with
   `PatternDocError::UnsupportedControl`. `Event::with_spans` is removed. A key
   set twice now reads the outer bus and falls back to the inner one where the
-  outer one rests: `note("C3").gain(saw).gain("1 ~")` follows `saw` on the
-  rest instead of holding 1.
+  outer one rests: `note("C3").pan(saw).pan("1 ~")` follows `saw` on the rest
+  instead of holding 1.
 - The CLAP prototype's voice gain, cutoff, resonance, and pan are buses holding
   the host's latest value, so a note in its release tail also follows host
   automation. Velocity is a constant on the envelope gain, and voice gain is

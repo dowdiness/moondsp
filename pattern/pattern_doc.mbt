@@ -744,7 +744,7 @@ priv struct ScopedValue[A, O] {
   mut source_frame : @identity.SourceFrameId?
   mut source_start : Double
   source_pitch : Double
-  bindings : FixedArray[(String, Int32)]
+  bindings : FixedArray[BusBinding]
 }
 
 ///|
@@ -755,7 +755,7 @@ fn[A, O] ScopedValue::ScopedValue(
   source_frame~ : @identity.SourceFrameId? = None,
   source_start~ : Double = -1.0,
   source_pitch~ : Double = @double.not_a_number,
-  bindings~ : FixedArray[(String, Int32)] = no_bus_bindings,
+  bindings~ : FixedArray[BusBinding] = no_bus_bindings,
 ) -> ScopedValue[A, O] {
   { value, scope, origin, source_frame, source_start, source_pitch, bindings, }
 }
@@ -765,7 +765,7 @@ fn[A, B, O] ScopedValue::remap(
   self : ScopedValue[A, O],
   value : B,
   scope : PatternNodePath,
-  bindings~ : FixedArray[(String, Int32)] = self.bindings,
+  bindings~ : FixedArray[BusBinding] = self.bindings,
 ) -> ScopedValue[B, O] {
   ScopedValue(
     value,
@@ -1379,7 +1379,8 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       CompiledPattern(pat, opaque_compiled_entries(pat, id), buses~)
     }
     // One new bus per key the provider sets, after the left side's buses,
-    // plus one per inner bus of that key that falls back to it. The merged
+    // plus one per inner bus of that key that combines with it: nested
+    // `gain` multiplies, and other keys take the outer value where it has one. The merged
     // values come from the buses at the snapshot root, on its clock, so the
     // provider is never queried.
     MergeControl(left_id, right_id, apply, controls_of) => {
@@ -1396,7 +1397,11 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         for inner, bus in left.buses {
           if bus.key == key {
             chained[inner] = buses.length()
-            buses.push({ key, signal: Stack([bus.signal, signal]), apply, })
+            buses.push({
+              key,
+              signal: Nesting::of(key).signal(bus.signal, signal),
+              apply,
+            })
           }
         }
       }
@@ -1413,13 +1418,25 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let scope = pattern_source_path_for_opaque_children(nodes, id, [
         left_id, right_id,
       ])
-      // Events of one atom share their bindings, so reuse the last result.
+      // Only `Multiply` keys record the payload's own value in a binding.
+      let recorded = keys.filter(key => Nesting::of(key) is Multiply)
+      // Events of one atom share their bindings, so reuse the last result
+      // while the recorded payload values also match.
       let mut last_in = no_bus_bindings
-      let mut last_out = bind_buses(no_bus_bindings, provided, chained)
+      let mut last_payload = ControlMap::empty()
+      let mut last_out = bind_buses(
+        no_bus_bindings, provided, chained, last_payload,
+      )
       let pat = bind_control_kernel(left.pat, right.pat.entry_signature(), value => {
-        if !physical_equal(value.bindings, last_in) {
+        let payload = controls_of(value.value)
+        let mut same = physical_equal(value.bindings, last_in)
+        for key in recorded {
+          same = same && payload.get(key) == last_payload.get(key)
+        }
+        if !same {
           last_in = value.bindings
-          last_out = bind_buses(value.bindings, provided, chained)
+          last_payload = payload
+          last_out = bind_buses(value.bindings, provided, chained, payload)
         }
         value.remap(value.value, scope, bindings=last_out)
       })

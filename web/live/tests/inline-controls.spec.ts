@@ -112,14 +112,14 @@ test("references, groups, stacks and drums expose locally editable literals", as
   }
 });
 
-test("repeated modifiers expose per-argument overrides without discarding inherited Q", async ({ page }) => {
+test("repeated filters expose per-argument overrides; repeated gains multiply", async ({ page }) => {
   await page.goto("/");
   const { mod } = await platformKeys(page);
   const original = 'note("C3").gain(.6).gain(.8).lpf(1800, .7).lpf(2400)';
   await replaceCode(page, original);
   const gains = page.getByRole("slider", { name: "Adjust Gain", exact: true });
   const cutoffs = page.getByRole("slider", { name: "Adjust Cutoff Hz", exact: true });
-  await expect(gains.nth(0)).toHaveAttribute("aria-description", /Overridden/);
+  await expect(gains.nth(0)).not.toHaveAttribute("aria-description", /Overridden/);
   await expect(gains.nth(1)).not.toHaveAttribute("aria-description", /Overridden/);
   await expect(cutoffs.nth(0)).toHaveAttribute("aria-description", /Overridden/);
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true })).not.toHaveAttribute("aria-description", /Overridden/);
@@ -129,10 +129,11 @@ test("repeated modifiers expose per-argument overrides without discarding inheri
   expect(await code(page)).toBe(original);
   await replaceCode(page, original + '.lpf(3000, 1.2)');
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true }).nth(0)).toHaveAttribute("aria-description", /Overridden/);
-  // Quoted steps and signals get no knob, but still override earlier ones.
+  // Quoted steps and signals get no knob, but still override earlier filter
+  // knobs; a later gain multiplies, so the gain knob stays live.
   await replaceCode(page, 'note("C3").gain(.6).gain("0.2 0.8").lpf(1800, .7).lpf(saw.range(200, 2000))');
   await expect(gains).toHaveCount(1);
-  await expect(gains).toHaveAttribute("aria-description", /Overridden/);
+  await expect(gains).not.toHaveAttribute("aria-description", /Overridden/);
   await expect(cutoffs).toHaveAttribute("aria-description", /Overridden/);
   await expect(page.getByRole("slider", { name: "Adjust Q", exact: true })).not.toHaveAttribute("aria-description", /Overridden/);
 });
