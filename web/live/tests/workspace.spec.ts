@@ -250,7 +250,7 @@ test("mobile Help contains keyboard focus, closes on Escape and yields to a chos
   expect(await readCode(page)).toBe('note("D4")');
 });
 
-test("every Help example loads its own score without playing", async ({ page }) => {
+test("every Help example loads its own score and plays it", async ({ page }) => {
   // One page walks the whole catalogue, so this test is long by design.
   test.slow();
   await page.goto("/");
@@ -261,10 +261,13 @@ test("every Help example loads its own score without playing", async ({ page }) 
   for (let index = 0; index < await examples.count(); index++) {
     await examples.nth(index).click();
     const code = await readCode(page);
-    expect(loaded.has(code), await examples.nth(index).innerText()).toBe(false);
+    const label = await examples.nth(index).innerText();
+    expect(loaded.has(code), label).toBe(false);
     loaded.add(code);
+    // Songs change layout, so a choice must restart rather than update.
+    await expect(page.locator("#status"), label).toHaveText("Playing");
+    await expect(page.locator("#draft-status"), label).toHaveText("Code is up to date");
   }
-  await expect(page.locator("#status")).toHaveText("Ready");
 });
 
 test("a Help scene plays the score it loads", async ({ page }) => {

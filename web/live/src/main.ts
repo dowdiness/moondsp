@@ -118,11 +118,11 @@ scope.own({ dispose: () => view.destroy() });
 
 const adapter = new CM6Adapter(view);
 const scoreSession = scope.own(mountScoreSession(dom.session, { view, notice }));
-// Starting sounds and examples replace the score; starting sounds also play it.
-const helpExamples = scope.own(mountHelpExamples(dom.help.examples, (source, plays) => {
+// Starting sounds and examples replace the score and play it from the beginning.
+const helpExamples = scope.own(mountHelpExamples(dom.help.examples, source => {
   if (dom.help.narrow.matches) setHelp(false);
   replaceScore(source);
-  if (plays && tools) restart(tools);
+  if (tools) restart(tools);
 }));
 
 function refreshEditorChrome(): void {

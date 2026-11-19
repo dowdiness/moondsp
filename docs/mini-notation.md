@@ -10,7 +10,7 @@ path under `specs/loom-mini-cst/`.
 
 ## Browser live examples
 
-In the live app, open **Show help**, select an example, and press **Play**:
+In the live app, open **Show help** and select an example; it plays at once:
 
 - [Overlay groove](../examples/overlay-groove.mini) layers drums, bass, and
   stereo melodies with `+`; a parenthesized `.slow(2)` affects both melodies.

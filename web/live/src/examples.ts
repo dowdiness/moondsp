@@ -1,6 +1,6 @@
-// Functional core for Help's music: the starting sounds, which play at once,
-// and the examples, which replace the score without playing. Help draws its
-// cards and buttons from these lists, so each entry is written once.
+// Functional core for Help's music: the starting sounds and the examples, each
+// of which replaces the score and plays it at once. Help draws its cards and
+// buttons from these lists, so each entry is written once.
 import envelopeComparison from "../../../examples/envelope-comparison.mini?raw";
 import roomOfLight from "../../../examples/room-of-light.mini?raw";
 import lightOrbit from "../../../examples/light-orbit.mini?raw";

@@ -16,8 +16,8 @@ export type HelpExamples = Disposable & {
   show(score: string): void;
 };
 
-/** `choose` receives the chosen score and whether it should play at once. */
-export function mountHelpExamples(host: HelpExamplesHost, choose: (source: string, plays: boolean) => void): HelpExamples {
+/** `choose` receives the chosen score, which plays at once. */
+export function mountHelpExamples(host: HelpExamplesHost, choose: (source: string) => void): HelpExamples {
   const abort = new AbortController();
   const button = (className: string, onClick: () => void): HTMLButtonElement => {
     const element = document.createElement("button");
@@ -28,7 +28,7 @@ export function mountHelpExamples(host: HelpExamplesHost, choose: (source: strin
   };
 
   const cards = STARTING_SOUNDS.map(sound => {
-    const card = button("scene", () => choose(sound.source, true));
+    const card = button("scene", () => choose(sound.source));
     card.setAttribute("aria-label", `Explore ${sound.title}`);
     card.title = sound.title;
     card.innerHTML = `<svg class="scene-art ${sound.artClass}" viewBox="0 0 100 64" aria-hidden="true">${sound.art}</svg>`;
@@ -40,7 +40,7 @@ export function mountHelpExamples(host: HelpExamplesHost, choose: (source: strin
   host.more.replaceChildren();
   for (const example of EXAMPLES) {
     const list = example.more ? host.more : host.featured;
-    const choice = button("example", () => choose(example.source, false));
+    const choice = button("example", () => choose(example.source));
     choice.textContent = example.label;
     list.append(choice);
     if (example.note) {
