@@ -244,8 +244,11 @@ test("mobile Help contains keyboard focus, closes on Escape and yields to a chos
   expect(await readCode(page)).toBe(original);
   await trigger.click();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await expect(help).toBeVisible();
   // Resizing an open modal to a sidebar must release the editor, not leave it inert.
+  // The media query reports the new width before its change event reopens the
+  // dialog as a sidebar, so wait for that rather than for visibility alone.
+  await expect.poll(() => help.evaluate(dialog => dialog.matches(":modal"))).toBe(false);
+  await expect(help).toBeVisible();
   await replaceCode(page, 'note("D4")');
   expect(await readCode(page)).toBe('note("D4")');
 });
