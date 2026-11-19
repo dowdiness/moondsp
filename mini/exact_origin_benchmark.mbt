@@ -3,13 +3,14 @@ fn bench_origin_draft_doc(
   text : String,
 ) -> @pattern.PatternDoc[@pattern.ControlMap] {
   let draft = try! Draft(text)
-  match draft.parsed {
-    Ok(source) =>
+  match draft.analysis {
+    Playable(source, _) =>
       match source.body() {
         Pattern(doc) => doc
         Arrangement(_, _) => abort("expected pattern source")
       }
-    Err(message) => abort("benchmark parse failed: \{message}")
+    Rejected(diagnostic) =>
+      abort("benchmark parse failed: \{diagnostic.message()}")
   }
 }
 

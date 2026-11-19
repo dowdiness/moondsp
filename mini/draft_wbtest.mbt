@@ -98,8 +98,8 @@ test "literal frame identities survive offsets but retire on content edits" {
 ///|
 test "revision exhaustion cannot wrap into a prior edit base" {
   let draft = Draft("note(\"60\")")
-  let version = DraftVersion(draft.current.at.epoch, DRAFT_IDENTITY_MAX)
-  draft.current = DraftState(draft.current.input, version, Pattern, None)
+  let version = DraftVersion(draft.at.epoch, DRAFT_IDENTITY_MAX)
+  draft.at = version
   assert_true(draft.edit(EditTransaction(base=version, edits=[])) is Ok(_))
   assert_true(
     draft.edit(

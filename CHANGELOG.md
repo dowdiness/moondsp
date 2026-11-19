@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Breaking MoonBit API:** `DraftDiagnosticKind::CompilerContract` is gone.
+  `Draft::prepare_playback` no longer lowers the source; a lowering failure is
+  a compiler bug and is reported by `PlaybackInput::compile`.
 - **Breaking MoonBit API:** `parse_play_source` and `PlaybackInput::compile`
   take `query_window : @pattern.QueryWindow` instead of
   `max_query_span : Rational?`. `QueryWindow::from_span` builds one only from a

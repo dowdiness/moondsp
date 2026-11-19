@@ -124,7 +124,6 @@ pub extend DraftTracking with Debug::{to_repr}
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
-  CompilerContract
   Disposed
 }
 
@@ -733,10 +732,42 @@ fn draft_origin_error(error : @pattern.PatternDocError) -> String {
 /// Single owner of current text, causal source lifetimes and bounded parse state.
 /// Playback acceptance and run eligibility belong to the caller, not this owner.
 pub struct Draft {
-  priv mut current : DraftState
+  priv mut input : String
+  priv mut at : DraftVersion
+  priv mut mode : DraftTracking
   priv mut sources : SourceMap
-  priv mut parsed : Result[PlaySource, String]
+  /// What the current text means for playback, or why it cannot be played.
+  priv mut analysis : DraftAnalysis
   priv mut last_valid_doc : @pattern.PatternDoc[@pattern.ControlMap]?
+}
+
+///|
+priv enum DraftAnalysis {
+  /// It parses and fits the player's window when that is known.
+  Playable(PlaySource, PlaybackPayload)
+  Rejected(DraftDiagnostic)
+}
+
+///|
+fn DraftAnalysis::diagnostic(self : DraftAnalysis) -> DraftDiagnostic? {
+  match self {
+    Playable(_, _) => None
+    Rejected(diagnostic) => Some(diagnostic)
+  }
+}
+
+///|
+fn DraftAnalysis::pattern_doc(
+  self : DraftAnalysis,
+) -> @pattern.PatternDoc[@pattern.ControlMap]? {
+  match self {
+    Playable(source, _) =>
+      match source.body() {
+        Pattern(doc) => Some(doc)
+        Arrangement(_, _) => None
+      }
+    Rejected(_) => None
+  }
 }
 
 ///|
@@ -762,47 +793,43 @@ fn draft_tracking(
 }
 
 ///|
-fn draft_parse(
+/// Every problem the author can cause, decided while editing so that preparing
+/// playback never finds a new one. Exact lowering is not repeated here: the
+/// parser already rejects every source it cannot lower, so a failure there is
+/// a compiler bug that `PlaybackInput::compile` still reports.
+fn draft_analysis(
   input : String,
+  at : DraftVersion,
   mode : DraftTracking,
   sources : SourceMap,
   previous : @pattern.PatternDoc[@pattern.ControlMap]?,
-) -> Result[PlaySource, String] {
-  match mode {
-    TrackingUnavailable => Err("source tracking exceeds 8192 UTF-16 code units")
-    Disposed => Err("Draft is disposed")
-    Pattern | Song =>
-      parse_play_source_with_origins(
-        input,
-        previous,
-        None,
-        origins=Some(sources),
-        syntax_depth_limit=Some(32),
-      )
-  }
-}
-
-///|
-fn draft_diagnostic(
-  version : DraftVersion,
-  mode : DraftTracking,
-  parsed : Result[PlaySource, String],
-) -> DraftDiagnostic? {
-  match parsed {
-    Ok(_) => None
-    Err(message) =>
-      Some(
+) -> DraftAnalysis {
+  let payload = match mode {
+    Pattern => PlaybackPayload::Pattern(at, sources)
+    Song => PlaybackPayload::Song(at, sources)
+    TrackingUnavailable =>
+      return Rejected(
         DraftDiagnostic(
-          version,
-          match mode {
-            TrackingUnavailable => TrackingUnavailable
-            Disposed => Disposed
-            _ => Syntax
-          },
-          message,
+          at,
+          TrackingUnavailable,
+          "source tracking exceeds 8192 UTF-16 code units",
         ),
       )
+    Disposed =>
+      return Rejected(DraftDiagnostic(at, Disposed, "Draft is disposed"))
   }
+  let source = match
+    parse_play_source_with_origins(
+      input,
+      previous,
+      None,
+      origins=Some(sources),
+      syntax_depth_limit=Some(32),
+    ) {
+    Ok(source) => source
+    Err(message) => return Rejected(DraftDiagnostic(at, Syntax, message))
+  }
+  Playable(source, payload)
 }
 
 ///|
@@ -815,32 +842,21 @@ pub fn Draft::Draft(input : String) -> Draft raise DraftEditError {
     Some(facts) if mode == Pattern || mode == Song => empty.advance(facts, [])
     _ => empty
   }
-  let version = DraftVersion(epoch, 0L)
-  let parsed = draft_parse(input, mode, sources, None)
-  let last_valid_doc = match parsed {
-    Ok(source) =>
-      match source.body() {
-        Pattern(doc) => Some(doc)
-        _ => None
-      }
-    _ => None
-  }
+  let at = DraftVersion(epoch, 0L)
+  let analysis = draft_analysis(input, at, mode, sources, None)
   {
-    current: DraftState(
-      input,
-      version,
-      mode,
-      draft_diagnostic(version, mode, parsed),
-    ),
+    input,
+    at,
+    mode,
     sources,
-    parsed,
-    last_valid_doc,
+    analysis,
+    last_valid_doc: analysis.pattern_doc(),
   }
 }
 
 ///|
 pub fn Draft::state(self : Draft) -> DraftState {
-  self.current
+  DraftState(self.input, self.at, self.mode, self.analysis.diagnostic())
 }
 
 ///|
@@ -903,17 +919,15 @@ fn Draft::edit_checked(
   self : Draft,
   tx : EditTransaction,
 ) -> DraftState raise DraftEditError {
-  guard self.current.mode != Disposed else { raise Disposed }
-  guard tx.base == self.current.at else { raise WrongBase }
-  let edits = draft_validate_edits(self.current.input, tx.edits)
-  guard !edits.is_empty() else { return self.current }
-  guard self.current.at.revision < DRAFT_IDENTITY_MAX else {
-    raise IdentityExhausted
-  }
-  let input = draft_apply_edits(self.current.input, edits)
+  guard self.mode != Disposed else { raise Disposed }
+  guard tx.base == self.at else { raise WrongBase }
+  let edits = draft_validate_edits(self.input, tx.edits)
+  guard !edits.is_empty() else { return self.state() }
+  guard self.at.revision < DRAFT_IDENTITY_MAX else { raise IdentityExhausted }
+  let input = draft_apply_edits(self.input, edits)
   let facts = draft_recognize(input)
-  let mode = draft_tracking(facts, self.current.mode)
-  let baseline = if mode == self.current.mode {
+  let mode = draft_tracking(facts, self.mode)
+  let baseline = if mode == self.mode {
     self.sources
   } else {
     SourceMap::empty(next_draft_epoch())
@@ -923,27 +937,18 @@ fn Draft::edit_checked(
       baseline.advance(facts, edits)
     _ => baseline
   }
-  let version = DraftVersion(
-    self.current.at.epoch,
-    self.current.at.revision + 1L,
-  )
-  let parsed = draft_parse(input, mode, sources, self.last_valid_doc)
-  let state = DraftState(
-    input,
-    version,
-    mode,
-    draft_diagnostic(version, mode, parsed),
-  )
+  let at = DraftVersion(self.at.epoch, self.at.revision + 1L)
+  let analysis = draft_analysis(input, at, mode, sources, self.last_valid_doc)
   // Commit only after all validation and checked identity allocation succeeded.
+  self.input = input
+  self.at = at
+  self.mode = mode
   self.sources = sources
-  self.parsed = parsed
-  self.current = state
-  if parsed is Ok(source) {
-    if source.body() is Pattern(doc) {
-      self.last_valid_doc = Some(doc)
-    }
+  self.analysis = analysis
+  if analysis.pattern_doc() is Some(doc) {
+    self.last_valid_doc = Some(doc)
   }
-  state
+  self.state()
 }
 
 ///|
@@ -964,16 +969,18 @@ pub fn Draft::reset(
   self : Draft,
   input : String,
 ) -> Result[DraftState, DraftEditError] {
-  guard self.current.mode != Disposed else { return Err(Disposed) }
+  guard self.mode != Disposed else { return Err(Disposed) }
   try Draft(input) catch {
     error => Err(error)
   } noraise {
     fresh => {
-      self.current = fresh.current
+      self.input = fresh.input
+      self.at = fresh.at
+      self.mode = fresh.mode
       self.sources = fresh.sources
-      self.parsed = fresh.parsed
+      self.analysis = fresh.analysis
       self.last_valid_doc = fresh.last_valid_doc
-      Ok(self.current)
+      Ok(self.state())
     }
   }
 }
@@ -982,51 +989,10 @@ pub fn Draft::reset(
 pub fn Draft::prepare_playback(
   self : Draft,
 ) -> Result[PlaybackInput, DraftDiagnostic] {
-  if self.current.error is Some(error) {
-    return Err(error)
+  match self.analysis {
+    Rejected(diagnostic) => Err(diagnostic)
+    Playable(_, payload) => Ok(PlaybackInput(self.input, payload))
   }
-  let payload = match self.current.mode {
-    Pattern => PlaybackPayload::Pattern(self.current.at, self.sources)
-    Song => PlaybackPayload::Song(self.current.at, self.sources)
-    TrackingUnavailable =>
-      return Err(
-        DraftDiagnostic(
-          self.current.at,
-          TrackingUnavailable,
-          "source tracking is unavailable",
-        ),
-      )
-    Disposed =>
-      return Err(
-        DraftDiagnostic(self.current.at, Disposed, "Draft is disposed"),
-      )
-  }
-  match self.parsed {
-    Ok(source) =>
-      if source.body() is Pattern(doc) {
-        try doc.lower_with_origins() catch {
-          error => {
-            let diagnostic = DraftDiagnostic(
-              self.current.at,
-              CompilerContract,
-              draft_origin_error(error),
-            )
-            self.current = DraftState(
-              self.current.input,
-              self.current.at,
-              self.current.mode,
-              Some(diagnostic),
-            )
-            return Err(diagnostic)
-          }
-        } noraise {
-          _ => ()
-        }
-      }
-    Err(message) =>
-      return Err(DraftDiagnostic(self.current.at, Syntax, message))
-  }
-  Ok(PlaybackInput(self.current.input, payload))
 }
 
 ///|
@@ -1035,7 +1001,7 @@ pub fn Draft::locate_origin(
   self : Draft,
   origin : @pattern.EventOrigin,
 ) -> OriginLocation {
-  guard (self.current.mode == Pattern || self.current.mode == Song) &&
+  guard (self.mode == Pattern || self.mode == Song) &&
     origin.atom().epoch() == self.sources.epoch else {
     return Unavailable(SourceReset)
   }
@@ -1075,8 +1041,7 @@ pub fn Draft::locate_origin_fields(
   atom_serial : Int64,
   path : Array[Int64],
 ) -> OriginLocation {
-  guard (self.current.mode == Pattern || self.current.mode == Song) &&
-    path.length() % 3 == 0 else {
+  guard (self.mode == Pattern || self.mode == Song) && path.length() % 3 == 0 else {
     return Unavailable(SourceReset)
   }
   guard atom_epoch == self.sources.epoch.serial() else {
@@ -1120,22 +1085,17 @@ pub fn Draft::locate_frame_fields(
   frame_epoch : Int64,
   frame_serial : Int64,
 ) -> SourceRange? {
-  guard self.current.mode == Pattern || self.current.mode == Song else {
-    return None
-  }
+  guard self.mode == Pattern || self.mode == Song else { return None }
   guard frame_epoch == self.sources.epoch.serial() else { return None }
   self.sources.frame_range(frame_serial)
 }
 
 ///|
 pub fn Draft::dispose(self : Draft) -> Unit {
-  self.current = DraftState(
-    self.current.input,
-    self.current.at,
-    Disposed,
-    Some(DraftDiagnostic(self.current.at, Disposed, "Draft is disposed")),
+  self.mode = Disposed
+  self.analysis = Rejected(
+    DraftDiagnostic(self.at, Disposed, "Draft is disposed"),
   )
   self.sources = SourceMap::empty(self.sources.epoch)
-  self.parsed = Err("Draft is disposed")
   self.last_valid_doc = None
 }

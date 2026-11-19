@@ -69,7 +69,6 @@ pub fn DraftDiagnostic::version(Self) -> DraftVersion
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
-  CompilerContract
   Disposed
 }
 pub fn DraftDiagnosticKind::equal(Self, Self) -> Bool
