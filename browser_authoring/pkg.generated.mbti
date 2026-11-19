@@ -9,6 +9,8 @@ import {
 // Values
 pub fn check_draft_within(@mini.Draft, @pattern.QueryWindow) -> String
 
+pub fn control_nesting() -> String
+
 pub fn create_draft(String, (@mini.Draft) -> Unit, (String) -> Unit) -> Unit
 
 pub fn draft_state(@mini.Draft) -> String

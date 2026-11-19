@@ -1421,7 +1421,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
             chained[inner] = buses.length()
             buses.push({
               key,
-              signal: Nesting::of(key).signal(bus.signal, signal),
+              signal: nested_signal(key.nesting(), bus.signal, signal),
               apply,
               controls_of,
             })

@@ -1,6 +1,6 @@
 # ADR-0020: Controls are typed signals with one representation
 
-- **Status:** Accepted 2026-11-19. Migration steps 1–4 are implemented; step 5 (browser ABI nesting rules) remains.
+- **Status:** Accepted 2026-11-19. All five migration steps are implemented.
 - **Date:** 2026-11-19
 - **Supersedes:** in [ADR-0019](0019-automatic-control-buses.md), the event
   binding mechanism of Decision 2 and the rejected alternative "a new signal
@@ -77,8 +77,10 @@ This is the set Mini emits (`mini/expression_syntax.mbt`) plus `Decay` and
 `Sustain`, which the voice writes itself to turn the envelope into a hold
 envelope for `hold` (`BoundVoicePool::note_on`). `Control` lives in
 its own leaf package, `control`, so `pattern` and `voice` share it without
-depending on each other. `Nesting::of(Control)` states each variant's
-nesting rule (`Gain` multiplies, the rest override) by an exhaustive match.
+depending on each other. `Control::nesting()` states each variant's
+nesting rule (`Gain` multiplies, the rest override) by an exhaustive match;
+pattern applies it to values and signals in one place (`nested_value`,
+`nested_signal`).
 Pool bindings target a `Control`, not a string. There is no open
 `Named(String)` case: adding a control means adding a variant, which a new
 control needs anyway for its nesting rule.
@@ -109,7 +111,8 @@ So the table stays, and the duplication is removed instead:
 - An event's bindings map a key to a bus and nothing else (`BusBinding` is
   `(key, bus)`). They depend neither on time nor on the payload, so events of
   one atom share them by identity.
-- A bound key's signal is `Nesting::of(key).signal(own, bus)`: the event's own
+- A bound key's signal is its bus nested over its own value by
+  `key.nesting()`: the event's own
   value is the innermost occurrence of the key, for every key. Where the
   outer bus rests, the own value applies, for `Override` keys as for `gain`.
 - Bus values enter a payload only where controls leave lowering
@@ -160,8 +163,10 @@ sees both, joins them.
 
 ### 5. The engine is the only source of nesting rules
 
-The browser ABI exposes each control's nesting rule, and the live editor
-reads it instead of hard-coding `gain`.
+The main-thread `browser_authoring.control_nesting()` export returns each
+control's rule from `Control::nesting()`, keyed by its text name. The live
+editor reads that table at build time and resolves each knob's rule once;
+no TypeScript names a control's rule.
 
 ## Evidence required before acceptance
 
@@ -232,6 +237,12 @@ reads it instead of hard-coding `gain`.
    were identical, and the CLAP allocation audit stayed at zero
    ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
 5. Browser ABI exports nesting rules; the editor drops its `gain` check.
+   Done: the rule moved to `control` (`Control::nesting`), and
+   `browser_authoring` exports `control_nesting()`. The editor needs the
+   rules before authoring loads lazily, so `web/live/scripts/sync-assets.mjs`
+   calls the export at build time and writes `src/generated/control-nesting.js`;
+   each knob resolves its rule once when the editor module loads. The
+   inline-control and authoring-startup Playwright suites pass.
 
 Each step lands with the full test suite and the allocation audit green.
 

@@ -8,68 +8,39 @@
 /// event records which bus each control key reads.
 ///
 /// An event's payload holds only its own values: lowering never writes a bus
-/// value into it. A bound key reads `Nesting::of(key).signal(own, bus)`, so
-/// the event's own value is the innermost occurrence of that key. Bus values
-/// enter a payload only where controls leave lowering (`project_controls`).
+/// value into it. A bound key reads its bus nested over its own value by the
+/// key's `Control::nesting`, so the event's own value is the innermost
+/// occurrence of that key. Bus values enter a payload only where controls
+/// leave lowering (`project_controls`).
 ///
 /// Compiled subtrees keep their buses in their own local time, and every
 /// enclosing node wraps them with its transform, so the lowering cache can
 /// share a subtree's buses wherever the subtree is reused.
 
 ///|
-/// How nested occurrences of one control key combine (ADR-0019, decision 8).
-/// `Nesting::of` is the only place that names a key's rule.
-priv enum Nesting {
-  /// The outer value replaces the inner one.
-  Override
-  /// The outer value multiplies the inner one.
-  Multiply
-}
-
-///|
-fn Nesting::of(key : @control.Control) -> Nesting {
-  match key {
-    Gain => Multiply
-    Note
-    | Sound
-    | Pan
-    | Room
-    | Lpf
-    | LpfResonance
-    | Hpf
-    | HpfResonance
-    | Attack
-    | Decay
-    | Sustain
-    | Hold
-    | Release => Override
-  }
-}
-
-///|
-/// An outer signal over an inner one. Where the outer has no value, the inner
-/// applies alone.
-fn Nesting::signal(
-  self : Nesting,
-  inner : BusSignal,
-  outer : BusSignal,
-) -> BusSignal {
-  match self {
-    Override => Stack([inner, outer])
-    Multiply => Product(inner, outer)
-  }
-}
-
-///|
-/// `Nesting::signal` at one time: the outer value over the inner one.
-fn Nesting::combine(
-  self : Nesting,
+/// An outer value over an inner one by `nesting`. Where the outer has no
+/// value, the inner applies alone.
+fn nested_value(
+  nesting : @control.Nesting,
   inner : @control.ControlValue,
   outer : @control.ControlValue,
 ) -> @control.ControlValue {
-  match self {
+  match nesting {
     Override => outer.or_else(inner)
     Multiply => inner.times(outer)
+  }
+}
+
+///|
+/// `nested_value` as a signal: an outer signal over an inner one.
+fn nested_signal(
+  nesting : @control.Nesting,
+  inner : BusSignal,
+  outer : BusSignal,
+) -> BusSignal {
+  match nesting {
+    Override => Stack([inner, outer])
+    Multiply => Product(inner, outer)
   }
 }
 
@@ -88,7 +59,8 @@ fn BusBinding::signal(
   bus : BusSignal,
 ) -> BusSignal {
   match own.get(self.key) {
-    Some(value) => Nesting::of(self.key).signal(BusSignal::of_value(value), bus)
+    Some(value) =>
+      nested_signal(self.key.nesting(), BusSignal::of_value(value), bus)
     None => bus
   }
 }
@@ -105,7 +77,7 @@ fn BusBinding::eval(
   let outer = bus.eval(num, den, false)
   match own.get(self.key) {
     Some(value) =>
-      Nesting::of(self.key).combine(@control.ControlValue::of(value), outer)
+      nested_value(self.key.nesting(), @control.ControlValue::of(value), outer)
     None => outer
   }
 }
@@ -662,7 +634,7 @@ fn[A] compile_signal(
           Merge(
             compile_signal(nodes, left, None, controls_of),
             inner,
-            Nesting::of(key).signal(inner, sub(right)),
+            nested_signal(key.nesting(), inner, sub(right)),
           )
         }
       }

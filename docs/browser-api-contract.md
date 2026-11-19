@@ -1168,6 +1168,15 @@ source spans follow document changes, including edits made while controls are
 hidden. Current-version acceptance with no pending material clears the notice;
 an older accepted version cannot clear newer edits.
 
+The main-thread `browser_authoring.control_nesting()` export returns a JSON
+object string mapping every control's text name (`"gain"`, `"lpf"`,
+`"lpf_resonance"`, ...) to its nesting rule, `"multiply"` or `"override"`
+(ADR-0020 Decision 5). A later modifier for an `"override"` control replaces
+an earlier one; a `"multiply"` control scales it. The live editor marks inline
+knobs as overridden from this table only; `web/live/scripts/sync-assets.mjs`
+reads it at build time into `src/generated/control-nesting.js`, so the editor
+does not load the authoring module at startup.
+
 The main-thread `browser_authoring.project_notation(kind, content)` export
 returns a JSON string for the quoted notation, independently of playback:
 

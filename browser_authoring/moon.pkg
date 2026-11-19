@@ -1,4 +1,5 @@
 import {
+  "dowdiness/moondsp/control",
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler",
@@ -20,6 +21,7 @@ options(
         "prepare_playback",
         "locate_onsets",
         "project_notation",
+        "control_nesting",
       ],
     },
   },

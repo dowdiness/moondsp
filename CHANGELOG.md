@@ -233,6 +233,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Each control's nesting rule is public: `@control.Control::nesting()`
+  (`Nesting::Override` or `Multiply`), and `Control::all()` lists the
+  controls (ADR-0020 step 5). The main-thread
+  `browser_authoring.control_nesting()` export returns the rules as JSON; the
+  live editor reads them at build time instead of special-casing `gain`.
+
 - Parameter automation through automatic control buses (ADR-0019). Control
   arguments in Mini take a number, a quoted step pattern such as
   `s("hh*8").gain("0.2 0.6 0.3 0.8")`, or a signal (`sine`, `cosine`, `saw`,

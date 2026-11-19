@@ -80,3 +80,64 @@ pub impl Hash for Control with fn hash(self) {
 pub impl Hash for Control with fn hash_combine(self, hasher) {
   hasher.combine_int(Hash::hash(self))
 }
+
+///|
+/// Every control, in declaration order. `Release` stays the last variant,
+/// so its hash bounds this list (see the test).
+pub fn Control::all() -> FixedArray[Control] {
+  [
+    Note,
+    Sound,
+    Gain,
+    Pan,
+    Room,
+    Lpf,
+    LpfResonance,
+    Hpf,
+    HpfResonance,
+    Attack,
+    Decay,
+    Sustain,
+    Hold,
+    Release,
+  ]
+}
+
+///|
+/// How nested occurrences of one control combine (ADR-0019, decision 8).
+pub(all) enum Nesting {
+  /// The outer value replaces the inner one.
+  Override
+  /// The outer value multiplies the inner one.
+  Multiply
+}
+
+///|
+/// The name text uses for this rule.
+pub fn Nesting::name(self : Nesting) -> String {
+  match self {
+    Override => "override"
+    Multiply => "multiply"
+  }
+}
+
+///|
+/// This control's nesting rule; the only place that names one.
+pub fn Control::nesting(self : Control) -> Nesting {
+  match self {
+    Gain => Multiply
+    Note
+    | Sound
+    | Pan
+    | Room
+    | Lpf
+    | LpfResonance
+    | Hpf
+    | HpfResonance
+    | Attack
+    | Decay
+    | Sustain
+    | Hold
+    | Release => Override
+  }
+}

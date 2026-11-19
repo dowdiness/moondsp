@@ -3,12 +3,23 @@ import { Decoration, EditorView, WidgetType, keymap, runScopeHandlers, type Deco
 import { history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import type { SyntaxNode, Tree } from "@lezer/common";
 import { syntaxTree } from "@codemirror/language";
+import { CONTROL_NESTING } from "./generated/control-nesting.js";
 
-/** A knob's parameter: how it is named, the range it shows, and how a gesture moves it. */
-type Param = Readonly<{ label: string; unit: string; min: number; max: number; step: number; scale: "linear" | "log" }>;
-const GAIN: Param = { label: "Gain", unit: "", min: 0, max: 2, step: 0.01, scale: "linear" };
-const CUTOFF: Param = { label: "Cutoff Hz", unit: " Hz", min: 20, max: 20000, step: 10, scale: "log" };
-const Q: Param = { label: "Q", unit: "", min: 0.1, max: 10, step: 0.01, scale: "linear" };
+/**
+ * A knob's parameter: whether a later modifier for its control replaces it,
+ * how it is named, the range it shows, and how a gesture moves it.
+ */
+type Param = Readonly<{ overridable: boolean; label: string; unit: string; min: number; max: number; step: number; scale: "linear" | "log" }>;
+
+/** A knob for `control`, with its nesting rule from the engine (ADR-0020 Decision 5). */
+function param(control: string, knob: Omit<Param, "overridable">): Param {
+  const rule = CONTROL_NESTING[control];
+  if (rule === undefined) throw new Error(`engine has no control ${control}`);
+  return { ...knob, overridable: rule === "override" };
+}
+const GAIN = param("gain", { label: "Gain", unit: "", min: 0, max: 2, step: 0.01, scale: "linear" });
+const CUTOFF = param("lpf", { label: "Cutoff Hz", unit: " Hz", min: 20, max: 20000, step: 10, scale: "log" });
+const Q = param("lpf_resonance", { label: "Q", unit: "", min: 0.1, max: 10, step: 0.01, scale: "linear" });
 
 type Target = { from: number; to: number; param: Param; value: string; notice: string };
 const lastInlineEdit = StateField.define<boolean>({
@@ -37,13 +48,14 @@ function controlTargets(tree: Tree, source: string): Target[] {
       for (let child = args.firstChild; child; child = child.nextSibling) {
         if (!["LineComment", "BlockComment"].includes(child.name)) children.push(child);
       }
-      // Any filter argument overrides earlier knobs for its parameter,
-      // including quoted steps and signals, which get no knob of their own.
-      // Nested gain multiplies (ADR-0019), so an earlier gain knob still counts.
+      // Any argument overrides earlier knobs for its parameter, including
+      // quoted steps and signals, which get no knob of their own, unless the
+      // engine nests that control another way.
       const argCount = children.some(child => !["(", ",", ")"].includes(child.name))
         ? children.filter(child => child.name === ",").length + 1
         : 0;
-      const overridden = name === "gain" ? [] : [CUTOFF, Q].slice(0, argCount);
+      const params = name === "gain" ? [GAIN] : [CUTOFF, Q];
+      const overridden = params.slice(0, argCount).filter(p => p.overridable);
       for (const earlier of local) {
         if (overridden.includes(earlier.param)) earlier.notice = "Overridden by a later modifier in this chain.";
       }
@@ -53,7 +65,7 @@ function controlTargets(tree: Tree, source: string): Target[] {
       children.filter(child => child.name === "Number").forEach((number, index) => {
         const value = text(number);
         if (!Number.isFinite(Number(value))) return;
-        const param = name === "gain" ? GAIN : index === 0 ? CUTOFF : Q;
+        const param = params[index];
         local.push({ from: number.from, to: number.to, value, param,
           notice: param === GAIN
             ? "Source edit · every sound, including drums."

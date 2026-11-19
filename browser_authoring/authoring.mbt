@@ -490,3 +490,15 @@ pub fn locate_onsets(draft : @mini.Draft, wire : String) -> String {
   }
   Json::array(resolved).stringify()
 }
+
+///|
+/// Each control's nesting rule, keyed by its text name, as a JSON object:
+/// `"multiply"` or `"override"` (ADR-0020 Decision 5). The editor reads this
+/// instead of naming any control's rule itself.
+pub fn control_nesting() -> String {
+  let rules : Map[String, Json] = Map([])
+  for control in @control.Control::all() {
+    rules[control.name()] = Json(control.nesting().name())
+  }
+  Json::object(rules).stringify()
+}

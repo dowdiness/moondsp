@@ -27,7 +27,9 @@ pub(all) enum Control {
   Hold
   Release
 }
+pub fn Control::all() -> FixedArray[Self]
 pub fn Control::name(Self) -> String
+pub fn Control::nesting(Self) -> Nesting
 pub impl Hash for Control
 pub impl Show for Control
 
@@ -41,6 +43,12 @@ pub fn ControlValue::times(Self, Self) -> Self
 pub fn ControlValue::unwrap_or(Self, Double) -> Double
 pub impl Eq for ControlValue
 pub impl Show for ControlValue
+
+pub(all) enum Nesting {
+  Override
+  Multiply
+}
+pub fn Nesting::name(Self) -> String
 
 // Type aliases
 
