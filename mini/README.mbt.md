@@ -43,7 +43,7 @@ surface:
 
 | Category | Types / Functions | Key operations |
 |---|---|---|
-| **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
+| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ControlMap]` or `ParsedSong` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
@@ -60,8 +60,7 @@ origins; `Draft` adds them.
 | Function | Use it when you need |
 |---|---|
 | `parse` | The lowered `Pat[ControlMap]` of `parse_snapshot` |
-| `parse_song` | A `Song[ControlMap]` layout |
-| `parse_song_with_bpm` | A song plus authored BPM metadata |
+| `parse_song` | A `Song[ControlMap]` layout plus its authored BPM metadata |
 | `parse_doc` | A general graph document, optionally reusing previous subtrees |
 | `parse_snapshot` | A parsed and lowered document snapshot |
 | `Draft` | Causal atom/reference identities across valid and invalid edits, frozen playback input, and current source locations |
@@ -189,14 +188,13 @@ inline notation pulses in both Pattern and Song; see the
 
 ## Parse a song
 
-Use `parse_song_with_bpm` when the host needs both the layout and its tempo.
-Plain `parse_song` returns only the layout.
+`parse_song` returns the layout and its authored tempo together.
 
 ```mbt check
 ///|
 test "parse song layout and tempo" {
   let parsed = match
-    @mini.parse_song_with_bpm(
+    @mini.parse_song(
       "song(bpm(96),section(\"groove\",4,s(\"bd*4\")),part(\"g1\",\"groove\"))",
     ) {
     Ok(value) => value

@@ -51,14 +51,10 @@ pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int32, @graph.G
 pub fn BoundVoicePool::binding(Self, String) -> @graph.ControlBinding?
 pub fn BoundVoicePool::follow(Self, VoiceHandle, VoiceFollower) -> Bool
 pub fn BoundVoicePool::follower(Self, String, (Int64, Int64) -> Double) -> VoiceFollower?
-#deprecated
-pub fn BoundVoicePool::kill(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int32
 pub fn BoundVoicePool::note_gate(Self, Map[String, Double]) -> NoteGate
-#deprecated
-pub fn BoundVoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
 pub fn BoundVoicePool::note_off_bool(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
@@ -69,8 +65,6 @@ pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.Aud
 pub fn BoundVoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn BoundVoicePool::set_template(Self, @graph.AnalyzedGraph, @graph.ControlBindingBuilder) -> Result[Unit, BoundVoicePoolError]
 pub fn BoundVoicePool::set_voice_gain_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
-#deprecated
-pub fn BoundVoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_bool(Self, VoiceHandle, Double) -> Bool
 pub fn BoundVoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
@@ -123,8 +117,6 @@ pub fn VoicePool::VoicePool(@graph.AnalyzedGraph, @dsp.DspContext, max_voices? :
 pub fn VoicePool::active_voice_count(Self) -> Int32
 pub fn VoicePool::kill_all(Self) -> Unit
 pub fn VoicePool::last_sanitized_count(Self) -> Int32
-#deprecated
-pub fn VoicePool::note_off(Self, VoiceHandle) -> Bool
 pub fn VoicePool::note_off_all(Self) -> Unit
 pub fn VoicePool::note_off_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::note_on(Self, Array[@graph.GraphControl]) -> VoiceHandle?
@@ -132,8 +124,6 @@ pub fn VoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuf
 pub fn VoicePool::process_with_send(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn VoicePool::set_template(Self, @graph.AnalyzedGraph) -> Result[Unit, VoicePoolError]
 pub fn VoicePool::set_voice_gain_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
-#deprecated
-pub fn VoicePool::set_voice_pan(Self, VoiceHandle, Double) -> Bool
 pub fn VoicePool::set_voice_pan_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::set_voice_send_result(Self, VoiceHandle, Double) -> Result[Unit, VoiceControlError]
 pub fn VoicePool::voice_state(Self, VoiceHandle) -> VoiceState

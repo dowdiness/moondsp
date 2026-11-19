@@ -24,7 +24,7 @@ between pattern queries and the scheduler:
 ```
 
 - **Upstream consumers**: [`mini/`](../mini/) parses `parse_song` and
-  `parse_song_with_bpm` expressions into `Song[ControlMap]` layouts.
+  `parse_song` expressions into `Song[ControlMap]` layouts.
 - **Downstream dependencies**: [`pattern/`](../pattern/) provides the underlying
   `Pat[A]`, `Rational`, and `TimeSpan` query types. `song` has zero dependencies
   on DSP buffers, synthesis graphs, or audio hardware.

@@ -41,21 +41,9 @@ pub fn ParsedSong::bpm(self : ParsedSong) -> Double? {
 /// - `fill("prefix", "section")`
 ///
 /// `pattern_expr` is the existing pattern mini-notation surface, such as
-/// `s("bd sd")`, `note("60 64")`, `stack(...)`, and method chains.
-pub fn parse_song(
-  input : String,
-) -> Result[@song.Song[@pattern.ControlMap], String] {
-  match parse_song_with_bpm(input) {
-    Ok(parsed) => Ok(parsed.song())
-    Err(msg) => Err(msg)
-  }
-}
-
-///|
-/// Parse song mini-notation and preserve optional playback metadata such as
-/// `bpm(number)`. Plain `parse_song` intentionally keeps returning only the
-/// layout value for compatibility.
-pub fn parse_song_with_bpm(input : String) -> Result[ParsedSong, String] {
+/// `s("bd sd")`, `note("60 64")`, `stack(...)`, and method chains. The result
+/// keeps the optional `bpm(number)` metadata beside the layout.
+pub fn parse_song(input : String) -> Result[ParsedSong, String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder(previous=None, origins=None)

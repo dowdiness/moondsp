@@ -22,9 +22,7 @@ pub fn parse_play_source(String, previous? : @pattern.PatternDoc[@pattern.Contro
 
 pub fn parse_snapshot(String, previous? : @pattern.PatternDoc[@pattern.ControlMap]?) -> Result[@pattern.PatternSnapshot[@pattern.ControlMap], String]
 
-pub fn parse_song(String) -> Result[@song.Song[@pattern.ControlMap], String]
-
-pub fn parse_song_with_bpm(String) -> Result[ParsedSong, String]
+pub fn parse_song(String) -> Result[ParsedSong, String]
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 

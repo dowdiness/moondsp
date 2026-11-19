@@ -1,9 +1,9 @@
 ///|
 fn unwrap_parsed_song(
-  result : Result[@song.Song[@pattern.ControlMap], String],
+  result : Result[@mini.ParsedSong, String],
 ) -> @song.Song[@pattern.ControlMap] {
   match result {
-    Ok(song) => song
+    Ok(parsed) => parsed.song()
     Err(msg) => abort("expected parsed song, got Err(\{msg})")
   }
 }
@@ -54,9 +54,9 @@ test "parse_song builds sections and implicit parts" {
 }
 
 ///|
-test "parse_song_with_bpm captures optional tempo metadata" {
+test "parse_song captures optional tempo metadata" {
   let parsed = match
-    @mini.parse_song_with_bpm(
+    @mini.parse_song(
       "song(bpm(72),section(\"intro\",1,s(\"bd\")),part(\"intro1\",\"intro\"))",
     ) {
     Ok(value) => value

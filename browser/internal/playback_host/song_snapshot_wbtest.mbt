@@ -11,8 +11,10 @@ fn cycle_span(begin : Int32, end : Int32) -> @pattern.TimeSpan {
 ///|
 test "prepared song respects section boundaries differing periods and finite end" {
   let song = @mini.parse_song(
-    "song(section(\"a\",3,stack(note(\"60\").slow(3),note(\"72 74\").slow(4))),section(\"b\",2,note(\"67\").slow(2)),part(\"a1\",\"a\"),part(\"b1\",\"b\"))",
-  ).unwrap()
+      "song(section(\"a\",3,stack(note(\"60\").slow(3),note(\"72 74\").slow(4))),section(\"b\",2,note(\"67\").slow(2)),part(\"a1\",\"a\"),part(\"b1\",\"b\"))",
+    )
+    .unwrap()
+    .song()
   let snapshot = song_update_snapshot(song)
   let span = cycle_span(0, 5)
   let events = snapshot.query(span)
@@ -36,8 +38,10 @@ test "prepared song respects section boundaries differing periods and finite end
 ///|
 test "snapshot thinning is deterministic across query partitions" {
   let song = @mini.parse_song(
-    "song(section(\"a\",4,note(\"60*8\").degradeBy(0.5)),part(\"a1\",\"a\"))",
-  ).unwrap()
+      "song(section(\"a\",4,note(\"60*8\").degradeBy(0.5)),part(\"a1\",\"a\"))",
+    )
+    .unwrap()
+    .song()
   let snapshot = song_update_snapshot(song)
   let whole = snapshot.query(cycle_span(0, 4))
   let mut count = 0

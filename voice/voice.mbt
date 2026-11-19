@@ -649,17 +649,6 @@ pub fn BoundVoicePool::note_on_prevalidated_params4_id(
 }
 
 ///|
-/// Deprecated compatibility wrapper. Use `note_off_result` to observe stale
-/// or invalid handles as `VoiceControlError` values.
-#deprecated("Use BoundVoicePool::note_off_result(handle) to observe VoiceControlError")
-pub fn BoundVoicePool::note_off(
-  self : BoundVoicePool,
-  handle : VoiceHandle,
-) -> Bool {
-  self.note_off_bool(handle)
-}
-
-///|
 /// Allocation-conscious note-off predicate for host callback paths.
 pub fn BoundVoicePool::note_off_bool(
   self : BoundVoicePool,
@@ -674,17 +663,6 @@ pub fn BoundVoicePool::note_off_result(
   handle : VoiceHandle,
 ) -> Result[Unit, VoiceControlError] {
   self.pool.note_off_result(handle)
-}
-
-///|
-/// Deprecated compatibility wrapper. Use `kill_result` to observe stale or
-/// invalid handles as `VoiceControlError` values.
-#deprecated("Use BoundVoicePool::kill_result(handle) to observe VoiceControlError")
-pub fn BoundVoicePool::kill(
-  self : BoundVoicePool,
-  handle : VoiceHandle,
-) -> Bool {
-  self.kill_result(handle) is Ok(_)
 }
 
 ///|
@@ -703,18 +681,6 @@ pub fn BoundVoicePool::note_off_all(self : BoundVoicePool) -> Unit {
 ///|
 pub fn BoundVoicePool::kill_all(self : BoundVoicePool) -> Unit {
   self.pool.kill_all()
-}
-
-///|
-/// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
-/// stale or invalid handles as `VoiceControlError` values.
-#deprecated("Use BoundVoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
-pub fn BoundVoicePool::set_voice_pan(
-  self : BoundVoicePool,
-  handle : VoiceHandle,
-  pan : Double,
-) -> Bool {
-  self.set_voice_pan_bool(handle, pan)
 }
 
 ///|
@@ -1072,14 +1038,6 @@ pub fn VoicePool::note_on(
 }
 
 ///|
-/// Deprecated compatibility wrapper. Use `note_off_result` to observe stale
-/// or invalid handles as `VoiceControlError` values.
-#deprecated("Use VoicePool::note_off_result(handle) to observe VoiceControlError")
-pub fn VoicePool::note_off(self : VoicePool, handle : VoiceHandle) -> Bool {
-  self.note_off_bool(handle)
-}
-
-///|
 /// Allocation-conscious note-off predicate for host callback paths.
 fn VoicePool::note_off_bool(self : VoicePool, handle : VoiceHandle) -> Bool {
   match self.resolve_slot(handle) {
@@ -1180,18 +1138,6 @@ pub fn VoicePool::kill_all(self : VoicePool) -> Unit {
     }
     slot.state = VoiceState::Idle
   }
-}
-
-///|
-/// Deprecated compatibility wrapper. Use `set_voice_pan_result` to observe
-/// stale or invalid handles as `VoiceControlError` values.
-#deprecated("Use VoicePool::set_voice_pan_result(handle, pan) to observe VoiceControlError")
-pub fn VoicePool::set_voice_pan(
-  self : VoicePool,
-  handle : VoiceHandle,
-  pan : Double,
-) -> Bool {
-  self.set_voice_pan_bool(handle, pan)
 }
 
 ///|
