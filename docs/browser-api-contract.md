@@ -860,7 +860,7 @@ browser-error update.
 Fill the shared UTF-16 input buffer, then consume it with `player_update_input`
 or `player_restart_input`. Both accept the same source grammar: optional
 bindings and `bpm(number);`, followed by a Pattern or arrangement. Omitted tempo
-is 60 BPM. Patterns repeat; finite arrangements end unless followed by `.repeat()`.
+is 120 BPM; one cycle is four beats. Patterns repeat; finite arrangements end unless followed by `.repeat()`.
 There are no public preparation tokens.
 
 Commands return `0` for acceptance, `1` for invalid/unrepresentable input, and

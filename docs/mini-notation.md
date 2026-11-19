@@ -72,7 +72,7 @@ in the browser bundle.
 <p class="cheat-note">A note starts from the value at its onset, then follows once per audio block. Limits such as room 0–1 apply to every value a pattern or signal can take.</p>
 
 <h2>Rhythm</h2>
-<p class="cheat-note">BPM sets cycles per minute: at 60, one cycle is one second. A cycle has no fixed meter.</p>
+<p class="cheat-note">One cycle is one bar of four beats. BPM counts beats: at the default 120 BPM, one cycle lasts two seconds, so <code>s("bd hh sd hh")</code> plays quarter notes.</p>
 <dl>
   <dt>.fast(n)</dt><dd>n× faster</dd>
   <dt>.slow(n)</dt><dd>n× slower; explicit envelope seconds stay unchanged</dd>
@@ -124,7 +124,7 @@ in the browser bundle.
   <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
 </dl>
 <p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
-<p class="cheat-note">The editor accepts patterns and <code>song(...)</code> without a mode selector. Set tempo in the score with <code>bpm(96);</code> before the pattern or song, or with <code>bpm(96)</code> inside <code>song(...)</code>. Declare tempo only once; there is no separate header BPM control.</p>
+<p class="cheat-note">The editor accepts patterns and <code>song(...)</code> without a mode selector. Set tempo in the score with <code>bpm(96);</code> before the pattern or song (default 120), or with <code>bpm(96)</code> inside <code>song(...)</code>. Declare tempo only once; there is no separate header BPM control.</p>
 <!-- LIVE_SYNTAX_REFERENCE_END -->
 
 ## Additional notation examples

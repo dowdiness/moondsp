@@ -170,7 +170,11 @@ pub fn init_scheduler_graph_with_templates(
       }
     }
   }
-  let scheduler = @scheduler.PatternScheduler(bpm=60.0, ctx~, instruments~) catch {
+  let scheduler = @scheduler.PatternScheduler(
+    bpm=@mini.DEFAULT_BPM,
+    ctx~,
+    instruments~,
+  ) catch {
     _ => {
       reset_scheduler_graph()
       return false

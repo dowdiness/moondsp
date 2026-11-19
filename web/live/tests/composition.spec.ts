@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readCode, replaceCode } from "./editor-helpers";
 
-const source = 'bpm(120);\n$: s("bd ~ sd ~").slow(4)\n$: note("C4  Eb4 F4 G4").slow(4).gain(0.2)';
+const source = 'bpm(120);\n$: s("bd ~ sd ~")\n$: note("C4  Eb4 F4 G4").gain(0.2)';
 
 test("selected note weight and Rest preserve exact source and share Undo", async ({ page }) => {
   await page.goto("/");

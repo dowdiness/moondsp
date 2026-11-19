@@ -7,6 +7,10 @@ pub enum PlayBody {
 }
 
 ///|
+/// Tempo of a source that declares no `bpm(...)`.
+pub const DEFAULT_BPM : Double = 120.0
+
+///|
 pub struct PlaySource {
   priv body : PlayBody
   priv bpm : Double
@@ -128,7 +132,7 @@ fn parse_play_source_with_origins(
       None =>
         match parsed.bpm() {
           Some(value) => value
-          None => 60.0
+          None => DEFAULT_BPM
         }
     }
     if admission is Some(admission) {
@@ -159,6 +163,6 @@ fn parse_play_source_with_origins(
         doc
       }
     }
-    Ok({ body: Pattern(doc), bpm: authored_bpm.unwrap_or(60.0), })
+    Ok({ body: Pattern(doc), bpm: authored_bpm.unwrap_or(DEFAULT_BPM), })
   }
 }

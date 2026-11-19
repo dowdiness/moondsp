@@ -101,9 +101,9 @@
         <details class="help-basics">
           <summary>Playback &amp; updates</summary>
           <p>Play starts or resumes the accepted score; Pause freezes it. Restart applies the editor's score from the beginning. Use Ctrl/⌘+Enter for Play/Pause and Ctrl/⌘+Shift+Enter for Restart.</p>
-          <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged. Author tempo with <code>bpm(90);</code>; omitted tempo is 60 BPM.</p>
+          <p>Updates take effect at each material's next entry. Pending changes wait while the current phrase finishes. Invalid code leaves Current song unchanged. Author tempo with <code>bpm(90);</code>; omitted tempo is 120 BPM, with four beats per cycle.</p>
           <p>Triggered notes, their source, and named references stay highlighted until the next note starts. Simultaneous notes light together; rests keep the previous highlight. Pause clears it. This shows the latest note starts, not note duration or proof that every edit has taken effect. After a notation edit, unchanged code atoms may stay highlighted even when the drawing cannot identify the older events.</p>
-          <p>Playback details counts cycles, not bars or seconds. Parts can have different cycle lengths. Accepted edits switch at each part's entry, not all at once.</p>
+          <p>Playback details counts cycles; each cycle is one four-beat bar, not a fixed number of seconds. Parts can have different cycle lengths. Accepted edits switch at each part's entry, not all at once.</p>
         </details>
         <h2>Listen to an idea</h2>
         <p class="cheat-note">Examples replace your score; Undo restores it. While paused, Play resumes the accepted score. Restart plays your new score from the beginning.</p>

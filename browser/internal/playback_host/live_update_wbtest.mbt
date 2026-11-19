@@ -32,20 +32,20 @@ test "mode and cycle status follow transport without sample-rate approximation" 
 ///|
 test "finite Ended status reports the accepted song endpoint" {
   assert_true(init_scheduler_graph_for_test())
-  let first = "song(section(\"a\",1/100,note(\"60\")),part(\"a1\",\"a\"))"
+  let first = "song(section(\"a\",1/200,note(\"60\")),part(\"a1\",\"a\"))"
   assert_eq(submit_for_test(first), 0)
   render_for_test(4)
   assert_eq(player_state(), 4)
   assert_true(player_mode() is Song)
-  assert_eq(scheduler_cycle_position(), 0.01)
+  assert_eq(scheduler_cycle_position(), 0.005)
   assert_eq(submit_for_test("silence()", restart=false), 0)
   assert_eq(player_state(), 4)
   assert_true(player_mode() is Pattern)
-  assert_eq(scheduler_cycle_position(), 0.01)
-  let second = "song(section(\"a\",1/50,note(\"72\")),part(\"a1\",\"a\"))"
+  assert_eq(scheduler_cycle_position(), 0.005)
+  let second = "song(section(\"a\",1/100,note(\"72\")),part(\"a1\",\"a\"))"
   assert_eq(submit_for_test(second, restart=false), 0)
   assert_eq(player_state(), 4)
-  assert_eq(scheduler_cycle_position(), 0.01)
+  assert_eq(scheduler_cycle_position(), 0.005)
 }
 
 ///|
@@ -86,7 +86,7 @@ test "invalid update preserves the last accepted material reservation" {
   assert_eq(player_pending_count(), 1)
   assert_eq(player.val.unwrap().view().source, Some(next))
   assert_position(128)
-  render_for_test(373)
+  render_for_test(748)
   assert_eq(output_energy(), 0.0)
   render_for_test(2)
   assert_true(output_energy() > 0.01)
@@ -181,14 +181,14 @@ test "source tempo commits at unchanged musical position" {
   render_for_test(1)
   assert_eq(
     player.val.unwrap().scheduler.current_block().unwrap().logical_arc.begin,
-    @pattern.Rational(512L * 120L + 128L * 90L, 2880000L),
+    @pattern.Rational(512L * 120L + 128L * 90L, 11520000L),
   )
 }
 
 ///|
 test "Ended Update leaves tails and position while Play uses newest song" {
   assert_true(init_scheduler_graph_for_test())
-  let finite = "song(section(\"a\",1/100,note(\"60\").release(1).room(1)),part(\"a1\",\"a\"))"
+  let finite = "song(section(\"a\",1/200,note(\"60\").release(1).room(1)),part(\"a1\",\"a\"))"
   assert_eq(submit_for_test(finite), 0)
   render_for_test(4)
   assert_eq(player_state(), 4)
@@ -242,7 +242,7 @@ test "workload rejection preserves the accepted song voices and all clocks" {
   ]
   for source in rejected {
     assert_eq(submit_for_test(source, restart=false), 1)
-    assert_tempo(60.0)
+    assert_tempo(120.0)
     assert_position(128)
     assert_eq(player.val.unwrap().view().source, Some(HELD_NOTE))
   }
@@ -300,11 +300,11 @@ test "unrepresentable finite endpoints reject before publication or restart" {
   render_for_test(8)
   assert_eq(submit_for_test(invalid), 1)
   assert_position(1024)
-  assert_tempo(60.0)
+  assert_tempo(120.0)
   assert_eq(player.val.unwrap().view().source, Some(HELD_NOTE))
   render_for_test(1)
   assert_true(output_energy() > 0.01)
-  let finite = "song(section(\"a\",1/1000,silence()),part(\"p\",\"a\"))"
+  let finite = "song(section(\"a\",1/2000,silence()),part(\"p\",\"a\"))"
   assert_eq(submit_for_test(finite), 0)
   render_for_test(2)
   assert_eq(player_state(), 4)
@@ -321,7 +321,7 @@ test "repeat admission rejects sub-block cycles without replacing music" {
   let too_short = "bpm(1000); song(section(\"a\",1/100000,silence()),part(\"p\",\"a\")).repeat()"
   assert_eq(submit_for_test(too_short), 1)
   assert_position(1024)
-  assert_tempo(60.0)
+  assert_tempo(120.0)
   assert_eq(player.val.unwrap().view().source, Some(HELD_NOTE))
   render_for_test(1)
   assert_true(output_energy() > 0.01)
@@ -330,14 +330,14 @@ test "repeat admission rejects sub-block cycles without replacing music" {
 ///|
 test "one-block repeat is valid but faster source and demo tempos reject" {
   assert_true(init_scheduler_graph_for_test())
-  let body = "song(section(\"a\",1/375,note(\"60\")),part(\"p\",\"a\")).repeat()"
+  let body = "song(section(\"a\",1/750,note(\"60\")),part(\"p\",\"a\")).repeat()"
   assert_eq(submit_for_test(body), 0)
   render_for_test(4)
   assert_eq(player_state(), 2)
   assert_position(512)
-  assert_eq(submit_for_test("bpm(60.001); " + body, restart=false), 1)
-  assert_eq(set_scheduler_bpm(60.001), 1)
-  assert_tempo(60.0)
+  assert_eq(submit_for_test("bpm(120.001); " + body, restart=false), 1)
+  assert_eq(set_scheduler_bpm(120.001), 1)
+  assert_tempo(120.0)
   assert_eq(player.val.unwrap().view().source, Some(body))
   render_for_test(4)
   assert_position(1024)

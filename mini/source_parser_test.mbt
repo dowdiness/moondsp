@@ -14,7 +14,7 @@ test "play source parses pattern and preserves previous document" {
     "// header\ns(\"sd\") // tail",
     previous=Some(first_doc),
   ).unwrap()
-  assert_eq(edited.bpm(), 60.0)
+  assert_eq(edited.bpm(), 120.0)
   match edited.body() {
     Pattern(_) => ()
     Arrangement(_, _) => fail("expected pattern")
@@ -24,7 +24,7 @@ test "play source parses pattern and preserves previous document" {
 ///|
 test "play source parses bindings and default bpm" {
   let pattern = @mini.parse_play_source("let beat = s(\"bd\"); beat").unwrap()
-  assert_eq(pattern.bpm(), 60.0)
+  assert_eq(pattern.bpm(), 120.0)
   match pattern.body() {
     Pattern(_) => ()
     Arrangement(_, _) => fail("expected pattern")

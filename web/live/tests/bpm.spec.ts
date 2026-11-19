@@ -13,6 +13,6 @@ test("paused source tempo edits are accepted without moving the transport", asyn
   await expect(page.locator("#status")).toHaveAttribute("data-tempo", "72");
   await expect(page.locator("#status")).toHaveAttribute("data-sample-position", position!);
   await replaceCode(page, 'note("60").slow(8)');
-  await expect(page.locator("#status")).toHaveAttribute("data-tempo", "60");
+  await expect(page.locator("#status")).toHaveAttribute("data-tempo", "120");
   await expect(page.locator("#status")).toHaveAttribute("data-sample-position", position!);
 });

@@ -10,6 +10,8 @@ import {
 }
 
 // Values
+pub const DEFAULT_BPM : Double = 120.0
+
 pub fn drum_midi(String) -> Int32?
 
 pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]

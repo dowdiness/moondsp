@@ -82,8 +82,8 @@ fn single_span(
 test "audio starts and releases at exact samples within a block" {
   let (sched, _, left, right) = transport_fixture()
   let pat = single_span(
-    @pattern.Rational(17L, 24000L),
-    @pattern.Rational(73L, 24000L),
+    @pattern.Rational(17L, 96000L),
+    @pattern.Rational(73L, 96000L),
   )
   sched.process_song_block(pat, left, right)
   for i in 0..<128 {
@@ -96,7 +96,7 @@ test "audio starts and releases at exact samples within a block" {
 test "fractional onset rounded across a block survives a tempo edit exactly once" {
   let (sched, _, left, right) = transport_fixture()
   let pat = single_span(
-    @pattern.Rational(255L, 48000L),
+    @pattern.Rational(255L, 192000L),
     @pattern.Rational::from_int(1),
   )
   sched.process_song_block(pat, left, right)
@@ -118,7 +118,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
   let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
   let pat = single_span(
     @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(24),
+    @pattern.Rational::from_int(6),
   )
   let physical = pool.note_on_controls({}).unwrap()
   sched
@@ -134,7 +134,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
   let before = sched.current_block().unwrap().logical_arc.begin
   sched.set_bpm(60.0).unwrap()
   assert_true(sched.current_block().unwrap().logical_arc.begin == before)
-  assert_eq(sched.sample_at(@pattern.Rational::from_int(24)).unwrap(), 1792L)
+  assert_eq(sched.sample_at(@pattern.Rational::from_int(6)).unwrap(), 1792L)
   for _ in 0..<2 {
     sched.process_song_block(pat, left, right)
   }
@@ -164,7 +164,7 @@ test "invalid tempo leaves the position and sounding note unchanged" {
   assert_true(sched.set_bpm(0.0) is Err(_))
   assert_true(sched.current_block().unwrap().logical_arc == before)
   assert_eq(sched.active_note_count(), 1)
-  assert_eq(sched.sample_at(@pattern.Rational::from_int(1)).unwrap(), 24000L)
+  assert_eq(sched.sample_at(@pattern.Rational::from_int(1)).unwrap(), 96000L)
 }
 
 ///|
@@ -185,14 +185,14 @@ test "set_tempo rejects atomically when an endpoint is unrepresentable" {
 ///|
 test "physical envelope lasts thirteen seconds across a tempo change" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
-  sched.set_bpm(60.0).unwrap()
   let control = @pattern.ControlMap::empty()
     .set("attack", 2.0)
     .set("hold", 3.0)
     .set("release", 8.0)
+  // Half a cycle at 120 BPM lasts one second.
   let song = single_span(
     @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
+    @pattern.Rational(1L, 2L),
     control=control.set("pan", -1.0),
   )
   // Levels at each second: attack reaches its peak at 2s, hold ends at 5s,
@@ -202,7 +202,7 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
   ]
   for second in 0..<14 {
     if second == 3 {
-      sched.set_bpm(120.0).unwrap()
+      sched.set_bpm(240.0).unwrap()
     }
     sched.process_song_block(song, left, right)
     assert_eq(sched.active_note_count(), if second < 4 { 1 } else { 0 })
@@ -230,10 +230,11 @@ test "without hold the event end releases an unfinished attack" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
   let song = single_span(
     @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
+    @pattern.Rational(1L, 4L),
     control=@pattern.ControlMap::empty().set("attack", 2.0).set("release", 1.0),
   )
-  // At 120 BPM the gate closes after half a second, during the attack.
+  // A quarter cycle at 120 BPM: the gate closes after half a second, during
+  // the attack.
   sched.process_song_block(song, left, right)
   assert_true(left.get(63) > 0.0)
   assert_true(left.get(127) < left.get(63))
@@ -243,12 +244,12 @@ test "without hold the event end releases an unfinished attack" {
 test "tempo sample spans preserve exact millibpm arithmetic" {
   let tempo = @scheduler.Tempo::from_bpm(120.1234).unwrap()
   let span = tempo.span_for_samples(128, sample_rate=48000.0).unwrap()
-  assert_true(span == @pattern.Rational(128L * 120123L, 2880000000L))
+  assert_true(span == @pattern.Rational(128L * 120123L, 11520000000L))
   // The exact block boundary maps back to its final sample without drift.
   assert_eq(tempo.sample_at_start(span, sample_rate=48000.0).unwrap(), 128L)
   assert_true(
     tempo.span_for_samples(128, sample_rate=128.0).unwrap() ==
-    @pattern.Rational(128L * 120123L, 128L * 60000L),
+    @pattern.Rational(128L * 120123L, 128L * 240000L),
   )
   assert_true(
     tempo.span_for_samples(0, sample_rate=48000.0).unwrap() ==

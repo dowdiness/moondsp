@@ -1,6 +1,9 @@
 ///|
-/// 60 BPM: 1 cycle = 1 second, 48 kHz, 128-sample blocks.
+/// 48 kHz, 128-sample blocks, 120 BPM: one cycle lasts two seconds.
 const BUS_RATE : Double = 48000.0
+
+///|
+const BUS_SECONDS_PER_CYCLE : Double = 2.0
 
 ///|
 const BUS_BLOCK : Int32 = 128
@@ -68,7 +71,7 @@ fn bus_brightness(
   snapshot : @pattern.PatternSnapshot[@pattern.ControlMap],
 ) -> Array[Double] raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
-  let scheduler = @scheduler.PatternScheduler(bpm=60.0, ctx~, instruments=[
+  let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.InstrumentSelector::AllEvents, bus_pool(ctx)),
   ])
   scheduler.queue_pattern_snapshot(snapshot)
@@ -76,7 +79,7 @@ fn bus_brightness(
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let mut previous = 0.0
   [
-    for _ in 0..<(2 * BUS_RATE.to_int() / BUS_BLOCK) => {
+    for _ in 0..<((2.0 * BUS_SECONDS_PER_CYCLE * BUS_RATE).to_int() / BUS_BLOCK) => {
       scheduler.render_block(left, right)
       let mut slope = 0.0
       for i in 0..<BUS_BLOCK {
@@ -91,8 +94,9 @@ fn bus_brightness(
 
 ///|
 /// Brightness over the 0.06 s (22 blocks, about 6.6 saw periods) ending at
-/// `seconds`, scaled by 1000.
-fn bus_brightness_at(blocks : Array[Double], seconds : Double) -> Double {
+/// cycle position `cycle`, scaled by 1000.
+fn bus_brightness_at(blocks : Array[Double], cycle : Double) -> Double {
+  let seconds = cycle * BUS_SECONDS_PER_CYCLE
   let end_ = (seconds * BUS_RATE / BUS_BLOCK.to_double()).to_int()
   let mut energy = 0.0
   for index in (end_ - 22)..<end_ {
@@ -119,9 +123,9 @@ test "a held voice follows a stretched lpf sweep through its bus" {
       "constant  " + row(times.map(t => bus_brightness_at(unfollowed, t))),
     ].join("\n"),
     content=(
-      #|swept     11.33 14.3 19.72 23.87 27.27
-      #|reference 11.95 14.73 20.03 24.12 27.47
-      #|constant  5.81 5.53 5.52 5.53 5.53
+      #|swept     10.85 14.52 19.88 23.99 27.37
+      #|reference 11.13 14.73 20.03 24.12 27.47
+      #|constant  5.53 5.52 5.52 5.52 5.53
     ),
   )
 }
@@ -141,7 +145,7 @@ fn bus_first_block_rms(
     @moondsp.ControlBindingBuilder().bind_voice(key="gain", param=Gain),
     max_voices=4,
   )
-  let scheduler = @scheduler.PatternScheduler(bpm=60.0, ctx~, instruments=[
+  let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.InstrumentSelector::AllEvents, pool),
   ])
   scheduler.queue_pattern_snapshot(doc.lower())

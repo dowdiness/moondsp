@@ -46,7 +46,7 @@ test("matrix arrow navigation, edit focus, and Escape return to code", async ({ 
 
 test("editing a repeated hit updates its source and clears retired playback indication", async ({ page }) => {
   await page.goto("/");
-  const source = 'bpm(120); s("[bd ~]*2").slow(4)';
+  const source = 'bpm(120); s("[bd ~]*2")';
   await replaceCode(page, source);
   await page.getByRole("button", { name: "Set Snare at source step 1", exact: true }).click();
   await expect.poll(() => readCode(page)).toBe(source.replace("bd", "sd"));

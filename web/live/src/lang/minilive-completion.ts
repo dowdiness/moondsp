@@ -17,7 +17,7 @@ import type { SyntaxNode } from "@lezer/common";
 const TOP_LEVEL: Completion[] = [
   snippetCompletion('let ${name} = ${pattern};', { label: "let", type: "keyword", detail: "define a reusable pattern" }),
   snippetCompletion('$: ${}', { label: "$:", type: "keyword", detail: "stack line" }),
-  snippetCompletion('bpm(${60});', { label: "bpm", type: "function", detail: "source tempo; default 60 BPM" }),
+  snippetCompletion('bpm(${120});', { label: "bpm", type: "function", detail: "beats per minute, 4 beats per cycle; default 120" }),
   snippetCompletion("silence()", { label: "silence", type: "function", detail: "silent pattern" }),
   snippetCompletion('song(section("${name}", ${4}, ${pattern}), part("${occurrence}", "${name}"))', { label: "song", type: "function", detail: "finite arrangement" }),
   snippetCompletion('s("${}")', { label: "s", type: "function", detail: "drum sounds" }),

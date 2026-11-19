@@ -14,7 +14,8 @@ pub extend TransportError with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 /// Exact millibeats per minute, rounded to nearest (ties upward) on input.
-/// Supported range: 0.001 through 1000 BPM.
+/// One cycle is `BEATS_PER_CYCLE` beats (a 4/4 bar), so 120 BPM plays
+/// 0.5 cycles per second. Supported range: 0.001 through 1000 BPM.
 #derive(Eq, Debug)
 pub struct Tempo {
   priv milli : Int64
@@ -41,8 +42,14 @@ pub fn Tempo::bpm(self : Tempo) -> Double {
 }
 
 ///|
+/// Beats in one pattern cycle. A four-step pattern plays quarter notes at the
+/// authored BPM without `slow(4)`.
+const BEATS_PER_CYCLE : Int64 = 4L
+
+///|
 /// One affine segment anchored at the next unrendered sample. Position ticks
-/// use sample_rate * 60000 per cycle, so edits do not accumulate denominators.
+/// use sample_rate * 60000 * BEATS_PER_CYCLE per cycle, so edits do not
+/// accumulate denominators.
 #derive(Eq, Debug)
 pub struct Clock {
   priv sample : Int64
@@ -69,7 +76,12 @@ pub fn Clock::at_start(
     sample_rate.to_int64().to_double() != sample_rate {
     return Err(InvalidSampleRate)
   }
-  Ok({ sample: 0L, ticks: 0L, scale: sample_rate.to_int64() * 60000L, tempo, })
+  Ok({
+    sample: 0L,
+    ticks: 0L,
+    scale: sample_rate.to_int64() * 60000L * BEATS_PER_CYCLE,
+    tempo,
+  })
 }
 
 ///|

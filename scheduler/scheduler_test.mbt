@@ -25,7 +25,7 @@ test "current_block exposes sample range and logical arc" {
   @debug.assert_eq(frame.sample_begin, 0L)
   @debug.assert_eq(frame.sample_end, 128L)
   assert_true(frame.logical_arc.begin == @pattern.Rational::from_int(0))
-  assert_true(frame.logical_arc.end_ == @pattern.Rational(128L, 24000L))
+  assert_true(frame.logical_arc.end_ == @pattern.Rational(128L, 96000L))
 }
 
 ///|
@@ -305,9 +305,9 @@ test "expire_notes_at: expires on performance sample boundary" {
     None => assert_true(false)
     Some(h) => {
       sched.push_active_note(0, h, @pattern.Rational::from_int(1)).unwrap()
-      sched.expire_notes_at(@scheduler.PerformanceTime(23999L))
+      sched.expire_notes_at(@scheduler.PerformanceTime(95999L))
       @debug.assert_eq(sched.active_note_count(), 1)
-      sched.expire_notes_at(@scheduler.PerformanceTime(24000L))
+      sched.expire_notes_at(@scheduler.PerformanceTime(96000L))
       @debug.assert_eq(sched.active_note_count(), 0)
     }
   }
@@ -480,7 +480,7 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
     @debug.assert_eq(right.get(i), expected_right.get(i))
   }
   // Cross the next cycle onset and the old note's release tail.
-  for _ in 0..<200 {
+  for _ in 0..<760 {
     sched.render_block(left, right)
   }
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -602,7 +602,7 @@ test "Retune preflights later voices before mutating the first voice" {
     let quick = @pattern.PatternDoc::stack(id=root, docs=[
       @pattern.PatternDoc::from_pattern(
         id=pid("mixed-templates-new"),
-        pat=@pattern.note(60.0).fast(@pattern.Rational::from_int(100)),
+        pat=@pattern.note(60.0).fast(@pattern.Rational::from_int(400)),
       ),
     ])
     s.queue_pattern_snapshot(quick.lower())
@@ -916,7 +916,7 @@ test "process_block: fast(2) triggers two voices per cycle" {
   sched.process_block(pat, left, right)
   assert_true(pool.active_voice_count() >= 1)
   let mut voices_seen = pool.active_voice_count()
-  for _i = 1; _i < 94; _i = _i + 1 {
+  for _i = 1; _i < 376; _i = _i + 1 {
     sched.process_block(pat, left, right)
     if pool.active_voice_count() > voices_seen {
       voices_seen = pool.active_voice_count()
@@ -931,7 +931,7 @@ test "process_block: gate-off fires after note ends" {
   let pat = @pattern.note(60.0)
   sched.process_block(pat, left, right)
   @debug.assert_eq(sched.active_note_count(), 1)
-  for _i = 1; _i < 190; _i = _i + 1 {
+  for _i = 1; _i < 760; _i = _i + 1 {
     sched.process_block(pat, left, right)
   }
   // After crossing cycle boundary, old note expired, new one triggered
@@ -944,17 +944,17 @@ test "process_block: gate-off is sent within the block containing the endpoint" 
   let note_pat = @pattern.note(60.0)
   let silence_pat : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(note_pat, left, right)
-  for _i = 0; _i < 187; _i = _i + 1 {
+  for _i = 0; _i < 750; _i = _i + 1 {
     sched.process_block(silence_pat, left, right)
   }
-  @debug.assert_eq(sched.sample_counter(), 24064L)
+  @debug.assert_eq(sched.sample_counter(), 96128L)
   @debug.assert_eq(sched.active_note_count(), 0)
 }
 
 ///|
 test "process_block: gate fraction ends a note before its next onset" {
   let (_, sched, left, right) = make_test_sched()
-  let pat = @pattern.note(60.0).gate(@pattern.Rational(1L, 2L))
+  let pat = @pattern.note(60.0).gate(@pattern.Rational(1L, 8L))
   let silence : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence()
   sched.process_block(pat, left, right)
   for _ in 0..<92 {
@@ -1021,7 +1021,7 @@ test "process_block: stolen voice gate-off is harmless" {
       let pat = @pattern.note(60.0).fast(@pattern.Rational::from_int(2))
       let left = @moondsp.AudioBuffer::filled(128)
       let right = @moondsp.AudioBuffer::filled(128)
-      for _i = 0; _i < 200; _i = _i + 1 {
+      for _i = 0; _i < 800; _i = _i + 1 {
         sched.process_block(pat, left, right)
       }
       assert_true(true)
@@ -1115,9 +1115,9 @@ test "process_block multi-block note expiry" {
   sched.process_block(note_pat, left, right)
   inspect(sched.active_note_count() > 0, content="true")
   // Now feed silence so no new notes are triggered.
-  // Process enough blocks to cross the cycle boundary (~188 blocks at 120 BPM)
+  // Process enough blocks to cross the cycle boundary (750 blocks at 120 BPM)
   // so the original note expires via gate-off.
-  for _i = 1; _i < 200; _i = _i + 1 {
+  for _i = 1; _i < 760; _i = _i + 1 {
     sched.process_block(silence_pat, left, right)
   }
   inspect(sched.active_note_count(), content="0")
@@ -1213,7 +1213,7 @@ test "deferred pattern replacement preserves selected voice provenance" {
     .unwrap()
   @debug.assert_eq(old_outcome.detached_note_count, 1)
   @debug.assert_eq(sched.active_note_count(), 1)
-  for _ in 0..<190 {
+  for _ in 0..<760 {
     sched.render_block(left, right)
   }
   let new_outcome = sched
@@ -1267,7 +1267,7 @@ test "deferred song replacement preserves selected layer provenance" {
     .unwrap()
   @debug.assert_eq(old_outcome.detached_note_count, 1)
   @debug.assert_eq(sched.active_note_count(), 1)
-  for _ in 0..<190 {
+  for _ in 0..<760 {
     sched.render_block(left, right)
   }
   let new_outcome = sched

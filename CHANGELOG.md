@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking tempo semantics:** BPM now counts beats with four beats per cycle
+  (one 4/4 bar), and the default source tempo is 120 BPM. A four-step pattern
+  such as `s("bd hh sd hh")` plays quarter notes without `.slow(4)`. Scores
+  written for the old cycles-per-minute tempo play four times slower; remove
+  one `.slow(4)` factor (and divide section lengths by four) to keep their
+  speed. `@mini.DEFAULT_BPM` is the single source of the default, and
+  `scheduler_bpm()` returns 0 before scheduler initialization, as documented,
+  instead of a stand-in tempo.
 - **Breaking MoonBit API:** one `PatternScheduler(bpm~, ctx~, instruments~)`
   drives every instrument pool. Each event plays on the first instrument whose
   `InstrumentSelector` matches its controls, so an event carrying both `sound`

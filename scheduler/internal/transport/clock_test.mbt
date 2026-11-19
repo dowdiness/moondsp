@@ -8,17 +8,17 @@ test "tempo edits preserve the anchor and retime only remaining distance" {
     .advance(480000)
     .unwrap()
   assert_true(
-    clock.position(clock.sample()).unwrap() == @pattern.Rational::from_int(20),
+    clock.position(clock.sample()).unwrap() == @pattern.Rational::from_int(5),
   )
   let slower = clock.with_tempo(@transport.Tempo::from_bpm(60.0).unwrap())
   assert_true(
     slower.position(slower.sample()).unwrap() ==
     clock.position(clock.sample()).unwrap(),
   )
-  assert_eq(slower.sample_at(@pattern.Rational::from_int(24)).unwrap(), 672000L)
+  assert_eq(slower.sample_at(@pattern.Rational::from_int(6)).unwrap(), 672000L)
   assert_true(
     slower.advance(96000).unwrap().position(576000L).unwrap() ==
-    @pattern.Rational::from_int(22),
+    @pattern.Rational(11L, 2L),
   )
 }
 
@@ -31,11 +31,16 @@ test "conversion rounds onsets upward and retains millibpm precision" {
   assert_eq(clock.tempo().bpm(), 120.123)
   assert_true(
     clock.position(128L).unwrap() ==
-    @pattern.Rational(128L * 120123L, 2880000000L),
+    @pattern.Rational(128L * 120123L, 11520000000L),
   )
   let clock = clock.with_tempo(@transport.Tempo::from_bpm(120.0).unwrap())
   for
-    entry in [(1L, 3L, 8000L), (1L, 7L, 3429L), (-1L, 7L, -3428L), (0L, 1L, 0L)] {
+    entry in [
+      (1L, 3L, 32000L),
+      (1L, 7L, 13715L),
+      (-1L, 7L, -13714L),
+      (0L, 1L, 0L),
+    ] {
     let (n, d, expected) = entry
     assert_eq(clock.sample_at(@pattern.Rational(n, d)).unwrap(), expected)
   }
@@ -59,7 +64,7 @@ test "many tempo edits keep exact position without denominator growth" {
   }
   let expected = @pattern.Rational(
     10000L * 128L * (120123L + 89987L),
-    2880000000L,
+    11520000000L,
   )
   assert_true(clock.position(clock.sample()).unwrap() == expected)
   assert_eq(clock.sample_at(expected).unwrap(), 2560000L)
@@ -95,11 +100,22 @@ test "fractional tempo remains queryable after eight hours" {
     clock.position(clock.sample()).unwrap(),
     clock.position(clock.sample() + 128L).unwrap(),
   )
-  assert_true(arc.duration() == @pattern.Rational(120123L, 22500000L))
+  assert_true(arc.duration() == @pattern.Rational(120123L, 90000000L))
   let events = @pattern.sequence([@pattern.note(60.0), @pattern.note(64.0)])
     .slow(@pattern.Rational::from_int(3))
     .query(arc)
   assert_eq(events.length(), 1)
   assert_eq(events[0].value.get("note"), Some(64.0))
   assert_true(events[0].part == arc)
+}
+
+///|
+test "one cycle is a four-beat bar at the authored BPM" {
+  let clock = @transport.Clock::at_start(
+    @transport.Tempo::from_bpm(120.0).unwrap(),
+    48000.0,
+  ).unwrap()
+  // 120 BPM: four beats last two seconds.
+  assert_true(clock.position(96000L).unwrap() == @pattern.Rational::from_int(1))
+  assert_eq(clock.sample_at(@pattern.Rational(1L, 4L)).unwrap(), 24000L)
 }

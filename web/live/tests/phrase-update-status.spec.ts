@@ -28,7 +28,7 @@ test("older acceptance cannot settle a newer draft; rejection scope is score-wid
 
 test("phrase feedback survives closing controls and clears only after pending material activates", async ({ page }) => {
   await page.goto("/");
-  await replaceCode(page, 'note("60").slow(8)');
+  await replaceCode(page, 'note("60").slow(4)');
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Playing");
   await page.locator(".moving-score__note-block").click();
@@ -37,7 +37,7 @@ test("phrase feedback survives closing controls and clears only after pending ma
   await expect(update).toBeVisible();
   await expect(update).toHaveAttribute("data-scope", "score");
   await page.locator("#source-toggle").click();
-  await replaceCode(page, 'note("62").slow(8)');
+  await replaceCode(page, 'note("62").slow(4)');
   await page.locator("#source-toggle").click();
   await expect(update).toBeVisible();
   await expect(update).toHaveAttribute("data-scope", "score");

@@ -133,7 +133,7 @@ for (const phrase of [
 ]) {
   test(`${phrase.expression} holds through rests until the next onset group`, async ({ page }) => {
     await page.goto("/");
-    await replaceCode(page, `bpm(120); ${phrase.expression}.slow(4).gain(.2)`);
+    await replaceCode(page, `bpm(120); ${phrase.expression}.gain(.2)`);
     await page.locator("#start").click();
     const result = await page.evaluate(() => {
       const { promise, resolve } = Promise.withResolvers<{

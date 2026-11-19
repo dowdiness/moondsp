@@ -248,9 +248,10 @@ Read errors through `get_playback_error` or its length/character pair.
 `player_pending_count` and `player_skipped_count` distinguish waiting material
 changes from finite additions that cannot enter during the current occurrence.
 
-Author `bpm(90);` in source; omission means 60 BPM. Patterns repeat, arrangements
-are finite unless suffixed with `.repeat()`. Repetition preserves release and
-effect tails. Restart clears them only after the new source has been accepted.
+Author `bpm(90);` in source; omission means 120 BPM, with four beats per
+cycle. Patterns repeat, arrangements are finite unless suffixed with
+`.repeat()`. Repetition preserves release and effect tails. Restart clears
+them only after the new source has been accepted.
 `set_scheduler_bpm` and `set_scheduler_gain` remain lower-level demo/probe controls.
 
 ## Demo and compiled export families

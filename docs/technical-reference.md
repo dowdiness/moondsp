@@ -1480,7 +1480,9 @@ The resource owner still manages AudioContext creation and shutdown separately.
 `clear_playback_input` / `push_playback_char` fill one UTF-16 input buffer.
 Both `player_update_input()` and `player_restart_input()` consume it through the
 same parser. A source may contain bindings, comments, an optional `bpm(number);`
-declaration, and either a Pattern or `song(...)`. The source default is 60 BPM.
+declaration, and either a Pattern or `song(...)`. The source default is 120 BPM.
+BPM counts beats, and one pattern cycle is four beats, so 120 BPM plays
+0.5 cycles per second.
 An arrangement may retain its embedded `bpm(...)` item, but declaring tempo
 twice is an error. Patterns repeat; arrangements end unless followed by
 `.repeat()`. `silence()` is an explicit silent Pattern.
