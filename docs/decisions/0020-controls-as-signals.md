@@ -91,29 +91,41 @@ binding's unit stays on the binding, not on the variant, because it belongs
 to the target: the browser synth converts `Note` with `MidiToHz`, the CLAP
 synth binds it linearly.
 
-### 2. An event's controls are signals, and only signals
+### 2. An event's own values and its buses are disjoint
 
-An event carries `Controls`: for each `Control` it sets, one signal over its
-own clock. A fixed value is `Const(v)`. There is no `ControlMap` payload
-beside it and no binding table into a separate bus array; the signal *is*
-the control.
+*Amended 2026-11-19, when step 3 was implemented.* The first version of this
+decision gave each event its signals directly and removed the bus table. That
+conflicts with ADR-0019 Decision 2: a compiled subtree keeps its buses in its
+own time and every enclosing node wraps the whole table once at compile time,
+which is what lets `CompiledCache` share the subtree wherever it is reused.
+Signals held by events would have to be rewrapped per event at every time
+transform on every query, or compiled top-down, which breaks that sharing.
 
-Consequences inside lowering:
+So the table stays, and the duplication is removed instead:
 
-- A leaf's values (`Pure`, `Atom`) become `Const` signals.
-- `MergeControl` composes each key as `nesting(key).signal(inner, outer)`.
-  A payload value is just another inner signal, so `BusBinding.inner`, the
-  payload cache, and `fill_bound_controls` disappear.
-- `jux` sets `Pan` to `Const(±1)`; no unbinding.
-- `FilterMap` receives the controls read at the event's onset and returns a
-  replacement. Keys it returns unchanged keep their signals; keys it changes
-  become `Const`. This is the one place a function sees values instead of
-  signals, and the rule is stated, not reconstructed from physical equality.
-- Placement and time transforms wrap signals exactly as ADR-0019 Decision 2
-  defines.
+- An event's payload holds only its **own** values, the ones its leaf
+  (`Pure`, `Atom`) or a `FilterMap`/`jux` result set. Lowering never writes a
+  bus value into it.
+- An event's bindings map a key to a bus and nothing else (`BusBinding` is
+  `(key, bus)`). They depend neither on time nor on the payload, so events of
+  one atom share them by identity.
+- A bound key's signal is `Nesting::of(key).signal(own, bus)`: the event's own
+  value is the innermost occurrence of the key, for every key. Where the
+  outer bus rests, the own value applies, for `Override` keys as for `gain`.
+- Bus values enter a payload only where controls leave lowering
+  (`project_controls`): the public `pat()`, each snapshot event, and the view
+  a `FilterMap` function receives. A reader composes the same signal from the
+  event's own values (`EventBuses.own`).
+- `FilterMap` sees the projection at the event's onset, on the child's clock.
+  Returning it unchanged keeps the own values and buses; any other result
+  becomes the event's own values and follows no bus, since a bus would undo
+  the mapping. `jux` sets its pan as an own value and unbinds the pan bus.
 
-Sharing stays structural: events of one atom share one `Controls` value, as
-they share bindings today, so query allocation per event does not grow.
+This removes `BusBinding.inner`, the payload-keyed binding cache
+(`last_payload`), the payload argument of `bind_buses`, and the write-back
+into the payload at the snapshot root (`at_root`). Projection is computed
+without building signals (`Nesting::combine`) and writes all bound keys with
+one `apply`.
 
 ### 3. Absence is a value type, not a sentinel
 
@@ -126,8 +138,9 @@ becomes a `BusValue`.
 
 ### 4. One read path at note-on and while sounding
 
-The voice receives `Controls` and reads every key at the onset for its
-note-on value. A key whose signal varies is also followed per block. The
+The voice receives the event's `Controls` (today's `EventBuses` renamed: its
+own values, bindings, and the snapshot's table) and reads every key at the
+onset for its note-on value. A key whose signal varies is also followed per block. The
 scheduler no longer builds a `Map[String, Double]` plus a `follow` list;
 `note_on_controls(controls, follow~)` becomes `note_on(controls)`.
 `EventBuses` is replaced by `Controls`; its reader returns `BusValue`.
@@ -156,6 +169,9 @@ reads it instead of hard-coding `gain`.
 | Signals in a `Map[String, BusSignal]` | Removes the duplication but keeps stringly keys and the duplicated nesting rule |
 | `Double?` for absence | Allocates per evaluation on all three backends (measured) |
 | One typed record with a field per control | Every event pays for every control; sparse keys are the common case |
+| Events hold their signals directly; no bus table (this decision's first version) | Rewraps signals per event at every time transform on every query, or compiles top-down and loses `CompiledCache` sharing (ADR-0019 Decision 2) |
+| Leaf values as `Const` buses in the table | Every child of a sequence would own buses, so renumbering runs per event for each one, and slot wrapping grows quadratically with sequence length |
+| Record each key's own value on its binding (generalized `inner`) | Keeps the binding dependent on the payload and the payload-keyed cache |
 
 ## Consequences
 
@@ -166,8 +182,10 @@ reads it instead of hard-coding `gain`.
 - Mini's grammar and the browser score format do not change; their parsers
   produce `Control` values.
 - The bus table and its renumbering (`shift_bus_bindings`,
-  `concat_child_buses` offsets) disappear, because an event refers to its
-  signals directly.
+  `concat_child_buses` offsets) stay: they are what lets a compiled subtree
+  be shared (Decision 2).
+- A projection from signals to values stays for as long as a function sees
+  values: `FilterMap`, and `Pat[ControlMap]` queries through `pat()`.
 
 ## Migration order
 
@@ -183,10 +201,15 @@ reads it instead of hard-coding `gain`.
    position (the derived hash was slower than `String`'s), and
    identical browser output hashes for ten scores
    ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
-3. `Controls` replaces payload plus bindings in lowering; delete
-   `fill_bound_controls`, `unbind_keys`, `BusBinding`.
-4. Voice and scheduler read `Controls`; delete `note_on_controls` and
-   `EventBuses`.
+3. Own values and buses are disjoint in lowering (Decision 2, as amended).
+   Done: `BusBinding.inner`, `last_payload`, and `at_root` are gone, and an
+   outer `Override` bus that rests falls back to the event's own value.
+   Against step 2, the pattern query benchmarks ran 7–17% faster and browser
+   output hashes for ten scores were identical
+   ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
+4. Voice and scheduler read an event's controls (today's `EventBuses`: own
+   values, bindings, and table) instead of a projected `Map` plus a `follow`
+   list; delete `note_on_controls`.
 5. Browser ABI exports nesting rules; the editor drops its `gain` check.
 
 Each step lands with the full test suite and the allocation audit green.
@@ -195,5 +218,5 @@ Each step lands with the full test suite and the allocation audit green.
 
 - A host needs user-defined graph parameters that the closed `Control` set
   cannot name.
-- Per-event `Controls` sharing does not hold for some combinator and query
+- Per-event binding sharing does not hold for some combinator and query
   allocation grows measurably.

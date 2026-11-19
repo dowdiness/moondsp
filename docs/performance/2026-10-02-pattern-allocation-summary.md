@@ -125,6 +125,25 @@ gain multiplication intends; `03e1a05`'s hash for the first matches the
 regression", not a speedup figure. Allocation counts and the Worklet path
 were not measured.
 
+## 2026-11-19: own values and buses kept apart (ADR-0020 step 3)
+
+Lowering stopped writing bus values into payloads; controls are projected
+only where they leave lowering, with every bound key written by one `apply`.
+Same method and orb as the step 2 entry, against `20016ea` in a separate
+worktree, three alternating rounds. The first version projected each key
+with its own `ControlMap::single` and merge and was about 4% slower on the
+first score; writing all keys at once gave:
+
+| Mini source | Before | After |
+|---|---:|---:|
+| `note("C4 E4 G4 B4").gain(0.5).lpf(1200).pan(-0.3).room(0.2)` | 10.84 ms | 9.00 ms |
+| `chord("Dm9 Bbmaj7").slow(2).lpf(saw.range(200, 4000).slow(4)).gain("1 0.6").pan(sine)` | 39.86 ms | 33.90 ms |
+| `s("hh*16").gain("1 0.4 0.7 0.4")` | 5.65 ms | 5.24 ms |
+
+Browser host output hashes over 400 blocks were identical to the step 2
+entry's for all ten scores. One shared orb; allocation counts and the
+Worklet path were not measured.
+
 ## Provenance and reproduction limits
 
 Optimization toolchain: Moon 0.1.20260920 (`914d7da`), Node 24.14.1, Python 3.14.2, Binaryen 125, WSL2 x64. Direct Moon commands used `NEW_MOON_MOD=0`.

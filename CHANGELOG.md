@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking behavior:** where an outer control rests while a note sounds,
+  the note's own value of that key applies again, for every key; before,
+  only `gain` fell back to it and other keys held their last value. Lowering
+  no longer writes bus values into event payloads (ADR-0020 step 3), so
+  pattern queries with merged controls run 7–17% faster in the benchmark
+  scores. Mini's own values are `note` and `sound`, so Mini scores sound the
+  same.
 - **Breaking behavior:** nested `gain` multiplies, as ADR-0019 decided:
   `.gain(0.5).gain(0.25)` plays at 0.125 instead of 0.25, so fading a group
   keeps the relative levels inside it. Where the outer gain rests, the inner

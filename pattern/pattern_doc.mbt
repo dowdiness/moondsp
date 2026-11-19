@@ -798,38 +798,46 @@ fn[A, O] ScopedValue::prepend(
 }
 
 ///|
-/// Give each bound key the value of its bus at the start of the event's
-/// fragment. `buses` must be on this pattern's clock; child bodies share it.
-fn[A, O] Pat::fill_bound_controls(
+/// Pair each event's payload with its projection at the start of the event's
+/// fragment (`project_controls`). `buses` must be on this pattern's clock;
+/// child bodies share it.
+fn[A, O] Pat::with_projected_controls(
   self : Pat[ScopedValue[A, O]],
   buses : Array[ControlBus[A]],
-) -> Pat[ScopedValue[A, O]] {
-  if buses.is_empty() {
-    return self
-  }
-  let body : PatBody[ScopedValue[A, O]] = match self.body {
+) -> Pat[(A, ScopedValue[A, O])] {
+  self.map_events((value, time) => {
+    (project_controls(value.value, value.bindings, buses, time), value)
+  })
+}
+
+///|
+/// The payloads as controls leave lowering, at the start of each fragment.
+fn[A, O] Pat::project_controls(
+  self : Pat[ScopedValue[A, O]],
+  buses : Array[ControlBus[A]],
+) -> Pat[A] {
+  self.map_events((value, time) => {
+    project_controls(value.value, value.bindings, buses, time)
+  })
+}
+
+///|
+/// Map each payload with its fragment's start time, keeping the pattern's
+/// shape and content.
+fn[A, B] Pat::map_events(self : Pat[A], f : (A, Rational) -> B) -> Pat[B] {
+  let body : PatBody[B] = match self.body {
     Silence => Silence
-    Opaque(children) =>
-      Opaque(children.map(child => child.fill_bound_controls(buses)))
-    Overlay(children) =>
-      Overlay(children.map(child => child.fill_bound_controls(buses)))
+    Opaque(children) => Opaque(children.map(child => child.map_events(f)))
+    Overlay(children) => Overlay(children.map(child => child.map_events(f)))
   }
   make_pat(
     fn(arc) {
       self
       .query(arc)
       .map(event => {
-        let value = event.value
-        if value.bindings.is_empty() {
-          return event
-        }
-        let filled = fill_bound_controls(
-          value.value,
-          value.bindings,
-          buses,
-          event.part.begin,
-        )
-        { ..event, value: value.remap(filled, value.scope), }
+        whole: event.whole,
+        part: event.part,
+        value: f(event.value, event.part.begin),
       })
     },
     self.metadata.period,
@@ -837,14 +845,6 @@ fn[A, O] Pat::fill_bound_controls(
     self.metadata.scope,
     self.metadata.content,
   )
-}
-
-///|
-/// This subtree as a snapshot root: bound keys carry their bus values.
-fn[A, O] CompiledPattern::at_root(
-  self : CompiledPattern[A, O],
-) -> CompiledPattern[A, O] {
-  self.transform(pat => pat.fill_bound_controls(self.buses))
 }
 
 ///|
@@ -889,18 +889,24 @@ fn[A, O] Pat::capture_source_frame(
 ///|
 fn[A, O] scoped_event(
   event : Event[ScopedValue[A, O]],
+  buses : Array[ControlBus[A]],
   table : Array[BusSignal],
 ) -> PatternSnapshotEvent[A] {
+  let value = event.value
   PatternSnapshotEvent(
-    event={ whole: event.whole, part: event.part, value: event.value.value, },
-    path=event.value.scope,
-    buses=EventBuses::in_snapshot(table, event.value.bindings),
+    event={
+      whole: event.whole,
+      part: event.part,
+      value: project_controls(
+        value.value,
+        value.bindings,
+        buses,
+        event.part.begin,
+      ),
+    },
+    path=value.scope,
+    buses=EventBuses::in_snapshot(value.value, value.bindings, buses, table),
   )
-}
-
-///|
-fn[A, O] erase_value(event : ScopedValue[A, O]) -> A {
-  event.value
 }
 
 ///|
@@ -917,16 +923,27 @@ pub struct EventWithOrigin[A] {
 ///|
 fn[A] EventWithOrigin::EventWithOrigin(
   event : Event[ScopedValue[A, EventOrigin]],
+  buses : Array[ControlBus[A]],
   table : Array[BusSignal],
 ) -> EventWithOrigin[A] {
+  let value = event.value
   {
-    event: { whole: event.whole, part: event.part, value: event.value.value, },
+    event: {
+      whole: event.whole,
+      part: event.part,
+      value: project_controls(
+        value.value,
+        value.bindings,
+        buses,
+        event.part.begin,
+      ),
+    },
     origin: event.value.origin,
     scope: event.value.scope,
     source_frame: event.value.source_frame,
     source_start: event.value.source_start,
     source_pitch: event.value.source_pitch,
-    buses: EventBuses::in_snapshot(table, event.value.bindings),
+    buses: EventBuses::in_snapshot(value.value, value.bindings, buses, table),
   }
 }
 
@@ -1284,22 +1301,27 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       .transform(pat => prepend(pat.rev()))
       .map_buses(signal => Rev(signal))
     // The map sees the child's controls with their bus values, on the
-    // child's clock. A value the map replaces no longer follows its buses:
-    // a bus would undo the mapping.
+    // child's clock. Returning them unchanged keeps the own values and their
+    // buses; a replaced value becomes the event's own values and follows no
+    // bus, since a bus would undo the mapping.
     FilterMap(child, f) => {
       let child = lower(child)
       child.transform(pat => {
         pat
-        .fill_bound_controls(child.buses)
+        .with_projected_controls(child.buses)
         .filter_map_payload(
-          value => {
-            f(value.value).map(mapped => {
-              let bindings = if physical_equal(mapped, value.value) {
-                value.bindings
+          pair => {
+            let (projected, value) = pair
+            f(projected).map(mapped => {
+              if physical_equal(mapped, projected) {
+                value.prepend(id)
               } else {
-                no_bus_bindings
+                value.remap(
+                  mapped,
+                  value.scope.prepend(id),
+                  bindings=no_bus_bindings,
+                )
               }
-              value.remap(mapped, value.scope.prepend(id), bindings~)
             })
           },
           "",
@@ -1393,7 +1415,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       for key in keys {
         let signal = compile_signal(nodes, right_id, Some(key), controls_of)
         provided.push((key, buses.length()))
-        buses.push({ key, signal, apply, })
+        buses.push({ key, signal, apply, controls_of, })
         for inner, bus in left.buses {
           if bus.key == key {
             chained[inner] = buses.length()
@@ -1401,6 +1423,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
               key,
               signal: Nesting::of(key).signal(bus.signal, signal),
               apply,
+              controls_of,
             })
           }
         }
@@ -1418,25 +1441,13 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let scope = pattern_source_path_for_opaque_children(nodes, id, [
         left_id, right_id,
       ])
-      // Only `Multiply` keys record the payload's own value in a binding.
-      let recorded = keys.filter(key => Nesting::of(key) is Multiply)
-      // Events of one atom share their bindings, so reuse the last result
-      // while the recorded payload values also match.
+      // Events of one atom share their bindings, so reuse the last result.
       let mut last_in = no_bus_bindings
-      let mut last_payload = ControlMap::empty()
-      let mut last_out = bind_buses(
-        no_bus_bindings, provided, chained, last_payload,
-      )
+      let mut last_out = bind_buses(no_bus_bindings, provided, chained)
       let pat = bind_control_kernel(left.pat, right.pat.entry_signature(), value => {
-        let payload = controls_of(value.value)
-        let mut same = physical_equal(value.bindings, last_in)
-        for key in recorded {
-          same = same && payload.get(key) == last_payload.get(key)
-        }
-        if !same {
+        if !physical_equal(value.bindings, last_in) {
           last_in = value.bindings
-          last_payload = payload
-          last_out = bind_buses(value.bindings, provided, chained, payload)
+          last_out = bind_buses(value.bindings, provided, chained)
         }
         value.remap(value.value, scope, bindings=last_out)
       })
@@ -1716,7 +1727,9 @@ pub struct PatternSnapshot[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, Unit]]
   priv entry_sourced : Array[CompiledEntry[A, Unit]]
-  priv buses : Array[BusSignal]
+  /// The root's buses, which project payloads as controls leave lowering.
+  priv buses : Array[ControlBus[A]]
+  priv table : Array[BusSignal]
 }
 
 ///|
@@ -1751,7 +1764,9 @@ pub fn[A] PatternSnapshot::query_sourced_events(
   self : PatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  self.sourced.query(arc).map(event => scoped_event(event, self.buses))
+  self.sourced
+  .query(arc)
+  .map(event => scoped_event(event, self.buses, self.table))
 }
 
 ///|
@@ -1765,7 +1780,9 @@ pub fn[A] PatternSnapshot::query_sourced_events_for_entry(
 ) -> Array[PatternSnapshotEvent[A]] {
   match self.entry_sourced.get(source_index) {
     Some(entry) =>
-      entry.source.query(arc).map(event => scoped_event(event, self.buses))
+      entry.source
+      .query(arc)
+      .map(event => scoped_event(event, self.buses, self.table))
     None => []
   }
 }
@@ -1778,7 +1795,9 @@ pub struct PatternSnapshotWithOrigins[A] {
   priv pat : Pat[A]
   priv sourced : Pat[ScopedValue[A, EventOrigin]]
   priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]
-  priv buses : Array[BusSignal]
+  /// The root's buses, which project payloads as controls leave lowering.
+  priv buses : Array[ControlBus[A]]
+  priv table : Array[BusSignal]
 }
 
 ///|
@@ -1807,7 +1826,9 @@ pub fn[A] PatternSnapshotWithOrigins::query(
   self : PatternSnapshotWithOrigins[A],
   arc : TimeSpan,
 ) -> Array[EventWithOrigin[A]] {
-  self.sourced.query(arc).map(event => EventWithOrigin(event, self.buses))
+  self.sourced
+  .query(arc)
+  .map(event => EventWithOrigin(event, self.buses, self.table))
 }
 
 ///|
@@ -1820,7 +1841,9 @@ pub fn[A] PatternSnapshotWithOrigins::query_for_entry(
   match self.entry_sourced.get(index) {
     None => []
     Some(entry) =>
-      entry.source.query(arc).map(event => EventWithOrigin(event, self.buses))
+      entry.source
+      .query(arc)
+      .map(event => EventWithOrigin(event, self.buses, self.table))
   }
 }
 
@@ -1849,6 +1872,7 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
       CompiledEntry(entry.key, entry.source.map_payload(erase_origin))
     }),
     buses: self.buses,
+    table: self.table,
   }
 }
 
@@ -1864,16 +1888,17 @@ pub fn[A] PatternDoc::lower_with_origins(
     cache.general,
     {},
     End,
-  ).at_root()
+  )
   {
     root: self.root,
     revision: self.revision,
     pat: compiled.pat
-    .map_payload(erase_value)
+    .project_controls(compiled.buses)
     .address_entries(compiled.entries.map(entry => entry.key)),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: compiled.buses.map(bus => bus.signal),
+    buses: compiled.buses,
+    table: compiled.buses.map(bus => bus.signal),
   }
 }
 
@@ -2104,16 +2129,17 @@ pub fn[A] PatternDoc::lower_with_cache(
     cache.general,
     {},
     End,
-  ).at_root()
+  )
   {
     root: self.root,
     revision: self.revision,
     pat: compiled.pat
-    .map_payload(erase_value)
+    .project_controls(compiled.buses)
     .address_entries(compiled.entries.map(entry => entry.key)),
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
-    buses: compiled.buses.map(bus => bus.signal),
+    buses: compiled.buses,
+    table: compiled.buses.map(bus => bus.signal),
   }
 }
 

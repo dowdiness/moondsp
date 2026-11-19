@@ -488,6 +488,34 @@ test "a gain in the note's own controls multiplies the merged gain" {
 }
 
 ///|
+test "an overriding key falls back to the note's own value where the outer one rests" {
+  let note = @pattern.PatternDoc::pure(
+    id=bus_id("own-pan-note"),
+    value=@pattern.ControlMap::single(Note, 60.0).set(Pan, 0.5),
+  )
+  let outer = @pattern.PatternDoc::sequence(id=bus_id("own-pan-outer"), docs=[
+    @pattern.PatternDoc::pure(
+      id=bus_id("own-pan-outer-0"),
+      value=@pattern.ControlMap::single(Pan, -1.0),
+    ),
+    @pattern.PatternDoc::silence(id=bus_id("own-pan-outer-1")),
+  ])
+  let onset = @pattern.PatternDoc::merge_control(
+      id=bus_id("own-pan"),
+      left=note,
+      right=outer,
+    )
+    .lower()
+    .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
+  let read = onset.buses().reader(Pan).unwrap()
+  // The same rule as `gain`: where the outer value rests, the inner applies.
+  @debug.assert_eq(
+    (onset.event().value.get(Pan), read(1L, 4L), read(3L, 4L)),
+    (Some(-1.0), -1.0, 0.5),
+  )
+}
+
+///|
 test "a provider that merges gain into gain multiplies them" {
   let provider = (outer : Array[Double]) => {
     @pattern.PatternDoc::merge_control(

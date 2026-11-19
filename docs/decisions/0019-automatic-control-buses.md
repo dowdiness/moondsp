@@ -67,10 +67,11 @@ bus combines with the inner one by the key's nesting rule (Decision 8):
 `gain` multiplies the two (`Product`), and every other key takes the outer
 value (`Stack`), matching `ControlMap::merge`. Where the outer provider has no
 value, either bus falls back to the inner one, so the binding never depends
-on whether the outer provider has a value at the onset. A `gain` already in
-the event's payload, with no inner bus, is recorded on the binding and
-multiplies the outer bus the same way; a provider that itself merges `gain`
-into `gain` compiles to their product. Voices that share a bus, such as the five tones of a
+on whether the outer provider has a value at the onset. The event's own
+value of a key, from its leaf, is the innermost occurrence and combines with
+the bus by the same rule; lowering never writes a bus value into the payload
+(ADR-0020 Decision 2). A provider that itself merges `gain` into `gain`
+compiles to their product. Voices that share a bus, such as the five tones of a
 chord, receive the same value, so the scheduler never needs to tell them
 apart. The time mapping from a node to the root follows one rule per
 combinator kind:

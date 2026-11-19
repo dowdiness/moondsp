@@ -7,6 +7,11 @@
 /// with every enclosing time transform applied, so it is in root time. Each
 /// event records which bus each control key reads.
 ///
+/// An event's payload holds only its own values: lowering never writes a bus
+/// value into it. A bound key reads `Nesting::of(key).signal(own, bus)`, so
+/// the event's own value is the innermost occurrence of that key. Bus values
+/// enter a payload only where controls leave lowering (`project_controls`).
+///
 /// Compiled subtrees keep their buses in their own local time, and every
 /// enclosing node wraps them with its transform, so the lowering cache can
 /// share a subtree's buses wherever the subtree is reused.
@@ -56,37 +61,51 @@ fn Nesting::signal(
 }
 
 ///|
+/// `Nesting::signal` at one time: the outer value over the inner one.
+fn Nesting::combine(
+  self : Nesting,
+  inner : BusValue,
+  outer : BusValue,
+) -> BusValue {
+  match self {
+    Override => outer.or_else(inner)
+    Multiply => inner.times(outer)
+  }
+}
+
+///|
 /// The bus one control key reads. Shared and never mutated.
 priv struct BusBinding {
   key : @control.Control
   bus : Int32
-  /// The payload's own value under a `Multiply` key that no inner bus
-  /// provides; the bus combines with it. Always `None` for `Override` keys,
-  /// whose payload value already stands wherever the bus has none.
-  inner : Double?
 }
 
 ///|
-/// Bind `key` to `bus` over `payload`, the controls the event carries before
-/// this merge. The only constructor, so `inner` follows the key's nesting.
-fn BusBinding::new(
-  key : @control.Control,
-  bus : Int32,
-  payload : ControlMap,
-) -> BusBinding {
-  let inner = match Nesting::of(key) {
-    Multiply => payload.get(key)
-    Override => None
-  }
-  { key, bus, inner, }
-}
-
-///|
-/// The signal this key reads, given its bus's signal.
-fn BusBinding::signal(self : BusBinding, bus : BusSignal) -> BusSignal {
-  match self.inner {
+/// The signal this key reads: its bus over the event's own value, if any.
+fn BusBinding::signal(
+  self : BusBinding,
+  own : ControlMap,
+  bus : BusSignal,
+) -> BusSignal {
+  match own.get(self.key) {
     Some(value) => Nesting::of(self.key).signal(BusSignal::of_value(value), bus)
     None => bus
+  }
+}
+
+///|
+/// `signal` at exact time `num / den`, without building it.
+fn BusBinding::eval(
+  self : BusBinding,
+  own : ControlMap,
+  bus : BusSignal,
+  num : Int64,
+  den : Int64,
+) -> BusValue {
+  let outer = bus.eval(num, den, false)
+  match own.get(self.key) {
+    Some(value) => Nesting::of(self.key).combine(BusValue(value), outer)
+    None => outer
   }
 }
 
@@ -108,11 +127,12 @@ fn bus_binding_for(
 
 ///|
 /// One bus of a compiled subtree: the signal one `MergeControl` gives `key`,
-/// and how that merge writes a value into the payload.
+/// and how that merge reads and writes the payload's controls.
 priv struct ControlBus[A] {
   key : @control.Control
   signal : BusSignal
   apply : (A, ControlMap) -> A
+  controls_of : (A) -> ControlMap
 }
 
 ///|
@@ -124,16 +144,15 @@ fn[A] ControlBus::map_signal(
 }
 
 ///|
-/// Bind each `(key, bus)` of `provided` over `payload`. A key already bound to
-/// an inner bus moves to the bus in `chained` that combines with that inner
-/// bus by the key's `Nesting`; a new key binds through `BusBinding::new`. The
-/// binding does not depend on time, so a sounding voice keeps the right bus
-/// across rests.
+/// Bind each `(key, bus)` of `provided`. A key already bound to an inner bus
+/// moves to the bus in `chained` that combines with that inner bus by the
+/// key's `Nesting`. The binding depends neither on time nor on the payload,
+/// so a sounding voice keeps the right bus across rests and events of one
+/// atom share their bindings.
 fn bind_buses(
   bindings : FixedArray[BusBinding],
   provided : Array[(@control.Control, Int32)],
   chained : Map[Int32, Int32],
-  payload : ControlMap,
 ) -> FixedArray[BusBinding] {
   let fresh = provided.filter(pair => bus_binding_for(bindings, pair.0) is None)
   let inner = bindings.length()
@@ -146,7 +165,7 @@ fn bind_buses(
       }
     } else {
       let (key, bus) = fresh[i - inner]
-      BusBinding::new(key, bus, payload)
+      { key, bus, }
     }
   })
 }
@@ -178,23 +197,26 @@ fn unbind_keys(
 }
 
 ///|
-/// Set each bound key of `value` to its bus at `time`. A key whose bus has no
-/// value there keeps the payload's own value.
-fn[A] fill_bound_controls(
+/// `value` as controls leave lowering: each bound key takes its signal at
+/// `time`. A key whose signal has no value there keeps the own value.
+fn[A] project_controls(
   value : A,
   bindings : FixedArray[BusBinding],
   buses : Array[ControlBus[A]],
   time : Rational,
 ) -> A {
-  let mut result = value
+  guard bindings.length() > 0 else { return value }
+  // Every bus of one snapshot reads and writes the payload the same way.
+  let { controls_of, apply, .. } = buses[bindings[0].bus]
+  let own = controls_of(value)
+  let values : Map[@control.Control, Double] = Map([])
   for binding in bindings {
-    let bus = buses[binding.bus]
-    let v = binding.signal(bus.signal).eval(time.num, time.den, false)
+    let v = binding.eval(own, buses[binding.bus].signal, time.num, time.den)
     if !v.is_absent() {
-      result = (bus.apply)(result, ControlMap::single(binding.key, v.0))
+      values[binding.key] = v.0
     }
   }
-  result
+  apply(value, { values, })
 }
 
 ///|
@@ -216,6 +238,8 @@ fn shift_bus_bindings(
 pub struct EventBuses {
   priv table : Array[BusSignal]
   priv bindings : FixedArray[BusBinding]
+  /// The event's own values, which its bound keys read under their buses.
+  priv own : ControlMap
   priv placement : Placement
 }
 
@@ -223,6 +247,7 @@ pub struct EventBuses {
 let no_event_buses : EventBuses = {
   table: [],
   bindings: no_bus_bindings,
+  own: ControlMap::empty(),
   placement: Placement(),
 }
 
@@ -233,14 +258,17 @@ pub fn EventBuses::none() -> EventBuses {
 }
 
 ///|
-fn EventBuses::in_snapshot(
-  table : Array[BusSignal],
+fn[A] EventBuses::in_snapshot(
+  value : A,
   bindings : FixedArray[BusBinding],
+  buses : Array[ControlBus[A]],
+  table : Array[BusSignal],
 ) -> EventBuses {
   if bindings.is_empty() {
     return no_event_buses
   }
-  { ..no_event_buses, table, bindings, }
+  let own = (buses[bindings[0].bus].controls_of)(value)
+  { ..no_event_buses, table, bindings, own, }
 }
 
 ///|
@@ -280,7 +308,7 @@ pub fn EventBuses::reader(
   key : @control.Control,
 ) -> ((Int64, Int64) -> Double)? {
   bus_binding_for(self.bindings, key).map(binding => {
-    let placed = self.place(binding.signal(self.table[binding.bus]))
+    let placed = self.place(binding.signal(self.own, self.table[binding.bus]))
     (num, den) => placed.eval(num, den, false).to_double()
   })
 }
@@ -293,7 +321,7 @@ pub fn EventBuses::each_reader(
   f : (@control.Control, (Int64, Int64) -> Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
-    let signal = binding.signal(self.table[binding.bus])
+    let signal = binding.signal(self.own, self.table[binding.bus])
     guard !signal.is_constant() else { continue }
     let placed = self.place(signal)
     f(binding.key, (num, den) => placed.eval(num, den, false).to_double())
