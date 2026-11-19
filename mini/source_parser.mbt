@@ -79,20 +79,15 @@ fn parse_play_source_with_origins(
   syntax_depth_limit~ : Int32? = None,
 ) -> Result[PlaySource, String] {
   guard !input.is_empty() else { return Err("empty input") }
-  if syntax_depth_limit is Some(_) {
+  // A bounded parse, by syntax depth or by playback admission, first bounds the text.
+  if syntax_depth_limit is Some(_) || query_window is Some(_) {
     check_playback_source_size(input) catch {
       ParseError(message) => return Err(message)
     }
   }
-  let admission = match query_window {
-    None => None
-    Some(window) => {
-      check_playback_source_size(input) catch {
-        ParseError(message) => return Err(message)
-      }
-      Some(PlaybackAdmission(window.span().to_double()))
-    }
-  }
+  let admission = query_window.map(window => {
+    PlaybackAdmission(window.span().to_double())
+  })
   let parser = Parser(input, admission~, syntax_depth_limit~)
   let builder = MiniDocBuilder(previous~, origins~)
   let mut authored_bpm : Double? = None

@@ -42,10 +42,13 @@ fn test_synth_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn init_scheduler_graph_for_test() -> Bool {
+fn init_scheduler_graph_for_test(
+  sample_rate~ : Double = 48000.0,
+  block_size~ : Int32 = 128,
+) -> Bool {
   init_scheduler_graph_with_templates(
-    48000.0,
-    128,
+    sample_rate,
+    block_size,
     test_drum_template(60.0),
     test_drum_template(180.0),
     test_drum_template(8000.0),
@@ -53,6 +56,25 @@ fn init_scheduler_graph_for_test() -> Bool {
     test_drum_template(6000.0),
     test_synth_template(),
   )
+}
+
+///|
+test "the player refuses at init any format its scheduler cannot run" {
+  for
+    format in [
+      (0.0, 128),
+      (-48000.0, 128),
+      (44100.5, 128),
+      (768000.0, 128),
+      (48000.0, 0),
+      (48000.0, -1),
+      (48000.0, 65537),
+    ] {
+    assert_false(
+      init_scheduler_graph_for_test(sample_rate=format.0, block_size=format.1),
+    )
+  }
+  assert_true(init_scheduler_graph_for_test())
 }
 
 ///|

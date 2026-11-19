@@ -145,10 +145,7 @@ pub fn init_scheduler_graph_with_templates(
   oh_template : Array[@moondsp.DspNode],
   synth_template : Array[@moondsp.DspNode],
 ) -> Bool {
-  if sample_rate <= 0.0 || block_size <= 0 {
-    reset_scheduler_graph()
-    return false
-  }
+  // The scheduler and its voice pools refuse any format they cannot run.
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let candidates = [
     (@scheduler.ControlEquals("sound", 36.0), make_drum_pool(bd_template, ctx)),
