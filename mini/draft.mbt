@@ -95,7 +95,6 @@ pub(all) suberror DraftEditError {
   WrongBase
   InvalidEdit(String)
   IdentityExhausted
-  Disposed
 }
 
 ///|
@@ -110,7 +109,6 @@ pub(all) enum DraftTracking {
   Pattern
   Song
   TrackingUnavailable
-  Disposed
 }
 
 ///|
@@ -124,7 +122,6 @@ pub extend DraftTracking with Debug::{to_repr}
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
-  Disposed
 }
 
 ///|
@@ -818,8 +815,6 @@ fn draft_analysis(
           "source tracking exceeds 8192 UTF-16 code units",
         ),
       )
-    Disposed =>
-      return Rejected(DraftDiagnostic(at, Disposed, "Draft is disposed"))
   }
   let source = match
     parse_play_source_with_origins(
@@ -955,7 +950,6 @@ fn Draft::edit_checked(
   self : Draft,
   tx : EditTransaction,
 ) -> DraftState raise DraftEditError {
-  guard self.mode != Disposed else { raise Disposed }
   guard tx.base == self.at else { raise WrongBase }
   let edits = draft_validate_edits(self.input, tx.edits)
   guard !edits.is_empty() else { return self.state() }
@@ -1012,7 +1006,6 @@ pub fn Draft::reset(
   self : Draft,
   input : String,
 ) -> Result[DraftState, DraftEditError] {
-  guard self.mode != Disposed else { return Err(Disposed) }
   try Draft::starting_with(input, self.query_window) catch {
     error => Err(error)
   } noraise {
@@ -1131,14 +1124,4 @@ pub fn Draft::locate_frame_fields(
   guard self.mode == Pattern || self.mode == Song else { return None }
   guard frame_epoch == self.sources.epoch.serial() else { return None }
   self.sources.frame_range(frame_serial)
-}
-
-///|
-pub fn Draft::dispose(self : Draft) -> Unit {
-  self.mode = Disposed
-  self.analysis = Rejected(
-    DraftDiagnostic(self.at, Disposed, "Draft is disposed"),
-  )
-  self.sources = SourceMap::empty(self.sources.epoch)
-  self.last_valid_doc = None
 }

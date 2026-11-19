@@ -7,5 +7,4 @@ export function player_query_window(sampleRate: number, blockSize: number, onWin
 export function check_draft_within(handle: DraftHandle, window: QueryWindowHandle): string;
 export function prepare_playback(handle: DraftHandle): string;
 export function locate_onsets(handle: DraftHandle, wire: string): string;
-export function dispose_draft(handle: DraftHandle): void;
 export function project_notation(kind: string, content: string): string;

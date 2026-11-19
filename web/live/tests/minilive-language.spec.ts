@@ -20,10 +20,8 @@ for (const [name, source] of [
 ] as const) {
   test(`source and editor agree on ${name}`, async ({ page }) => {
     const draft = new Draft(source);
-    try {
-      expect(draft.state().diagnostic).toBeNull();
-      expect(draft.prepare().source).toBe(source);
-    } finally { draft.dispose(); }
+    expect(draft.state().diagnostic).toBeNull();
+    expect(draft.prepare().source).toBe(source);
     const numbers: string[] = [];
     parser.parse(source).iterate({ enter(node) {
       if (node.name === "Number" && node.node.parent?.parent?.name === "MemberCall") numbers.push(source.slice(node.from, node.to));
@@ -44,8 +42,7 @@ for (const [name, source] of [
 test("unfinished lexical tokens never expose modifier-looking content", async ({ page }) => {
   await page.goto("/");
   for (const source of ['note("C3\n.gain(.6).lpf(1800)', '/* 🎹 ** .gain(.6) note("C3").lpf(1800)']) {
-    const draft = new Draft(source);
-    try { expect(draft.state().diagnostic).not.toBeNull(); } finally { draft.dispose(); }
+    expect(new Draft(source).state().diagnostic).not.toBeNull();
     await replaceCode(page, source);
     await expect(page.locator(".cm-inline-control")).toHaveCount(0);
   }

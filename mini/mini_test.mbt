@@ -1105,19 +1105,11 @@ test "Draft tracking limit and reset each establish fresh source epochs" {
 }
 
 ///|
-test "Draft disposal does not invalidate a separately frozen playback input" {
+test "resetting a Draft does not invalidate a separately frozen playback input" {
   let draft = @mini.Draft("note(\"60\")")
   guard draft.prepare_playback() is Ok(input) else { fail("expected input") }
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
-  draft.dispose()
-  assert_true(draft.prepare_playback() is Err(_))
-  assert_true(draft.reset("note(\"62\")") is Err(Disposed))
-  assert_true(
-    draft.edit(
-      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[]),
-    )
-    is Err(Disposed),
-  )
+  assert_true(draft.reset("note(\"62\")") is Ok(_))
   assert_true(draft.locate_origin(origin) is Unavailable(SourceReset))
   guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) else {
     fail("frozen input was invalidated")

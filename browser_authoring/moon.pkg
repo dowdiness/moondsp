@@ -19,7 +19,6 @@ options(
         "edit_draft",
         "prepare_playback",
         "locate_onsets",
-        "dispose_draft",
         "project_notation",
       ],
     },

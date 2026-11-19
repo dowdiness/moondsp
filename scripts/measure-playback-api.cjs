@@ -184,30 +184,28 @@ async function measureExactWorklet(page, order, onsetObservation = false) {
   const draft = await new Promise((resolve, reject) => authoring.create_draft(source, resolve, reject));
   const wires = { text: [], tracked: [] };
   const versions = [];
-  try {
-    for (let i = 0; i <= 40; i++) {
-      const note = i % 2 ? '61' : '60';
-      const expected = source.replace('"60 ', `"${note} `);
-      if (i > 0) {
-        const state = JSON.parse(authoring.draft_state(draft));
-        const from = source.indexOf('60');
-        const edit = JSON.parse(authoring.edit_draft(draft, JSON.stringify({
-          base: state.version, edits: [{ from, to: from + 2, inserted: note }],
-        })));
-        if (!edit.ok) throw new Error(edit.message);
-      }
-      const prepared = JSON.parse(authoring.prepare_playback(draft));
-      if (!prepared.ok) throw new Error(prepared.message);
-      const envelope = JSON.parse(prepared.input);
-      if (envelope.kind !== 'pattern' || envelope.text !== expected ||
-          !Array.isArray(envelope.version) || envelope.version[1] !== i) {
-        throw new Error('Tracked input did not preserve the expected causal edit sequence');
-      }
-      wires.tracked.push(prepared.input);
-      wires.text.push(JSON.stringify({ schema: 1, kind: 'text', text: expected }));
-      versions.push(envelope.version);
+  for (let i = 0; i <= 40; i++) {
+    const note = i % 2 ? '61' : '60';
+    const expected = source.replace('"60 ', `"${note} `);
+    if (i > 0) {
+      const state = JSON.parse(authoring.draft_state(draft));
+      const from = source.indexOf('60');
+      const edit = JSON.parse(authoring.edit_draft(draft, JSON.stringify({
+        base: state.version, edits: [{ from, to: from + 2, inserted: note }],
+      })));
+      if (!edit.ok) throw new Error(edit.message);
     }
-  } finally { authoring.dispose_draft(draft); }
+    const prepared = JSON.parse(authoring.prepare_playback(draft));
+    if (!prepared.ok) throw new Error(prepared.message);
+    const envelope = JSON.parse(prepared.input);
+    if (envelope.kind !== 'pattern' || envelope.text !== expected ||
+        !Array.isArray(envelope.version) || envelope.version[1] !== i) {
+      throw new Error('Tracked input did not preserve the expected causal edit sequence');
+    }
+    wires.tracked.push(prepared.input);
+    wires.text.push(JSON.stringify({ schema: 1, kind: 'text', text: expected }));
+    versions.push(envelope.version);
+  }
   const arms = {};
   for (const kind of order) arms[kind] = await measureWorklet(page, {
     source,

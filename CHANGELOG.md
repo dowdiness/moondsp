@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking MoonBit and browser API:** `Draft` has no disposal. `dispose`,
+  `DraftTracking::Disposed`, `DraftDiagnosticKind::Disposed`,
+  `DraftEditError::Disposed`, and `browser_authoring.dispose_draft` are gone,
+  along with the TypeScript `Draft.dispose`. A Draft is released when it is
+  dropped, and prepared `PlaybackInput` values never depended on it.
 - **Breaking tempo semantics:** BPM now counts beats with four beats per cycle
   (one 4/4 bar), and the default source tempo is 120 BPM. A four-step pattern
   such as `s("bd hh sd hh")` plays quarter notes without `.slow(4)`. Scores

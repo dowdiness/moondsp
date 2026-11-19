@@ -300,7 +300,6 @@ test "onset lookup keeps exact references but retires edited literal geometry" {
   assert_true(reference.get("from") == Some(Json::number(26.0)))
   assert_true(reference.get("to") == Some(Json::number(31.0)))
   assert_true(fields.get("notation") == Some(Json::null()))
-  draft.dispose()
 }
 
 ///|
@@ -347,6 +346,5 @@ test "negative pitch is distinct from an unpitched drum onset" {
     assert_true(notation.get("pitch") == Some(pitch))
     assert_true(fields.get("from") == Some(Json::number(from)))
     assert_true(fields.get("to") == Some(Json::number(from + 2.0)))
-    draft.dispose()
   }
 }

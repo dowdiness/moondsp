@@ -86,7 +86,6 @@ fn projection_boundary_mini_draft_snapshot(
     @core.Edit::replace(old_start, old_end, new_end),
   )
   let snapshot = projection_boundary_draft_snapshot(draft)
-  draft.dispose()
   snapshot
 }
 
@@ -565,7 +564,6 @@ fn projection_boundary_assert_recovery_matrix_row(
   )
   let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
-  draft.dispose()
   projection.dispose()
   loom_ids
 }
@@ -652,7 +650,6 @@ fn projection_boundary_assert_semantic_recovery_matrix_row(
   )
   let loom_ids = projection_boundary_leaf_ids_from_doc(loom_doc)
   projection_boundary_assert_ids_equal(row.expected_lowered_event_ids, loom_ids)
-  draft.dispose()
   projection.dispose()
   loom_ids
 }

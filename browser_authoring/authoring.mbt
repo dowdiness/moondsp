@@ -140,11 +140,6 @@ pub fn check_draft_within(
 }
 
 ///|
-pub fn dispose_draft(draft : @mini.Draft) -> Unit {
-  draft.dispose()
-}
-
-///|
 fn projection_atom_index(
   nodes : Array[Json],
   start : Int32,
@@ -338,72 +333,57 @@ fn notation_projection_json(
   let draft = @mini.Draft(source) catch {
     error => raise InvalidEdit("\{Repr(error)}")
   }
-  let result : Json = try {
-    let events = notation_projection_compile_events(
-      draft,
+  let events = notation_projection_compile_events(
+    draft,
+    span,
+    content_start,
+    content.length(),
+    nodes,
+    kind,
+    false,
+  )
+  let mut has_rests = false
+  for index, _ in nodes {
+    if notation_projection_is_rest(nodes, index) {
+      has_rests = true
+    }
+    if has_rests {
+      break
+    }
+  }
+  let rests = if kind == "note" && has_rests {
+    let rest_content = notation_projection_rest_source(content, nodes)
+    // Sounding a rest changes the admission model's event/work bound.
+    match @mini.project_notation_nodes("note", rest_content) {
+      Err(message) => raise InvalidEdit(message)
+      Ok(_) => ()
+    }
+    let rest_source = source_prefix + rest_content + "\")"
+    let rest_draft = notation_projection_temp_draft(rest_source)
+    let rest_result = notation_projection_compile_events(
+      rest_draft,
       span,
       content_start,
       content.length(),
       nodes,
       kind,
-      false,
+      true,
     )
-    let mut has_rests = false
-    for index, _ in nodes {
-      if notation_projection_is_rest(nodes, index) {
-        has_rests = true
-      }
-      if has_rests {
-        break
-      }
+    guard events.length() + rest_result.length() <= 256 else {
+      raise InvalidEdit("notation projection exceeds 256 emitted events")
     }
-    let rests = if kind == "note" && has_rests {
-      let rest_content = notation_projection_rest_source(content, nodes)
-      // Sounding a rest changes the admission model's event/work bound.
-      match @mini.project_notation_nodes("note", rest_content) {
-        Err(message) => raise InvalidEdit(message)
-        Ok(_) => ()
-      }
-      let rest_source = source_prefix + rest_content + "\")"
-      let rest_draft = notation_projection_temp_draft(rest_source)
-      let rest_result = notation_projection_compile_events(
-        rest_draft,
-        span,
-        content_start,
-        content.length(),
-        nodes,
-        kind,
-        true,
-      ) catch {
-        InvalidEdit(message) => {
-          rest_draft.dispose()
-          raise InvalidEdit(message)
-        }
-      }
-      rest_draft.dispose()
-      guard events.length() + rest_result.length() <= 256 else {
-        raise InvalidEdit("notation projection exceeds 256 emitted events")
-      }
-      rest_result
-    } else {
-      []
-    }
-    {
-      "error": Json::null(),
-      "roots": roots,
-      "nodes": Json::array(nodes),
-      "events": Json::array(events),
-      "rests": Json::array(rests),
-      "span": Json(span_value),
-    }
-  } catch {
-    InvalidEdit(message) => {
-      draft.dispose()
-      raise InvalidEdit(message)
-    }
+    rest_result
+  } else {
+    []
   }
-  draft.dispose()
-  result
+  {
+    "error": Json::null(),
+    "roots": roots,
+    "nodes": Json::array(nodes),
+    "events": Json::array(events),
+    "rests": Json::array(rests),
+    "span": Json(span_value),
+  }
 }
 
 ///|

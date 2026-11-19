@@ -1187,7 +1187,7 @@ Rest timing uses a temporary compiler probe: replace only each one-code-unit
 `~` core with `0`, reapply the production parser's query-work admission, then
 query that compiled pattern and map its origins back to original rest nodes.
 This preserves offsets, weights, nesting, repetition, and original sounded
-events without interpreting timing in JavaScript. Both drafts are disposed.
+events without interpreting timing in JavaScript. Both drafts are temporary.
 Input is bounded to 8,192 UTF-16 code units and the combined event/rest
 projection to 256 occurrences, with the existing conservative query budget
 also applying. Failure returns empty roots/nodes/events/rests and `span: 1`;

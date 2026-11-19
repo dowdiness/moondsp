@@ -45,7 +45,7 @@ surface:
 |---|---|---|
 | **Text Parsing** | `parse`, `parse_song`, `parse_song_with_bpm` | Parse string into `Pat[ControlMap]`, `Song[ControlMap]`, or `ParsedSong` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
-| **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `locate_origin`, `dispose` |
+| **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
 | **Song & Utilities** | `ParsedSong`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
@@ -232,7 +232,8 @@ let edited = match first {
 Use `Draft` rather than this stateless loop when editing needs exact source
 continuity. Its last-valid document is internal parse state, not a playback
 acceptance channel. Parsing remains whole-source; this is not token-level
-incremental parsing. Call `dispose()` when the owner is no longer needed.
+incremental parsing. A Draft needs no disposal: dropping it releases it, and
+`PlaybackInput` values prepared from it own their own source witnesses.
 
 ## Parser model
 

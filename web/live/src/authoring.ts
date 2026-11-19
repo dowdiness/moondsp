@@ -7,7 +7,6 @@ import {
   edit_draft as editDraft,
   prepare_playback as preparePlayback,
   locate_onsets as locateOnsets,
-  dispose_draft as disposeDraft,
   type DraftHandle,
 } from "./generated/authoring.js";
 
@@ -61,7 +60,6 @@ export class PlaybackInput {
 /** Main-thread ownership, independent of AudioContext and playback-run lifetime. */
 export class Draft {
   private readonly handle: DraftHandle;
-  private disposed = false;
   constructor(text: string) {
     let handle: DraftHandle | undefined;
     createDraft(text, created => { handle = created; }, message => { throw new Error(message); });
@@ -69,28 +67,23 @@ export class Draft {
     this.handle = handle;
   }
   state(): DraftState {
-    if (this.disposed) throw new Error("Draft is disposed");
     return decodeState(JSON.parse(draftState(this.handle)));
   }
   edit(transaction: Readonly<{ base: DraftVersion; edits: readonly DraftEdit[] }>): DraftState {
-    if (this.disposed) throw new Error("Draft is disposed");
     const result = JSON.parse(editDraft(this.handle, JSON.stringify(transaction)));
     if (!result.ok) throw new Error(result.message);
     return decodeState(result.state);
   }
   /** From now on, also report what a player querying over `window` would refuse, before it is asked to play. */
   checkWithin(window: PlayerWindow): DraftState {
-    if (this.disposed) throw new Error("Draft is disposed");
     return decodeState(JSON.parse(checkDraftWithin(this.handle, window.handle)));
   }
   prepare(): PlaybackInput {
-    if (this.disposed) throw new Error("Draft is disposed");
     const result = JSON.parse(preparePlayback(this.handle));
     if (!result.ok) throw new Error(result.message);
     return inputFromDraft(result.input, this.state());
   }
   locateOnsets(rows: readonly (readonly number[])[]): readonly (LocatedOnset | null)[] {
-    if (this.disposed) throw new Error("Draft is disposed");
     const result: unknown = JSON.parse(locateOnsets(this.handle, JSON.stringify(rows)));
     if (!Array.isArray(result) || result.length !== rows.length) throw new Error("Invalid playback origin lookup");
     const range = (value: unknown): boolean => {
@@ -110,10 +103,5 @@ export class Draft {
     }
     return result as (LocatedOnset | null)[];
   }
-  dispose(): void {
-    if (!this.disposed) {
-      disposeDraft(this.handle);
-      this.disposed = true;
-    }
-  }
+
 }

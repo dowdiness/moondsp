@@ -116,7 +116,6 @@ test "Draft definition edits update nested named groups without stale playback" 
       unwrap_ok(@mini.parse(inline)).query(span),
     )
   }
-  draft.dispose()
 }
 
 ///|

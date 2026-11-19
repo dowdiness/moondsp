@@ -299,7 +299,6 @@ const readinessNoticeTimer = window.setTimeout(() => {
 scope.own({ dispose: () => clearTimeout(readinessNoticeTimer) });
 
 async function prepareAuthoring(): Promise<void> {
-  let createdDraft: Draft | undefined;
   let observation: Tools["observation"] | undefined;
   try {
     const [authoring, player, controls] = await Promise.all([
@@ -309,7 +308,7 @@ async function prepareAuthoring(): Promise<void> {
     ]);
     if (disposed) return;
     // No await between reading the document and installing its edit listener.
-    const draft = createdDraft = new authoring.Draft(view.state.doc.toString());
+    const draft = new authoring.Draft(view.state.doc.toString());
     const playback = new player.Player(engine, { draft }, renderPlayback);
     observation = scope.own(mountPlaybackObservation(view, draft, engine, dom.page.document, error => {
       setLog(`Playback highlighting: ${error instanceof Error ? error.message : String(error)}`, "error");
@@ -326,9 +325,8 @@ async function prepareAuthoring(): Promise<void> {
     setAuthoring("ready");
     refreshEditorChrome();
   } catch (error) {
-    if (disposed) { createdDraft?.dispose(); return; }
+    if (disposed) return;
     observation?.dispose();
-    createdDraft?.dispose();
     tools = null;
     setAuthoring("failed");
     setLog(`Could not load score tools. Reload to try again. ${error instanceof Error ? error.message : String(error)}`, "error");

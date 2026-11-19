@@ -34,7 +34,6 @@ pub(all) suberror DraftEditError {
   WrongBase
   InvalidEdit(String)
   IdentityExhausted
-  Disposed
 }
 pub fn DraftEditError::equal(Self, Self) -> Bool
 pub fn DraftEditError::not_equal(Self, Self) -> Bool
@@ -46,7 +45,6 @@ pub struct Draft {
 }
 pub fn Draft::Draft(String) -> Self raise DraftEditError
 pub fn Draft::check_playback_within(Self, @pattern.QueryWindow) -> DraftState
-pub fn Draft::dispose(Self) -> Unit
 pub fn Draft::edit(Self, EditTransaction) -> Result[DraftState, DraftEditError]
 pub fn Draft::locate_frame_fields(Self, Int64, Int64) -> SourceRange?
 pub fn Draft::locate_origin(Self, @pattern.EventOrigin) -> OriginLocation
@@ -70,7 +68,6 @@ pub fn DraftDiagnostic::version(Self) -> DraftVersion
 pub(all) enum DraftDiagnosticKind {
   Syntax
   TrackingUnavailable
-  Disposed
 }
 pub fn DraftDiagnosticKind::equal(Self, Self) -> Bool
 pub fn DraftDiagnosticKind::not_equal(Self, Self) -> Bool
@@ -89,7 +86,6 @@ pub(all) enum DraftTracking {
   Pattern
   Song
   TrackingUnavailable
-  Disposed
 }
 pub fn DraftTracking::equal(Self, Self) -> Bool
 pub fn DraftTracking::not_equal(Self, Self) -> Bool
