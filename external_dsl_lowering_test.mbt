@@ -45,7 +45,7 @@ test "external DSL lowering contract: generated graph compiles with bindings" {
   let bindings = fixture.bindings.build(template).unwrap()
   let compiled = @moondsp.Dsp::compile_result(template, context).unwrap()
   let controls : Map[String, Double] = { "freq": 660.0, "gain": 0.25 }
-  let resolved = bindings.resolve_controls(controls)
+  let resolved = bindings.resolve_controls(key => controls.get(key))
   @debug.assert_eq(resolved.length(), 2)
   compiled.apply_controls(resolved).unwrap()
   let output = @moondsp.AudioBuffer::filled(16)

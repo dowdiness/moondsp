@@ -326,7 +326,9 @@ pub fn ClapSynthEngine::ClapSynthEngine(
   let followers = FixedArray::from_array(
     voice_buses.map(bus => {
       let id = bus.1
-      pool.follower(bus.0, (_, _) => params[id]).unwrap()
+      pool
+      .follower(bus.0, (_, _) => @moondsp.ControlValue::of(params[id]))
+      .unwrap()
     }),
   )
   {

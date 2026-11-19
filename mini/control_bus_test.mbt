@@ -82,7 +82,10 @@ fn bus_first_onset(
     Some(read) => read
     None => abort("no bus for \{key}")
   }
-  (onset.event().value.get(key), times.map(t => read(t.num, t.den)))
+  (
+    onset.event().value.get(key),
+    times.map(t => read(t.num, t.den).get().unwrap()),
+  )
 }
 
 ///|
@@ -190,7 +193,7 @@ test "a provider that is itself a merge sets the key wherever its left has an ev
     [(Some(0.3), Some(800.0)), (Some(0.6), Some(800.0))],
   )
   let read = events[1].buses().reader(Gain).unwrap()
-  @debug.assert_eq(read(3L, 4L), 0.9)
+  @debug.assert_eq(read(3L, 4L).get().unwrap(), 0.9)
 }
 
 ///|
@@ -209,7 +212,7 @@ test "held voice follows a stretched sweep through its bus" {
   let mut t = bus_r(0L, 1L)
   // The voice holds for [0, 2); after slow(2) the ramp reads t / 2.
   while t < bus_r(2L, 1L) {
-    values.push(read(t.num, t.den))
+    values.push(read(t.num, t.den).get().unwrap())
     t = t + step
   }
   @debug.assert_eq(values, [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875])
@@ -238,10 +241,14 @@ test "continuous bus signal is exact under rev and inside sequence" {
   let times = [bus_r(1L, 8L), bus_r(3L, 8L), bus_r(17L, 16L)]
   // rev mirrors within the cycle: t -> 2c + 1 - t, and the ramp reads it.
   let read = gain_reader(reversed)
-  @debug.assert_eq(times.map(t => read(t.num, t.den)), [0.875, 0.625, 0.9375])
+  @debug.assert_eq(times.map(t => read(t.num, t.den).get().unwrap()), [
+    0.875, 0.625, 0.9375,
+  ])
   // Slot 0 of 2 maps [c, c + 1/2) onto the child's [0, 1).
   let read = gain_reader(in_slot)
-  @debug.assert_eq(times.map(t => read(t.num, t.den)), [0.25, 0.75, 0.125])
+  @debug.assert_eq(times.map(t => read(t.num, t.den).get().unwrap()), [
+    0.25, 0.75, 0.125,
+  ])
 }
 
 ///|
@@ -282,7 +289,7 @@ test "cached subtree buses follow their new position after an edit" {
     .query_sourced_events(arc)
     .map(event => {
       let value = match event.buses().reader(Gain) {
-        Some(read) => read(3L, 4L)
+        Some(read) => read(3L, 4L).get().unwrap()
         None => -1.0
       }
       (event.event().value.get(Note), value)
@@ -315,7 +322,7 @@ fn mini_control_at(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 64L)),
     )[0]
   guard onset.buses().reader(key) is Some(read) else { fail("no \{key} bus") }
-  (onset.event().value.get(key), read(at.num, at.den))
+  (onset.event().value.get(key), read(at.num, at.den).get().unwrap())
 }
 
 ///|
@@ -450,7 +457,10 @@ fn bus_gain_reads(
     .lower()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   let read = onset.buses().reader(Gain).unwrap()
-  (onset.event().value.get(Gain), [read(1L, 4L), read(3L, 4L)])
+  (
+    onset.event().value.get(Gain),
+    [read(1L, 4L).get().unwrap(), read(3L, 4L).get().unwrap()],
+  )
 }
 
 ///|
@@ -510,7 +520,11 @@ test "an overriding key falls back to the note's own value where the outer one r
   let read = onset.buses().reader(Pan).unwrap()
   // The same rule as `gain`: where the outer value rests, the inner applies.
   @debug.assert_eq(
-    (onset.event().value.get(Pan), read(1L, 4L), read(3L, 4L)),
+    (
+      onset.event().value.get(Pan),
+      read(1L, 4L).get().unwrap(),
+      read(3L, 4L).get().unwrap(),
+    ),
     (Some(-1.0), -1.0, 0.5),
   )
 }
@@ -534,5 +548,24 @@ test "a provider that merges gain into gain multiplies them" {
   @debug.assert_eq(
     bus_gain_reads(bus_with("note(\"60\")", "gp-b", provider([0.25, 0.0]))),
     (Some(0.125), [0.125, 0.5]),
+  )
+}
+
+///|
+test "a voice follows only the keys whose bus varies" {
+  let snapshot = @mini.parse_snapshot("note(\"60\").lpf(1200).gain(saw)").unwrap()
+  let onset = snapshot.query_sourced_events(
+      @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 4L)),
+    )[0]
+  let controls = @pattern.Controls(onset.event().value, buses=onset.buses())
+  let followed = []
+  @control.ControlSource::each_varying(controls, (key, read) => {
+    followed.push("\{key} \{read(1L, 2L)}")
+  })
+  @debug.assert_eq(followed, ["gain 0.5"])
+  let keys : Array[@control.Control] = [Note, Lpf, Gain, Pan]
+  @debug.assert_eq(
+    keys.map(key => "\{@control.ControlSource::value(controls, key)}"),
+    ["60", "1200", "0", "absent"],
   )
 }

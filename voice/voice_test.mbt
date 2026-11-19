@@ -284,7 +284,7 @@ test "bound voice pool set_template rejection leaves prior bindings active" {
     _ => assert_true(false)
   }
   let controls : Map[@control.Control, Double] = Map([(Note, 880.0)])
-  assert_true(pool.note_on_controls(controls) is Some(_))
+  assert_true(pool.note_on(controls) is Some(_))
   assert_true(pool.active_voice_count() == 1)
 }
 
@@ -298,7 +298,7 @@ test "bound voice live control updates one active voice" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
   pool.process(ctx, before_left, before_right)
@@ -327,8 +327,8 @@ test "bound voice live control rejects stale handles" {
     ControlBindingBuilder(),
     max_voices=1,
   )
-  let stale = pool.note_on_controls({}).unwrap()
-  let current = pool.note_on_controls({}).unwrap()
+  let stale = pool.note_on(fixed([])).unwrap()
+  let current = pool.note_on(fixed([])).unwrap()
   match
     pool.apply_voice_control_result(
       stale,
@@ -351,7 +351,7 @@ test "bound voice live control invalid batch leaves voice unchanged" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
   pool.process(ctx, before_left, before_right)
@@ -385,8 +385,8 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
     ControlBindingBuilder(),
     max_voices=3,
   )
-  let first = pool.note_on_controls({}).unwrap()
-  let stale = pool.note_on_controls({}).unwrap()
+  let first = pool.note_on(fixed([])).unwrap()
+  let stale = pool.note_on(fixed([])).unwrap()
   pool.kill_result(stale).unwrap()
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -417,7 +417,7 @@ test "multi voice rejection preserves earlier targets and diagnostic order" {
     ControlBindingBuilder(),
   )
   .unwrap()
-  let second = pool.note_on_controls({}).unwrap()
+  let second = pool.note_on(fixed([])).unwrap()
   match
     @voice.apply_controls_to_voices([(pool, first), (pool, second)], [
       GraphControl::set_param(0, GraphParamSlot::Value0, 2.0),
@@ -446,7 +446,7 @@ test "bound voice live control leaves future voice template unchanged" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let first = pool.note_on_controls({}).unwrap()
+  let first = pool.note_on(fixed([])).unwrap()
   let before_left = AudioBuffer::filled(4)
   let before_right = AudioBuffer::filled(4)
   pool.process(ctx, before_left, before_right)
@@ -460,7 +460,7 @@ test "bound voice live control leaves future voice template unchanged" {
     Err(_) => assert_true(false)
   }
   assert_true(pool.kill_result(first) is Ok(_))
-  let future = pool.note_on_controls({}).unwrap()
+  let future = pool.note_on(fixed([])).unwrap()
   let future_left = AudioBuffer::filled(4)
   let future_right = AudioBuffer::filled(4)
   pool.process(ctx, future_left, future_right)
@@ -885,7 +885,7 @@ test "kill immediately idles an active voice" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   assert_true(pool.active_voice_count() == 1)
   assert_true(pool.kill_result(handle) is Ok(_))
   assert_true(pool.active_voice_count() == 0)
@@ -908,7 +908,7 @@ test "kill_result immediately idles an active voice" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   assert_true(pool.active_voice_count() == 1)
   assert_true(pool.kill_result(handle) is Ok(_))
   assert_true(pool.active_voice_count() == 0)
@@ -930,7 +930,7 @@ test "bound note_off_result transitions voice to Releasing" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   assert_true(pool.voice_state(handle) is @voice.VoiceState::Active)
   assert_true(pool.note_off_result(handle) is Ok(_))
   assert_true(pool.voice_state(handle) is @voice.VoiceState::Releasing)
@@ -946,8 +946,8 @@ test "bound note_off_result reports stale handle" {
     ControlBindingBuilder(),
     max_voices=1,
   )
-  let stale = pool.note_on_controls({}).unwrap()
-  let current = pool.note_on_controls({}).unwrap()
+  let stale = pool.note_on(fixed([])).unwrap()
+  let current = pool.note_on(fixed([])).unwrap()
   assert_invalid_voice_handle(pool.note_off_result(stale), stale)
   assert_true(pool.voice_state(current) is @voice.VoiceState::Active)
   assert_true(pool.note_off_result(stale) is Err(_))
@@ -963,7 +963,7 @@ test "bound set_voice_pan_result pans hard left" {
     ControlBindingBuilder(),
     max_voices=4,
   )
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   assert_true(pool.set_voice_pan_result(handle, -1.0) is Ok(_))
   let left = AudioBuffer::filled(4)
   let right = AudioBuffer::filled(4)
@@ -984,8 +984,8 @@ test "bound set_voice_pan_result reports stale handle" {
     ControlBindingBuilder(),
     max_voices=1,
   )
-  let stale = pool.note_on_controls({}).unwrap()
-  ignore(pool.note_on_controls({}))
+  let stale = pool.note_on(fixed([])).unwrap()
+  ignore(pool.note_on(fixed([])))
   assert_invalid_voice_handle(pool.set_voice_pan_result(stale, 0.5), stale)
   assert_true(pool.set_voice_pan_result(stale, 0.5) is Err(_))
 }
@@ -1182,14 +1182,12 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
     right.fill(0.0)
     pool.process(ctx, left, right)
   }
-  let old = pool.note_on_controls(Map([(Release, 2000.0)])).unwrap()
+  let old = pool.note_on(fixed([(Release, 2000.0)])).unwrap()
   render_second()
   let peak = left.get(127)
   assert_true(peak > 0.0)
   pool.note_off_result(old).unwrap()
-  let newer = pool
-    .note_on_controls(Map([(Attack, 2000.0), (Sustain, 0.5)]))
-    .unwrap()
+  let newer = pool.note_on(fixed([(Attack, 2000.0), (Sustain, 0.5)])).unwrap()
   render_second()
   // Old voice fades from 1 to .5 while new voice rises from 0 to .5.
   for i in 0..<128 {
@@ -1198,14 +1196,14 @@ test "per-note envelope controls preserve older voices and reset on reuse" {
   pool.note_off_result(newer).unwrap()
   render_second()
   render_second()
-  let reused = pool.note_on_controls({}).unwrap()
+  let reused = pool.note_on(fixed([])).unwrap()
   render_second()
   assert_true((left.get(0) - peak).abs() < 0.000001)
   pool.note_off_result(reused).unwrap()
   render_second()
   assert_eq(left.get(0), 0.0)
-  assert_true(pool.note_on_controls(Map([(Sustain, 2.0)])) is None)
-  assert_true(pool.note_on_controls(Map([(Release, -1.0)])) is None)
+  assert_true(pool.note_on(fixed([(Sustain, 2.0)])) is None)
+  assert_true(pool.note_on(fixed([(Release, -1.0)])) is None)
 }
 
 ///|
@@ -1239,15 +1237,20 @@ test "instrument gate follows template changes without mutating note controls" {
   let pool = @voice.BoundVoicePool(template(1000.0), ctx, bindings())
   let controls : Map[@control.Control, Double] = Map([(Hold, 2.0)])
   assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(3.0))
-  assert_true(pool.note_on_controls(controls) is Some(_))
+  assert_true(pool.note_on(controls) is Some(_))
   assert_eq(controls.length(), 1)
   assert_eq(controls.get(Hold), Some(2.0))
-  assert_eq(pool.note_gate({}), @voice.NoteGate::EventEnd)
+  assert_eq(pool.note_gate(fixed([])), @voice.NoteGate::EventEnd)
+  // `NaN` is no control value: a NaN hold is no hold, and the event gate applies.
   assert_eq(
-    pool.note_gate(Map([(Hold, -1.0)])),
+    pool.note_gate(fixed([(Hold, 0.0 / 0.0)])),
+    @voice.NoteGate::EventEnd,
+  )
+  assert_eq(
+    pool.note_gate(fixed([(Hold, -1.0)])),
     @voice.NoteGate::InvalidDuration,
   )
-  assert_true(pool.note_on_controls(Map([(Hold, -1.0)])) is None)
+  assert_true(pool.note_on(fixed([(Hold, -1.0)])) is None)
   pool.set_template(template(2000.0), bindings()).unwrap()
   assert_eq(pool.note_gate(controls), @voice.NoteGate::AfterSeconds(4.0))
   let invalid = ControlBindingBuilder().bind(
@@ -1288,11 +1291,8 @@ test "followed values reach a releasing voice and end with the voice's slot" {
     pool.process(ctx, left, right)
     left.get(3)
   }
-  // gain follows t = num / den.
-  let ramp = (num : Int64, den : Int64) => num.to_double() / den.to_double()
-  let first = pool
-    .note_on_controls(Map([(Gain, 1.0)]), follow=[(Gain, ramp)])
-    .unwrap()
+  // gain follows t = num / den (`GainRamp`).
+  let first = pool.note_on(GainRamp::{ onset: 1.0, }).unwrap()
   for _ in 0..<100 {
     ignore(level())
   }
@@ -1304,7 +1304,7 @@ test "followed values reach a releasing voice and end with the voice's slot" {
   // A quarter of the level, less the first samples of a 1 s release.
   assert_true((released / full - 0.25).abs() < 0.001)
   // Stealing the slot starts a voice without the old follower.
-  ignore(pool.note_on_controls(Map([(Gain, 1.0)])).unwrap())
+  ignore(pool.note_on(fixed([(Gain, 1.0)])).unwrap())
   for _ in 0..<100 {
     ignore(level())
   }
@@ -1326,11 +1326,11 @@ test "a follower attaches only to voices of the template it was made for" {
     bindings,
     max_voices=1,
   )
-  let half = (_ : Int64, _ : Int64) => 0.5
+  let half = (_ : Int64, _ : Int64) => @control.ControlValue::of(0.5)
   let stale = pool.follower(Gain, half).unwrap()
   assert_true(pool.follower(Lpf, half) is None)
   pool.set_template(AnalyzedGraph::analyze(nodes), bindings).unwrap()
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   assert_true(!pool.follow(handle, stale))
   assert_true(pool.follow(handle, pool.follower(Gain, half).unwrap()))
   let left = AudioBuffer::filled(4)
@@ -1342,4 +1342,32 @@ test "a follower attaches only to voices of the template it was made for" {
   right.fill(0.0)
   pool.process(ctx, left, right)
   assert_true((left.get(3) / unit - 0.5).abs() < 0.000001)
+}
+
+///|
+fn fixed(
+  pairs : Array[(@control.Control, Double)],
+) -> Map[@control.Control, Double] {
+  Map(pairs)
+}
+
+///|
+/// Gain `onset` at the onset, then t = num / den while the note sounds.
+struct GainRamp {
+  onset : Double
+}
+
+///|
+impl @control.ControlSource for GainRamp with fn value(self, key) {
+  match key {
+    Gain => @control.ControlValue::of(self.onset)
+    _ => @control.ControlValue::absent()
+  }
+}
+
+///|
+impl @control.ControlSource for GainRamp with fn each_varying(_, f) {
+  f(Gain, (num, den) => {
+    @control.ControlValue::of(num.to_double() / den.to_double())
+  })
 }

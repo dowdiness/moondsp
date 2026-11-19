@@ -520,24 +520,13 @@ test "song events read their buses on the song clock" {
     @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
   )
   @debug.assert_eq(events.length(), 1)
-  let values = []
-  events[0]
-  .buses()
-  .each_reader((key, reader) => {
-    values.push("\{key} \{reader(13L, 4L)} \{reader(17L, 5L)}")
-  })
+  let reader = events[0].buses().reader(Lpf).unwrap()
   // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
-  @debug.assert_eq(values, ["lpf 50 80"])
+  @debug.assert_eq("\{reader(13L, 4L)} \{reader(17L, 5L)}", "50 80")
   // An entry that starts the song at playback time 1 adds 1, after the rate.
   let entry = @pattern.Placement(origin=@pattern.Rational::from_int(1))
-  let placed = []
-  events[0]
-  .buses()
-  .placed(entry)
-  .each_reader((key, reader) => {
-    placed.push("\{key} \{reader(17L, 4L)} \{reader(22L, 5L)}")
-  })
-  @debug.assert_eq(placed, ["lpf 50 80"])
+  let placed = events[0].buses().placed(entry).reader(Lpf).unwrap()
+  @debug.assert_eq("\{placed(17L, 4L)} \{placed(22L, 5L)}", "50 80")
   @debug.assert_eq(
     events[0].event().placed(entry).part,
     @pattern.TimeSpan(@pattern.Rational(17L, 4L), @pattern.Rational(9L, 2L)),

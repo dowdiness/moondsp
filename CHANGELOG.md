@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed. Bundled examples and guides are rewritten in bars. `@mini.DEFAULT_BPM`
   is the single source of the default, and `scheduler_bpm()` returns 0 before
   scheduler initialization, as documented, instead of a stand-in tempo.
+- **Breaking MoonBit API:** a voice reads a note's controls through one
+  source, `@control.ControlSource` (ADR-0020 step 4).
+  `BoundVoicePool::note_on(controls)` replaces `note_on_controls(map, follow~)`:
+  it reads each key's onset value and follows every key whose value varies.
+  `note_gate` takes the same source. The scheduler passes
+  `@pattern.Controls(event.value, buses~)` and no longer copies controls into
+  a `Map` or builds a follow list; a `Map[Control, Double]` is a source of
+  fixed controls. A control value is `@control.ControlValue`
+  (re-exported as `@moondsp.ControlValue`): `EventBuses::reader` and voice
+  followers return it, so `NaN` no longer marks absence in any public API.
+  `EventBuses::each_reader` is removed. `ControlBindingMap::resolve_controls`
+  and `each_voice_value` take a lookup `(K) -> Double?` instead of a `Map`.
+- **Breaking behavior:** a `NaN` control value is no value. A note whose
+  `hold` is `NaN` keeps its event gate instead of being rejected as an
+  invalid duration, a `NaN` `attack` takes the bound default, and a `NaN`
+  graph or voice-frame value leaves the template's value in place.
 - **Breaking behavior:** where an outer control rests while a note sounds,
   the note's own value of that key applies again, for every key; before,
   only `gain` fell back to it and other keys held their last value. Lowering

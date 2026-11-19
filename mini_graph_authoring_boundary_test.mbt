@@ -127,7 +127,7 @@ fn resolve_mini_graph_controls(
       _ => graph_controls[key] = value
     }
   })
-  Ok(prepared.bindings.resolve_controls(graph_controls))
+  Ok(prepared.bindings.resolve_controls(key => graph_controls.get(key)))
 }
 
 ///|

@@ -38,10 +38,10 @@ test "bench/control_bus/per_block" (b : @bench.T) {
     .reader(Lpf)
     .unwrap()
   b.bench(name="one compiled bus signal per block", () => {
-    let mut sum = 0.0
+    let mut last = @control.ControlValue::absent()
     for arc in arcs {
-      sum += read(arc.begin.num, arc.begin.den)
+      last = read(arc.begin.num, arc.begin.den).or_else(last)
     }
-    b.keep(sum)
+    b.keep(last)
   })
 }

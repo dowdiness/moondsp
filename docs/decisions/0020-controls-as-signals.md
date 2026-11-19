@@ -1,6 +1,6 @@
 # ADR-0020: Controls are typed signals with one representation
 
-- **Status:** Accepted 2026-11-19. Migration steps 1 (`BusValue`, `BusSignal::Absent`) and 2 (`Control`, typed pool bindings) are implemented; steps 3–5 remain.
+- **Status:** Accepted 2026-11-19. Migration steps 1–4 are implemented; step 5 (browser ABI nesting rules) remains.
 - **Date:** 2026-11-19
 - **Supersedes:** in [ADR-0019](0019-automatic-control-buses.md), the event
   binding mechanism of Decision 2 and the rejected alternative "a new signal
@@ -75,7 +75,7 @@ Note | Sound | Gain | Pan | Room | Lpf | LpfResonance | Hpf | HpfResonance
 
 This is the set Mini emits (`mini/expression_syntax.mbt`) plus `Decay` and
 `Sustain`, which the voice writes itself to turn the envelope into a hold
-envelope for `hold` (`BoundVoicePool::note_on_controls`). `Control` lives in
+envelope for `hold` (`BoundVoicePool::note_on`). `Control` lives in
 its own leaf package, `control`, so `pattern` and `voice` share it without
 depending on each other. `Nesting::of(Control)` states each variant's
 nesting rule (`Gain` multiplies, the rest override) by an exhaustive match.
@@ -129,21 +129,34 @@ one `apply`.
 
 ### 3. Absence is a value type, not a sentinel
 
-`BusValue` is a single-field newtype over `Double`. Its methods own the only
-absence rules: `times` (for `Multiply`), `or_else` (for `Override` and
-`Merge` presence), and `is_absent`. `BusSignal` gains an `Absent` variant,
-so `Const` always holds a value; the `Fast` silence case and Euclid gaps
-return `Absent`. A continuous function's result is checked once where it
-becomes a `BusValue`.
+`ControlValue` (in `control`) is a single-field newtype over `Double`. Its
+methods own the only absence rules: `times` (for `Multiply`), `or_else` (for
+`Override` and `Merge` presence), `is_absent`, `get`, and `unwrap_or`, the
+non-allocating read the audio thread uses. `BusSignal` gains an `Absent`
+variant, so `Const` always holds a value; the `Fast` silence case and Euclid
+gaps return `Absent`. A continuous function's result is checked once where it
+becomes a `ControlValue`. Bus readers and voice followers return
+`ControlValue`, so no public API passes `NaN` for absence.
 
 ### 4. One read path at note-on and while sounding
 
-The voice receives the event's `Controls` (today's `EventBuses` renamed: its
-own values, bindings, and the snapshot's table) and reads every key at the
-onset for its note-on value. A key whose signal varies is also followed per block. The
-scheduler no longer builds a `Map[String, Double]` plus a `follow` list;
-`note_on_controls(controls, follow~)` becomes `note_on(controls)`.
-`EventBuses` is replaced by `Controls`; its reader returns `BusValue`.
+A voice reads a note's controls through one source, the
+`@control.ControlSource` trait: `value(key)` is the key's value at the onset,
+and `each_varying` visits each key whose value changes while the note sounds,
+with its reader. `BoundVoicePool::note_on(controls)` and `note_gate(controls)`
+take any source; `note_on` resolves graph and voice-frame bindings from the
+onset values, and the varying keys become the voice's followers. The `hold`
+envelope substitutes `Decay` and `Sustain` in its lookup instead of copying
+the controls.
+
+`@pattern.Controls` is the source for a pattern event: its payload as it
+leaves lowering, and its `EventBuses`. The payload is projected at the onset
+(`part.begin`), so a bound key's onset value is already there and the bus is
+evaluated only for keys whose signal varies. `EventBuses` stays as what an
+event carries through song and playback placement. A `Map[Control, Double]`
+is a source of fixed controls, for hosts and tests. The trait lives in
+`control` because `voice` must not depend on `pattern`; the scheduler, which
+sees both, joins them.
 
 ### 5. The engine is the only source of nesting rules
 
@@ -153,7 +166,7 @@ reads it instead of hard-coding `gain`.
 ## Evidence required before acceptance
 
 - The allocation audit (`scripts/audit-clap-audio-allocations.sh
-  --expect-zero`) stays at zero, and a probe of the final `BusValue`
+  --expect-zero`) stays at zero, and a probe of the final `ControlValue`
   evaluator shows no allocation on wasm-gc, JS, and native.
 - Block-query benchmarks for the three Mini scores in
   [the pattern performance summary](../performance/2026-10-02-pattern-allocation-summary.md)
@@ -175,10 +188,13 @@ reads it instead of hard-coding `gain`.
 
 ## Consequences
 
-- Breaking for `@pattern`, `@voice`, and `@scheduler` public APIs:
-  `ControlMap`, `EventBuses`, and string-keyed bindings are replaced. No
-  compatibility layer, as in ADR-0019.
-- ADR-0007's accessor surface becomes `Controls` accessors by `Control`.
+- Breaking for `@pattern`, `@voice`, `@graph`, and `@scheduler` public
+  APIs: string-keyed bindings, `NaN`-valued readers, and
+  `note_on_controls` are replaced. No compatibility layer, as in ADR-0019.
+- ADR-0007's accessor surface becomes `ControlMap` accessors by `Control`.
+- A voice host that is not a pattern, such as the CLAP engine, attaches
+  followers whose readers return `ControlValue`; a host with fixed controls
+  passes a `Map[Control, Double]`.
 - Mini's grammar and the browser score format do not change; their parsers
   produce `Control` values.
 - The bus table and its renumbering (`shift_bus_bindings`,
@@ -207,9 +223,14 @@ reads it instead of hard-coding `gain`.
    Against step 2, the pattern query benchmarks ran 7–17% faster and browser
    output hashes for ten scores were identical
    ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
-4. Voice and scheduler read an event's controls (today's `EventBuses`: own
-   values, bindings, and table) instead of a projected `Map` plus a `follow`
-   list; delete `note_on_controls`.
+4. Voice and scheduler read an event's controls instead of a copied `Map`
+   plus a `follow` list. Done: `note_on(controls : ControlSource)` replaces
+   `note_on_controls`, `ControlValue` moved to `control` and replaces `NaN`
+   in bus readers and followers, and graph binding resolution takes a lookup
+   instead of a `Map`. Against step 3, an isolated note-on benchmark and the
+   query benchmarks did not regress, browser output hashes for ten scores
+   were identical, and the CLAP allocation audit stayed at zero
+   ([record](../performance/2026-10-02-pattern-allocation-summary.md)).
 5. Browser ABI exports nesting rules; the editor drops its `gain` check.
 
 Each step lands with the full test suite and the allocation audit green.

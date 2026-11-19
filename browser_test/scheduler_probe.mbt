@@ -223,7 +223,7 @@ fn scheduler_probe_start_notes(
   }
   for freq in notes {
     let controls : Map[@moondsp.Control, Double] = Map([(Note, freq)])
-    if runtime.pool.note_on_controls(controls) is None {
+    if runtime.pool.note_on(controls) is None {
       scheduler_probe_last_error.val = "browser_test scheduler comparison note_on failed"
       return false
     }

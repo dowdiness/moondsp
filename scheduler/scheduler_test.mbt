@@ -277,7 +277,7 @@ test "expire_notes: removes notes past their end_time" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls(Map([(Note, 69.0)]))
+  let handle = pool.note_on(fixed([(Note, 69.0)]))
   match handle {
     None => assert_true(false)
     Some(h) => {
@@ -299,7 +299,7 @@ test "expire_notes_at: expires on performance sample boundary" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls(Map([(Note, 69.0)]))
+  let handle = pool.note_on(fixed([(Note, 69.0)]))
   match handle {
     None => assert_true(false)
     Some(h) => {
@@ -1340,7 +1340,7 @@ test "an active note of an unknown instrument is rejected" {
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
     (@scheduler.AllEvents, pool),
   ])
-  let handle = pool.note_on_controls(Map([(Note, 69.0)])).unwrap()
+  let handle = pool.note_on(fixed([(Note, 69.0)])).unwrap()
   @debug.assert_eq(
     sched.push_active_note(1, handle, @pattern.Rational::from_int(1)),
     Err(@scheduler.UnknownInstrument(1)),
@@ -1357,4 +1357,11 @@ test "an active note of an unknown instrument is rejected" {
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.render_block(left, right)
+}
+
+///|
+fn fixed(
+  pairs : Array[(@control.Control, Double)],
+) -> Map[@control.Control, Double] {
+  Map(pairs)
 }

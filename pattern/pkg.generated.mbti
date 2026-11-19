@@ -77,6 +77,12 @@ pub fn ControlMap::to_repr(Self) -> @debug.Repr
 pub fn ControlMap::to_string(Self) -> String
 pub impl Show for ControlMap
 
+pub struct Controls {
+  // private fields
+}
+pub fn Controls::Controls(ControlMap, buses~ : EventBuses) -> Self
+pub impl @control.ControlSource for Controls
+
 #derive(@debug.Debug)
 pub struct Event[A] {
   whole : TimeSpan?
@@ -93,10 +99,9 @@ pub impl[A : @debug.Debug] Show for Event[A]
 pub struct EventBuses {
   // private fields
 }
-pub fn EventBuses::each_reader(Self, (@control.Control, (Int64, Int64) -> Double) -> Unit) -> Unit
 pub fn EventBuses::none() -> Self
 pub fn EventBuses::placed(Self, Placement) -> Self
-pub fn EventBuses::reader(Self, @control.Control) -> ((Int64, Int64) -> Double)?
+pub fn EventBuses::reader(Self, @control.Control) -> ((Int64, Int64) -> @control.ControlValue)?
 
 #derive(Eq, @debug.Debug)
 pub struct EventOrigin {

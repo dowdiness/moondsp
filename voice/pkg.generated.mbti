@@ -51,15 +51,15 @@ pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@gra
 pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int32, @graph.GraphParamSlot, Double) -> Bool
 pub fn BoundVoicePool::binding(Self, @control.Control) -> @graph.ControlBinding[@control.Control]?
 pub fn BoundVoicePool::follow(Self, VoiceHandle, VoiceFollower) -> Bool
-pub fn BoundVoicePool::follower(Self, @control.Control, (Int64, Int64) -> Double) -> VoiceFollower?
+pub fn BoundVoicePool::follower(Self, @control.Control, (Int64, Int64) -> @control.ControlValue) -> VoiceFollower?
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int32
-pub fn BoundVoicePool::note_gate(Self, Map[@control.Control, Double]) -> NoteGate
+pub fn[C : @control.ControlSource] BoundVoicePool::note_gate(Self, C) -> NoteGate
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
 pub fn BoundVoicePool::note_off_bool(Self, VoiceHandle) -> Bool
 pub fn BoundVoicePool::note_off_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
-pub fn BoundVoicePool::note_on_controls(Self, Map[@control.Control, Double], follow? : Array[(@control.Control, (Int64, Int64) -> Double)]) -> VoiceHandle?
+pub fn[C : @control.ControlSource] BoundVoicePool::note_on(Self, C) -> VoiceHandle?
 pub fn BoundVoicePool::note_on_graph_controls(Self, Array[@graph.GraphControl]) -> VoiceHandle?
 pub fn BoundVoicePool::note_on_prevalidated_params4_id(Self, Int32, @graph.GraphParamSlot, Double, Int32, @graph.GraphParamSlot, Double, Int32, @graph.GraphParamSlot, Double, Int32, @graph.GraphParamSlot, Double, Double) -> Int64
 pub fn BoundVoicePool::process(Self, @dsp.DspContext, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit

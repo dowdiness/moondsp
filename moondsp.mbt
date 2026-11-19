@@ -69,8 +69,9 @@ pub using @dsp {
 pub using @identity {type GraphNodeId, type Revision, type StableIdError}
 
 ///|
-// Re-export control/ package — the closed set of controls voice pools bind.
-pub using @control {type Control}
+// Re-export control/ package — the closed set of controls voice pools bind,
+// and the value a voice follower reads.
+pub using @control {type Control, type ControlValue}
 
 ///|
 // Re-export graph/ package — compiled graph runtime, topology editing, etc.

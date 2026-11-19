@@ -210,18 +210,18 @@ pub fn[K : Eq + Hash] ControlBindingBuilder::build(
 ///|
 /// Convert score controls to graph controls using the validated bindings.
 /// Emits GraphControl::set_param, in target units, for each graph-bound key
-/// found in the input map, in binding insertion order. Missing keys are
+/// `value_of` gives a value, in binding insertion order. Missing keys are
 /// skipped; unrecognized keys and voice-frame keys are ignored. Values are
 /// passed through without domain validation.
-pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(
+pub fn[K] ControlBindingMap::resolve_controls(
   self : ControlBindingMap[K],
-  controls : Map[K, Double],
+  value_of : (K) -> Double?,
 ) -> Array[@model.GraphControl] {
   let result : Array[@model.GraphControl] = []
   result.reserve_capacity(self.bindings.length())
   for i in 0..<self.bindings.length() {
     let binding = self.bindings[i]
-    match (binding.target, controls.get(binding.key)) {
+    match (binding.target, value_of(binding.key)) {
       (Graph(node_index, slot), Some(value)) =>
         result.push(
           @model.GraphControl::set_param(
@@ -237,14 +237,14 @@ pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(
 }
 
 ///|
-/// Visit each voice-frame-bound key found in `controls`, in binding order.
-pub fn[K : Eq + Hash] ControlBindingMap::each_voice_value(
+/// Visit each voice-frame-bound key `value_of` gives a value, in binding order.
+pub fn[K] ControlBindingMap::each_voice_value(
   self : ControlBindingMap[K],
-  controls : Map[K, Double],
+  value_of : (K) -> Double?,
   f : (VoiceParam, Double) -> Unit,
 ) -> Unit {
   for binding in self.bindings {
-    match (binding.target, controls.get(binding.key)) {
+    match (binding.target, value_of(binding.key)) {
       (Voice(param), Some(value)) => f(param, value)
       _ => ()
     }

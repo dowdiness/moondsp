@@ -64,9 +64,9 @@ fn Nesting::signal(
 /// `Nesting::signal` at one time: the outer value over the inner one.
 fn Nesting::combine(
   self : Nesting,
-  inner : BusValue,
-  outer : BusValue,
-) -> BusValue {
+  inner : @control.ControlValue,
+  outer : @control.ControlValue,
+) -> @control.ControlValue {
   match self {
     Override => outer.or_else(inner)
     Multiply => inner.times(outer)
@@ -101,10 +101,11 @@ fn BusBinding::eval(
   bus : BusSignal,
   num : Int64,
   den : Int64,
-) -> BusValue {
+) -> @control.ControlValue {
   let outer = bus.eval(num, den, false)
   match own.get(self.key) {
-    Some(value) => Nesting::of(self.key).combine(BusValue(value), outer)
+    Some(value) =>
+      Nesting::of(self.key).combine(@control.ControlValue::of(value), outer)
     None => outer
   }
 }
@@ -212,8 +213,8 @@ fn[A] project_controls(
   let values : Map[@control.Control, Double] = Map([])
   for binding in bindings {
     let v = binding.eval(own, buses[binding.bus].signal, time.num, time.den)
-    if !v.is_absent() {
-      values[binding.key] = v.0
+    if v.get() is Some(value) {
+      values[binding.key] = value
     }
   }
   apply(value, { values, })
@@ -301,74 +302,51 @@ fn EventBuses::place(self : EventBuses, signal : BusSignal) -> BusSignal {
 
 ///|
 /// The bus `key` follows, read at exact time `num / den` (`den > 0`) on this
-/// event's clock; `NaN` where the control has no value. Reading allocates
-/// nothing. `None` when `key` follows no bus.
+/// event's clock. Reading allocates nothing. `None` when `key` follows no bus.
 pub fn EventBuses::reader(
   self : EventBuses,
   key : @control.Control,
-) -> ((Int64, Int64) -> Double)? {
+) -> ((Int64, Int64) -> @control.ControlValue)? {
   bus_binding_for(self.bindings, key).map(binding => {
     let placed = self.place(binding.signal(self.own, self.table[binding.bus]))
-    (num, den) => placed.eval(num, den, false).to_double()
+    (num, den) => placed.eval(num, den, false)
   })
 }
 
 ///|
-/// Visit each bound key whose bus changes over time, with its reader. A
-/// constant bus needs no reader: the value set at note-on already holds.
-pub fn EventBuses::each_reader(
-  self : EventBuses,
-  f : (@control.Control, (Int64, Int64) -> Double) -> Unit,
-) -> Unit {
-  for binding in self.bindings {
-    let signal = binding.signal(self.own, self.table[binding.bus])
+/// An event's controls as a voice reads them: its values at the onset, and
+/// the buses its bound keys follow while it sounds.
+pub struct Controls {
+  /// Projected at the onset, so a bound key already holds its bus value.
+  priv values : ControlMap
+  priv buses : EventBuses
+}
+
+///|
+/// `values` must be the event's payload as it leaves lowering, and `buses`
+/// the buses of the same event.
+pub fn Controls::Controls(values : ControlMap, buses~ : EventBuses) -> Controls {
+  { values, buses, }
+}
+
+///|
+pub impl @control.ControlSource for Controls with fn value(self, key) {
+  match self.values.get(key) {
+    Some(value) => @control.ControlValue::of(value)
+    None => @control.ControlValue::absent()
+  }
+}
+
+///|
+/// A constant bus has no reader: the onset value already holds.
+pub impl @control.ControlSource for Controls with fn each_varying(self, f) {
+  let buses = self.buses
+  for binding in buses.bindings {
+    let signal = binding.signal(buses.own, buses.table[binding.bus])
     guard !signal.is_constant() else { continue }
-    let placed = self.place(signal)
-    f(binding.key, (num, den) => placed.eval(num, den, false).to_double())
+    let placed = buses.place(signal)
+    f(binding.key, (num, den) => placed.eval(num, den, false))
   }
-}
-
-///|
-/// A control's value at one time, or its absence there. A single-field type,
-/// so evaluating a signal allocates nothing on any backend; its methods are
-/// the only code that knows how absence is represented.
-priv struct BusValue(Double)
-
-///|
-let absent : BusValue = BusValue(@double.not_a_number)
-
-///|
-fn BusValue::is_absent(self : BusValue) -> Bool {
-  self.0.is_nan()
-}
-
-///|
-/// This value, or `fallback` where this one is absent.
-fn BusValue::or_else(self : BusValue, fallback : BusValue) -> BusValue {
-  if self.is_absent() {
-    fallback
-  } else {
-    self
-  }
-}
-
-///|
-/// The product where both are present, else whichever is present.
-fn BusValue::times(self : BusValue, other : BusValue) -> BusValue {
-  if self.is_absent() {
-    other
-  } else if other.is_absent() {
-    self
-  } else {
-    BusValue(self.0 * other.0)
-  }
-}
-
-///|
-/// The public reading of a bus: `NaN` where the control has no value
-/// (`EventBuses::reader`).
-fn BusValue::to_double(self : BusValue) -> Double {
-  self.0
 }
 
 ///|
@@ -436,15 +414,18 @@ fn BusSignal::eval(
   num : Int64,
   den : Int64,
   left : Bool,
-) -> BusValue {
+) -> @control.ControlValue {
   match self {
-    Absent => absent
-    Const(value) => BusValue(value)
-    Continuous(f) => BusValue(f(num.to_double() / den.to_double()))
+    Absent => @control.ControlValue::absent()
+    Const(value) => @control.ControlValue::of(value)
+    Continuous(f) =>
+      @control.ControlValue::of(f(num.to_double() / den.to_double()))
     Fast(fnum, fden, child) => {
       // A non-positive factor silences the pattern (`Pat::fast`/`slow`), so
       // the bus has no value; it must not divide by a zero denominator.
-      guard fnum > 0L && fden > 0L else { return absent }
+      guard fnum > 0L && fden > 0L else {
+        return @control.ControlValue::absent()
+      }
       let n = num * fnum
       let d = den * fden
       let g = bus_gcd(n, d)
@@ -493,7 +474,7 @@ fn BusSignal::eval(
       }
     }
     Stack(children) => {
-      let mut value = absent
+      let mut value = @control.ControlValue::absent()
       for child in children {
         value = child.eval(num, den, left).or_else(value)
       }
@@ -503,7 +484,7 @@ fn BusSignal::eval(
       inner.eval(num, den, left).times(outer.eval(num, den, left))
     Merge(presence, left_signal, right_signal) => {
       if presence.eval(num, den, left).is_absent() {
-        return absent
+        return @control.ControlValue::absent()
       }
       right_signal
       .eval(num, den, left)
@@ -523,7 +504,7 @@ fn BusSignal::is_constant(self : BusSignal) -> Bool {
 
 ///|
 fn BusSignal::of_value(value : Double) -> BusSignal {
-  if BusValue(value).is_absent() {
+  if @control.ControlValue::of(value).is_absent() {
     Absent
   } else {
     Const(value)

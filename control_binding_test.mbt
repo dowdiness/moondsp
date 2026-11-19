@@ -120,7 +120,7 @@ test "resolve: all present keys converted in binding insertion order" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "note": 60.0, "gain": 0.5 }
-  let result = map.resolve_controls(controls)
+  let result = map.resolve_controls(key => controls.get(key))
   @debug.assert_eq(result.length(), 2)
   @debug.assert_eq(result[0].node_index(), 0)
   @debug.assert_eq(result[0].slot(), @moondsp.GraphParamSlot::Value0)
@@ -143,7 +143,7 @@ test "resolve: partial map skips missing keys" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "gain": 0.8 }
-  let result = map.resolve_controls(controls)
+  let result = map.resolve_controls(key => controls.get(key))
   @debug.assert_eq(result.length(), 1)
   @debug.assert_eq(result[0].node_index(), 1)
   @debug.assert_eq(result[0].value(), 0.8)
@@ -157,7 +157,7 @@ test "resolve: extra keys in map are ignored" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "freq": 220.0, "unknown": 99.0 }
-  let result = map.resolve_controls(controls)
+  let result = map.resolve_controls(key => controls.get(key))
   @debug.assert_eq(result.length(), 1)
   @debug.assert_eq(result[0].value(), 220.0)
 }
@@ -170,7 +170,7 @@ test "resolve: empty map produces empty controls" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = Map([])
-  let result = map.resolve_controls(controls)
+  let result = map.resolve_controls(key => controls.get(key))
   @debug.assert_eq(result.length(), 0)
 }
 
@@ -181,7 +181,7 @@ test "resolve: empty binding map produces empty controls" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "freq": 440.0 }
-  let result = map.resolve_controls(controls)
+  let result = map.resolve_controls(key => controls.get(key))
   @debug.assert_eq(result.length(), 0)
 }
 
@@ -204,7 +204,7 @@ test "integration: resolved controls accepted by VoicePool::note_on" {
     .build(@moondsp.AnalyzedGraph::analyze(template))
     .unwrap()
   let controls : Map[String, Double] = { "note": 880.0, "gain": 0.5 }
-  let resolved = bindings.resolve_controls(controls)
+  let resolved = bindings.resolve_controls(key => controls.get(key))
   let handle = pool.note_on(resolved)
   assert_true(handle is Some(_))
   assert_true(pool.voice_state(handle.unwrap()) is @moondsp.VoiceState::Active)
@@ -410,11 +410,8 @@ test "bindings convert score units and route voice-frame keys" {
       ]),
     )
     .unwrap()
-  let result = map.resolve_controls({
-    "note": 60.0,
-    "attack": 0.25,
-    "pan": -1.0,
-  })
+  let controls = { "note": 60.0, "attack": 0.25, "pan": -1.0 }
+  let result = map.resolve_controls(key => controls.get(key))
   // Voice-frame keys never become graph controls.
   @debug.assert_eq(result.length(), 2)
   // 440 × 2^((60 − 69) / 12)
@@ -425,7 +422,8 @@ test "bindings convert score units and route voice-frame keys" {
   @debug.assert_eq(map.default_value("attack"), Some(0.005))
   @debug.assert_eq(map.default_value("pan"), Some(0.0))
   let voice = []
-  map.each_voice_value({ "note": 60.0, "pan": -1.0 }, (param, value) => {
+  let controls = { "note": 60.0, "pan": -1.0 }
+  map.each_voice_value(key => controls.get(key), (param, value) => {
     voice.push((param, value))
   })
   @debug.assert_eq(voice, [(@moondsp.VoiceParam::Pan, -1.0)])

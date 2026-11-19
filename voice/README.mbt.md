@@ -36,7 +36,7 @@ compiled DSP graph execution:
 | Category | Types | Key operations |
 |---|---|---|
 | **Voice Pools** | `VoicePool`, `BoundVoicePool` | `VoicePool(...)`, `BoundVoicePool(...)`, `BoundVoicePool::set_template`, `VoicePool::process`, `BoundVoicePool::process_with_send` |
-| **Note Lifecycle** | `VoiceHandle`, `VoiceState`, `NoteGate` | `VoicePool::note_on`, `BoundVoicePool::note_on_controls`, `BoundVoicePool::note_on_graph_controls`, `VoicePool::note_off_result`, `BoundVoicePool::kill_result`, `BoundVoicePool::note_gate` |
+| **Note Lifecycle** | `VoiceHandle`, `VoiceState`, `NoteGate` | `VoicePool::note_on`, `BoundVoicePool::note_on`, `BoundVoicePool::note_on_graph_controls`, `VoicePool::note_off_result`, `BoundVoicePool::kill_result`, `BoundVoicePool::note_gate` |
 | **Voice Control & Pan** | `BoundVoicePool`, `VoicePool` | `VoicePool::set_voice_pan_result`, `BoundVoicePool::set_voice_send_result`, `BoundVoicePool::apply_voice_control_result`, `BoundVoicePool::apply_voice_controls_result` |
 | **Inspection & Safety** | `BoundVoicePool`, `VoicePool` | `VoicePool::active_voice_count`, `VoicePool::voice_state`, `VoicePool::last_sanitized_count` |
 | **Errors** | `VoicePoolError`, `BoundVoicePoolError`, `VoiceControlError` | Rejection reporting for invalid max voices, orphan ADSR envelopes, compile failures, or stale `VoiceHandle` values |
@@ -164,7 +164,8 @@ test "resolve a named control at note-on" {
     slot=@graph.GraphParamSlot::Value0,
   )
   let pool = @voice.BoundVoicePool(template, context, bindings, max_voices=4)
-  let handle = pool.note_on_controls(Map([(Note, 330.0)]))
+  let controls : Map[@control.Control, Double] = Map([(Note, 330.0)])
+  let handle = pool.note_on(controls)
 
   assert_true(handle is Some(_))
   assert_eq(pool.active_voice_count(), 1)

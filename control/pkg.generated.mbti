@@ -31,6 +31,22 @@ pub fn Control::name(Self) -> String
 pub impl Hash for Control
 pub impl Show for Control
 
+type ControlValue
+pub fn ControlValue::absent() -> Self
+pub fn ControlValue::get(Self) -> Double?
+pub fn ControlValue::is_absent(Self) -> Bool
+pub fn ControlValue::of(Double) -> Self
+pub fn ControlValue::or_else(Self, Self) -> Self
+pub fn ControlValue::times(Self, Self) -> Self
+pub fn ControlValue::unwrap_or(Self, Double) -> Double
+pub impl Eq for ControlValue
+pub impl Show for ControlValue
+
 // Type aliases
 
 // Traits
+pub(open) trait ControlSource {
+  fn value(Self, Control) -> ControlValue
+  fn each_varying(Self, (Control, (Int64, Int64) -> ControlValue) -> Unit) -> Unit
+}
+pub impl ControlSource for Map[Control, Double]

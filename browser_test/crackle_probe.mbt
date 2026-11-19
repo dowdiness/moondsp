@@ -169,7 +169,7 @@ pub fn crackle_probe_reset() -> Unit {
 /// 3 = Dsp oscillator(waveform, placeholder) + Value0 control;
 /// 4 = Dsp oscillator_from(constant(freq), waveform);
 /// 5 = Dsp oscillator_from(controlled constant, waveform);
-/// 6 = BoundVoicePool note_on_controls(Map([(Note, freq)])) binding to Value0;
+/// 6 = BoundVoicePool note_on(Map([(Note, freq)])) binding to Value0;
 /// 7 = BoundVoicePool browser-synth-shape clone with selectable waveform.
 /// Waveform ids: 0=Sine, 1=Saw, 2=Square, 3=Triangle.
 /// Route 7 has no direct oscillator reference; residual metrics are disabled
@@ -903,7 +903,7 @@ fn crackle_probe_stream_voice_pool_state(
   } noraise {
     pool => {
       let controls : Map[@moondsp.Control, Double] = Map([(Note, freq_hz)])
-      if pool.note_on_controls(controls) is None {
+      if pool.note_on(controls) is None {
         crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_NOTE_ON_FAILED
         return None
       }
@@ -964,7 +964,7 @@ fn crackle_probe_stream_browser_synth_shape_state(
   } noraise {
     pool => {
       let controls : Map[@moondsp.Control, Double] = Map([(Note, freq_hz)])
-      if pool.note_on_controls(controls) is None {
+      if pool.note_on(controls) is None {
         crackle_probe_last_error_code.val = CRACKLE_PROBE_ERROR_NOTE_ON_FAILED
         return None
       }

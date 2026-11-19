@@ -112,7 +112,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(6),
   )
-  let physical = pool.note_on_controls({}).unwrap()
+  let physical = pool.note_on(fixed([])).unwrap()
   sched
   .push_active_note_until(
     0,
@@ -163,7 +163,7 @@ test "invalid tempo leaves the position and sounding note unchanged" {
 test "set_tempo rejects atomically when an endpoint is unrepresentable" {
   let (sched, pool, left, right) = transport_fixture()
   sched.set_bpm(0.001).unwrap()
-  let handle = pool.note_on_controls({}).unwrap()
+  let handle = pool.note_on(fixed([])).unwrap()
   let endpoint = @pattern.Rational(100000000L, 10000019L * 100000003L)
   sched.push_active_note(0, handle, endpoint).unwrap()
   sched.process_block(@pattern.Pat::silence(), left, right)

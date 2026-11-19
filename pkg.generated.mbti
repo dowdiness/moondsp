@@ -76,6 +76,8 @@ pub using @graph {type ControlTarget}
 
 pub using @graph {type ControlUnit}
 
+pub using @control {type ControlValue}
+
 pub using @dsp {type DelayLine}
 
 pub using @dsp {type DemoSource}

@@ -84,12 +84,12 @@ pub struct ControlBindingMap[K] {
 }
 pub fn[K : Eq] ControlBindingMap::binding(Self[K], K) -> ControlBinding[K]?
 pub fn[K : Eq] ControlBindingMap::default_value(Self[K], K) -> Double?
-pub fn[K : Eq + Hash] ControlBindingMap::each_voice_value(Self[K], Map[K, Double], (VoiceParam, Double) -> Unit) -> Unit
+pub fn[K] ControlBindingMap::each_voice_value(Self[K], (K) -> Double?, (VoiceParam, Double) -> Unit) -> Unit
 pub fn[K : Eq] ControlBindingMap::equal(Self[K], Self[K]) -> Bool
 pub fn[K] ControlBindingMap::length(Self[K]) -> Int32
 pub fn[K : Eq] ControlBindingMap::not_equal(Self[K], Self[K]) -> Bool
 pub fn[K : @debug.Debug] ControlBindingMap::output(Self[K], &Logger) -> Unit
-pub fn[K : Eq + Hash] ControlBindingMap::resolve_controls(Self[K], Map[K, Double]) -> Array[GraphControl]
+pub fn[K] ControlBindingMap::resolve_controls(Self[K], (K) -> Double?) -> Array[GraphControl]
 pub fn[K : @debug.Debug] ControlBindingMap::to_repr(Self[K]) -> @debug.Repr
 pub fn[K : @debug.Debug] ControlBindingMap::to_string(Self[K]) -> String
 pub impl[K : @debug.Debug] Show for ControlBindingMap[K]

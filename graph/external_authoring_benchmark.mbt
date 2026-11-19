@@ -703,7 +703,7 @@ fn bench_external_string_control_resolution_group(
     b.bench(name=fixture.name, fn() {
       let controls = if use_b.val { controls_b } else { controls_a }
       use_b.val = !use_b.val
-      let batch = bindings.resolve_controls(controls)
+      let batch = bindings.resolve_controls(key => controls.get(key))
       b.keep(batch)
     })
   }

@@ -144,6 +144,30 @@ Browser host output hashes over 400 blocks were identical to the step 2
 entry's for all ten scores. One shared orb; allocation counts and the
 Worklet path were not measured.
 
+## 2026-11-19: voices read an event's controls (ADR-0020 step 4)
+
+The scheduler hands each note-on `@pattern.Controls` instead of copying its
+controls into a `Map` and collecting a follow list. An isolated benchmark
+starts and kills one voice for each of the 72 onsets that
+`chord("Dm9 Bbmaj7").lpf(saw.range(200, 4000).slow(4)).gain("1 0.6").pan(sine).room(0.2)`
+plays over 8 cycles, through `note_gate` and note-on, on a pool binding
+`note`, `lpf`, `gain`, and `pan`. Against `37b034b`, in a separate worktree
+with the old call sequence, three alternating rounds (wasm-gc, release):
+
+| Round | Before | After |
+|---|---:|---:|
+| 1 | 275.63 µs | 260.94 µs |
+| 2 | 265.43 µs | 262.07 µs |
+| 3 | 293.73 µs | 272.62 µs |
+
+Voice start dominates the cost, so this supports "no regression", not a
+speedup. The three pattern query scores above stayed within noise of
+`37b034b` (8.8–9.5 ms, 33–36 ms, 4.8–5.4 ms). Browser host output hashes
+over 400 blocks were identical to the step 3 entry's for all ten scores. The
+CLAP allocation audit stayed at zero, with followers now returning
+`ControlValue`. One shared orb; allocation counts on the browser note-on path
+were not measured.
+
 ## Provenance and reproduction limits
 
 Optimization toolchain: Moon 0.1.20260920 (`914d7da`), Node 24.14.1, Python 3.14.2, Binaryen 125, WSL2 x64. Direct Moon commands used `NEW_MOON_MOD=0`.

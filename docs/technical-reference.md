@@ -944,8 +944,10 @@ Current semantics:
     template before mutating the live pool
   - if validation or binding fails, the previous template and bindings remain
     active
-- `BoundVoicePool::note_on_controls(...)` accepts pattern/control-map values,
-  resolves them through the current binding map, and delegates to the inner
+- `BoundVoicePool::note_on(controls)` takes any `@control.ControlSource`
+  (a pattern event's `@pattern.Controls`, or a `Map[Control, Double]` of fixed
+  controls), resolves its onset values through the current binding map,
+  follows each key whose value varies, and delegates to the inner
   `VoicePool::note_on(...)`; hosts that already have a materialized
   graph-control batch may call `note_on_graph_controls(...)` to bypass the
   control-key map resolution layer. Stable-template hosts with a fixed four-
@@ -977,7 +979,7 @@ Current semantics:
   control bindings.
 - `PatternScheduler::process_block(...)` routes each event to the first
   instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, passes the
-  event's score controls to `note_on_controls(...)`, then renders and sums
+  event's `@pattern.Controls` to `note_on(...)`, then renders and sums
   every instrument pool. The pool's bindings decide what each key sets: a
   graph parameter, converted by the binding's unit (`MidiToHz`,
   `SecondsToMs`), or a voice-frame parameter (gain, pan, or the single

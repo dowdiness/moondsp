@@ -131,7 +131,8 @@ one that does not set the key.
 At note-on the scheduler starts the voice with the event's values, which
 already come from its buses (Decision 4), and, in the same call, hands the
 pool a reader for each time-varying bound key
-(`note_on_controls(controls, follow=...)`). The follower belongs to the voice
+(`note_on_controls(controls, follow=...)`; since ADR-0020, `note_on(controls)`
+reads both from one source). The follower belongs to the voice
 slot: reusing the slot (including a steal) clears it, and an idle slot is
 skipped. Once per block the scheduler calls `update_follows` at the block's
 start time; each follower reads its bus and applies a value only when it

@@ -266,8 +266,10 @@ periods, musical signatures, and degradation seeds never include source IDs.
 Lowering also derives automatic control buses ([ADR-0019](../docs/decisions/0019-automatic-control-buses.md)):
 one per `PatternDoc::merge_control` and control key. An event's `buses()` carries the
 buses its keys follow, placed on the clock the event is on; `reader(key)`
-returns an allocation-free reader of exact time, and `each_reader` visits the
-keys whose bus changes over time. A
+returns an allocation-free reader of exact time that yields a
+`@control.ControlValue`. `Controls(event.value, buses~)` is what a voice reads
+(`@control.ControlSource`): onset values from the payload, and through
+`each_varying` the keys whose bus changes over time. A
 provider must be built from atoms, `pure`, `continuous`, and time or
 structure nodes; an opaque `from_pattern` provider raises
 `UnsupportedControl`.

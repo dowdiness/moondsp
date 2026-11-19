@@ -189,7 +189,7 @@ priv enum FollowTarget {
 /// allocates nothing. A follower made before `set_template` no longer attaches.
 pub struct VoiceFollower {
   priv target : FollowTarget
-  priv read : (Int64, Int64) -> Double
+  priv read : (Int64, Int64) -> @control.ControlValue
   priv template_generation : Int32
 }
 
@@ -219,7 +219,7 @@ priv struct VoiceSlot {
   follows : Array[VoiceFollower]
   /// The last score-unit value applied for each of `follows`, so unchanged
   /// values apply nothing. Parallel arrays keep attaching allocation-free.
-  follow_last : Array[Double]
+  follow_last : Array[@control.ControlValue]
   mono_buffer : AudioBuffer
 }
 
@@ -494,7 +494,7 @@ pub fn BoundVoicePool::set_template(
 pub fn BoundVoicePool::follower(
   self : BoundVoicePool,
   key : @control.Control,
-  read : (Int64, Int64) -> Double,
+  read : (Int64, Int64) -> @control.ControlValue,
 ) -> VoiceFollower? {
   guard self.bindings.binding(key) is Some(binding) else { return None }
   let target = match binding.target {
@@ -525,36 +525,38 @@ pub fn BoundVoicePool::follow(
     return false
   }
   slot.follows.push(follower)
-  slot.follow_last.push(@double.not_a_number)
+  slot.follow_last.push(@control.ControlValue::absent())
   true
 }
 
 ///|
-/// Start a voice from score controls: graph-bound keys convert through their
-/// bindings' units, and voice-frame keys set the new voice's frame.
+/// Start a voice from a note's controls: graph-bound keys convert through
+/// their bindings' units, and voice-frame keys set the new voice's frame. Keys
+/// this pool does not bind are ignored.
 ///
-/// Each `follow` entry makes the bound parameter for its key read a value at
-/// exact time `num / den` while the voice sounds; `update_follows` applies it.
-/// Keys this pool does not bind are ignored.
-pub fn BoundVoicePool::note_on_controls(
+/// Each key whose value varies keeps following it while the voice sounds;
+/// `update_follows` applies it.
+pub fn[C : @control.ControlSource] BoundVoicePool::note_on(
   self : BoundVoicePool,
-  controls : Map[@control.Control, Double],
-  follow~ : Array[(@control.Control, (Int64, Int64) -> Double)] = [],
+  controls : C,
 ) -> VoiceHandle? {
+  let value_of = key => controls.value(key).get()
   let resolved = match self.note_gate(controls) {
     InvalidDuration => return None
-    EventEnd => self.bindings.resolve_controls(controls)
-    AfterSeconds(_) => {
-      // Resolve a private copy so callers can reuse their control map.
-      let held = controls.copy()
-      held[Decay] = 0.0
-      held[Sustain] = 1.0
-      self.bindings.resolve_controls(held)
-    }
+    EventEnd => self.bindings.resolve_controls(value_of)
+    // A held note sustains at full level until its gate ends.
+    AfterSeconds(_) =>
+      self.bindings.resolve_controls(key => {
+        match key {
+          Decay => Some(0.0)
+          Sustain => Some(1.0)
+          _ => value_of(key)
+        }
+      })
   }
   let handle = self.pool.note_on(resolved)
   if handle is Some(handle) {
-    self.bindings.each_voice_value(controls, (param, value) => {
+    self.bindings.each_voice_value(value_of, (param, value) => {
       match param {
         @graph.VoiceParam::Gain =>
           ignore(self.pool.set_voice_gain_result(handle, value))
@@ -565,14 +567,12 @@ pub fn BoundVoicePool::note_on_controls(
       }
     })
     let slot = self.pool.slots[handle.slot]
-    for entry in follow {
-      guard self.follower(entry.0, entry.1) is Some(follower) else { continue }
+    controls.each_varying((key, read) => {
+      guard self.follower(key, read) is Some(follower) else { return }
       slot.follows.push(follower)
       // The voice already holds its onset value, so only a change applies.
-      slot.follow_last.push(
-        controls.get(entry.0).unwrap_or(@double.not_a_number),
-      )
-    }
+      slot.follow_last.push(controls.value(key))
+    })
   }
   handle
 }
@@ -588,11 +588,14 @@ pub fn BoundVoicePool::update_follows(
   for slot in self.pool.slots {
     guard !(slot.state is VoiceState::Idle) else { continue }
     for index, follower in slot.follows {
-      let value = (follower.read)(num, den)
-      if value.is_nan() || value == slot.follow_last[index] {
+      let read = (follower.read)(num, den)
+      guard !read.is_absent() && read != slot.follow_last[index] else {
         continue
       }
-      slot.follow_last[index] = value
+      slot.follow_last[index] = read
+      // Present by the guard. `get` would box an `Option` per read on wasm-gc
+      // (it is not inlined there), so the audio thread reads with `unwrap_or`.
+      let value = read.unwrap_or(0.0)
       match follower.target {
         Gain => slot.update_gain(value)
         Pan => slot.update_pan(value)
@@ -1399,11 +1402,11 @@ pub extend NoteGate with Eq::{not_equal, equal}
 /// Resolve gate timing without starting a voice or changing the input controls.
 /// Controls are in score units: attack and hold in seconds.
 /// Instruments without all four envelope bindings retain their event gate.
-pub fn BoundVoicePool::note_gate(
+pub fn[C : @control.ControlSource] BoundVoicePool::note_gate(
   self : BoundVoicePool,
-  controls : Map[@control.Control, Double],
+  controls : C,
 ) -> NoteGate {
-  let hold = match controls.get(Hold) {
+  let hold = match controls.value(Hold).get() {
     Some(seconds) => seconds
     None => return EventEnd
   }
@@ -1413,9 +1416,8 @@ pub fn BoundVoicePool::note_gate(
       self.bindings.default_value(Release) is Some(_) => attack
     _ => return EventEnd
   }
-  let attack = controls.get(Attack).unwrap_or(default_attack)
-  if hold.is_nan() ||
-    hold.is_inf() ||
+  let attack = controls.value(Attack).get().unwrap_or(default_attack)
+  if hold.is_inf() ||
     hold < 0.0 ||
     hold > 86400.0 ||
     attack.is_nan() ||
