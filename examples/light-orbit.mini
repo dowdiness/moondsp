@@ -1,28 +1,28 @@
 let motif = note("E4 G4 A4");
 let orbit = note("D5 A4 G4 E5");
-let lead = motif.slow(3).gain(0.105);
-let answer = orbit.slow(4).jux(rev).gain(0.055);
-let kick = s("bd").gain(0.46);
-let hats = s("hh(5,8)").slow(4).every(3, rev).degradeBy(0.12).gain(0.065);
-let clap = s("cp(2,4,1)").slow(4).gain(0.13);
-let open_hat = s("oh(2,8,1)").slow(4).gain(0.055);
-let harmony = chord("Cmaj9 Am7 Fmaj9 G6").slow(48).gain(0.12);
-let bass = note("C2(3,8) A1(3,8,1) F2(3,8) G2(3,8,1)").slow(48).gain(0.25);
+let lead = motif.slow(0.75).gain(0.105);
+let answer = orbit.jux(rev).gain(0.055);
+let kick = s("bd*4").gain(0.46);
+let hats = s("hh(5,8)").every(3, rev).degradeBy(0.12).gain(0.065);
+let clap = s("cp(2,4,1)").gain(0.13);
+let open_hat = s("oh(2,8,1)").gain(0.055);
+let harmony = chord("Cmaj9 Am7 Fmaj9 G6").slow(12).gain(0.12);
+let bass = note("C2(3,8) A1(3,8,1) F2(3,8) G2(3,8,1)").slow(12).gain(0.25);
 let groove = stack(kick, clap, hats, open_hat);
 
 song(
-  section("seed",12,stack(lead,chord("Cmaj9").slow(12).gain(0.10))),
-  section("second_orbit",12,stack(lead,answer,s("hh(3,8)").slow(4).gain(0.045))),
-  section("ground",24,stack(lead,answer,kick,hats,note("C2(3,8) A1(3,8,1)").slow(24).gain(0.23),chord("Cmaj9 Am7").slow(24).gain(0.11))),
-  section("daybreak",48,stack(lead,answer,harmony,bass,groove)),
-  section("suspension",24,stack(chord("Fmaj9 Cmaj9").slow(24).gain(0.12),motif.slow(6).jux(rev).gain(0.075),orbit.slow(8).gain(0.065))),
-  section("refraction",23,stack(note("A4 G4 E4").slow(3).gain(0.105),answer,chord("Am7 G6").slow(24).gain(0.11),note("A1(3,8) G2(3,8,1)").slow(24).gain(0.23),s("bd(3,8)").slow(4).gain(0.40),hats,clap)),
-  section("one_breath",1,stack(note("C4").gain(0))),
-  section("confluence",24,stack(lead,answer,harmony,bass,groove,note("G5(2,8) E5(2,8,1)").slow(12).gain(0.035))),
-  section("alignment",24,stack(motif.slow(4).gain(0.105),answer,chord("Fmaj9 G6 Cmaj9").slow(24).gain(0.13),note("F2 G2 C2").slow(24).gain(0.25),groove)),
-  section("unthread",24,stack(lead,answer,chord("Fmaj9 Cmaj9").slow(24).gain(0.10),note("F2 C2").slow(24).gain(0.18),hats)),
-  section("remember",12,stack(motif.slow(6).gain(0.075),chord("Am7").slow(12).gain(0.10))),
-  section("still_light",12,stack(motif.slow(6).gain(0.06),chord("Cmaj9").slow(12).gain(0.085))),
+  section("seed",3,stack(lead,chord("Cmaj9").slow(3).gain(0.10))),
+  section("second_orbit",3,stack(lead,answer,s("hh(3,8)").gain(0.045))),
+  section("ground",6,stack(lead,answer,kick,hats,note("C2(3,8) A1(3,8,1)").slow(6).gain(0.23),chord("Cmaj9 Am7").slow(6).gain(0.11))),
+  section("daybreak",12,stack(lead,answer,harmony,bass,groove)),
+  section("suspension",6,stack(chord("Fmaj9 Cmaj9").slow(6).gain(0.12),motif.slow(1.5).jux(rev).gain(0.075),orbit.slow(2).gain(0.065))),
+  section("refraction",23/4,stack(note("A4 G4 E4").slow(0.75).gain(0.105),answer,chord("Am7 G6").slow(6).gain(0.11),note("A1(3,8) G2(3,8,1)").slow(6).gain(0.23),s("bd(3,8)").gain(0.40),hats,clap)),
+  section("one_breath",1/4,silence()),
+  section("confluence",6,stack(lead,answer,harmony,bass,groove,note("G5(2,8) E5(2,8,1)").slow(3).gain(0.035))),
+  section("alignment",6,stack(motif.gain(0.105),answer,chord("Fmaj9 G6 Cmaj9").slow(6).gain(0.13),note("F2 G2 C2").slow(6).gain(0.25),groove)),
+  section("unthread",6,stack(lead,answer,chord("Fmaj9 Cmaj9").slow(6).gain(0.10),note("F2 C2").slow(6).gain(0.18),hats)),
+  section("remember",3,stack(motif.slow(1.5).gain(0.075),chord("Am7").slow(3).gain(0.10))),
+  section("still_light",3,stack(motif.slow(1.5).gain(0.06),chord("Cmaj9").slow(3).gain(0.085))),
   part("r1","seed"),
   part("r2","second_orbit"),
   part("r3","ground"),

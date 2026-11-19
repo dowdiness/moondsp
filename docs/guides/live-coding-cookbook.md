@@ -30,8 +30,8 @@ Click inside a plain `s(...)` or `note(...)` sequence to show its step
 controls. Text and controls edit the same score, and **Undo** applies to
 both. **Download** saves the score as a plain-text `.mini` file.
 
-At 60 BPM, one cycle lasts one second. At 120 BPM, it lasts half a second.
-A cycle is a unit of time, not a fixed bar or beat.
+One cycle is one bar of four beats. At the default 120 BPM, a cycle lasts two
+seconds, so `s("bd hh sd hh")` plays quarter notes without `.slow(4)`.
 
 > `.pan()`, `.room()`, `.attack()`, `.hold()`, `.release()`, and `.gate()` work
 > with the browser instruments. `.gain()`, `.lpf(hz, resonance?)`, and
@@ -100,7 +100,7 @@ s("bd hh sd hh").fast(2)
 ```
 
 ```mini
-s("bd hh sd hh").slow(4)
+s("bd hh sd hh").slow(2)
 ```
 
 Inside the quotes, `*n` repeats one item and `/n` stretches one item:
@@ -170,15 +170,15 @@ note("60 64 67 72")
 `chord()` accepts common chord names:
 
 ```mini
-chord("C Am F G7").slow(4)
+chord("C Am F G7")
 ```
 
 Layer drums, bass, and chords with `+`:
 
 ```mini
-let drums = s("bd hh sd hh").slow(4);
-let bass = note("C2 C2 A1 G1").slow(4);
-let chords = chord("C Am F G7").slow(4);
+let drums = s("bd hh sd hh");
+let bass = note("C2 C2 A1 G1");
+let chords = chord("C Am F G7");
 drums + bass + chords
 ```
 
@@ -214,8 +214,8 @@ $: note("C3 ~ Eb3 ~ G3 ~ Bb3 ~").gain(0.25)
 Ordinary newlines do not combine independent expressions. Use `$:` on each
 layer, or combine them with `+` or `stack(...)`.
 
-Set tempo with `bpm(number);` before the patterns. Without an explicit
-tempo, a score uses 60 BPM.
+Set tempo with `bpm(number);` before the patterns. BPM counts beats, with four
+beats per cycle. Without an explicit tempo, a score uses 120 BPM.
 
 ## Shape the sound
 
@@ -223,7 +223,7 @@ Envelope times are seconds. They do not change with tempo.
 
 ```mini
 note("E4 G4 D4")
-  .slow(21)
+  .slow(10.5)
   .attack(2)
   .hold(3)
   .release(8)
@@ -232,7 +232,7 @@ note("E4 G4 D4")
 Pan from left (`-1`) to right (`1`):
 
 ```mini
-let melody = note("E4 G4 A4 C5").slow(4);
+let melody = note("E4 G4 A4 C5");
 melody.pan(-0.45) + melody.rev().pan(0.45)
 ```
 
@@ -245,8 +245,8 @@ note("C4 E4 G4").jux(rev)
 Send sound to the shared room reverb. `0` is dry and `1` is the largest send:
 
 ```mini
-let drums = s("bd sd hh sd").slow(4).room(0.2);
-let chords = chord("Cmaj9 Am7 Fmaj9 G6").slow(8).room(0.7);
+let drums = s("bd sd hh sd").room(0.2);
+let chords = chord("Cmaj9 Am7 Fmaj9 G6").slow(2).room(0.7);
 drums + chords
 ```
 
@@ -258,16 +258,16 @@ Compare dry and wet versions in
 Replace the whole editor score with this arrangement; no mode switch is needed:
 
 ```mini-song
-let beat = s("bd hh sd hh").slow(4);
-let bass = note("C2 C2 A1 G1").slow(4);
-let chords = chord("C Am F G7").slow(4);
-let lead = note("E4 G4 A4 G4").slow(4).jux(rev);
+let beat = s("bd hh sd hh");
+let bass = note("C2 C2 A1 G1");
+let chords = chord("C Am F G7");
+let lead = note("E4 G4 A4 G4").jux(rev);
 
 song(
   bpm(96),
-  section("intro", 8, chords),
-  section("groove", 16, beat + bass + chords),
-  section("full", 16, beat + bass + chords + lead),
+  section("intro", 2, chords),
+  section("groove", 4, beat + bass + chords),
+  section("full", 4, beat + bass + chords + lead),
   part("intro-1", "intro"),
   part("groove-1", "groove"),
   part("full-1", "full")

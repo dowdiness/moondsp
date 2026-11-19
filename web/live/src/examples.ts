@@ -31,28 +31,28 @@ export const STARTING_SOUNDS: readonly StartingSound[] = [
   { title: "First light", artClass: "scene-art-light", art: '<circle cx="34" cy="32" r="25"/><path d="M55 7h10a25 25 0 0 1 0 50H55Z"/>',
     source: `bpm(96);
 
-$: s("bd ~ sd ~ bd bd sd ~").slow(4)
-$: s("hh hh hh hh hh hh hh hh").slow(4)
-$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").slow(4).gain(0.25).lpf(1800)` },
+$: s("bd ~ sd ~ bd bd sd ~")
+$: s("hh hh hh hh hh hh hh hh")
+$: note("C4 ~ Eb4 G4 Bb4 ~ G4 Eb4").gain(0.25).lpf(1800)` },
   { title: "Offbeat", artClass: "scene-art-offbeat", art: '<path d="M8 39h23V14h23v25h23V14h15v39H8Z"/>',
     source: `bpm(112);
 
-$: s("bd ~ ~ bd sd ~ bd ~").slow(4)
-$: s("~ hh ~ hh ~ hh ~ oh").slow(4)
-$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").slow(4).gain(0.3).lpf(1200)` },
+$: s("bd ~ ~ bd sd ~ bd ~")
+$: s("~ hh ~ hh ~ hh ~ oh")
+$: note("C3 ~ C3 Eb3 ~ G3 Bb3 ~").gain(0.3).lpf(1200)` },
   { title: "Slow drift", artClass: "scene-art-drift", art: '<ellipse cx="50" cy="32" rx="42" ry="23"/><ellipse cx="50" cy="32" rx="27" ry="23"/><ellipse cx="50" cy="32" rx="10" ry="23"/>',
     source: `bpm(72);
 
-$: s("bd ~ ~ ~ sd ~ ~ ~").slow(4)
-$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").slow(4).gain(0.2).lpf(2400)
-$: chord("Cm7 Abmaj7").slow(8).gain(0.12).lpf(900)` },
+$: s("bd ~ ~ ~ sd ~ ~ ~")
+$: note("C4 ~ G4 ~ Eb4 ~ Bb4 ~").gain(0.2).lpf(2400)
+$: chord("Cm7 Abmaj7").slow(2).gain(0.12).lpf(900)` },
   { title: "Moonrise", artClass: "scene-art-rise", art: '<path d="M14 50a36 36 0 0 1 72 0Z"/><path d="M6 50h88"/>',
     source: `bpm(104);
 
-$: s("bd ~ ~ bd sd ~ bd ~, hh*8").slow(4)
-$: note("A2 ~ A2 C3 ~ E3 G2 ~").slow(4).gain(0.3).lpf(900)
-$: chord("Am7 Fmaj7 Cmaj7 G").slow(16).gain(0.12).lpf(1400)
-$: note("E5 ~ C5 D5 ~ B4 G4 A4").slow(8).gain(0.16).lpf(3200)` },
+$: s("bd ~ ~ bd sd ~ bd ~, hh*8")
+$: note("A2 ~ A2 C3 ~ E3 G2 ~").gain(0.3).lpf(900)
+$: chord("Am7 Fmaj7 Cmaj7 G").slow(4).gain(0.12).lpf(1400)
+$: note("E5 ~ C5 D5 ~ B4 G4 A4").slow(2).gain(0.16).lpf(3200)` },
 ];
 
 export const EXAMPLES: readonly Example[] = [
@@ -66,15 +66,15 @@ export const EXAMPLES: readonly Example[] = [
     source: envelopeComparison },
   { label: "Carve the mix: cutoff + resonance", note: "LPF warms the chords; HPF clears lows from the lead. The second argument adds emphasis at each cutoff.",
     source: `bpm(84);
-let warm = chord("Cmaj7 Fmaj7").slow(4).gain(0.45).lpf(900, 2.5).hpf(60);
-let air = note("G5 E5 D5 B4").slow(4).gain(0.2).lpf(5000).hpf(1200, 1.4);
+let warm = chord("Cmaj7 Fmaj7").gain(0.45).lpf(900, 2.5).hpf(60);
+let air = note("G5 E5 D5 B4").gain(0.2).lpf(5000).hpf(1200, 1.4);
 stack(warm, air)` },
   { label: "Moving controls: accents + filter sweep", note: "Quoted steps accent the drums; saw and sine move a held chord's filter and pan while it sounds.",
     source: `bpm(96);
 
 $: s("bd ~ sd ~").gain("1 0.7")
 $: s("hh*8").gain("0.2 0.6 0.3 0.8")
-$: chord("Cm9").slow(4).gain(0.3).lpf(saw.range(300, 3000).slow(4), 2).pan(sine.range(-0.5, 0.5).slow(8))` },
+$: chord("Cm9").gain(0.3).lpf(saw.range(300, 3000), 2).pan(sine.range(-0.5, 0.5).slow(2))` },
   { label: "Room of Light — pop sketch", note: "Short bass, soft chords, and a singing lead. 39 seconds.",
     source: roomOfLight },
   { label: "Dry → shared room comparison", note: "Same groove dry, then drums and chords send into one room. 16 seconds.",
@@ -82,18 +82,18 @@ $: chord("Cm9").slow(4).gain(0.3).lpf(saw.range(300, 3000).slow(4), 2).pan(sine.
   { label: "Shared Room Afterglow", note: "Dry low end, drifting polyrhythms, a sparse room break, and one shared tail. 60 seconds.",
     source: sharedRoomAfterglow },
   { label: "Drifting notes — long envelopes", note: "Each note lasts 13 seconds. Try changing release(8).",
-    source: `note("E4 G4 D4").slow(21).attack(2).hold(3).release(8)` },
+    source: `note("E4 G4 D4").slow(10.5).attack(2).hold(3).release(8)` },
   { label: "Independent entries — 3 and 4 cycles", note: "Change E4 to F4 and D5 to C5 while playing.", more: true,
     source: `let melody = note("E4 G4 A4").slow(3).gain(0.12);
 let response = note("D5 A4 G4 E5").slow(4).gain(0.08);
 stack(melody, response)` },
   { label: "Shared melody + live tempo", note: "Change bpm(60) to bpm(72) while playing.", more: true,
-    source: `let melody = note("E4 G4 A4").slow(3).gain(0.12);
-let beat = s("bd hh sd hh").slow(4).gain(0.2);
+    source: `let melody = note("E4 G4 A4").slow(0.75).gain(0.12);
+let beat = s("bd hh sd hh").gain(0.2);
 song(
   bpm(60),
-  section("opening", 12, melody),
-  section("groove", 24, stack(melody, beat)),
+  section("opening", 3, melody),
+  section("groove", 6, stack(melody, beat)),
   part("first", "opening"),
   part("second", "groove")
 )` },
@@ -108,13 +108,13 @@ groove` },
 song(
   section(
     "ode",
-    256,
+    64,
     stack(
-      s("bd").slow(4),
+      s("bd"),
       note("64 64 65 67
 67 65 64 62
 60 60 62 64
-64 62 62 62").slow(16)
+64 62 62 62").slow(4)
     )
   ),
   part("ode1", "ode")
@@ -142,13 +142,13 @@ song(
   { label: '$: s("bd sd hh sd") / $: chord("C Dm G7")', more: true,
     source: `$: s("bd sd hh sd")
 $: chord("C Dm G7")` },
-  { label: 'note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)', more: true,
-    source: `note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(4).every(4, rev)` },
+  { label: 'note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(2).every(4, rev)', more: true,
+    source: `note("60(3,8) 64(2,8,2) 67(3,8) 64(2,8) 60(3,8) 62(2,8,3) 64(3,8) 67(2,8)").slow(2).every(4, rev)` },
   { label: '$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2) / $: note("C4…").slow(3)', more: true,
     source: `$: s("bd(3,8), hh(5,16)?, sd(2,8,4)").slow(2)
 $: note("C4(3,8) E4(2,8,2) G4(3,8) E4(2,8,3) C4(3,8)").slow(3)` },
-  { label: 'note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)', more: true,
-    source: `note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(4).jux(rev)` },
+  { label: 'note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(2).jux(rev)', more: true,
+    source: `note("48(3,8) 55(2,8,2) 60(3,8) 64(2,8) 67(3,8) 72(1,8)? 67(2,8,2) 60(3,8)").slow(2).jux(rev)` },
   { label: '$: s("bd…").slow(2).jux(slow(2)) / $: note("46…").slow(2).jux(slow(2))', more: true,
     source: `$: s("bd(1,4), sd(1,4,2)").slow(2).jux(slow(2))
 $: note("46*4 60*8, 40*16 192(1,16)?").slow(2).jux(slow(2))` },
