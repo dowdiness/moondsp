@@ -20,7 +20,7 @@ for (const [name, source] of [
 ] as const) {
   test(`source and editor agree on ${name}`, async ({ page }) => {
     const draft = new Draft(source);
-    expect(draft.state().diagnostic).toBeNull();
+    expect(draft.state().problem).toBeNull();
     expect(draft.prepare().source).toBe(source);
     const numbers: string[] = [];
     parser.parse(source).iterate({ enter(node) {
@@ -42,7 +42,7 @@ for (const [name, source] of [
 test("unfinished lexical tokens never expose modifier-looking content", async ({ page }) => {
   await page.goto("/");
   for (const source of ['note("C3\n.gain(.6).lpf(1800)', '/* 🎹 ** .gain(.6) note("C3").lpf(1800)']) {
-    expect(new Draft(source).state().diagnostic).not.toBeNull();
+    expect(new Draft(source).state().problem).not.toBeNull();
     await replaceCode(page, source);
     await expect(page.locator(".cm-inline-control")).toHaveCount(0);
   }

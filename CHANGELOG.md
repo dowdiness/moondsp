@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The live editor marks only real mistakes in the code. A score that is valid
+  but too large to play, such as one with too many overlapping parts, now shows
+  "Score is too large to play" with its reason instead of an error mark on the
+  first character. Errors in the editor or the player that the author cannot
+  fix are shown as messages, not as marks in the score.
+- **Breaking authoring adapter:** `draft_state` reports `problem` as
+  `{ kind: "mistake", at, message }`, `{ kind: "over-limit", message }`, or
+  `{ kind: "internal", message }` instead of a `diagnostic` string.
 - Mistakes inside quoted notation, such as `note("c4 ?? e4")`, are reported at
   their position in the whole source instead of within the string, so the
   editor marks the right place. Unknown song sections, duplicate song parts and

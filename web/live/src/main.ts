@@ -16,7 +16,7 @@ import { CM6Adapter } from "./canopy";
 import type { Diagnostic } from "./canopy";
 import { AudioEngine } from "./audio";
 import type { Draft } from "./authoring";
-import type { Player, PlaybackView } from "./playback";
+import type { DraftDiagnostic, Player, PlaybackView } from "./playback";
 import { mountOutputObservation } from "./output-observation";
 import { mountOutputScope } from "./output-scope";
 import { mountSignalHorizon } from "./signal-horizon";
@@ -172,10 +172,13 @@ function applyStatus(state: PlaybackView): void {
   writeStatus(dom.transport, status);
   signalHorizon.setCycle(state.cyclePosition, status.playing);
 }
-function diagnosticFromError(raw: string, docLength: number): Diagnostic {
-  const match = /^position (\d+):\s*(.*)$/.exec(raw);
-  const position = match ? Math.min(Number.parseInt(match[1], 10), docLength) : 0;
-  return { from: Math.max(0, position - (position === docLength ? 1 : 0)), to: Math.max(1, Math.min(docLength, position + 1)), severity: "error", message: match?.[2] || raw };
+/** Only a mistake marks a place in the code; every other diagnostic is told in the log. */
+function editorDiagnostics(diagnostic: DraftDiagnostic | null): Diagnostic[] {
+  if (diagnostic?.kind !== "mistake") return [];
+  // The editor can be one edit ahead of the draft the mistake was found in.
+  const length = view.state.doc.length;
+  const at = Math.min(diagnostic.at, length);
+  return [{ from: Math.max(0, at - (at === length ? 1 : 0)), to: Math.max(1, Math.min(length, at + 1)), severity: "error", message: diagnostic.message }];
 }
 let renderedPlayback: PlaybackView | undefined;
 
@@ -184,11 +187,10 @@ function renderPlayback(state: PlaybackView): void {
   applyStatus(state);
   tools?.observation.setPlaying(state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {
-    setLog(state.feedback?.message ?? "", state.feedback?.kind ?? "info");
+    setLog(state.feedback ?? "", state.feedback === null ? "info" : "error");
   }
   if (state.diagnostic !== renderedPlayback?.diagnostic) {
-    const diagnostic = state.diagnostic;
-    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: diagnostic ? [diagnosticFromError(diagnostic.message, diagnostic.documentLength)] : [] }]);
+    adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: editorDiagnostics(state.diagnostic) }]);
   }
   renderedPlayback = state;
 }

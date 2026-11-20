@@ -75,6 +75,12 @@ test("an empty player reads as ready with nothing accepted", () => {
     restoreHidden: true,
     help: "Fix the error below, then press Play.",
   });
+  // A compiler failure is reported as one, not as a mistake in the author's code.
+  expect(statusView({ ...base, draftStatus: "internal" })).toMatchObject({
+    tone: "error",
+    headline: "Couldn't prepare this code",
+    helpHidden: false,
+  });
 });
 
 test("accepted code is up to date only once every part has switched", () => {

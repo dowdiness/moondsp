@@ -46,6 +46,11 @@ function changeMessage(state: StatusInput): readonly [string, string] {
     : "Your previously accepted code is unchanged. Check the error below.";
   switch (state.draftStatus) {
     case "invalid": return ["Check your code", retained];
+    case "internal": return ["Couldn't prepare this code",
+      "This is a problem in moondsp, not in your code. Editing the code tries again."];
+    case "over-limit": return ["Score is too large to play", state.currentSource === null
+      ? "Make it lighter, such as fewer overlapping parts, then press Play."
+      : "Your previously accepted code keeps playing. Make it lighter to update it."];
     case "rejected": return ["Changes weren't accepted", retained];
     case "queued": return ["Waiting to send changes", "Your latest edit will be sent automatically."];
     case "submitting": return ["Sending changes…", "Waiting for the audio engine to accept this version."];
@@ -66,7 +71,8 @@ function changeMessage(state: StatusInput): readonly [string, string] {
 
 /** Pure: the status surface for one playback view. */
 export function statusView(state: StatusInput): StatusView {
-  const draftFailed = state.draftStatus === "invalid" || state.draftStatus === "rejected";
+  const draftFailed = state.draftStatus === "invalid" || state.draftStatus === "over-limit" ||
+    state.draftStatus === "internal" || state.draftStatus === "rejected";
   const fault = state.state === "Fault";
   const moving = state.state === "Playing" || state.state === "Starting";
   const settled = state.pendingCount === 0 && state.skippedCount === 0;

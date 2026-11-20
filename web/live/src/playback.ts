@@ -1,11 +1,17 @@
 import type { AudioEngine, AudioEvent, AudioSession, AudioStatus } from "./audio";
-import { Draft, PlaybackInput, playerWindow, type DraftState, type PlayerWindow } from "./authoring";
+import { Draft, PlaybackInput, playerWindow, type DraftState, type PlayerWindow, type SourceProblem } from "./authoring";
 import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
 import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
-type Feedback = Readonly<{ message: string; kind: "error" | "info" }>;
-type Diagnostic = Readonly<{ message: string; documentLength: number }>;
-export type DraftStatus = "unsubmitted" | "queued" | "submitting" | "accepted" | "rejected" | "invalid";
+/** The player's answer that it would not take a draft. */
+type Refusal = Readonly<{ kind: "refused"; message: string }>;
+/** Why the current draft cannot play: its own problem, or the player's refusal of it. */
+export type DraftDiagnostic = SourceProblem | Refusal;
+export type DraftStatus = "unsubmitted" | "queued" | "submitting" | "accepted" | "rejected" | "invalid" | "over-limit" | "internal";
+/** The status a draft's own problem gives it, whatever the player has said. */
+const PROBLEM_STATUS: Readonly<Record<SourceProblem["kind"], DraftStatus>> = {
+  mistake: "invalid", "over-limit": "over-limit", internal: "internal",
+};
 export type PlaybackView = Readonly<{
   status: AudioStatus;
   state: PlayerSnapshot["state"] | "Starting";
@@ -21,8 +27,9 @@ export type PlaybackView = Readonly<{
   cyclePosition: number;
   pendingCount: number;
   skippedCount: number;
-  feedback: Feedback | null;
-  diagnostic: Diagnostic | null;
+  /** The error the log shows, if any. */
+  feedback: string | null;
+  diagnostic: DraftDiagnostic | null;
 }>;
 type Pending = {
   operation: PlayerOperation;
@@ -34,13 +41,8 @@ type Pending = {
 type HeldSnapshot = Omit<PlayerSnapshot, "tempo"> & Readonly<{ tempo: number | null }>;
 const EMPTY: HeldSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: null, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
 
-/** The draft's own parse error, shown until the draft changes or audio reports another. */
-function draftDiagnostic(state: DraftState): Diagnostic | null {
-  return state.diagnostic === null ? null : { message: state.diagnostic, documentLength: state.text.length };
-}
-function draftFeedback(state: DraftState): Feedback | null {
-  return state.diagnostic === null ? null : { kind: "error", message: state.diagnostic };
-}
+/** The player's newest answer about one draft version, by receipt order. */
+type Verdict = Readonly<{ version: DraftVersion; receipt: number; refusal: Refusal | null }>;
 
 type Connection =
   | { kind: "closed" }
@@ -53,10 +55,11 @@ export class Player {
   private currentSource: string | null = null;
   private acceptedVersion: DraftVersion | null = null;
   private latestAcceptedSourceId = 0;
-  private latestRejectedVersion: DraftVersion | null = null;
-  private latestDraftReceipt = 0;
-  private feedback: Feedback | null = null;
-  private diagnostic: Diagnostic | null = null;
+  private verdict: Verdict | null = null;
+  /** An audio or program error, shown until the draft changes or the player answers for it. */
+  private notice: string | null = null;
+  /** The version whose editing or preparation failed inside moondsp, until the draft moves on. */
+  private failedVersion: DraftVersion | null = null;
   private next = RequestId.first();
   private epoch = 0;
   private intent = 0;
@@ -75,7 +78,6 @@ export class Player {
   ) {
     this.draft = initial.draft;
     this.draftState = this.draft.state();
-    this.diagnostic = draftDiagnostic(this.draftState);
     // A configured format no player can run gets no early check; opening audio reports it.
     const planned = engine.plannedFormat === undefined ? undefined : playerWindow(engine.plannedFormat);
     if (planned?.kind === "runs") this.checkDraftWithin(planned.window);
@@ -85,41 +87,50 @@ export class Player {
   /** From now on the draft also reports what the player, running in `format`, would refuse. */
   private checkDraftWithin(window: PlayerWindow): void {
     this.draftState = this.draft.checkWithin(window);
-    this.diagnostic = draftDiagnostic(this.draftState);
-    this.feedback = draftFeedback(this.draftState);
+    this.notice = null;
+  }
+
+  /** The player's refusal of the current draft, if its newest answer was one. */
+  private refusal(): Refusal | null {
+    const verdict = this.verdict;
+    return verdict !== null && sameDraftVersion(verdict.version, this.draftState.version) ? verdict.refusal : null;
   }
 
   view(): PlaybackView {
     const state = this.connection.kind === "opening" ? "Starting" : this.snapshot.state;
-    const status: AudioStatus = state === "Starting" ? { kind: "starting" }
-      : state === "Fault" ? { kind: "error", message: this.feedback?.message ?? "Audio failed" }
-      : this.connection.kind === "open" ? { kind: "running" } : { kind: "idle" };
     const draftState = this.draftState;
+    const refusal = this.refusal();
+    const diagnostic = draftState.problem ?? refusal;
+    const feedback = this.notice ?? diagnostic?.message ?? null;
+    const status: AudioStatus = state === "Starting" ? { kind: "starting" }
+      : state === "Fault" ? { kind: "error", message: feedback ?? "Audio failed" }
+      : this.connection.kind === "open" ? { kind: "running" } : { kind: "idle" };
     const inFlightVersions: DraftVersion[] = [];
     for (const pending of this.pending.values()) {
       if (pending.input !== undefined) inFlightVersions.push(pending.input.draftVersion);
     }
     let draftStatus: DraftStatus = "unsubmitted";
-    if (draftState.diagnostic !== null ||
-        (this.diagnostic !== null && !sameDraftVersion(this.latestRejectedVersion, draftState.version))) draftStatus = "invalid";
+    if (draftState.problem !== null) draftStatus = PROBLEM_STATUS[draftState.problem.kind];
+    else if (sameDraftVersion(this.failedVersion, draftState.version)) draftStatus = "internal";
     else if (inFlightVersions.some(version => sameDraftVersion(version, draftState.version))) draftStatus = "submitting";
     else if (sameDraftVersion(this.queuedVersion, draftState.version)) draftStatus = "queued";
-    else if (sameDraftVersion(this.latestRejectedVersion, draftState.version)) draftStatus = "rejected";
+    else if (refusal !== null) draftStatus = "rejected";
     else if (sameDraftVersion(this.acceptedVersion, draftState.version)) draftStatus = "accepted";
     return { ...this.snapshot, state, status, currentSource: this.currentSource,
       draftVersion: draftState.version, acceptedVersion: this.acceptedVersion, inFlightVersions, draftStatus,
-      feedback: this.feedback, diagnostic: this.diagnostic };
+      feedback, diagnostic };
   }
   private render(): void { this.present(this.view()); }
+  /**
+   * Follows the draft to its latest version. Within one version only
+   * `checkDraftWithin` changes what the draft reports, so the state already
+   * held stays, and so does the identity of the problem it carries.
+   */
   private refreshDraft(): void {
     const state = this.draft.state();
-    if (!sameDraftVersion(state.version, this.draftState.version)) {
-      this.latestDraftReceipt = 0;
-      this.latestRejectedVersion = null;
-      this.diagnostic = draftDiagnostic(state);
-      this.feedback = draftFeedback(state);
-    }
+    if (sameDraftVersion(state.version, this.draftState.version)) return;
     this.draftState = state;
+    this.notice = null;
   }
   private cancelAutomatic(): void {
     clearTimeout(this.debounce);
@@ -133,9 +144,7 @@ export class Player {
     this.cancelAutomatic();
     this.refreshDraft();
     const state = this.draftState;
-    this.diagnostic = draftDiagnostic(state);
-    this.feedback = draftFeedback(state);
-    if (state.diagnostic === null && this.connection.kind === "open") {
+    if (state.problem === null && this.connection.kind === "open") {
       this.queuedVersion = state.version;
       this.debounce = setTimeout(() => {
         this.debounce = undefined;
@@ -175,14 +184,7 @@ export class Player {
     const intent = ++this.intent;
     const session = await this.open();
     if (intent !== this.intent) throw new DOMException("Restart cancelled", "AbortError");
-    let input: PlaybackInput;
-    try {
-      input = this.draft.prepare();
-    } catch (error) {
-      this.reportDraftFailure(error);
-      throw error;
-    }
-    const result = await this.send("restart", input);
+    const result = await this.send("restart", this.playableDraft());
     if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
     return result;
   }
@@ -190,14 +192,22 @@ export class Player {
     const intent = ++this.intent;
     const session = await this.open();
     if (intent !== this.intent) throw new DOMException("Play cancelled", "AbortError");
+    const result = this.currentSource === null
+      ? await this.send("restart", this.playableDraft())
+      : await this.send("play");
+    if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
+    return result;
+  }
+
+  /** The current draft as player input; a draft with a problem refuses with it. */
+  private playableDraft(): PlaybackInput {
+    this.refreshDraft();
+    const problem = this.draftState.problem;
+    if (problem !== null) throw new Error(problem.message);
     try {
-      const result = this.currentSource === null
-        ? await this.send("restart", this.draft.prepare())
-        : await this.send("play");
-      if (result.kind === "accepted" && intent === this.intent) session.fadeIn();
-      return result;
+      return this.draft.prepare();
     } catch (error) {
-      if (this.draft.state().diagnostic !== null) this.reportDraftFailure(error);
+      this.reportDraftFailure(error);
       throw error;
     }
   }
@@ -223,9 +233,8 @@ export class Player {
   async close(): Promise<void> {
     const retirement = this.endRun(new DOMException("Player closed", "AbortError"));
     this.snapshot = EMPTY;
-    this.feedback = null;
+    this.notice = null;
     this.refreshDraft();
-    this.diagnostic = draftDiagnostic(this.draftState);
     this.render();
     await retirement;
   }
@@ -247,8 +256,7 @@ export class Player {
     this.currentSource = null;
     this.acceptedVersion = null;
     this.latestAcceptedSourceId = 0;
-    this.latestRejectedVersion = null;
-    this.latestDraftReceipt = 0;
+    this.verdict = null;
     return this.retire(previous);
   }
 
@@ -328,16 +336,16 @@ export class Player {
 
   report(error: unknown): void {
     if (error instanceof Error && error.name === "AbortError") return;
-    this.feedback = { kind: "error", message: error instanceof Error ? error.message : String(error) };
+    this.notice = error instanceof Error ? error.message : String(error);
     this.render();
   }
+  /** Editing or preparing the draft failed: a program error, not a problem in the score. */
   reportDraftFailure(error: unknown): void {
     if (error instanceof Error && error.name === "AbortError") return;
     this.cancelAutomatic();
     this.refreshDraft();
-    const message = error instanceof Error ? error.message : String(error);
-    this.feedback = { kind: "error", message };
-    this.diagnostic = { message, documentLength: this.draftState.text.length };
+    this.failedVersion = this.draftState.version;
+    this.notice = error instanceof Error ? error.message : String(error);
     this.render();
   }
   private rejectPending(error: Error): void {
@@ -347,7 +355,7 @@ export class Player {
   private fail(message: string): void {
     const retirement = this.endRun(new Error(message));
     this.snapshot = { ...this.snapshot, state: "Fault" };
-    this.feedback = { kind: "error", message };
+    this.notice = message;
     this.render();
     void retirement.catch(error => this.report(error));
   }
@@ -369,7 +377,7 @@ export class Player {
       this.lastReceipt = receipt.id.value;
       this.snapshot = receipt;
       if (receipt.kind === "rejected" && pending.input === undefined) {
-        this.feedback = { kind: "error", message: receipt.message };
+        this.notice = receipt.message;
       }
     }
     if (pending.input !== undefined) {
@@ -379,11 +387,10 @@ export class Player {
         this.currentSource = pending.input.source;
         this.acceptedVersion = version;
       }
-      if (sameDraftVersion(version, this.draftState.version) && receipt.id.value > this.latestDraftReceipt) {
-        this.latestDraftReceipt = receipt.id.value;
-        this.latestRejectedVersion = receipt.kind === "rejected" ? version : null;
-        this.diagnostic = receipt.kind === "rejected" ? { message: receipt.message, documentLength: pending.input.source.length } : null;
-        this.feedback = receipt.kind === "rejected" ? { kind: "error", message: receipt.message } : null;
+      const answered = this.verdict !== null && sameDraftVersion(this.verdict.version, version) ? this.verdict.receipt : 0;
+      if (sameDraftVersion(version, this.draftState.version) && receipt.id.value > answered) {
+        this.verdict = { version, receipt: receipt.id.value, refusal: receipt.kind === "rejected" ? { kind: "refused", message: receipt.message } : null };
+        this.notice = null;
       }
     }
     pending.resolve(receipt);

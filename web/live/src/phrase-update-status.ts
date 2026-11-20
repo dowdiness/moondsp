@@ -16,6 +16,12 @@ export function phraseUpdateFeedback(state: PlaybackView): PhraseUpdateFeedback 
     case "invalid": return state.state === "Playing"
       ? { text: "Invalid draft · accepted playback continues", scope: "score", tone: "error" }
       : { text: "Invalid draft · not submitted", scope: "score", tone: "error" };
+    case "internal": return state.state === "Playing"
+      ? { text: "Couldn't prepare · accepted playback continues", scope: "score", tone: "error" }
+      : { text: "Couldn't prepare · not submitted", scope: "score", tone: "error" };
+    case "over-limit": return state.state === "Playing"
+      ? { text: "Too large to play · accepted playback continues", scope: "score", tone: "error" }
+      : { text: "Too large to play · not submitted", scope: "score", tone: "error" };
     case "rejected": return state.state === "Playing"
       ? { text: "Rejected · accepted playback continues (score-wide)", scope: "score", tone: "error" }
       : { text: "Rejected · score update not accepted", scope: "score", tone: "error" };

@@ -13,7 +13,15 @@ import {
 import type { AudioFormat } from "./playback-protocol";
 import { decodeDraftVersion, type DraftVersion } from "./draft-version";
 
-export type DraftState = Readonly<{ text: string; version: DraftVersion; diagnostic: string | null }>;
+/** Why the draft cannot play, as the parser decided it. */
+export type SourceProblem =
+  /** The code is wrong at `at`, a UTF-16 offset into the draft's text. */
+  | Readonly<{ kind: "mistake"; at: number; message: string }>
+  /** The code is valid but more than playback can afford. */
+  | Readonly<{ kind: "over-limit"; message: string }>
+  /** The compiler broke its own invariant; the author cannot fix it. */
+  | Readonly<{ kind: "internal"; message: string }>;
+export type DraftState = Readonly<{ text: string; version: DraftVersion; problem: SourceProblem | null }>;
 export type DraftEdit = Readonly<{ from: number; to: number; inserted: string }>;
 export type LocatedOnset = Readonly<{
   from: number;
@@ -22,12 +30,24 @@ export type LocatedOnset = Readonly<{
   notation: Readonly<{ from: number; to: number; start: number; pitch: number | null }> | null;
 }>;
 
-function decodeState(raw: { text: string; version: unknown; diagnostic: string | null }): DraftState {
-  const version = decodeDraftVersion(raw.version);
-  if (!version || typeof raw.text !== "string" || (raw.diagnostic !== null && typeof raw.diagnostic !== "string")) {
-    throw new Error("invalid authoring state");
+function decodeProblem(raw: unknown, text: string): SourceProblem | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw !== "object") return undefined;
+  const { kind, at, message } = raw as Record<string, unknown>;
+  if (typeof message !== "string") return undefined;
+  if (kind === "mistake") {
+    return Number.isSafeInteger(at) && Number(at) >= 0 && Number(at) <= text.length
+      ? Object.freeze({ kind, at: Number(at), message }) : undefined;
   }
-  return Object.freeze({ text: raw.text, version, diagnostic: raw.diagnostic });
+  return kind === "over-limit" || kind === "internal" ? Object.freeze({ kind, message }) : undefined;
+}
+
+function decodeState(raw: { text: unknown; version: unknown; problem: unknown }): DraftState {
+  const version = decodeDraftVersion(raw.version);
+  const text = raw.text;
+  const problem = typeof text === "string" ? decodeProblem(raw.problem, text) : undefined;
+  if (!version || typeof text !== "string" || problem === undefined) throw new Error("invalid authoring state");
+  return Object.freeze({ text, version, problem });
 }
 
 

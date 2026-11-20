@@ -94,7 +94,8 @@ test("the draft reports what the player would refuse as soon as the player's for
   const limit = "playback arrangement exceeds the query expansion limit";
   // A configured sample rate is known before audio starts.
   const configured = harness(false, false, false, { plannedFormat: PLAYER_FORMAT, text: layered(96) });
-  expect(configured.player.view().diagnostic?.message).toBe(limit);
+  expect(configured.player.view().diagnostic).toEqual({ kind: "over-limit", message: limit });
+  expect(configured.player.view().draftStatus).toBe("over-limit");
   const fitting = harness(false, false, false, { plannedFormat: PLAYER_FORMAT, text: layered(32) });
   expect(fitting.player.view().diagnostic).toBeNull();
   // A native rate is known once audio opens, and Play then sends nothing the player would refuse.
@@ -129,7 +130,23 @@ test("resuming uses Current song even when the editor contains invalid source", 
   const resumed = h.player.play(); h.reply(await h.command(2)); await resumed;
   expect(h.commands[2]).toMatchObject({ operation: "play", input: undefined });
   expect(h.player.view().currentSource).toBe('note("60")');
-  expect(h.player.view().diagnostic).toEqual(diagnostic);
+  // The page repaints the mark only when the diagnostic itself changes.
+  h.player.editDraft();
+  expect(h.player.view().diagnostic).toBe(diagnostic);
+  await h.player.close();
+  expect(h.player.view().diagnostic).toBe(diagnostic);
+});
+
+test("a failure inside the editor is reported as one until the draft moves on", async () => {
+  const h = harness();
+  h.player.reportDraftFailure(new Error("edit lost"));
+  expect(h.player.view()).toMatchObject({ draftStatus: "internal", feedback: "edit lost", diagnostic: null });
+  h.edit('note("62")');
+  expect(h.player.view()).toMatchObject({ draftStatus: "unsubmitted", feedback: null });
+  // Preparing the draft for Play fails the same way as preparing it after an edit.
+  h.draft.prepare = () => { throw new Error("prepare lost"); };
+  await expect(h.player.play()).rejects.toThrow("prepare lost");
+  expect(h.player.view()).toMatchObject({ draftStatus: "internal", feedback: "prepare lost", diagnostic: null });
   await h.player.close();
 });
 

@@ -26,14 +26,24 @@ pub fn create_draft(
 
 ///|
 fn state_json(state : @mini.DraftState) -> Json {
-  let diagnostic : Json = match state.diagnostic() {
-    Some(diagnostic) => Json(diagnostic.problem().to_string())
+  let problem : Json = match state.diagnostic() {
+    Some(diagnostic) => problem_json(diagnostic.problem())
     None => Json::null()
   }
   {
     "text": Json(state.text()),
     "version": Json(state.version()),
-    "diagnostic": diagnostic,
+    "problem": problem,
+  }
+}
+
+///|
+fn problem_json(problem : @mini.SourceProblem) -> Json {
+  let message = Json(problem.message())
+  match problem {
+    Mistake(at, _) => { "kind": "mistake", "at": Json(at), "message": message }
+    OverLimit(_) => { "kind": "over-limit", "message": message }
+    Internal(_) => { "kind": "internal", "message": message }
   }
 }
 
