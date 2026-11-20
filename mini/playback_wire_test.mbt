@@ -3,7 +3,7 @@ fn wire_test_input(text : String) -> @mini.PlaybackInput raise {
   let draft = @mini.Draft(text)
   match draft.prepare_playback() {
     Ok(input) => input
-    Err(error) => fail(error.message())
+    Err(diagnostic) => fail(diagnostic.problem().to_string())
   }
 }
 

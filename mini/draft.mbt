@@ -119,23 +119,9 @@ pub extend DraftTracking with Debug::{to_repr}
 
 ///|
 #derive(Eq, Debug)
-pub(all) enum DraftDiagnosticKind {
-  Syntax
-  TrackingUnavailable
-}
-
-///|
-pub extend DraftDiagnosticKind with Eq::{equal, not_equal}
-
-///|
-pub extend DraftDiagnosticKind with Debug::{to_repr}
-
-///|
-#derive(Eq, Debug)
 pub struct DraftDiagnostic {
   priv at : DraftVersion
-  priv category : DraftDiagnosticKind
-  priv detail : String
+  priv found : SourceProblem
 }
 
 ///|
@@ -147,10 +133,9 @@ pub extend DraftDiagnostic with Debug::{to_repr}
 ///|
 fn DraftDiagnostic::DraftDiagnostic(
   at : DraftVersion,
-  category : DraftDiagnosticKind,
-  detail : String,
+  found : SourceProblem,
 ) -> DraftDiagnostic {
-  { at, category, detail, }
+  { at, found, }
 }
 
 ///|
@@ -159,13 +144,8 @@ pub fn DraftDiagnostic::version(self : DraftDiagnostic) -> DraftVersion {
 }
 
 ///|
-pub fn DraftDiagnostic::kind(self : DraftDiagnostic) -> DraftDiagnosticKind {
-  self.category
-}
-
-///|
-pub fn DraftDiagnostic::message(self : DraftDiagnostic) -> String {
-  self.detail
+pub fn DraftDiagnostic::problem(self : DraftDiagnostic) -> SourceProblem {
+  self.found
 }
 
 ///|
@@ -573,7 +553,7 @@ fn SourceMap::resolve_reference(
   end : Int32,
   definition_span : MiniSpan,
   definition : @pattern.PatternDoc,
-) -> @pattern.ResolvedReference raise ParseError {
+) -> @pattern.ResolvedReference raise SourceProblem {
   for reference in self.references {
     if reference.span.start == start && reference.span.end == end {
       let (binding, target) = match reference.binding {
@@ -584,7 +564,7 @@ fn SourceMap::resolve_reference(
             DuplicateName => "duplicate target"
             OpaqueScope => "opaque preceding scope"
           }
-          raise ParseError("exact reference at \{start}: \{message}")
+          raise Internal("exact reference at \{start}: \{message}")
         }
       }
       for declared in self.definitions {
@@ -597,13 +577,13 @@ fn SourceMap::resolve_reference(
             reference=reference.id,
             binding~,
           ) catch {
-            _ => raise ParseError("exact reference epoch mismatch at \{start}")
+            _ => raise Internal("exact reference epoch mismatch at \{start}")
           }
         }
       }
     }
   }
-  raise ParseError("missing exact reference witness at \{start}")
+  raise Internal("missing exact reference witness at \{start}")
 }
 
 ///|
@@ -664,20 +644,18 @@ pub fn PlaybackInput::compile(
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
     Text =>
-      parse_play_source(self.input, previous~, query_window?).map(source => {
-        Runtime(source)
-      })
+      parse_play_source(self.input, previous~, query_window?)
+      .map(source => Runtime(source))
+      .map_err(SourceProblem::to_string)
     Song(_, origins) => {
-      let source = match
-        parse_play_source_with_origins(
-          self.input,
-          previous,
-          query_window,
-          origins=Some(origins),
-          syntax_depth_limit=Some(32),
-        ) {
-        Ok(source) => source
-        Err(message) => return Err(message)
+      let source = parse_play_source_with_origins(
+        self.input,
+        previous,
+        query_window,
+        origins=Some(origins),
+        syntax_depth_limit=Some(32),
+      ) catch {
+        problem => return Err(problem.to_string())
       }
       guard source.body() is ExactArrangement(_, _) else {
         return Err("song input changed source mode")
@@ -685,16 +663,14 @@ pub fn PlaybackInput::compile(
       Ok(Runtime(source))
     }
     Pattern(_, origins) => {
-      let source = match
-        parse_play_source_with_origins(
-          self.input,
-          None,
-          query_window,
-          origins=Some(origins),
-          syntax_depth_limit=Some(32),
-        ) {
-        Ok(source) => source
-        Err(message) => return Err(message)
+      let source = parse_play_source_with_origins(
+        self.input,
+        None,
+        query_window,
+        origins=Some(origins),
+        syntax_depth_limit=Some(32),
+      ) catch {
+        problem => return Err(problem.to_string())
       }
       guard source.body() is Pattern(doc) else {
         return Err("exact pattern input changed source mode")
@@ -806,24 +782,16 @@ fn draft_analysis(
     Pattern => PlaybackPayload::Pattern(at, sources)
     Song => PlaybackPayload::Song(at, sources)
     TrackingUnavailable =>
-      return Rejected(
-        DraftDiagnostic(
-          at,
-          TrackingUnavailable,
-          "source tracking exceeds 8192 UTF-16 code units",
-        ),
-      )
+      return Rejected(DraftDiagnostic(at, OverLimit(Length)))
   }
-  let source = match
-    parse_play_source_with_origins(
-      input,
-      previous,
-      query_window,
-      origins=Some(sources),
-      syntax_depth_limit=Some(32),
-    ) {
-    Ok(source) => source
-    Err(message) => return Rejected(DraftDiagnostic(at, Syntax, message))
+  let source = parse_play_source_with_origins(
+    input,
+    previous,
+    query_window,
+    origins=Some(sources),
+    syntax_depth_limit=Some(32),
+  ) catch {
+    problem => return Rejected(DraftDiagnostic(at, problem))
   }
   Playable(source, payload)
 }

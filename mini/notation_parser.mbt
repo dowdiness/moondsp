@@ -28,11 +28,9 @@ fn NotationParser::projection_node(
   base_to : Int32,
   value : String,
   children : Array[Int32],
-) -> Int32 raise ParseError {
+) -> Int32 raise SourceProblem {
   guard self.projection_nodes is Some(nodes) else { return -1 }
-  guard nodes.length() < 256 else {
-    raise ParseError("notation projection exceeds 256 source nodes")
-  }
+  guard nodes.length() < 256 else { raise OverLimit(NotationNodes) }
   let index = nodes.length()
   for child in children {
     nodes[child].parent = Some(index)
@@ -94,6 +92,16 @@ priv struct NotationParser {
 }
 
 ///|
+/// Notation positions count from the quoted content; mistakes report the whole source.
+fn NotationParser::mistake(
+  self : NotationParser,
+  at : Int32,
+  message : String,
+) -> SourceProblem {
+  Mistake(self.source_offset + at, message)
+}
+
+///|
 fn NotationParser::NotationParser(
   input : String,
   sound~ : Bool,
@@ -142,7 +150,7 @@ fn NotationParser::skip_spaces(self : NotationParser) -> Unit {
 /// Parse top-level notation: layer ( "," layer )*
 fn NotationParser::parse_notation(
   self : NotationParser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let first = self.parse_layer()
   let layers : Array[@pattern.Pat[@pattern.ControlMap]] = [first]
   let layer_roots : Array[Int32] = match self.projection_root {
@@ -191,7 +199,7 @@ fn NotationParser::parse_notation(
 /// Parse a layer: sequence of space-separated elements.
 fn NotationParser::parse_layer(
   self : NotationParser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   self.skip_spaces()
   let layer_start = self.pos
   let elements : Array[@pattern.Pat[@pattern.ControlMap]] = []
@@ -212,9 +220,7 @@ fn NotationParser::parse_layer(
     }
     total_weight += weight
     weighted = weighted || weight != 1
-    guard !weighted || total_weight <= 256 else {
-      raise ParseError("relative duration sum must not exceed 256")
-    }
+    guard !weighted || total_weight <= 256 else { raise OverLimit(DurationSum) }
     if self.query_work is Some(cost) {
       costs.unwrap().push(cost)
       for _ in 1..<weight {
@@ -225,9 +231,7 @@ fn NotationParser::parse_layer(
     self.skip_spaces()
   }
   guard !elements.is_empty() else {
-    raise ParseError(
-      "position \{self.pos}: expected at least one element in layer",
-    )
+    raise self.mistake(self.pos, "expected at least one element in layer")
   }
   if costs is Some(costs) {
     self.query_work = Some(
@@ -262,7 +266,7 @@ const RELATIVE_DURATION_WEIGHT_LIMIT : Int32 = 16
 ///|
 fn NotationParser::read_relative_duration(
   self : NotationParser,
-) -> Int32 raise ParseError {
+) -> Int32 raise SourceProblem {
   let at_pos = self.pos
   self.pos += 1
   let digits_start = self.pos
@@ -280,9 +284,7 @@ fn NotationParser::read_relative_duration(
   guard self.pos > digits_start &&
     weight > 0 &&
     weight <= RELATIVE_DURATION_WEIGHT_LIMIT else {
-    raise ParseError(
-      "position \{at_pos}: '@' requires a positive integer from 1 to 16",
-    )
+    raise self.mistake(at_pos, "'@' requires a positive integer from 1 to 16")
   }
   weight
 }
@@ -290,14 +292,14 @@ fn NotationParser::read_relative_duration(
 ///|
 fn NotationParser::parse_element(
   self : NotationParser,
-) -> (@pattern.Pat[@pattern.ControlMap], Int32, Int32?) raise ParseError {
+) -> (@pattern.Pat[@pattern.ControlMap], Int32, Int32?) raise SourceProblem {
   guard (self.recognized_atoms is None && self.projection_nodes is None) ||
     self.depth < 32 else {
-    raise ParseError("source exceeds notation nesting depth 32")
+    raise OverLimit(Nesting(32))
   }
   self.skip_spaces()
   guard !self.at_end() else {
-    raise ParseError("position \{self.pos}: unexpected end of notation")
+    raise self.mistake(self.pos, "unexpected end of notation")
   }
   let start = self.pos
   let mut source_node : Int32? = None
@@ -308,7 +310,7 @@ fn NotationParser::parse_element(
     let inner_node = self.projection_root
     self.depth -= 1
     guard !self.at_end() && self.input[self.pos] == ']' else {
-      raise ParseError("position \{self.pos}: expected ']'")
+      raise self.mistake(self.pos, "expected ']'")
     }
     self.pos += 1
     if self.projection_nodes is Some(_) {
@@ -388,8 +390,9 @@ fn NotationParser::parse_element(
         applied = true
       } else if c == '?' {
         if self.control is Some(key) {
-          raise ParseError(
-            "position \{self.pos}: random drop ? is not supported in \{key} patterns",
+          raise self.mistake(
+            self.pos,
+            "random drop ? is not supported in \{key} patterns",
           )
         }
         let salt = self.pos
@@ -425,7 +428,7 @@ fn NotationParser::parse_element(
 ///|
 fn NotationParser::require_element_boundary(
   self : NotationParser,
-) -> Unit raise ParseError {
+) -> Unit raise SourceProblem {
   if self.at_end() {
     return
   }
@@ -433,7 +436,7 @@ fn NotationParser::require_element_boundary(
   if mini_is_space(c) || c == ',' || c == ']' {
     return
   }
-  raise ParseError("position \{self.pos}: expected separator between elements")
+  raise self.mistake(self.pos, "expected separator between elements")
 }
 
 ///|
@@ -441,14 +444,12 @@ fn NotationParser::require_element_boundary(
 fn NotationParser::apply_replicate(
   self : NotationParser,
   pat : @pattern.Pat[@pattern.ControlMap],
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let op_pos = self.pos
   self.pos += 1 // consume '*'
   let n = self.read_int_signed(op_pos)
   guard n > 0 else {
-    raise ParseError(
-      "position \{op_pos}: '*' requires a positive integer, got \{n}",
-    )
+    raise self.mistake(op_pos, "'*' requires a positive integer, got \{n}")
   }
   self.last_modifier_value = n
   if self.query_work is Some(cost) {
@@ -465,14 +466,12 @@ fn NotationParser::apply_replicate(
 fn NotationParser::apply_step_slow(
   self : NotationParser,
   pat : @pattern.Pat[@pattern.ControlMap],
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let op_pos = self.pos
   self.pos += 1 // consume '/'
   let n = self.read_int_signed(op_pos)
   guard n > 0 else {
-    raise ParseError(
-      "position \{op_pos}: '/' requires a positive integer, got \{n}",
-    )
+    raise self.mistake(op_pos, "'/' requires a positive integer, got \{n}")
   }
   self.last_modifier_value = n
   if self.query_work is Some(cost) {
@@ -489,7 +488,7 @@ fn NotationParser::apply_step_slow(
 fn NotationParser::maybe_apply_euclid(
   self : NotationParser,
   pat : @pattern.Pat[@pattern.ControlMap],
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   if self.at_end() || self.input[self.pos] != '(' {
     return pat
   }
@@ -499,7 +498,7 @@ fn NotationParser::maybe_apply_euclid(
   let k = self.read_int_signed(euclid_start)
   self.skip_spaces()
   guard !self.at_end() && self.input[self.pos] == ',' else {
-    raise ParseError("position \{self.pos}: expected ',' in euclid (k,n)")
+    raise self.mistake(self.pos, "expected ',' in euclid (k,n)")
   }
   self.pos += 1 // consume ','
   self.skip_spaces()
@@ -513,14 +512,12 @@ fn NotationParser::maybe_apply_euclid(
     self.skip_spaces()
   }
   guard !self.at_end() && self.input[self.pos] == ')' else {
-    raise ParseError("position \{self.pos}: expected ')' to close euclid")
+    raise self.mistake(self.pos, "expected ')' to close euclid")
   }
   self.pos += 1 // consume ')'
   self.last_euclid_args = [k, n, rotation]
   if self.query_work is Some(cost) {
-    guard n <= 128 else {
-      raise ParseError("playback Euclidean rhythm exceeds 128 steps")
-    }
+    guard n <= 128 else { raise OverLimit(EuclideanSteps) }
     self.query_work = Some(
       if n <= 0 || k <= 0 {
         Quiet
@@ -538,7 +535,7 @@ fn NotationParser::maybe_apply_euclid(
 fn NotationParser::read_int_signed(
   self : NotationParser,
   err_pos : Int32,
-) -> Int32 raise ParseError {
+) -> Int32 raise SourceProblem {
   let start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -551,7 +548,7 @@ fn NotationParser::read_int_signed(
   }
   guard self.pos > digits_start else {
     self.pos = start
-    raise ParseError("position \{err_pos}: expected integer")
+    raise self.mistake(err_pos, "expected integer")
   }
   let s = self.input[start:self.pos].to_owned()
   let mut value = 0
@@ -576,7 +573,7 @@ fn NotationParser::read_int_signed(
 /// number or note name in note mode, or a named/explicit chord in chord mode.
 fn NotationParser::parse_atom(
   self : NotationParser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let start = self.pos
   let pat = self.parse_atom_value()
   if self.recognized_atoms is Some(atoms) && self.input[start] != '~' {
@@ -610,7 +607,7 @@ fn NotationParser::parse_atom(
 ///|
 fn NotationParser::parse_atom_value(
   self : NotationParser,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let start = self.pos
   if self.query_work is Some(_) {
     self.query_work = Some(Atom)
@@ -630,16 +627,16 @@ fn NotationParser::parse_atom_value(
     // Read identifier
     let name = self.read_ident()
     guard !name.is_empty() else {
-      raise ParseError("position \{start}: expected sound name")
+      raise self.mistake(start, "expected sound name")
     }
     match drum_midi(name) {
       Some(midi) => @pattern.sound(midi.to_double())
-      None => raise ParseError("position \{start}: unknown drum name '\{name}'")
+      None => raise self.mistake(start, "unknown drum name '\{name}'")
     }
   } else if self.chord {
     let name = self.read_chord_name_text()
     guard !name.is_empty() else {
-      raise ParseError("position \{start}: expected chord name")
+      raise self.mistake(start, "expected chord name")
     }
     match @pattern.parse_chord(name) {
       Some(notes) => {
@@ -650,12 +647,12 @@ fn NotationParser::parse_atom_value(
         let note_pats = notes.map(fn(midi) { @pattern.note(midi.to_double()) })
         @pattern.stack(note_pats)
       }
-      None => raise ParseError("position \{start}: unknown chord '\{name}'")
+      None => raise self.mistake(start, "unknown chord '\{name}'")
     }
   } else {
     // Read number or note name (e.g., "60" or "C4")
     try self.read_note_number(start) catch {
-      ParseError(_) => self.read_note_name_atom(start)
+      _ => self.read_note_name_atom(start)
     } noraise {
       pat => pat
     }
@@ -682,14 +679,14 @@ fn NotationParser::read_explicit_chord_text(self : NotationParser) -> String {
 fn NotationParser::read_note_name_atom(
   self : NotationParser,
   start : Int32,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let name = self.read_note_name_text()
   guard !name.is_empty() else {
-    raise ParseError("position \{start}: expected note name or number")
+    raise self.mistake(start, "expected note name or number")
   }
   match @pattern.note_name_to_midi(name) {
     Some(midi) => @pattern.note(midi)
-    None => raise ParseError("position \{start}: unknown note name '\{name}'")
+    None => raise self.mistake(start, "unknown note name '\{name}'")
   }
 }
 
@@ -795,9 +792,9 @@ fn NotationParser::read_ident(self : NotationParser) -> String {
 fn NotationParser::read_control_number(
   self : NotationParser,
   start : Int32,
-) -> (Double, String, Int32, Int32) raise ParseError {
+) -> (Double, String, Int32, Int32) raise SourceProblem {
   let read = self.read_note_number_value(start) catch {
-    ParseError(_) => raise ParseError("position \{start}: expected number")
+    _ => raise self.mistake(start, "expected number")
   }
   self.control_values.push(read.0)
   read
@@ -807,7 +804,7 @@ fn NotationParser::read_control_number(
 fn NotationParser::read_note_number(
   self : NotationParser,
   start : Int32,
-) -> @pattern.Pat[@pattern.ControlMap] raise ParseError {
+) -> @pattern.Pat[@pattern.ControlMap] raise SourceProblem {
   let num_start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -830,7 +827,7 @@ fn NotationParser::read_note_number(
   }
   guard has_digit else {
     self.pos = num_start
-    raise ParseError("position \{start}: expected number")
+    raise self.mistake(start, "expected number")
   }
   let n = parse_double_manual(self.input, num_start, self.pos)
   @pattern.note(n)

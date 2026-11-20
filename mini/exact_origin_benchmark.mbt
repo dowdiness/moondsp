@@ -9,7 +9,7 @@ fn bench_origin_draft_doc(text : String) -> @pattern.PatternDoc {
           abort("expected pattern source")
       }
     Rejected(diagnostic) =>
-      abort("benchmark parse failed: \{diagnostic.message()}")
+      abort("benchmark parse failed: \{diagnostic.problem().message()}")
   }
 }
 

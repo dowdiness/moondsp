@@ -39,7 +39,7 @@ priv enum ResolvedMiniExprNode {
 fn resolve_mini_expr(
   expr : MiniExpr,
   definitions : Map[String, MiniDefinition],
-) -> ResolvedMiniExpr raise ParseError {
+) -> ResolvedMiniExpr raise SourceProblem {
   let node : ResolvedMiniExprNode = match expr.node {
     Literal(kind, content, offset) => Literal(kind, content, offset)
     Stack(children) =>
@@ -50,8 +50,9 @@ fn resolve_mini_expr(
       match unique_definition(definitions.get(name).iter(), false) {
         Ok(definition) => Reference(name, definition)
         Err(_) =>
-          raise ParseError(
-            "position \{expr.span.start}: undefined pattern '\{name}'; define it before use",
+          raise Mistake(
+            expr.span.start,
+            "undefined pattern '\{name}'; define it before use",
           )
       }
   }
@@ -70,7 +71,7 @@ fn ResolvedMiniExpr::ResolvedMiniExpr(
 fn compile_mini_doc(
   expr : ResolvedMiniExpr,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   match expr.node {
     Literal(kind, content, offset) => {
       let doc = match kind {
@@ -87,13 +88,11 @@ fn compile_mini_doc(
       match builder.source_frame_at(offset, offset + content.length()) {
         Some(frame) =>
           doc.with_source_frame(frame~) catch {
-            _ => raise ParseError("internal source-frame construction failed")
+            _ => raise Internal("internal source-frame construction failed")
           }
         None => {
           if builder.origins is Some(_) && !(kind is Silence) {
-            raise ParseError(
-              "position \{offset}: missing source-frame identity",
-            )
+            raise Internal("missing source-frame identity at \{offset}")
           }
           doc
         }

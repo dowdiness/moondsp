@@ -1,15 +1,19 @@
 ///|
 priv struct SongPartSpec {
+  at : Int32
   id : @identity.OccurrenceId?
   name : String
   section_name : String
+  section_at : Int32
   start : @pattern.Rational?
 }
 
 ///|
 priv struct SongFillSpec {
+  at : Int32
   prefix : String
   section_name : String
+  section_at : Int32
 }
 
 ///|
@@ -51,10 +55,10 @@ pub fn parse_song(
   let p = Parser(input)
   let builder = MiniDocBuilder(previous=None, origins=None)
   p.parse_bindings(builder) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   let result = p.parse_song_expr(builder, lower=doc => doc.lower().pat()) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   p.skip_whitespace()
   guard p.at_end() else {
@@ -71,17 +75,15 @@ fn[C] Parser::parse_song_expr(
   self : Parser,
   builder : MiniDocBuilder,
   lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
-) -> ParsedSong[C] raise ParseError {
+) -> ParsedSong[C] raise SourceProblem {
   self.skip_whitespace()
   let song_start = self.pos
   guard self.match_keyword("song(") else {
-    raise ParseError("position \{song_start}: expected 'song('")
+    raise Mistake(song_start, "expected 'song('")
   }
   self.skip_whitespace()
   guard !self.at_end() && self.input[self.pos] != ')' else {
-    raise ParseError(
-      "position \{song_start}: song() requires at least one item",
-    )
+    raise Mistake(song_start, "song() requires at least one item")
   }
   let sections : Map[String, @song.Section[C]] = Map([])
   let part_specs : Array[SongPartSpec] = []
@@ -110,19 +112,19 @@ fn[C] Parser::parse_song_expr(
     self.skip_whitespace()
   }
   self.expect_char(')')
-  let mut song = build_song(
-    [
-      for spec in part_specs => spec.to_part(sections)
-    ],
-  )
+  let mut song = build_song(part_specs, sections, at=song_start)
   for fill in fill_specs {
-    let section = resolve_song_section(sections, fill.section_name)
+    let section = resolve_song_section(
+      sections,
+      fill.section_name,
+      at=fill.section_at,
+    )
     if self.admission is Some(_) &&
       song.occurrences().length() + song.gap_spans().length() > 128 {
-      raise ParseError("playback arrangement exceeds 128 occurrences")
+      raise OverLimit(Occurrences)
     }
     song = song.fill_gaps(prefix=fill.prefix, section~) catch {
-      _ => raise ParseError("song fill '\{fill.prefix}' could not be applied")
+      error => raise song_mistake(error, [], at=fill.at)
     }
   }
   let bpm = match bpm_values.get(0) {
@@ -141,20 +143,18 @@ fn[C] Parser::parse_song_item(
   bpm_values : Array[Double],
   builder~ : MiniDocBuilder,
   lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
-) -> Unit raise ParseError {
+) -> Unit raise SourceProblem {
   self.skip_whitespace()
   let item_start = self.pos
   if self.match_keyword("section(") {
     let section = self.parse_song_section(item_start, builder~, lower~)
     if sections.contains(section.name()) {
-      raise ParseError(
-        "position \{item_start}: duplicate section '\{section.name()}'",
-      )
+      raise Mistake(item_start, "duplicate section '\{section.name()}'")
     }
     sections[section.name()] = section
   } else if self.match_keyword("bpm(") {
     if !bpm_values.is_empty() {
-      raise ParseError("position \{item_start}: duplicate bpm(...)")
+      raise Mistake(item_start, "duplicate bpm(...)")
     }
     bpm_values.push(self.parse_song_bpm(item_start))
   } else if self.match_keyword("part_id(") {
@@ -162,14 +162,14 @@ fn[C] Parser::parse_song_item(
   } else if self.match_keyword("part(") {
     part_specs.push(self.parse_song_part(item_start))
   } else if self.match_keyword("fill(") {
-    fill_specs.push(self.parse_song_fill())
+    fill_specs.push(self.parse_song_fill(item_start))
   } else {
-    raise ParseError(
-      "position \{item_start}: expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
+    raise Mistake(
+      item_start, "expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
     )
   }
   if self.admission is Some(_) && part_specs.length() > 128 {
-    raise ParseError("playback arrangement exceeds 128 occurrences")
+    raise OverLimit(Occurrences)
   }
 }
 
@@ -177,15 +177,13 @@ fn[C] Parser::parse_song_item(
 fn Parser::parse_song_bpm(
   self : Parser,
   item_start : Int32,
-) -> Double raise ParseError {
+) -> Double raise SourceProblem {
   self.skip_whitespace()
   let value = self.read_number()
   self.skip_whitespace()
   self.expect_char(')')
   guard value > 0.0 else {
-    raise ParseError(
-      "position \{item_start}: bpm() requires a positive number, got \{value}",
-    )
+    raise Mistake(item_start, "bpm() requires a positive number, got \{value}")
   }
   value
 }
@@ -196,7 +194,7 @@ fn[C] Parser::parse_song_section(
   item_start : Int32,
   builder~ : MiniDocBuilder,
   lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
-) -> @song.Section[C] raise ParseError {
+) -> @song.Section[C] raise SourceProblem {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -211,11 +209,10 @@ fn[C] Parser::parse_song_section(
   let doc = compile_mini_doc(resolve_mini_expr(syntax, self.bindings), builder)
   self.skip_whitespace()
   self.expect_char(')')
-  let compile_error = ParseError(
-    "position \{item_start}: could not compile section '\{name}'",
-  )
-  let length_error = ParseError(
-    "position \{item_start}: section '\{name}' requires a positive length",
+  let compile_error = Internal("could not compile section '\{name}'")
+  let length_error = Mistake(
+    item_start,
+    "section '\{name}' requires a positive length",
   )
   let content = lower(doc) catch { _ => raise compile_error }
   @song.Section(
@@ -232,47 +229,55 @@ fn[C] Parser::parse_song_section(
 fn Parser::parse_song_part(
   self : Parser,
   item_start : Int32,
-) -> SongPartSpec raise ParseError {
-  ignore(item_start)
+) -> SongPartSpec raise SourceProblem {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
+  self.skip_whitespace()
+  let section_at = self.pos
   let section_name = self.read_quoted_string()
   let start = self.read_optional_song_start()
-  { id: None, name, section_name, start, }
+  { at: item_start, id: None, name, section_name, section_at, start, }
 }
 
 ///|
 fn Parser::parse_song_part_with_id(
   self : Parser,
   item_start : Int32,
-) -> SongPartSpec raise ParseError {
+) -> SongPartSpec raise SourceProblem {
   self.skip_whitespace()
   let id_value = self.read_quoted_string()
   let id = parse_occurrence_id(id_value, item_start)
   self.expect_comma()
   let name = self.read_quoted_string()
   self.expect_comma()
+  self.skip_whitespace()
+  let section_at = self.pos
   let section_name = self.read_quoted_string()
   let start = self.read_optional_song_start()
-  { id: Some(id), name, section_name, start, }
+  { at: item_start, id: Some(id), name, section_name, section_at, start, }
 }
 
 ///|
-fn Parser::parse_song_fill(self : Parser) -> SongFillSpec raise ParseError {
+fn Parser::parse_song_fill(
+  self : Parser,
+  item_start : Int32,
+) -> SongFillSpec raise SourceProblem {
   self.skip_whitespace()
   let prefix = self.read_quoted_string()
   self.expect_comma()
+  self.skip_whitespace()
+  let section_at = self.pos
   let section_name = self.read_quoted_string()
   self.skip_whitespace()
   self.expect_char(')')
-  { prefix, section_name, }
+  { at: item_start, prefix, section_name, section_at, }
 }
 
 ///|
 fn Parser::read_optional_song_start(
   self : Parser,
-) -> @pattern.Rational? raise ParseError {
+) -> @pattern.Rational? raise SourceProblem {
   self.skip_whitespace()
   let start = if !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
@@ -287,7 +292,7 @@ fn Parser::read_optional_song_start(
 }
 
 ///|
-fn Parser::expect_comma(self : Parser) -> Unit raise ParseError {
+fn Parser::expect_comma(self : Parser) -> Unit raise SourceProblem {
   self.skip_whitespace()
   self.expect_char(',')
   self.skip_whitespace()
@@ -297,7 +302,7 @@ fn Parser::expect_comma(self : Parser) -> Unit raise ParseError {
 fn Parser::read_song_rational(
   self : Parser,
   label : String,
-) -> @pattern.Rational raise ParseError {
+) -> @pattern.Rational raise SourceProblem {
   self.skip_whitespace()
   let value_start = self.pos
   let num = self.read_song_int(value_start, label)
@@ -307,9 +312,7 @@ fn Parser::read_song_rational(
     den = self.read_song_int(value_start, label)
   }
   guard den != 0 else {
-    raise ParseError(
-      "position \{value_start}: \{label} denominator cannot be zero",
-    )
+    raise Mistake(value_start, "\{label} denominator cannot be zero")
   }
   @pattern.Rational(num.to_int64(), den.to_int64())
 }
@@ -319,7 +322,7 @@ fn Parser::read_song_int(
   self : Parser,
   err_pos : Int32,
   label : String,
-) -> Int32 raise ParseError {
+) -> Int32 raise SourceProblem {
   let start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -332,7 +335,7 @@ fn Parser::read_song_int(
   }
   guard self.pos > digits_start else {
     self.pos = start
-    raise ParseError("position \{err_pos}: \{label} requires an integer")
+    raise Mistake(err_pos, "\{label} requires an integer")
   }
   let s = self.input[start:self.pos].to_owned()
   let mut value = 0
@@ -356,9 +359,9 @@ fn Parser::read_song_int(
 fn parse_occurrence_id(
   value : String,
   pos : Int32,
-) -> @identity.OccurrenceId raise ParseError {
+) -> @identity.OccurrenceId raise SourceProblem {
   @identity.OccurrenceId::from_string(value) catch {
-    _ => raise ParseError("position \{pos}: invalid occurrence id '\{value}'")
+    _ => raise Mistake(pos, "invalid occurrence id '\{value}'")
   }
 }
 
@@ -366,10 +369,11 @@ fn parse_occurrence_id(
 fn[C] resolve_song_section(
   sections : Map[String, @song.Section[C]],
   name : String,
-) -> @song.Section[C] raise ParseError {
+  at~ : Int32,
+) -> @song.Section[C] raise SourceProblem {
   match sections.get(name) {
     Some(section) => section
-    None => raise ParseError("unknown song section '\{name}'")
+    None => raise Mistake(at, "unknown song section '\{name}'")
   }
 }
 
@@ -377,8 +381,12 @@ fn[C] resolve_song_section(
 fn[C] SongPartSpec::to_part(
   self : SongPartSpec,
   sections : Map[String, @song.Section[C]],
-) -> @song.SongPart[C] raise ParseError {
-  let section = resolve_song_section(sections, self.section_name)
+) -> @song.SongPart[C] raise SourceProblem {
+  let section = resolve_song_section(
+    sections,
+    self.section_name,
+    at=self.section_at,
+  )
   match (self.id, self.start) {
     (Some(id), Some(start)) =>
       @song.SongPart::with_id_at(id~, start~, name=self.name, section~)
@@ -390,9 +398,49 @@ fn[C] SongPartSpec::to_part(
 
 ///|
 fn[C] build_song(
-  parts : Array[@song.SongPart[C]],
-) -> @song.Song[C] raise ParseError {
+  specs : Array[SongPartSpec],
+  sections : Map[String, @song.Section[C]],
+  at~ : Int32,
+) -> @song.Song[C] raise SourceProblem {
+  let parts = [ for spec in specs => spec.to_part(sections) ]
   @song.Song(parts~) catch {
-    _ => raise ParseError("song construction failed")
+    error => raise song_mistake(error, specs, at~)
+  }
+}
+
+///|
+/// A song the author arranged inconsistently. A repeated part is reported
+/// where it repeats; anything else at `at`.
+fn song_mistake(
+  error : @song.SongBuildError,
+  specs : Array[SongPartSpec],
+  at~ : Int32,
+) -> SourceProblem {
+  // The first part that repeats an earlier one.
+  let repeated = (same : (SongPartSpec) -> Bool) => {
+    let mut seen = false
+    for spec in specs {
+      if same(spec) {
+        if seen {
+          return spec.at
+        }
+        seen = true
+      }
+    }
+    at
+  }
+  match error {
+    EmptySong => Mistake(at, "song() requires at least one part")
+    DuplicateOccurrence(name) =>
+      Mistake(
+        repeated(spec => spec.name == name),
+        "duplicate song part '\{name}'",
+      )
+    DuplicateOccurrenceId(id) =>
+      Mistake(
+        repeated(spec => spec.id is Some(own) && own.value() == id),
+        "duplicate song part id '\{id}'",
+      )
+    InvalidOccurrenceId(id) => Mistake(at, "invalid song part id '\{id}'")
   }
 }

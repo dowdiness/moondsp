@@ -400,8 +400,8 @@ test "Mini control arguments are range-checked and syntax-checked" {
       #|position 11: lpf() expects finite resonance above 0
       #|position 16: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got 'sin'
       #|position 20: unknown signal method 'wobble'; use range, fast, or slow
-      #|position 4: expected number
-      #|position 7: random drop ? is not supported in gain patterns
+      #|position 21: expected number
+      #|position 24: random drop ? is not supported in gain patterns
       #|ok
     ),
   )

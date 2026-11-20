@@ -74,6 +74,38 @@ test "play source rejects empty and duplicate tempo declarations" {
 }
 
 ///|
+test "play source problems say whether the author made a mistake or exceeded a limit" {
+  let problem = (source : String) => {
+    match @mini.parse_play_source(source) {
+      Ok(_) => None
+      Err(problem) => Some(problem)
+    }
+  }
+  // Inside quoted notation, a mistake is still located in the whole source.
+  guard problem("note(\"c4 ?? e4\")") is Some(Mistake(9, _)) else {
+    fail("expected a mistake at the unknown note")
+  }
+  let song = "song(section(\"a\",4,s(\"bd\")),part(\"p\",\"b\",0))"
+  guard problem(song) is Some(Mistake(at, _)) else {
+    fail("expected a mistake at the unknown section")
+  }
+  assert_eq(song[at:at + 3].to_owned(), "\"b\"")
+  // A repeated part is reported where it first repeats, not where the song
+  // begins.
+  let repeated = "song(section(\"a\",4,s(\"bd\")),part(\"p\",\"a\",0),part(\"p\",\"a\",4),part(\"p\",\"a\",8))"
+  guard problem(repeated) is Some(Mistake(at, "duplicate song part 'p'")) else {
+    fail("expected a mistake at the repeated part")
+  }
+  assert_true(repeated[at:].to_owned().has_prefix("part(\"p\",\"a\",4)"))
+  // Valid but too deep for playback: a limit, with no position to blame.
+  let nested = "note(\"" + "[".repeat(40) + "60" + "]".repeat(40) + "\")"
+  assert_true(
+    @mini.parse_play_source(nested, query_window=calibrated_window())
+    is Err(OverLimit(Nesting(32))),
+  )
+}
+
+///|
 test "bounded play source preserves ordinary musical output" {
   let source = "let beat = note(\"60 64\"); beat.fast(2)"
   let bounded = @mini.parse_play_source(

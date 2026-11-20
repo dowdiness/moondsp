@@ -139,7 +139,7 @@ fn Parser::record_literal_fact(
     recognized_atoms=Some(self.recognized_atoms),
   )
   try parser.parse_notation() catch {
-    ParseError(_) => ()
+    _ => ()
   } noraise {
     _ => ()
   }
@@ -216,7 +216,7 @@ fn recognize_expression(
 ) -> Unit {
   let first_reference = parser.recognized_references.length()
   try parser.parse_syntax_expr() catch {
-    ParseError(_) => ()
+    _ => ()
   } noraise {
     _ => ()
   }
@@ -267,12 +267,12 @@ fn Parser::recognize_song_sections(
           self.skip_whitespace()
           self.pos
         } catch {
-          ParseError(_) => cursor + 1
+          _ => cursor + 1
         }
         if body_start > cursor + 1 {
           self.pos = body_start
           try self.parse_syntax_expr() catch {
-            ParseError(_) => ()
+            _ => ()
           } noraise {
             _ => ()
           }
@@ -306,7 +306,7 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
     guard !parser.at_end() else { break }
     let start = parser.pos
     let header = try parser.read_binding_name() catch {
-      ParseError(_) => Err(())
+      _ => Err(())
     } noraise {
       name => Ok(name)
     }
@@ -349,7 +349,7 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
         if parser.match_keyword("bpm(") {
           parser.pos = start
           try parse_play_bpm_declaration(parser) catch {
-            ParseError(_) => ()
+            _ => ()
           } noraise {
             _ => ()
           }
@@ -366,8 +366,11 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
         }
         parser.pos = start
         parser.recognized_pattern = false
-        match mini_collect_dollar_stack_lines(input, start~, partial=true) {
-          Ok(Some(lines)) => {
+        match
+          (mini_collect_dollar_stack_lines(input, start~, partial=true) catch {
+            _ => None
+          }) {
+          Some(lines) => {
             mode = Some(Pattern)
             for line in lines {
               parser.pos = line.start

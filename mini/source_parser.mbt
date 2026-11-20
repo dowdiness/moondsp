@@ -30,10 +30,10 @@ pub fn PlaySource::bpm(self : PlaySource) -> Double {
 }
 
 ///|
-fn parse_play_bpm_declaration(parser : Parser) -> Double raise ParseError {
+fn parse_play_bpm_declaration(parser : Parser) -> Double raise SourceProblem {
   let start = parser.pos
   guard parser.match_keyword("bpm(") else {
-    raise ParseError("position \{start}: expected bpm(...)")
+    raise Mistake(start, "expected bpm(...)")
   }
   parser.skip_whitespace()
   let value = parser.read_number()
@@ -42,9 +42,7 @@ fn parse_play_bpm_declaration(parser : Parser) -> Double raise ParseError {
   parser.skip_whitespace()
   parser.expect_char(';')
   guard value > 0.0 else {
-    raise ParseError(
-      "position \{start}: bpm() requires a positive number, got \{value}",
-    )
+    raise Mistake(start, "bpm() requires a positive number, got \{value}")
   }
   value
 }
@@ -63,14 +61,20 @@ pub fn parse_play_source(
   input : String,
   previous~ : @pattern.PatternDoc? = None,
   query_window? : @pattern.QueryWindow,
-) -> Result[PlaySource, String] {
-  parse_play_source_with_origins(
-    input,
-    previous,
-    query_window,
-    origins=None,
-    syntax_depth_limit=None,
-  )
+) -> Result[PlaySource, SourceProblem] {
+  try
+    parse_play_source_with_origins(
+      input,
+      previous,
+      query_window,
+      origins=None,
+      syntax_depth_limit=None,
+    )
+  catch {
+    problem => Err(problem)
+  } noraise {
+    source => Ok(source)
+  }
 }
 
 ///|
@@ -80,73 +84,71 @@ fn parse_play_source_with_origins(
   query_window : @pattern.QueryWindow?,
   origins~ : SourceMap? = None,
   syntax_depth_limit~ : Int32? = None,
-) -> Result[PlaySource, String] {
-  guard !input.is_empty() else { return Err("empty input") }
+) -> PlaySource raise SourceProblem {
+  guard !input.is_empty() else { raise Mistake(0, "empty input") }
   // A bounded parse, by syntax depth or by playback admission, first bounds the text.
   if syntax_depth_limit is Some(_) || query_window is Some(_) {
-    check_playback_source_size(input) catch {
-      ParseError(message) => return Err(message)
-    }
+    check_playback_source_size(input)
   }
   let admission = query_window.map(window => {
     PlaybackAdmission(window.span().to_double())
   })
   let parser = Parser(input, admission~, syntax_depth_limit~)
   let builder = MiniDocBuilder(previous~, origins~)
-  let mut authored_bpm : Double? = None
+  // A top-level `bpm(...)` and where it was written.
+  let mut authored_bpm : (Int32, Double)? = None
   while true {
-    parser.parse_bindings(builder) catch {
-      ParseError(msg) => return Err(msg)
-    }
+    parser.parse_bindings(builder)
     parser.skip_whitespace()
+    let bpm_at = parser.pos
     guard parser.match_keyword("bpm(") else { break }
-    guard authored_bpm is None else { return Err("duplicate bpm(...)") }
-    parser.pos -= 4
-    authored_bpm = Some(
-      parse_play_bpm_declaration(parser) catch {
-        ParseError(msg) => return Err(msg)
-      },
-    )
-  }
-  if parser.match_keyword("song(") {
-    parser.pos -= 5
-    let arrangement = if origins is Some(_) {
-      parser
-      .parse_play_song(builder, admission, authored_bpm, lower=doc => {
-        doc.lower_with_origins()
-      })
-      .map(song => (ExactArrangement(song.0, song.1), song.2))
-    } else {
-      parser
-      .parse_play_song(builder, admission, authored_bpm, lower=doc => {
-        doc.lower().pat()
-      })
-      .map(song => (Arrangement(song.0, song.1), song.2))
+    guard authored_bpm is None else {
+      raise Mistake(bpm_at, "duplicate bpm(...)")
     }
-    arrangement.map(arrangement => { body: arrangement.0, bpm: arrangement.1, })
+    parser.pos = bpm_at
+    authored_bpm = Some((bpm_at, parse_play_bpm_declaration(parser)))
+  }
+  let body_at = parser.pos
+  if parser.match_keyword("song(") {
+    parser.pos = body_at
+    if origins is Some(_) {
+      let (song, repeating, bpm) = parser.parse_play_song(
+        builder,
+        admission,
+        authored_bpm,
+        lower=doc => doc.lower_with_origins(),
+      )
+      { body: ExactArrangement(song, repeating), bpm, }
+    } else {
+      let (song, repeating, bpm) = parser.parse_play_song(
+        builder,
+        admission,
+        authored_bpm,
+        lower=doc => doc.lower().pat(),
+      )
+      { body: Arrangement(song, repeating), bpm, }
+    }
   } else {
-    guard !parser.at_end() else { return Err("empty input") }
+    guard !parser.at_end() else { raise Mistake(body_at, "empty input") }
     let doc = match mini_collect_dollar_stack_lines(input, start=parser.pos) {
-      Err(msg) => return Err(msg)
-      Ok(Some(lines)) =>
-        match parse_doc_dollar_stack_program(input, parser, builder, lines) {
-          Ok(doc) => doc
-          Err(msg) => return Err(msg)
-        }
-      Ok(None) => {
-        let doc = parser.parse_doc_expr(builder) catch {
-          ParseError(msg) => return Err(msg)
-        }
+      Some(lines) =>
+        parse_doc_dollar_stack_program(input, parser, builder, lines)
+      None => {
+        let doc = parser.parse_doc_expr(builder)
         parser.skip_whitespace()
         guard parser.at_end() else {
-          return Err(
-            "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:].to_owned()}'",
+          raise Mistake(
+            parser.pos,
+            "unexpected trailing input '\{input[parser.pos:].to_owned()}'",
           )
         }
         doc
       }
     }
-    Ok({ body: Pattern(doc), bpm: authored_bpm.unwrap_or(DEFAULT_BPM), })
+    {
+      body: Pattern(doc),
+      bpm: authored_bpm.map(declared => declared.1).unwrap_or(DEFAULT_BPM),
+    }
   }
 }
 
@@ -157,31 +159,28 @@ fn[C] Parser::parse_play_song(
   self : Parser,
   builder : MiniDocBuilder,
   admission : PlaybackAdmission?,
-  authored_bpm : Double?,
+  authored_bpm : (Int32, Double)?,
   lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
-) -> Result[(@song.Song[C], Bool, Double), String] {
-  let parsed = self.parse_song_expr(builder, lower~) catch {
-    ParseError(msg) => return Err(msg)
-  }
+) -> (@song.Song[C], Bool, Double) raise SourceProblem {
+  let parsed = self.parse_song_expr(builder, lower~)
   self.skip_whitespace()
   let repeating = self.match_keyword(".repeat()")
   self.skip_whitespace()
   guard self.at_end() else {
-    return Err(
-      "position \{self.pos}: unexpected trailing input '\{self.input[self.pos:].to_owned()}'",
+    raise Mistake(
+      self.pos,
+      "unexpected trailing input '\{self.input[self.pos:].to_owned()}'",
     )
   }
-  guard !(authored_bpm is Some(_) && parsed.bpm() is Some(_)) else {
-    return Err("duplicate bpm(...)")
+  if authored_bpm is Some((at, _)) && parsed.bpm() is Some(_) {
+    raise Mistake(at, "duplicate bpm(...)")
   }
   let bpm = match authored_bpm {
-    Some(value) => value
+    Some((_, value)) => value
     None => parsed.bpm().unwrap_or(DEFAULT_BPM)
   }
   if admission is Some(admission) {
-    admission.arrangement(parsed.song(), repeating) catch {
-      ParseError(message) => return Err(message)
-    }
+    admission.arrangement(parsed.song(), repeating)
   }
-  Ok((parsed.song(), repeating, bpm))
+  (parsed.song(), repeating, bpm)
 }

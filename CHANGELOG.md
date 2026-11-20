@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Mistakes inside quoted notation, such as `note("c4 ?? e4")`, are reported at
+  their position in the whole source instead of within the string, so the
+  editor marks the right place. Unknown song sections, duplicate song parts and
+  colliding `fill(...)` prefixes are now reported as positioned mistakes
+  instead of "song construction failed".
+- **Breaking MoonBit API:** a refused source is a typed `SourceProblem`:
+  `Mistake(at, message)` for code that is wrong at a whole-source offset,
+  `OverLimit(SourceLimit)` for valid code that exceeds what playback affords,
+  and `Internal(message)` for a compiler bug. `parse_play_source` returns it,
+  and `DraftDiagnostic::problem()` replaces `DraftDiagnostic::kind()` and
+  `DraftDiagnostic::message()`; `DraftDiagnosticKind` is removed. A Draft over
+  8192 code units reports `OverLimit(Length)`.
 - The live editor now reports sources the player would refuse, such as
   arrangements whose overlapping parts exceed the query expansion limit,
   instead of showing no diagnostic until Play. With a configured sample rate

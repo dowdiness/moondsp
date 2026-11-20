@@ -617,7 +617,7 @@ fn draft_snapshot(
 ) -> @pattern.PatternSnapshotWithOrigins raise {
   let input = match draft.prepare_playback() {
     Ok(input) => input
-    Err(error) => fail(error.message())
+    Err(diagnostic) => fail(diagnostic.problem().to_string())
   }
   match input.compile() {
     Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) => snapshot
@@ -1101,6 +1101,10 @@ test "Draft tracking limit and reset each establish fresh source epochs" {
   let padding = " ".repeat(8192)
   edit_draft(draft, 0, 0, padding)
   assert_true(draft.state().tracking() is TrackingUnavailable)
+  assert_true(
+    draft.state().diagnostic().map(diagnostic => diagnostic.problem())
+    is Some(OverLimit(Length)),
+  )
   assert_true(draft.prepare_playback() is Err(_))
   assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
   edit_draft(draft, 0, padding.length(), "")

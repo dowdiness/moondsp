@@ -22,11 +22,6 @@
 ///   atom     = identifier | number
 
 ///|
-priv suberror ParseError {
-  ParseError(String)
-}
-
-///|
 /// Parser state: input string + current position.
 priv struct Parser {
   input : String
@@ -76,7 +71,7 @@ fn mini_collect_dollar_stack_lines(
   input : String,
   start~ : Int32 = 0,
   partial~ : Bool = false,
-) -> Result[Array[MiniDollarStackLine]?, String] {
+) -> Array[MiniDollarStackLine]? raise SourceProblem {
   let lines : Array[MiniDollarStackLine] = []
   let mut saw_program = false
   let mut pos = start
@@ -105,24 +100,24 @@ fn mini_collect_dollar_stack_lines(
           expr_first += 1
         }
         if expr_first == content_end && !partial {
-          return Err("position \{first}: $: requires an expression")
+          raise Mistake(first, "$: requires an expression")
         }
         lines.push({ start: expr_start, end: content_end, })
       } else if saw_program {
         if partial {
           break
         }
-        return Err("position \{first}: expected '$:' stack line")
+        raise Mistake(first, "expected '$:' stack line")
       } else {
-        return Ok(None)
+        return None
       }
     }
     pos = if line_end < input.length() { line_end + 1 } else { line_end }
   }
   if saw_program {
-    Ok(Some(lines))
+    Some(lines)
   } else {
-    Ok(None)
+    None
   }
 }
 
@@ -179,15 +174,13 @@ fn Parser::skip_inline_whitespace(self : Parser) -> Unit {
 }
 
 ///|
-fn Parser::expect_char(self : Parser, c : Char) -> Unit raise ParseError {
+fn Parser::expect_char(self : Parser, c : Char) -> Unit raise SourceProblem {
   if self.at_end() {
-    raise ParseError("position \{self.pos}: expected '\{c}', got end of input")
+    raise Mistake(self.pos, "expected '\{c}', got end of input")
   }
   let code = c.to_int().to_uint16()
   if self.input[self.pos] != code {
-    raise ParseError(
-      "position \{self.pos}: expected '\{c}', got '\{self.input[self.pos]}'",
-    )
+    raise Mistake(self.pos, "expected '\{c}', got '\{self.input[self.pos]}'")
   }
   self.pos += 1
 }
@@ -231,7 +224,7 @@ fn Parser::read_ident(self : Parser) -> String {
 
 ///|
 /// Read a number (integer or float, possibly negative).
-fn Parser::read_number(self : Parser) -> Double raise ParseError {
+fn Parser::read_number(self : Parser) -> Double raise SourceProblem {
   let start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -254,7 +247,7 @@ fn Parser::read_number(self : Parser) -> Double raise ParseError {
   }
   guard has_digit else {
     self.pos = start
-    raise ParseError("position \{start}: expected number")
+    raise Mistake(start, "expected number")
   }
   parse_double_manual(self.input, start, self.pos)
 }
@@ -263,7 +256,7 @@ fn Parser::read_number(self : Parser) -> Double raise ParseError {
 fn Parser::read_method_control_argument(
   self : Parser,
   key : @control.Control,
-) -> MiniValue raise ParseError {
+) -> MiniValue raise SourceProblem {
   self.expect_char('(')
   let value = self.read_control_value(key)
   self.skip_whitespace()
@@ -277,11 +270,12 @@ fn Parser::read_seconds_control(
   self : Parser,
   key : @control.Control,
   method_start : Int32,
-) -> MiniTransform raise ParseError {
+) -> MiniTransform raise SourceProblem {
   let seconds = self.read_method_control_argument(key)
   guard seconds.all(s => key.admits(s)) else {
-    raise ParseError(
-      "position \{method_start}: \{key}() expects seconds between 0 and \{@control.MAX_SECONDS}",
+    raise Mistake(
+      method_start,
+      "\{key}() expects seconds between 0 and \{@control.MAX_SECONDS}",
     )
   }
   Control(key, seconds)
@@ -293,18 +287,19 @@ fn Parser::read_seconds_control(
 fn Parser::read_control_value(
   self : Parser,
   key : @control.Control,
-) -> MiniValue raise ParseError {
+) -> MiniValue raise SourceProblem {
   self.skip_whitespace()
   let start = self.pos
-  guard !self.at_end() else {
-    raise ParseError("position \{start}: expected a control value")
-  }
+  guard !self.at_end() else { raise Mistake(start, "expected a control value") }
   if self.input[self.pos] == '"' {
     let (content, offset) = self.read_quoted_string_with_start()
-    guard !content.is_empty() else {
-      raise ParseError("position \{offset}: empty notation")
-    }
-    let notation = NotationParser(content, sound=false, control=key)
+    guard !content.is_empty() else { raise Mistake(offset, "empty notation") }
+    let notation = NotationParser(
+      content,
+      sound=false,
+      control=key,
+      source_offset=offset,
+    )
     ignore(notation.parse_notation())
     return Steps(content, offset, notation.control_values)
   }
@@ -313,8 +308,9 @@ fn Parser::read_control_value(
     return Number(self.read_number())
   }
   guard MiniShape::from_name(name) is Some(shape) else {
-    raise ParseError(
-      "position \{start}: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got '\{name}'",
+    raise Mistake(
+      start,
+      "expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got '\{name}'",
     )
   }
   let mut low = 0.0
@@ -355,8 +351,9 @@ fn Parser::read_control_value(
         self.skip_whitespace()
         self.expect_char(')')
         guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
-          raise ParseError(
-            "position \{method_start}: \{op}() requires a finite positive number, got \{value}",
+          raise Mistake(
+            method_start,
+            "\{op}() requires a finite positive number, got \{value}",
           )
         }
         let factor = parse_decimal_rational(
@@ -368,8 +365,9 @@ fn Parser::read_control_value(
         rate = if op == "fast" { rate * factor } else { rate / factor }
       }
       other =>
-        raise ParseError(
-          "position \{method_start}: unknown signal method '\{other}'; use range, fast, or slow",
+        raise Mistake(
+          method_start,
+          "unknown signal method '\{other}'; use range, fast, or slow",
         )
     }
   }
@@ -414,7 +412,7 @@ fn parse_decimal_rational(
   start : Int32,
   end_ : Int32,
   error_position : Int32,
-) -> @pattern.Rational raise ParseError {
+) -> @pattern.Rational raise SourceProblem {
   let negative = input[start] == '-'
   let digits_start = if negative { start + 1 } else { start }
   let mut point = end_
@@ -428,8 +426,8 @@ fn parse_decimal_rational(
   for index in digits_start..<point {
     let digit = (input[index].to_int() - '0'.to_int()).to_int64()
     guard whole <= (9223372036854775807L - digit) / 10L else {
-      raise ParseError(
-        "position \{error_position}: decimal factor exceeds exact rational range",
+      raise Mistake(
+        error_position, "decimal factor exceeds exact rational range",
       )
     }
     whole = whole * 10L + digit
@@ -444,8 +442,8 @@ fn parse_decimal_rational(
     0
   }
   guard fractional_digits <= 18 else {
-    raise ParseError(
-      "position \{error_position}: exact decimal factors support at most 18 fractional digits",
+    raise Mistake(
+      error_position, "exact decimal factors support at most 18 fractional digits",
     )
   }
   let mut denominator = 1L
@@ -456,9 +454,7 @@ fn parse_decimal_rational(
       (input[index].to_int() - '0'.to_int()).to_int64()
   }
   guard whole <= (9223372036854775807L - fractional) / denominator else {
-    raise ParseError(
-      "position \{error_position}: decimal factor exceeds exact rational range",
-    )
+    raise Mistake(error_position, "decimal factor exceeds exact rational range")
   }
   let numerator = whole * denominator + fractional
   @pattern.Rational(if negative { -numerator } else { numerator }, denominator)
@@ -466,7 +462,7 @@ fn parse_decimal_rational(
 
 ///|
 /// Read the quoted string contents between double quotes.
-fn Parser::read_quoted_string(self : Parser) -> String raise ParseError {
+fn Parser::read_quoted_string(self : Parser) -> String raise SourceProblem {
   self.expect_char('"')
   let start = self.pos
   while !self.at_end() && self.input[self.pos] != '"' {
@@ -484,12 +480,10 @@ fn require_integer(
   value : Double,
   method_start : Int32,
   label : String,
-) -> Int32 raise ParseError {
+) -> Int32 raise SourceProblem {
   let n = value.to_int()
   if value != n.to_double() {
-    raise ParseError(
-      "position \{method_start}: \{label} requires an integer, got \{value}",
-    )
+    raise Mistake(method_start, "\{label} requires an integer, got \{value}")
   }
   n
 }
@@ -497,7 +491,7 @@ fn require_integer(
 ///|
 /// Consume a declaration header. Bindings are immutable and ordered, so no
 /// unresolved or cyclic dependency can enter the lowered pattern.
-fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
+fn Parser::read_binding_name(self : Parser) -> String? raise SourceProblem {
   self.skip_whitespace()
   let start = self.pos
   if self.read_ident() != "let" {
@@ -508,17 +502,15 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
   let name_start = self.pos
   let name = self.read_ident()
   guard !name.is_empty() else {
-    raise ParseError("position \{name_start}: expected pattern name")
+    raise Mistake(name_start, "expected pattern name")
   }
   match name {
     "let" | "s" | "note" | "chord" | "stack" | "song" =>
-      raise ParseError(
-        "position \{name_start}: reserved pattern name '\{name}'",
-      )
+      raise Mistake(name_start, "reserved pattern name '\{name}'")
     _ => ()
   }
   if self.bindings.contains(name) {
-    raise ParseError("position \{name_start}: duplicate pattern '\{name}'")
+    raise Mistake(name_start, "duplicate pattern '\{name}'")
   }
   self.skip_whitespace()
   self.expect_char('=')
@@ -533,7 +525,7 @@ fn Parser::read_binding_name(self : Parser) -> String? raise ParseError {
 fn Parser::parse_bindings(
   self : Parser,
   builder : MiniDocBuilder,
-) -> Unit raise ParseError {
+) -> Unit raise SourceProblem {
   while true {
     self.skip_whitespace()
     guard self.read_binding_name() is Some(name) else { break }

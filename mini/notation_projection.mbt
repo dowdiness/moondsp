@@ -47,7 +47,7 @@ pub fn project_notation_nodes(
   let parser = NotationParser(content, sound~, chord~)
   parser.projection_nodes = Some([])
   let pattern = parser.parse_notation() catch {
-    ParseError(message) => return Err(message)
+    problem => return Err(problem.to_string())
   }
   guard parser.at_end() else {
     return Err("position \{parser.pos}: unexpected trailing notation")
@@ -70,7 +70,7 @@ pub fn project_notation_nodes(
   // admission model with that alignment, rather than an arbitrary runtime arc.
   let assessment = NotationParser(content, sound~, chord~, assess=true)
   let _ = assessment.parse_notation() catch {
-    ParseError(message) => return Err(message)
+    problem => return Err(problem.to_string())
   }
   guard assessment.query_work.unwrap().estimate(span, aligned=true).allowed() else {
     return Err("notation projection exceeds the bounded query budget")

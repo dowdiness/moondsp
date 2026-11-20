@@ -19,7 +19,7 @@ pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
 
 pub fn parse_doc(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternDoc, String]
 
-pub fn parse_play_source(String, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, String]
+pub fn parse_play_source(String, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, SourceProblem]
 
 pub fn parse_snapshot(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternSnapshot, String]
 
@@ -37,6 +37,19 @@ pub(all) suberror DraftEditError {
 pub fn DraftEditError::equal(Self, Self) -> Bool
 pub fn DraftEditError::not_equal(Self, Self) -> Bool
 pub fn DraftEditError::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) suberror SourceProblem {
+  Mistake(Int32, String)
+  OverLimit(SourceLimit)
+  Internal(String)
+}
+pub fn SourceProblem::equal(Self, Self) -> Bool
+pub fn SourceProblem::message(Self) -> String
+pub fn SourceProblem::not_equal(Self, Self) -> Bool
+pub fn SourceProblem::to_repr(Self) -> @debug.Repr
+pub fn SourceProblem::to_string(Self) -> String
+pub impl Show for SourceProblem
 
 // Types and methods
 pub struct Draft {
@@ -57,20 +70,10 @@ pub struct DraftDiagnostic {
   // private fields
 }
 pub fn DraftDiagnostic::equal(Self, Self) -> Bool
-pub fn DraftDiagnostic::kind(Self) -> DraftDiagnosticKind
-pub fn DraftDiagnostic::message(Self) -> String
 pub fn DraftDiagnostic::not_equal(Self, Self) -> Bool
+pub fn DraftDiagnostic::problem(Self) -> SourceProblem
 pub fn DraftDiagnostic::to_repr(Self) -> @debug.Repr
 pub fn DraftDiagnostic::version(Self) -> DraftVersion
-
-#derive(Eq, @debug.Debug)
-pub(all) enum DraftDiagnosticKind {
-  Syntax
-  TrackingUnavailable
-}
-pub fn DraftDiagnosticKind::equal(Self, Self) -> Bool
-pub fn DraftDiagnosticKind::not_equal(Self, Self) -> Bool
-pub fn DraftDiagnosticKind::to_repr(Self) -> @debug.Repr
 
 pub struct DraftState {
   // private fields
@@ -175,6 +178,22 @@ pub(all) enum PreparedPlayback {
   Pattern(@pattern.PatternSnapshotWithOrigins, Double)
   Runtime(PlaySource)
 }
+
+#derive(Eq, @debug.Debug)
+pub(all) enum SourceLimit {
+  Length
+  Nesting(Int32)
+  SyntaxNodes
+  PatternExpansion
+  ArrangementExpansion
+  Occurrences
+  EuclideanSteps
+  DurationSum
+  NotationNodes
+}
+pub fn SourceLimit::equal(Self, Self) -> Bool
+pub fn SourceLimit::not_equal(Self, Self) -> Bool
+pub fn SourceLimit::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)
 pub struct SourceRange {

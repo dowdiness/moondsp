@@ -80,7 +80,7 @@ test "bounded recursive descent rejects depth without relying on the pre-scan" {
     Array::make(2000, ")").join("")
   let parser = Parser(source, admission=Some(PlaybackAdmission(0.125)))
   let rejected = try parser.parse_syntax_expr() catch {
-    ParseError(_) => true
+    problem => problem == OverLimit(Nesting(32))
   } noraise {
     _ => false
   }
@@ -178,7 +178,10 @@ test "sequential song sections are admitted one occurrence at a time" {
     "," +
     parts.map(part => part.replace(old=")", new=",0)")).join(",") +
     ")"
-  assert_true(parse_play_source(layered, query_window=window) is Err(_))
+  assert_true(
+    parse_play_source(layered, query_window=window)
+    is Err(OverLimit(ArrangementExpansion)),
+  )
   // The editor reports the player's rejection before Play is pressed.
   guard draft.edit(
       EditTransaction(base=draft.state().version(), edits=[
@@ -191,10 +194,7 @@ test "sequential song sections are admitted one occurrence at a time" {
   guard state.diagnostic() is Some(diagnostic) else {
     fail("expected admission diagnostic")
   }
-  assert_eq(
-    diagnostic.message(),
-    "playback arrangement exceeds the query expansion limit",
-  )
+  assert_eq(diagnostic.problem(), OverLimit(ArrangementExpansion))
   assert_true(draft.prepare_playback() is Err(_))
   // A Draft that learns its player later reports the same, at the same version.
   let late = Draft(layered)

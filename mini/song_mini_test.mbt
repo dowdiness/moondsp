@@ -174,7 +174,7 @@ test "parse_song supports explicit occurrence IDs and display names" {
 test "parse_song reports unknown section references" {
   let result = @mini.parse_song("song(part(\"a1\",\"missing\"))")
   match result {
-    Err("unknown song section 'missing'") => ()
+    Err("position 15: unknown song section 'missing'") => ()
     _ => assert_true(false)
   }
 }

@@ -27,7 +27,7 @@ pub fn create_draft(
 ///|
 fn state_json(state : @mini.DraftState) -> Json {
   let diagnostic : Json = match state.diagnostic() {
-    Some(error) => Json(error.message())
+    Some(diagnostic) => Json(diagnostic.problem().to_string())
     None => Json::null()
   }
   {
@@ -106,7 +106,8 @@ pub fn edit_draft(draft : @mini.Draft, transaction : String) -> String {
 pub fn prepare_playback(draft : @mini.Draft) -> String {
   let result : Json = match draft.prepare_playback() {
     Ok(input) => { "ok": true, "input": Json(input.encode_wire()) }
-    Err(error) => { "ok": false, "message": Json(error.message()) }
+    Err(diagnostic) =>
+      { "ok": false, "message": Json(diagnostic.problem().to_string()) }
   }
   result.stringify()
 }
@@ -282,7 +283,7 @@ fn notation_projection_compile_events(
 ) -> Array[Json] raise EditWireError {
   let input = match draft.prepare_playback() {
     Ok(input) => input
-    Err(error) => raise InvalidEdit(error.message())
+    Err(diagnostic) => raise InvalidEdit(diagnostic.problem().to_string())
   }
   let compiled = match input.compile() {
     Ok(value) => value

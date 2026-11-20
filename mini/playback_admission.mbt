@@ -134,18 +134,16 @@ fn MiniQueryWork::estimate(
 fn MiniQueryWork::check(
   self : MiniQueryWork,
   width : Double,
-) -> Unit raise ParseError {
+) -> Unit raise SourceProblem {
   guard self.estimate(width).allowed() else {
-    raise ParseError("playback source exceeds the query expansion limit")
+    raise OverLimit(PatternExpansion)
   }
 }
 
 ///|
 /// The pre-scan only bounds lexical size/depth; syntax still belongs to Parser.
-fn check_playback_source_size(input : String) -> Unit raise ParseError {
-  guard input.length() <= 8192 else {
-    raise ParseError("playback source exceeds 8192 characters")
-  }
+fn check_playback_source_size(input : String) -> Unit raise SourceProblem {
+  guard input.length() <= 8192 else { raise OverLimit(Length) }
   let mut depth = 0
   let mut quoted_depth = 0
   let mut quoted = false
@@ -160,7 +158,7 @@ fn check_playback_source_size(input : String) -> Unit raise ParseError {
         }
         None =>
           if index + 1 < input.length() && input[index + 1] == '*' {
-            raise ParseError("position \{index}: unterminated block comment")
+            raise Mistake(index, "unterminated block comment")
           }
       }
     }
@@ -179,9 +177,7 @@ fn check_playback_source_size(input : String) -> Unit raise ParseError {
         _ => ()
       }
     }
-    guard depth + quoted_depth <= 32 else {
-      raise ParseError("playback source exceeds nesting depth 32")
-    }
+    guard depth + quoted_depth <= 32 else { raise OverLimit(Nesting(32)) }
     index += 1
   }
 }
@@ -207,14 +203,15 @@ fn MiniValue::merge_work(
   self : MiniValue,
   key : @control.Control,
   child : MiniQueryWork,
-) -> MiniQueryWork raise ParseError {
+) -> MiniQueryWork raise SourceProblem {
   match self {
     Number(_) | Signal(_) => MergeScalar(child)
-    Steps(content, _, _) => {
+    Steps(content, offset, _) => {
       let notation = NotationParser(
         content,
         sound=false,
         control=key,
+        source_offset=offset,
         assess=true,
       )
       ignore(notation.parse_notation())
@@ -240,18 +237,17 @@ fn PlaybackAdmission::expression(
   self : PlaybackAdmission,
   expr : MiniExpr,
   depth~ : Int32 = 0,
-) -> MiniQueryWork raise ParseError {
+) -> MiniQueryWork raise SourceProblem {
   self.nodes += 1
-  guard self.nodes <= 512 && depth <= 32 else {
-    raise ParseError("playback source exceeds 512 syntax nodes or depth 32")
-  }
+  guard self.nodes <= 512 && depth <= 32 else { raise OverLimit(SyntaxNodes) }
   let work = match expr.node {
     Literal(Silence, _, _) => Quiet
-    Literal(kind, content, _) => {
+    Literal(kind, content, content_start) => {
       let notation = NotationParser(
         content,
         sound=kind is Sound,
         chord=kind is Chord,
+        source_offset=content_start,
         assess=true,
       )
       ignore(notation.parse_notation())
@@ -260,7 +256,11 @@ fn PlaybackAdmission::expression(
     Reference(name) =>
       match self.definitions.get(name) {
         Some(work) => work
-        None => raise ParseError("undefined pattern '\{name}'")
+        None =>
+          raise Mistake(
+            expr.span.start,
+            "undefined pattern '\{name}'; define it before use",
+          )
       }
     Stack(children) =>
       Overlay(children.map(child => self.expression(child, depth=depth + 1)))
@@ -303,7 +303,7 @@ fn[C] PlaybackAdmission::arrangement(
   self : PlaybackAdmission,
   song : @song.Song[C],
   repeating : Bool,
-) -> Unit raise ParseError {
+) -> Unit raise SourceProblem {
   let occurrences = song.occurrences()
   guard occurrences is [first, ..] else { return }
   let mut minimum_length = first.section().length_cycles().to_double()
@@ -312,9 +312,7 @@ fn[C] PlaybackAdmission::arrangement(
   let mut work = 0.0
   for occurrence in occurrences {
     let bound = self.sections[occurrence.section().name()].estimate(self.width)
-    guard bound.allowed() else {
-      raise ParseError("playback source exceeds the query expansion limit")
-    }
+    guard bound.allowed() else { raise OverLimit(PatternExpansion) }
     events = events.max(bound.events)
     work = work.max(bound.work)
     minimum_length = minimum_length.min(
@@ -338,6 +336,6 @@ fn[C] PlaybackAdmission::arrangement(
   )
   let queries = parts * (if repeating { 2.0 } else { 1.0 })
   guard MiniQueryBound(events * queries, work * queries).allowed() else {
-    raise ParseError("playback arrangement exceeds the query expansion limit")
+    raise OverLimit(ArrangementExpansion)
   }
 }

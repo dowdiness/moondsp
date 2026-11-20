@@ -165,14 +165,12 @@ priv enum MiniExprNode {
 fn Parser::parse_syntax_expr(
   self : Parser,
   depth~ : Int32 = 0,
-) -> MiniExpr raise ParseError {
+) -> MiniExpr raise SourceProblem {
   guard self.admission is None || depth < 32 else {
-    raise ParseError("playback source exceeds nesting depth 32")
+    raise OverLimit(Nesting(32))
   }
   if self.syntax_depth_limit is Some(limit) {
-    guard depth < limit else {
-      raise ParseError("source exceeds nesting depth \{limit}")
-    }
+    guard depth < limit else { raise OverLimit(Nesting(limit)) }
   }
   let start = self.pos
   let first = self.parse_syntax_chain(depth)
@@ -187,13 +185,11 @@ fn Parser::parse_syntax_expr(
     self.pos += 1
     self.skip_whitespace()
     guard !self.at_end() else {
-      raise ParseError("position \{self.pos}: expected an expression after '+'")
+      raise Mistake(self.pos, "expected an expression after '+'")
     }
     match self.input[self.pos] {
       '+' | ')' | ',' | ';' =>
-        raise ParseError(
-          "position \{self.pos}: expected an expression after '+'",
-        )
+        raise Mistake(self.pos, "expected an expression after '+'")
       _ => ()
     }
     operands.push(self.parse_syntax_chain(depth))
@@ -211,7 +207,7 @@ fn Parser::parse_syntax_expr(
 fn Parser::parse_syntax_chain(
   self : Parser,
   depth : Int32,
-) -> MiniExpr raise ParseError {
+) -> MiniExpr raise SourceProblem {
   self.skip_whitespace()
   let start = self.pos
   let mut expr = self.parse_syntax_primary(depth)
@@ -227,9 +223,7 @@ fn Parser::parse_syntax_chain(
     self.skip_whitespace()
     chain_depth += 1
     if self.syntax_depth_limit is Some(limit) {
-      guard chain_depth < limit else {
-        raise ParseError("source exceeds nesting depth \{limit}")
-      }
+      guard chain_depth < limit else { raise OverLimit(Nesting(limit)) }
     }
     let transform = self.parse_transform()
     expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
@@ -244,9 +238,9 @@ fn Parser::parse_syntax_chain(
 fn Parser::parse_syntax_primary(
   self : Parser,
   depth : Int32,
-) -> MiniExpr raise ParseError {
+) -> MiniExpr raise SourceProblem {
   guard !self.at_end() else {
-    raise ParseError("position \{self.pos}: unexpected end of input")
+    raise Mistake(self.pos, "unexpected end of input")
   }
   let start = self.pos
   if self.match_keyword("stack(") {
@@ -255,9 +249,7 @@ fn Parser::parse_syntax_primary(
     }
     self.skip_whitespace()
     guard !self.at_end() && self.input[self.pos] != ')' else {
-      raise ParseError(
-        "position \{start}: stack() requires at least one argument",
-      )
+      raise Mistake(start, "stack() requires at least one argument")
     }
     let args = [self.parse_syntax_expr(depth=depth + 1)]
     self.skip_whitespace()
@@ -319,13 +311,14 @@ fn Parser::parse_syntax_primary(
     }
     return { span: { start, end: self.pos, }, node: Reference(name), }
   }
-  raise ParseError(
-    "position \{self.pos}: expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('",
+  raise Mistake(
+    self.pos,
+    "expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('",
   )
 }
 
 ///|
-fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
+fn Parser::parse_transform(self : Parser) -> MiniTransform raise SourceProblem {
   let method_start = self.pos
   let name = self.read_ident()
   match name {
@@ -338,8 +331,9 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.skip_whitespace()
       self.expect_char(')')
       guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
-        raise ParseError(
-          "position \{method_start}: \{name}() requires a finite positive number, got \{value}",
+        raise Mistake(
+          method_start,
+          "\{name}() requires a finite positive number, got \{value}",
         )
       }
       let factor = parse_decimal_rational(
@@ -349,8 +343,9 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
         method_start,
       )
       guard factor > @pattern.Rational::from_int(0) else {
-        raise ParseError(
-          "position \{method_start}: \{name}() requires a representable positive factor",
+        raise Mistake(
+          method_start,
+          "\{name}() requires a representable positive factor",
         )
       }
       if name == "fast" {
@@ -368,9 +363,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.skip_whitespace()
       self.expect_char(')')
       guard !value.is_nan() && !value.is_inf() && value >= 0.0 && value <= 1.0 else {
-        raise ParseError(
-          "position \{method_start}: gate() expects a fraction between 0 and 1",
-        )
+        raise Mistake(method_start, "gate() expects a fraction between 0 and 1")
       }
       let factor = parse_decimal_rational(
         self.input,
@@ -380,9 +373,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       )
       guard factor >= @pattern.Rational::from_int(0) &&
         factor <= @pattern.Rational::from_int(1) else {
-        raise ParseError(
-          "position \{method_start}: gate() expects a fraction between 0 and 1",
-        )
+        raise Mistake(method_start, "gate() expects a fraction between 0 and 1")
       }
       Gate(factor)
     }
@@ -408,8 +399,9 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
         self.pos += 1
         let q = self.read_control_value(kind.resonance_control_key())
         guard q.all(q => kind.resonance_control_key().admits(q)) else {
-          raise ParseError(
-            "position \{method_start}: \{name}() expects finite resonance above 0",
+          raise Mistake(
+            method_start,
+            "\{name}() expects finite resonance above 0",
           )
         }
         Some(q)
@@ -428,9 +420,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
     "room" => {
       let send = self.read_method_control_argument(Room)
       guard send.all(s => @control.Control::Room.admits(s)) else {
-        raise ParseError(
-          "position \{method_start}: room() expects a send between 0 and 1",
-        )
+        raise Mistake(method_start, "room() expects a send between 0 and 1")
       }
       Control(Room, send)
     }
@@ -451,8 +441,9 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.expect_char(')')
       let n = require_integer(n_dbl, method_start, "every() first argument")
       guard n > 0 else {
-        raise ParseError(
-          "position \{method_start}: every() requires a positive integer, got \{n}",
+        raise Mistake(
+          method_start,
+          "every() requires a positive integer, got \{n}",
         )
       }
       Every(n, f)
@@ -470,7 +461,7 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise ParseError {
       self.expect_char(')')
       Jux(f)
     }
-    _ => raise ParseError("position \{method_start}: unknown method '\{name}'")
+    _ => raise Mistake(method_start, "unknown method '\{name}'")
   }
 }
 
@@ -480,7 +471,7 @@ fn Parser::parse_transform_callback(
   method_start : Int32,
   name : String,
   calling_method~ : String,
-) -> MiniCallback raise ParseError {
+) -> MiniCallback raise SourceProblem {
   match name {
     "fast" => {
       self.expect_char('(')
@@ -490,8 +481,9 @@ fn Parser::parse_transform_callback(
       self.expect_char(')')
       let k = require_integer(k_dbl, method_start, "\{calling_method}(fast(k))")
       guard k > 0 else {
-        raise ParseError(
-          "position \{method_start}: \{calling_method}(fast(k)) requires a positive integer, got \{k}",
+        raise Mistake(
+          method_start,
+          "\{calling_method}(fast(k)) requires a positive integer, got \{k}",
         )
       }
       Fast(k)
@@ -504,8 +496,9 @@ fn Parser::parse_transform_callback(
       self.expect_char(')')
       let k = require_integer(k_dbl, method_start, "\{calling_method}(slow(k))")
       guard k > 0 else {
-        raise ParseError(
-          "position \{method_start}: \{calling_method}(slow(k)) requires a positive integer, got \{k}",
+        raise Mistake(
+          method_start,
+          "\{calling_method}(slow(k)) requires a positive integer, got \{k}",
         )
       }
       Slow(k)
@@ -519,8 +512,9 @@ fn Parser::parse_transform_callback(
       Rev
     }
     _ =>
-      raise ParseError(
-        "position \{method_start}: \{calling_method}() callback must be fast(N), slow(N), or rev; got '\{name}'",
+      raise Mistake(
+        method_start,
+        "\{calling_method}() callback must be fast(N), slow(N), or rev; got '\{name}'",
       )
   }
 }

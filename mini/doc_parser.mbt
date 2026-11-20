@@ -79,7 +79,7 @@ pub fn MiniDocBuilder::sound_atom(
   let doc = match drum_midi(name) {
     Some(midi) =>
       self.control_doc(id, Sound, midi.to_double()) catch {
-        ParseError(msg) => return Err(msg)
+        problem => return Err(problem.to_string())
       }
     None => return Err("unknown drum name '\{name}'")
   }
@@ -98,7 +98,7 @@ pub fn MiniDocBuilder::note_atom(
     Err(msg) => return Err(msg)
   }
   let doc = self.control_doc(id, Note, note) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -109,7 +109,7 @@ fn MiniDocBuilder::chord_tone_id(
   chord_id : @identity.PatternNodeId,
   tone_index : Int32,
   midi : Int32,
-) -> @identity.PatternNodeId raise ParseError {
+) -> @identity.PatternNodeId raise SourceProblem {
   self.id("mini:chord-tone:\{chord_id.value()}:\{tone_index}:\{midi}")
 }
 
@@ -118,7 +118,7 @@ fn MiniDocBuilder::chord_doc_from_notes(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   notes : Array[Int32],
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   self.contents[id.value()] = "chord:\{notes.map(note => "\{note}").join(":")}"
   match self.reuse_doc(id) {
     Some(doc) => doc
@@ -136,7 +136,7 @@ fn MiniDocBuilder::chord_doc_from_notes(
         tone_index += 1
       }
       @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
     }
   }
@@ -153,7 +153,7 @@ pub fn MiniDocBuilder::chord_atom(
   match @pattern.parse_chord(name) {
     Some(notes) => {
       let doc = self.chord_doc_from_notes(id, notes) catch {
-        ParseError(msg) => return Err(msg)
+        problem => return Err(problem.to_string())
       }
       Ok(doc)
     }
@@ -198,7 +198,7 @@ pub fn MiniDocBuilder::fast(
   factor : @pattern.Rational,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.fast_doc(doc, factor) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -211,7 +211,7 @@ pub fn MiniDocBuilder::slow(
   factor : @pattern.Rational,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.slow_doc(doc, factor) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -222,7 +222,9 @@ pub fn MiniDocBuilder::rev(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
 ) -> Result[@pattern.PatternDoc, String] {
-  let doc = self.rev_doc(doc) catch { ParseError(msg) => return Err(msg) }
+  let doc = self.rev_doc(doc) catch {
+    problem => return Err(problem.to_string())
+  }
   Ok(doc)
 }
 
@@ -236,7 +238,7 @@ pub fn MiniDocBuilder::euclid(
   rotation : Int32,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.euclid_doc(doc, k, n, rotation) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -251,7 +253,7 @@ pub fn MiniDocBuilder::degrade(
   step? : Int32,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.degrade_doc(doc, p, step?) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -265,7 +267,7 @@ pub fn MiniDocBuilder::control(
   value : Double,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.scalar_control_doc(doc, key, value) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -279,7 +281,7 @@ pub fn MiniDocBuilder::every(
   transform : @pattern.TimeTransform,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.every_doc(doc, n, transform) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -292,7 +294,7 @@ pub fn MiniDocBuilder::jux(
   transform : @pattern.TimeTransform,
 ) -> Result[@pattern.PatternDoc, String] {
   let doc = self.jux_doc(doc, transform) catch {
-    ParseError(msg) => return Err(msg)
+    problem => return Err(problem.to_string())
   }
   Ok(doc)
 }
@@ -303,7 +305,9 @@ pub fn MiniDocBuilder::sequence(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc],
 ) -> Result[@pattern.PatternDoc, String] {
-  let doc = self.sequence_doc(docs) catch { ParseError(msg) => return Err(msg) }
+  let doc = self.sequence_doc(docs) catch {
+    problem => return Err(problem.to_string())
+  }
   Ok(doc)
 }
 
@@ -313,7 +317,9 @@ pub fn MiniDocBuilder::stack(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc],
 ) -> Result[@pattern.PatternDoc, String] {
-  let doc = self.stack_doc(docs) catch { ParseError(msg) => return Err(msg) }
+  let doc = self.stack_doc(docs) catch {
+    problem => return Err(problem.to_string())
+  }
   Ok(doc)
 }
 
@@ -321,10 +327,10 @@ pub fn MiniDocBuilder::stack(
 fn MiniDocBuilder::id(
   self : MiniDocBuilder,
   value : String,
-) -> @identity.PatternNodeId raise ParseError {
+) -> @identity.PatternNodeId raise SourceProblem {
   ignore(self)
   @identity.PatternNodeId::from_string(value) catch {
-    _ => raise ParseError("internal mini id was invalid: \{value}")
+    _ => raise Internal("internal mini id was invalid: \{value}")
   }
 }
 
@@ -346,7 +352,7 @@ fn MiniDocBuilder::atom_id(
   self : MiniDocBuilder,
   kind : String,
   value : String,
-) -> @identity.PatternNodeId raise ParseError {
+) -> @identity.PatternNodeId raise SourceProblem {
   let key = "\{kind}:\{value}"
   let occurrence = self.next_occurrence(key)
   self.id("mini:\{kind}:\{mini_doc_id_fragment(value)}:\{occurrence}")
@@ -359,14 +365,12 @@ fn MiniDocBuilder::atom_id_at(
   value : String,
   start : Int32,
   end : Int32,
-) -> @identity.PatternNodeId raise ParseError {
+) -> @identity.PatternNodeId raise SourceProblem {
   let id = self.atom_id(kind, value)
   if self.origins is Some(origins) &&
     (kind == "sound" || kind == "note" || kind == "chord") {
     guard origins.atom_at(kind, start, end) is Some(source_atom) else {
-      raise ParseError(
-        "position \{start}: source atom witness missing for \{kind}",
-      )
+      raise Internal("source atom witness missing for \{kind} at \{start}")
     }
     self.source_atom_by_graph_id[id.value()] = source_atom
   }
@@ -379,7 +383,7 @@ fn MiniDocBuilder::node_id(
   kind : String,
   inputs : Array[@pattern.PatternDoc],
   params : String,
-) -> @identity.PatternNodeId raise ParseError {
+) -> @identity.PatternNodeId raise SourceProblem {
   let parts = inputs.map(input => input.root().value())
   let mut content = "\{kind}("
   for input in inputs {
@@ -412,7 +416,7 @@ fn MiniDocBuilder::reuse_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   inputs~ : Array[@pattern.PatternDoc] = [],
-) -> @pattern.PatternDoc? raise ParseError {
+) -> @pattern.PatternDoc? raise SourceProblem {
   guard self.origins is None else { return None }
   match self.previous {
     None => None
@@ -421,13 +425,13 @@ fn MiniDocBuilder::reuse_doc(
         for input in inputs {
           guard previous.contains_node(input.root()) else { return None }
           let old_input = previous.subdoc(root=input.root()) catch {
-            _ => raise ParseError("internal mini input could not be reused")
+            _ => raise Internal("internal mini input could not be reused")
           }
           guard old_input.revision() == input.revision() else { return None }
         }
         let doc = previous.subdoc(root=id) catch {
           _ =>
-            raise ParseError(
+            raise Internal(
               "internal mini id could not be reused: \{id.value()}",
             )
         }
@@ -442,7 +446,7 @@ fn MiniDocBuilder::reuse_doc(
 fn MiniDocBuilder::rest_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   self.contents[id.value()] = "silence"
   match self.reuse_doc(id) {
     Some(doc) => doc
@@ -456,7 +460,7 @@ fn MiniDocBuilder::control_doc(
   id : @identity.PatternNodeId,
   key : @control.Control,
   value : Double,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   self.contents[id.value()] = "control:\{key}:\{value}"
   match self.reuse_doc(id) {
     Some(doc) => doc
@@ -478,7 +482,7 @@ fn MiniDocBuilder::reference_doc(
   end : Int32,
   definition_span : MiniSpan,
   definition : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   self.contents[id.value()] = self.content(definition)
   match self.origins {
     None => @pattern.PatternDoc::reference(id~, definition~)
@@ -495,7 +499,7 @@ fn MiniDocBuilder::reference_doc(
 fn MiniDocBuilder::sequence_doc(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc],
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   if docs.length() == 1 {
     return docs[0]
   }
@@ -504,7 +508,7 @@ fn MiniDocBuilder::sequence_doc(
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::sequence(id~, docs~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -514,7 +518,7 @@ fn MiniDocBuilder::weighted_sequence_doc(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc],
   weights : Array[Int32],
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id(
     "weighted_seq",
     docs,
@@ -524,7 +528,7 @@ fn MiniDocBuilder::weighted_sequence_doc(
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::sequence_weighted(id~, docs~, weights~) catch {
-        _ => raise ParseError("invalid relative duration sequence")
+        _ => raise Internal("invalid relative duration sequence")
       }
   }
 }
@@ -533,7 +537,7 @@ fn MiniDocBuilder::weighted_sequence_doc(
 fn MiniDocBuilder::stack_doc(
   self : MiniDocBuilder,
   docs : Array[@pattern.PatternDoc],
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   if docs.length() == 1 {
     return docs[0]
   }
@@ -542,7 +546,7 @@ fn MiniDocBuilder::stack_doc(
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::stack(id~, docs~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -552,13 +556,13 @@ fn MiniDocBuilder::fast_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("fast", [doc], "\{factor.num}:\{factor.den}")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.fast(id~, factor~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -568,13 +572,13 @@ fn MiniDocBuilder::slow_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("slow", [doc], "\{factor.num}:\{factor.den}")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.slow(id~, factor~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -584,13 +588,13 @@ fn MiniDocBuilder::gate_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("gate", [doc], "\{factor.num}:\{factor.den}")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.gate(id~, factor~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -599,13 +603,13 @@ fn MiniDocBuilder::gate_doc(
 fn MiniDocBuilder::rev_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("rev", [doc], "")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.rev(id~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -617,13 +621,13 @@ fn MiniDocBuilder::euclid_doc(
   k : Int32,
   n : Int32,
   rotation : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("euclid", [doc], "\{k}:\{n}:\{rotation}")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.euclid(id~, k~, n~, rotation~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -634,7 +638,7 @@ fn MiniDocBuilder::degrade_doc(
   doc : @pattern.PatternDoc,
   p : Double,
   step? : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   // Seed by content so a named pattern drops the events its inline form does.
   // Like Strudel, each `?` of a notation string draws its own seed; the seed
   // never depends on `p`, so a higher probability drops a superset.
@@ -648,7 +652,7 @@ fn MiniDocBuilder::degrade_doc(
     Some(doc) => doc
     None =>
       doc.degrade_by(id~, p~, seed~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -659,14 +663,14 @@ fn MiniDocBuilder::every_doc(
   doc : @pattern.PatternDoc,
   n : Int32,
   transform : @pattern.TimeTransform,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let signature = time_transform_signature(transform)
   let id = self.node_id("every", [doc], "\{n}:\{signature}")
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.every(id~, n~, transform~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -676,13 +680,13 @@ fn MiniDocBuilder::jux_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
   transform : @pattern.TimeTransform,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let id = self.node_id("jux", [doc], time_transform_signature(transform))
   match self.reuse_doc(id, inputs=[doc]) {
     Some(doc) => doc
     None =>
       doc.jux(id~, transform~) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -710,7 +714,7 @@ fn MiniDocBuilder::scalar_control_doc(
   doc : @pattern.PatternDoc,
   key : @control.Control,
   value : Double,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let control_id = self.id("mini:control:\{doc.root().value()}:\{key}:\{value}")
   let control_doc = self.control_doc(control_id, key, value)
   let id = self.node_id("merge_control", [doc], "\{key}:\{value}")
@@ -718,7 +722,7 @@ fn MiniDocBuilder::scalar_control_doc(
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -730,7 +734,7 @@ fn MiniDocBuilder::control_value_doc(
   doc : @pattern.PatternDoc,
   key : @control.Control,
   value : MiniValue,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let control_doc = match value {
     Number(value) => return self.scalar_control_doc(doc, key, value)
     Steps(content, offset, _) => {
@@ -765,7 +769,7 @@ fn MiniDocBuilder::control_value_doc(
     Some(doc) => doc
     None =>
       @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
-        _ => raise ParseError("internal mini PatternDoc construction failed")
+        _ => raise Internal("internal mini PatternDoc construction failed")
       }
   }
 }
@@ -787,25 +791,32 @@ fn parse_doc_internal(
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder(previous~)
-  p.parse_bindings(builder) catch {
-    ParseError(msg) => return Err(msg)
+  try parse_doc_body(input, p, builder) catch {
+    problem => Err(problem.to_string())
+  } noraise {
+    doc => Ok(doc)
   }
-  match mini_collect_dollar_stack_lines(input, start=p.pos) {
-    Err(msg) => return Err(msg)
-    Ok(Some(lines)) =>
-      return parse_doc_dollar_stack_program(input, p, builder, lines)
-    Ok(None) => ()
+}
+
+///|
+fn parse_doc_body(
+  input : String,
+  p : Parser,
+  builder : MiniDocBuilder,
+) -> @pattern.PatternDoc raise SourceProblem {
+  p.parse_bindings(builder)
+  if mini_collect_dollar_stack_lines(input, start=p.pos) is Some(lines) {
+    return parse_doc_dollar_stack_program(input, p, builder, lines)
   }
-  let result = p.parse_doc_expr(builder) catch {
-    ParseError(msg) => return Err(msg)
-  }
+  let result = p.parse_doc_expr(builder)
   p.skip_whitespace()
   guard p.at_end() else {
-    return Err(
-      "position \{p.pos}: unexpected trailing input '\{input[p.pos:].to_owned()}'",
+    raise Mistake(
+      p.pos,
+      "unexpected trailing input '\{input[p.pos:].to_owned()}'",
     )
   }
-  Ok(result)
+  result
 }
 
 ///|
@@ -814,23 +825,21 @@ fn parse_doc_dollar_stack_program(
   parser : Parser,
   builder : MiniDocBuilder,
   lines : Array[MiniDollarStackLine],
-) -> Result[@pattern.PatternDoc, String] {
+) -> @pattern.PatternDoc raise SourceProblem {
   let args : Array[@pattern.PatternDoc] = []
   for line in lines {
     parser.pos = line.start
-    let doc = parser.parse_doc_expr(builder) catch {
-      ParseError(msg) => return Err(msg)
-    }
+    let doc = parser.parse_doc_expr(builder)
     parser.skip_inline_whitespace()
     if parser.pos != line.end {
-      return Err(
-        "position \{parser.pos}: unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
+      raise Mistake(
+        parser.pos,
+        "unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
       )
     }
     args.push(doc)
   }
-  let doc = builder.stack_doc(args) catch { ParseError(msg) => return Err(msg) }
-  Ok(doc)
+  builder.stack_doc(args)
 }
 
 ///|
@@ -871,7 +880,7 @@ pub fn parse_snapshot(
 fn Parser::parse_doc_expr(
   self : Parser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let syntax = self.parse_syntax_expr()
   if self.admission is Some(admission) {
     admission.roots.push(admission.expression(syntax))
@@ -884,7 +893,7 @@ fn Parser::parse_doc_expr(
 ///|
 fn Parser::read_quoted_string_with_start(
   self : Parser,
-) -> (String, Int32) raise ParseError {
+) -> (String, Int32) raise SourceProblem {
   self.expect_char('"')
   let start = self.pos
   while !self.at_end() && self.input[self.pos] != '"' {
@@ -900,9 +909,9 @@ fn parse_sound_doc_notation(
   content : String,
   builder : MiniDocBuilder,
   source_offset~ : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
+    raise Mistake(source_offset, "empty notation")
   }
   let sub = NotationParser(content, sound=true, source_offset~)
   sub.parse_doc_notation(builder)
@@ -913,9 +922,9 @@ fn parse_note_doc_notation(
   content : String,
   builder : MiniDocBuilder,
   source_offset~ : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
+    raise Mistake(source_offset, "empty notation")
   }
   let sub = NotationParser(content, sound=false, source_offset~)
   sub.parse_doc_notation(builder)
@@ -926,9 +935,9 @@ fn parse_chord_doc_notation(
   content : String,
   builder : MiniDocBuilder,
   source_offset~ : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   guard !content.is_empty() else {
-    raise ParseError("position 0: empty notation")
+    raise Mistake(source_offset, "empty notation")
   }
   let sub = NotationParser(content, sound=false, chord=true, source_offset~)
   sub.parse_doc_notation(builder)
@@ -938,7 +947,7 @@ fn parse_chord_doc_notation(
 fn NotationParser::parse_doc_notation(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let first = self.parse_doc_layer(builder)
   let layers : Array[@pattern.PatternDoc] = [first]
   while !self.at_end() && self.input[self.pos] == ',' {
@@ -953,7 +962,7 @@ fn NotationParser::parse_doc_notation(
 fn NotationParser::parse_doc_layer(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   self.skip_spaces()
   let elements : Array[@pattern.PatternDoc] = []
   let weights : Array[Int32] = []
@@ -967,16 +976,12 @@ fn NotationParser::parse_doc_layer(
     weights.push(weight)
     total_weight += weight
     weighted = weighted || weight != 1
-    guard !weighted || total_weight <= 256 else {
-      raise ParseError("relative duration sum must not exceed 256")
-    }
+    guard !weighted || total_weight <= 256 else { raise OverLimit(DurationSum) }
     self.require_element_boundary()
     self.skip_spaces()
   }
   guard !elements.is_empty() else {
-    raise ParseError(
-      "position \{self.pos}: expected at least one element in layer",
-    )
+    raise self.mistake(self.pos, "expected at least one element in layer")
   }
   if !weighted {
     return builder.sequence_doc(elements)
@@ -988,16 +993,16 @@ fn NotationParser::parse_doc_layer(
 fn NotationParser::parse_doc_element(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> (@pattern.PatternDoc, Int32) raise ParseError {
+) -> (@pattern.PatternDoc, Int32) raise SourceProblem {
   self.skip_spaces()
   guard !self.at_end() else {
-    raise ParseError("position \{self.pos}: unexpected end of notation")
+    raise self.mistake(self.pos, "unexpected end of notation")
   }
   let base = if self.input[self.pos] == '[' {
     self.pos += 1
     let inner = self.parse_doc_notation(builder)
     guard !self.at_end() && self.input[self.pos] == ']' else {
-      raise ParseError("position \{self.pos}: expected ']'")
+      raise self.mistake(self.pos, "expected ']'")
     }
     self.pos += 1
     inner
@@ -1039,14 +1044,12 @@ fn NotationParser::apply_doc_replicate(
   self : NotationParser,
   builder : MiniDocBuilder,
   doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let op_pos = self.pos
   self.pos += 1
   let n = self.read_int_signed(op_pos)
   guard n > 0 else {
-    raise ParseError(
-      "position \{op_pos}: '*' requires a positive integer, got \{n}",
-    )
+    raise self.mistake(op_pos, "'*' requires a positive integer, got \{n}")
   }
   builder.fast_doc(doc, @pattern.Rational::from_int(n))
 }
@@ -1056,14 +1059,12 @@ fn NotationParser::apply_doc_step_slow(
   self : NotationParser,
   builder : MiniDocBuilder,
   doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let op_pos = self.pos
   self.pos += 1
   let n = self.read_int_signed(op_pos)
   guard n > 0 else {
-    raise ParseError(
-      "position \{op_pos}: '/' requires a positive integer, got \{n}",
-    )
+    raise self.mistake(op_pos, "'/' requires a positive integer, got \{n}")
   }
   builder.slow_doc(doc, @pattern.Rational::from_int(n))
 }
@@ -1073,7 +1074,7 @@ fn NotationParser::maybe_apply_doc_euclid(
   self : NotationParser,
   builder : MiniDocBuilder,
   doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   if self.at_end() || self.input[self.pos] != '(' {
     return doc
   }
@@ -1083,7 +1084,7 @@ fn NotationParser::maybe_apply_doc_euclid(
   let k = self.read_int_signed(euclid_start)
   self.skip_spaces()
   guard !self.at_end() && self.input[self.pos] == ',' else {
-    raise ParseError("position \{self.pos}: expected ',' in euclid (k,n)")
+    raise self.mistake(self.pos, "expected ',' in euclid (k,n)")
   }
   self.pos += 1
   self.skip_spaces()
@@ -1097,7 +1098,7 @@ fn NotationParser::maybe_apply_doc_euclid(
     self.skip_spaces()
   }
   guard !self.at_end() && self.input[self.pos] == ')' else {
-    raise ParseError("position \{self.pos}: expected ')' to close euclid")
+    raise self.mistake(self.pos, "expected ')' to close euclid")
   }
   self.pos += 1
   builder.euclid_doc(doc, k, n, rotation)
@@ -1107,7 +1108,7 @@ fn NotationParser::maybe_apply_doc_euclid(
 fn NotationParser::parse_doc_atom(
   self : NotationParser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let start = self.pos
   if self.input[self.pos] == '~' {
     self.pos += 1
@@ -1132,7 +1133,7 @@ fn NotationParser::parse_doc_atom(
   if self.sound {
     let name = self.read_ident()
     guard !name.is_empty() else {
-      raise ParseError("position \{start}: expected sound name")
+      raise self.mistake(start, "expected sound name")
     }
     match drum_midi(name) {
       Some(midi) => {
@@ -1144,14 +1145,14 @@ fn NotationParser::parse_doc_atom(
         )
         builder.control_doc(id, Sound, midi.to_double())
       }
-      None => raise ParseError("position \{start}: unknown drum name '\{name}'")
+      None => raise self.mistake(start, "unknown drum name '\{name}'")
     }
   } else if self.chord {
     // Read chord name (including accidentals like #, b) → stack of note docs
     let name_start = self.pos
     let name = self.read_chord_name_text()
     guard !name.is_empty() else {
-      raise ParseError("position \{start}: expected chord name")
+      raise self.mistake(start, "expected chord name")
     }
     match @pattern.parse_chord(name) {
       Some(notes) => {
@@ -1163,7 +1164,7 @@ fn NotationParser::parse_doc_atom(
         )
         builder.chord_doc_from_notes(id, notes)
       }
-      None => raise ParseError("position \{start}: unknown chord '\{name}'")
+      None => raise self.mistake(start, "unknown chord '\{name}'")
     }
   } else {
     // Try number first, then note name
@@ -1179,7 +1180,7 @@ fn NotationParser::parse_doc_atom(
       )
       builder.control_doc(id, Note, note)
     } catch {
-      ParseError(_) => self.parse_doc_note_name_atom(builder, start)
+      _ => self.parse_doc_note_name_atom(builder, start)
     } noraise {
       doc => doc
     }
@@ -1192,11 +1193,11 @@ fn NotationParser::parse_doc_note_name_atom(
   self : NotationParser,
   builder : MiniDocBuilder,
   start : Int32,
-) -> @pattern.PatternDoc raise ParseError {
+) -> @pattern.PatternDoc raise SourceProblem {
   let name_start = self.pos
   let name = self.read_note_name_text()
   guard !name.is_empty() else {
-    raise ParseError("position \{start}: expected note name or number")
+    raise self.mistake(start, "expected note name or number")
   }
   match @pattern.note_name_to_midi(name) {
     Some(midi) => {
@@ -1208,7 +1209,7 @@ fn NotationParser::parse_doc_note_name_atom(
       )
       builder.control_doc(id, Note, midi)
     }
-    None => raise ParseError("position \{start}: unknown note name '\{name}'")
+    None => raise self.mistake(start, "unknown note name '\{name}'")
   }
 }
 
@@ -1216,7 +1217,7 @@ fn NotationParser::parse_doc_note_name_atom(
 fn NotationParser::read_note_number_value(
   self : NotationParser,
   start : Int32,
-) -> (Double, String, Int32, Int32) raise ParseError {
+) -> (Double, String, Int32, Int32) raise SourceProblem {
   let num_start = self.pos
   if !self.at_end() && self.input[self.pos] == '-' {
     self.pos += 1
@@ -1239,7 +1240,7 @@ fn NotationParser::read_note_number_value(
   }
   guard has_digit else {
     self.pos = num_start
-    raise ParseError("position \{start}: expected number")
+    raise self.mistake(start, "expected number")
   }
   let token = self.input[num_start:self.pos].to_owned()
   (
