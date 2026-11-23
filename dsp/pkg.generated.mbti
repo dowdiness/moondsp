@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn cosine_of_turns(Double) -> Double
+
 pub fn effective_sample_count(DspContext, AudioBuffer) -> Int32
 
 pub fn[T : FilterSym] exit_deliverable() -> T
@@ -27,6 +29,8 @@ pub fn pan_right_gain(Double) -> Double
 pub fn[T : ArithSym] range(T, Double, Double) -> T
 
 pub fn sanitize_buffer(AudioBuffer, Int32) -> Int32
+
+pub fn sine_of_turns(Double) -> Double
 
 pub fn stereo_shape() -> Int32
 

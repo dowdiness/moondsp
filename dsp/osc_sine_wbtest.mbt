@@ -9,7 +9,12 @@ fn assert_sine_phase_matches_core(phase : Double) -> Unit raise {
 ///|
 test "sine samples preserve core rounding across the complete phase range" {
   for i in 0..<=65536 {
-    assert_sine_phase_matches_core(i.to_double() / 65536.0)
+    let turns = i.to_double() / 65536.0
+    assert_sine_phase_matches_core(turns)
+    assert_eq(
+      cosine_of_turns(turns).reinterpret_as_uint64(),
+      @math.cos(turns * 2.0 * @math.PI).reinterpret_as_uint64(),
+    )
   }
   assert_sine_phase_matches_core(-0.0)
   assert_sine_phase_matches_core(1UL.reinterpret_as_double())

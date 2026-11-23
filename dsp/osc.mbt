@@ -132,6 +132,19 @@ pub fn Oscillator::process(
 }
 
 ///|
+/// `sin(2π · turns)` for `turns` in `[0, 1]`, as the sine oscillator computes
+/// it. Allocates nothing on every target, unlike core `@math.sin` on wasm-gc.
+pub fn sine_of_turns(turns : Double) -> Double {
+  sine_for_phase(turns)
+}
+
+///|
+/// `cos(2π · turns)` for `turns` in `[0, 1]`. Allocates nothing on every target.
+pub fn cosine_of_turns(turns : Double) -> Double {
+  cos(turns * 2.0 * @math.PI)
+}
+
+///|
 fn sample_for_phase(waveform : Waveform, phase : Double) -> Double {
   match waveform {
     Sine => sine_for_phase(phase)
