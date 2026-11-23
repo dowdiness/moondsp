@@ -1050,3 +1050,23 @@ pub fn Draft::locate_frame_fields(
   guard frame_epoch == self.sources.epoch.serial() else { return None }
   self.sources.frame_range(frame_serial)
 }
+
+///|
+/// Resolve a serialized signal identity only while that exact signal is still
+/// present in the current source map; editing a signal's text retires it.
+pub fn Draft::locate_signal_fields(
+  self : Draft,
+  epoch : Int64,
+  serial : Int64,
+) -> SourceRange? {
+  guard (self.mode == Pattern || self.mode == Song) &&
+    epoch == self.sources.epoch.serial() else {
+    return None
+  }
+  for atom in self.sources.atoms {
+    if atom.kind == "signal" && atom.id.serial() == serial {
+      return Some(SourceRange(atom.span))
+    }
+  }
+  None
+}

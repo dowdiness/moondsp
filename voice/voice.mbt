@@ -188,9 +188,24 @@ priv enum FollowTarget {
 /// Resolved once against the pool's bindings, so attaching it with `follow`
 /// allocates nothing. A follower made before `set_template` no longer attaches.
 pub struct VoiceFollower {
+  priv key : @control.Control
   priv target : FollowTarget
   priv read : (Int64, Int64) -> @control.ControlValue
   priv template_generation : Int32
+}
+
+///|
+/// The control key this follower's bus gives.
+pub fn VoiceFollower::key(self : VoiceFollower) -> @control.Control {
+  self.key
+}
+
+///|
+/// The bus this follower reads.
+pub fn VoiceFollower::read(
+  self : VoiceFollower,
+) -> (Int64, Int64) -> @control.ControlValue {
+  self.read
 }
 
 ///|
@@ -503,7 +518,31 @@ pub fn BoundVoicePool::follower(
     Voice(Send) => Send
     Graph(node, param) => Graph(node, param, binding.unit)
   }
-  Some({ target, read, template_generation: self.pool.template_generation, })
+  Some({
+    key,
+    target,
+    read,
+    template_generation: self.pool.template_generation,
+  })
+}
+
+///|
+/// The `index`-th follower the voice behind `handle` follows, in the order it
+/// started following them, while it sounds, release included; `None` past the
+/// last, once the voice is idle, or for a stale handle. Allocates nothing.
+pub fn BoundVoicePool::followed(
+  self : BoundVoicePool,
+  handle : VoiceHandle,
+  index : Int32,
+) -> VoiceFollower? {
+  guard handle.slot >= 0 && handle.slot < self.pool.slots.length() else {
+    return None
+  }
+  let slot = self.pool.slots[handle.slot]
+  guard slot.is_handle_valid(handle) && !(slot.state is VoiceState::Idle) else {
+    return None
+  }
+  slot.follows.get(index)
 }
 
 ///|

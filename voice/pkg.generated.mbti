@@ -51,6 +51,7 @@ pub fn BoundVoicePool::apply_voice_controls_result(Self, VoiceHandle, Array[@gra
 pub fn BoundVoicePool::apply_voice_param_bool(Self, VoiceHandle, Int32, @graph.GraphParamSlot, Double) -> Bool
 pub fn BoundVoicePool::binding(Self, @control.Control) -> @graph.ControlBinding[@control.Control]?
 pub fn BoundVoicePool::follow(Self, VoiceHandle, VoiceFollower) -> Bool
+pub fn BoundVoicePool::followed(Self, VoiceHandle, Int32) -> VoiceFollower?
 pub fn BoundVoicePool::follower(Self, @control.Control, (Int64, Int64) -> @control.ControlValue) -> VoiceFollower?
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
@@ -101,6 +102,8 @@ pub impl Show for VoiceControlError
 pub struct VoiceFollower {
   // private fields
 }
+pub fn VoiceFollower::key(Self) -> @control.Control
+pub fn VoiceFollower::read(Self) -> (Int64, Int64) -> @control.ControlValue
 
 #derive(Eq, @debug.Debug)
 pub struct VoiceHandle {

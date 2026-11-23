@@ -518,7 +518,7 @@ fn EntrySpec::query_sourced(
         source_frame: None,
         source_start: -1.0,
         source_pitch: -1.0,
-        controls: event.controls().placed(placement),
+        controls: event.controls().on_playback_clock(origin),
       })
     PatternWithOrigins(snapshot, index) =>
       snapshot
@@ -530,7 +530,7 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: authored_pitch(event.event().value),
-        controls: event.controls().placed(placement),
+        controls: event.controls().on_playback_clock(origin),
       })
     RuntimeSong(song_origin) =>
       query_entry(self, origin, arc).map(event => {
@@ -559,7 +559,10 @@ fn EntrySpec::query_sourced(
         source_frame: event.source_frame(),
         source_start: event.source_start(),
         source_pitch: authored_pitch(event.event().value),
-        controls: event.controls().placed(slice.placement()).placed(placement),
+        controls: event
+        .controls()
+        .placed(slice.placement())
+        .on_playback_clock(origin - self.start),
       })
     }
   }

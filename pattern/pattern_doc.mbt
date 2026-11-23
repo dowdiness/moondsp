@@ -927,14 +927,12 @@ fn[A, O] Pat::capture_source_frame(
 fn[A : WithControls, O] scoped_event(
   event : Event[ScopedValue[A, O]],
   buses : Array[ControlBus],
-  table : Array[BusSignal],
 ) -> PatternSnapshotEvent[A] {
   let value = event.value
   let controls = Controls::lowered(
     value.value.controls(),
     value.bindings,
     buses,
-    table,
     event.part.begin,
   )
   PatternSnapshotEvent(
@@ -962,14 +960,12 @@ pub struct EventWithOrigin[A] {
 fn[A : WithControls] EventWithOrigin::EventWithOrigin(
   event : Event[ScopedValue[A, EventOrigin]],
   buses : Array[ControlBus],
-  table : Array[BusSignal],
 ) -> EventWithOrigin[A] {
   let value = event.value
   let controls = Controls::lowered(
     value.value.controls(),
     value.bindings,
     buses,
-    table,
     event.part.begin,
   )
   {
@@ -1818,7 +1814,6 @@ pub struct PatternSnapshot[A] {
   priv entry_sourced : Array[CompiledEntry[A, Unit]]
   /// The root's buses, which project payloads as controls leave lowering.
   priv buses : Array[ControlBus]
-  priv table : Array[BusSignal]
 }
 
 ///|
@@ -1853,9 +1848,7 @@ pub fn[A : WithControls] PatternSnapshot::query_sourced_events(
   self : PatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
-  self.sourced
-  .query(arc)
-  .map(event => scoped_event(event, self.buses, self.table))
+  self.sourced.query(arc).map(event => scoped_event(event, self.buses))
 }
 
 ///|
@@ -1869,9 +1862,7 @@ pub fn[A : WithControls] PatternSnapshot::query_sourced_events_for_entry(
 ) -> Array[PatternSnapshotEvent[A]] {
   match self.entry_sourced.get(source_index) {
     Some(entry) =>
-      entry.source
-      .query(arc)
-      .map(event => scoped_event(event, self.buses, self.table))
+      entry.source.query(arc).map(event => scoped_event(event, self.buses))
     None => []
   }
 }
@@ -1891,7 +1882,6 @@ pub fn[A : WithControls] PatternSnapshot::entered(
     .project_controls(buses)
     .address_entries(self.entry_sourced.map(entry => entry.key)),
     buses,
-    table: buses.map(bus => bus.signal),
   }
 }
 
@@ -1918,7 +1908,6 @@ pub struct PatternSnapshotWithOrigins[A] {
   priv entry_sourced : Array[CompiledEntry[A, EventOrigin]]
   /// The root's buses, which project payloads as controls leave lowering.
   priv buses : Array[ControlBus]
-  priv table : Array[BusSignal]
 }
 
 ///|
@@ -1964,9 +1953,7 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::query(
   self : PatternSnapshotWithOrigins[A],
   arc : TimeSpan,
 ) -> Array[EventWithOrigin[A]] {
-  self.sourced
-  .query(arc)
-  .map(event => EventWithOrigin(event, self.buses, self.table))
+  self.sourced.query(arc).map(event => EventWithOrigin(event, self.buses))
 }
 
 ///|
@@ -1979,9 +1966,7 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::query_for_entry(
   match self.entry_sourced.get(index) {
     None => []
     Some(entry) =>
-      entry.source
-      .query(arc)
-      .map(event => EventWithOrigin(event, self.buses, self.table))
+      entry.source.query(arc).map(event => EventWithOrigin(event, self.buses))
   }
 }
 
@@ -1998,7 +1983,6 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(
     .project_controls(buses)
     .address_entries(self.entry_sourced.map(entry => entry.key)),
     buses,
-    table: buses.map(bus => bus.signal),
   }
 }
 
@@ -2026,7 +2010,6 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
       CompiledEntry(entry.key, entry.source.map_payload(erase_origin))
     }),
     buses: self.buses,
-    table: self.table,
   }
 }
 
@@ -2052,7 +2035,6 @@ pub fn[A : WithControls] PatternDoc::lower_with_origins(
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
     buses: compiled.buses,
-    table: compiled.buses.map(bus => bus.signal),
   }
 }
 
@@ -2162,7 +2144,8 @@ pub fn[A] PatternDoc::from_pattern(
 /// evaluates `f` at exact time, and `rev` reads limits from below. `period` is
 /// the cycles after which `f` repeats, when it does; `ControlTrace::period`
 /// reads it. `source` is the authored signal it compiles, by which
-/// `PatternSnapshotWithOrigins::control_traces` finds the buses it provides.
+/// `PatternSnapshotWithOrigins::control_traces` finds the buses it provides
+/// and which they report as `Controls::signal_source`.
 /// `signature` names `f`: two signals with the same key and signature must
 /// compute the same function. A live edit keeps a material whose content,
 /// signatures included, is unchanged.
@@ -2368,7 +2351,6 @@ pub fn[A : WithControls] PatternDoc::lower_with_cache(
     sourced: compiled.pat,
     entry_sourced: compiled.entries,
     buses: compiled.buses,
-    table: compiled.buses.map(bus => bus.signal),
   }
 }
 

@@ -70,6 +70,7 @@ pub fn PatternScheduler::active_note_count(Self) -> Int32
 pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::attach_onset_buffer(Self, OnsetBuffer) -> Unit
+pub fn PatternScheduler::attach_signal_buffer(Self, SignalBuffer) -> Unit
 pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
 pub fn PatternScheduler::cycle_position(Self) -> Double
@@ -134,6 +135,16 @@ pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
+
+pub struct SignalBuffer {
+  // private fields
+}
+pub fn SignalBuffer::SignalBuffer() -> Self
+pub fn SignalBuffer::clear(Self) -> Unit
+pub fn SignalBuffer::count(Self) -> Int32
+pub fn SignalBuffer::dropped(Self) -> Double
+pub fn SignalBuffer::enable(Self, Bool) -> Unit
+pub fn SignalBuffer::field(Self, Int32, Int32) -> Double
 
 pub(all) enum SongMaterial {
   Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])

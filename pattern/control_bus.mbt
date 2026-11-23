@@ -228,9 +228,13 @@ pub struct Controls {
   priv values : ControlMap
   /// The event's own values, which its bound keys read under their buses.
   priv own : ControlMap
-  priv table : Array[BusSignal]
+  /// The snapshot's buses, in root time.
+  priv table : Array[ControlBus]
   priv bindings : FixedArray[BusBinding]
   priv placement : Placement
+  /// The material's own clock onto this event's clock: set where playback
+  /// dispatches it (`Controls::on_playback_clock`), then moved with it.
+  priv material : Placement
 }
 
 ///|
@@ -242,6 +246,7 @@ pub fn Controls::fixed(values : ControlMap) -> Controls {
     table: [],
     bindings: no_bus_bindings,
     placement: Placement(),
+    material: Placement(),
   }
 }
 
@@ -252,7 +257,6 @@ fn Controls::lowered(
   own : ControlMap,
   bindings : FixedArray[BusBinding],
   buses : Array[ControlBus],
-  table : Array[BusSignal],
   onset : Rational,
 ) -> Controls {
   if bindings.is_empty() {
@@ -261,9 +265,10 @@ fn Controls::lowered(
   {
     values: project_controls(own, bindings, buses, onset),
     own,
-    table,
+    table: buses,
     bindings,
     placement: Placement(),
+    material: Placement(),
   }
 }
 
@@ -279,7 +284,51 @@ pub fn Controls::placed(self : Controls, placement : Placement) -> Controls {
   if self.bindings.is_empty() {
     return self
   }
-  { ..self, placement: self.placement.then(placement), }
+  {
+    ..self,
+    placement: self.placement.then(placement),
+    material: self.material.then(placement),
+  }
+}
+
+///|
+/// Move the controls onto the playback clock of a material whose own clock
+/// starts at `origin`, as playback moves the material's events.
+pub fn Controls::on_playback_clock(
+  self : Controls,
+  origin : Rational,
+) -> Controls {
+  if self.bindings.is_empty() {
+    return self
+  }
+  let material = Placement(origin~)
+  { ..self, placement: self.placement.then(material), material, }
+}
+
+///|
+/// Where the clock of the material that dispatched this event starts on the
+/// event's clock: time `t` is material time `(t - material_origin) ×
+/// material_rate`, for a song, song time.
+pub fn Controls::material_origin(self : Controls) -> Rational {
+  self.material.origin
+}
+
+///|
+/// Material cycles per cycle of this event's clock; see `material_origin`.
+pub fn Controls::material_rate(self : Controls) -> Rational {
+  self.material.rate
+}
+
+///|
+/// The authored signal the bus `key` follows, when it is one.
+pub fn Controls::signal_source(
+  self : Controls,
+  key : @control.Control,
+) -> @identity.SourceAtomId? {
+  match bus_binding_for(self.bindings, key) {
+    Some(binding) => self.table[binding.bus].source
+    None => None
+  }
 }
 
 ///|
@@ -306,7 +355,9 @@ pub fn Controls::reader(
   key : @control.Control,
 ) -> ((Int64, Int64) -> @control.ControlValue)? {
   bus_binding_for(self.bindings, key).map(binding => {
-    let placed = self.place(binding.signal(self.own, self.table[binding.bus]))
+    let placed = self.place(
+      binding.signal(self.own, self.table[binding.bus].signal),
+    )
     (num, den) => placed.eval(num, den, false)
   })
 }
@@ -323,7 +374,7 @@ pub impl @control.ControlSource for Controls with fn value(self, key) {
 /// A constant bus has no reader: the onset value already holds.
 pub impl @control.ControlSource for Controls with fn each_varying(self, f) {
   for binding in self.bindings {
-    let signal = binding.signal(self.own, self.table[binding.bus])
+    let signal = binding.signal(self.own, self.table[binding.bus].signal)
     guard !signal.is_constant() else { continue }
     let placed = self.place(signal)
     f(binding.key, (num, den) => placed.eval(num, den, false))

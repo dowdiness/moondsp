@@ -49,6 +49,7 @@ pub struct PatternScheduler {
   priv active_notes : @voice_runtime.ActiveNotes
   priv playback_state : @playback.PlaybackState
   priv mut onsets : OnsetBuffer?
+  priv mut signals : SignalBuffer?
 }
 
 ///|
@@ -85,6 +86,7 @@ pub fn PatternScheduler::PatternScheduler(
     active_notes: @voice_runtime.ActiveNotes(),
     playback_state: @playback.PlaybackState(),
     onsets: None,
+    signals: None,
   }
 }
 
@@ -198,6 +200,9 @@ fn PatternScheduler::process_single_event(
               end_sample~,
               musical_end?,
             )
+            if self.signals is Some(signals) {
+              signals.follow(controls.controls, pool, instrument, handle)
+            }
             if onset_sample >= 0L && self.onsets is Some(buffer) {
               buffer.record(
                 onset_sample,
@@ -343,6 +348,9 @@ fn PatternScheduler::process_block_events(
   let at = frame.logical_arc.begin
   for pool in self.pools {
     pool.update_follows(at.num, at.den)
+  }
+  if self.signals is Some(signals) {
+    signals.observe(self.pools, at, frame.sample_begin)
   }
   // Ceil may put a preceding block's final fractional onset at this block's
   // first sample. Retain that query result for one block; never query history.

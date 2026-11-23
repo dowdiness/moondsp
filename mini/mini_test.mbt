@@ -2469,3 +2469,44 @@ test "a draft that does not parse has no signal graphs" {
   )
   assert_eq(graphs.length(), 0)
 }
+
+///|
+test "a signal keeps its identity across unrelated edits and loses it when its own text changes" {
+  let source = "note(\"C2\").lpf(saw.range(200, 4000))"
+  let draft = try! @mini.Draft(source)
+  // Every signal identity the draft holds is found by scanning small serials.
+  let epoch = draft.state().version().to_json()
+  guard epoch is Array([Number(epoch, ..), _]) else { fail("no epoch") }
+  let epoch = epoch.to_int64()
+  let find = () => {
+    for serial in 1L..<64L {
+      if draft.locate_signal_fields(epoch, serial) is Some(range) {
+        return Some((serial, range.start(), range.end()))
+      }
+    }
+    None
+  }
+  guard find() is Some((serial, start, end)) else { fail("no signal") }
+  assert_eq((start, end), (15, 35))
+  // Inserting a note before the signal moves it but keeps its identity.
+  ignore(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[
+        @mini.TextEdit::TextEdit(from=8, to=8, inserted=" E2"),
+      ]),
+    ),
+  )
+  guard draft.locate_signal_fields(epoch, serial) is Some(moved) else {
+    fail("signal identity lost after an unrelated edit")
+  }
+  assert_eq((moved.start(), moved.end()), (18, 38))
+  // Editing the signal's own range retires it.
+  ignore(
+    draft.edit(
+      @mini.EditTransaction::EditTransaction(base=draft.state().version(), edits=[
+        @mini.TextEdit::TextEdit(from=28, to=32, inserted="8000"),
+      ]),
+    ),
+  )
+  assert_true(draft.locate_signal_fields(epoch, serial) is None)
+}

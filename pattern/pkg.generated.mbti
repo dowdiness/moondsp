@@ -82,8 +82,12 @@ pub struct Controls {
   // private fields
 }
 pub fn Controls::fixed(ControlMap) -> Self
+pub fn Controls::material_origin(Self) -> Rational
+pub fn Controls::material_rate(Self) -> Rational
+pub fn Controls::on_playback_clock(Self, Rational) -> Self
 pub fn Controls::placed(Self, Placement) -> Self
 pub fn Controls::reader(Self, @control.Control) -> ((Int64, Int64) -> @control.ControlValue)?
+pub fn Controls::signal_source(Self, @control.Control) -> @identity.SourceAtomId?
 pub fn Controls::values(Self) -> ControlMap
 pub impl @control.ControlSource for Controls
 

@@ -215,3 +215,163 @@ test "a voice starts from its bus value, which rev defines" {
   assert_true(fixed > 0.0)
   inspect((steps / fixed * 100.0).round() / 100.0, content="1")
 }
+
+///|
+test "a signal buffer records the value held voices follow, once per block, on its material clock" {
+  let source = @identity.SourceAtomId::SourceAtomId(
+    @identity.SourceEpoch::SourceEpoch(3L),
+    7L,
+  )
+  let snapshot = @pattern.PatternDoc::merge_control(
+      id=bus_id("merge"),
+      // Two chord tones follow one signal.
+      left=@pattern.PatternDoc::stack(id=bus_id("chord"), docs=[
+        @pattern.PatternDoc::atom(
+          id=bus_id("root"),
+          value=played(@pattern.ControlMap::single(Note, 60.0)),
+        ),
+        @pattern.PatternDoc::atom(
+          id=bus_id("third"),
+          value=played(@pattern.ControlMap::single(Note, 64.0)),
+        ),
+      ]),
+      right=@pattern.PatternDoc::continuous(
+        id=bus_id("lpf"),
+        key=Lpf,
+        f=(t, _) => 200.0 + 3800.0 * t,
+        signature="sweep",
+        source=Some(source),
+      ),
+    )
+    .slow(id=bus_id("slow"), factor=@pattern.Rational::from_int(2))
+    .lower()
+  let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
+  let scheduler = @scheduler.PatternScheduler(
+    bpm=240.0,
+    ctx~,
+    pools=[bus_pool(ctx)],
+    route=_ => 0,
+  )
+  let signals = @scheduler.SignalBuffer()
+  signals.enable(true)
+  scheduler.attach_signal_buffer(signals)
+  scheduler.queue_pattern_snapshot(snapshot)
+  let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  // Block 375 starts at sample 48000: one cycle, halfway through the stretched sweep.
+  for _ in 0..<376 {
+    scheduler.render_block(left, right)
+  }
+  let last = signals.count() - 1
+  @debug.assert_eq([0, 1, 2, 3, 4].map(field => signals.field(last, field)), [
+    48000.0, 3.0, 7.0, 1.0, 2100.0,
+  ])
+  // One row per block for both tones, also once the ring overwrites: the
+  // chord started in block 0, so blocks 1 to 375 report.
+  @debug.assert_eq((signals.count(), signals.dropped()), (256, 119.0))
+  for index in 1..<signals.count() {
+    assert_eq(signals.field(index, 0) - signals.field(index - 1, 0), 128.0)
+  }
+}
+
+///|
+test "a signal buffer keeps recording through a voice's release and stops once it is idle" {
+  let snapshot = @pattern.PatternDoc::merge_control(
+    id=bus_id("merge"),
+    // The note sounds for the first half of the cycle.
+    left=@pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
+      @pattern.PatternDoc::atom(
+        id=bus_id("note"),
+        value=played(@pattern.ControlMap::single(Note, 60.0)),
+      ),
+      @pattern.PatternDoc::silence(id=bus_id("rest")),
+    ]),
+    right=@pattern.PatternDoc::continuous(
+      id=bus_id("lpf"),
+      key=Lpf,
+      f=(t, _) => 200.0 + 3800.0 * t,
+      signature="sweep",
+      source=Some(
+        @identity.SourceAtomId::SourceAtomId(
+          @identity.SourceEpoch::SourceEpoch(3L),
+          7L,
+        ),
+      ),
+    ),
+  ).lower()
+  let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
+  let scheduler = @scheduler.PatternScheduler(
+    bpm=240.0,
+    ctx~,
+    pools=[bus_pool(ctx)],
+    route=_ => 0,
+  )
+  let signals = @scheduler.SignalBuffer()
+  signals.enable(true)
+  scheduler.attach_signal_buffer(signals)
+  scheduler.queue_pattern_snapshot(snapshot)
+  let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  // The cycle is 48000 samples: the gate closes at sample 24000, the 50 ms
+  // release ends 2400 samples later, and the next note starts at 48000.
+  for _ in 0..<300 {
+    scheduler.render_block(left, right)
+  }
+  let last = signals.field(signals.count() - 1, 0)
+  assert_true(last > 24000.0 && last < 24000.0 + 2400.0 + 2.0 * 128.0)
+  let count = signals.count()
+  for _ in 0..<50 {
+    scheduler.render_block(left, right)
+  }
+  assert_eq(signals.count(), count)
+}
+
+///|
+test "a signal buffer keeps signals of different epochs apart even when their serials match" {
+  let voice = (name : String, epoch : Int64, note : Double) => {
+    @pattern.PatternDoc::merge_control(
+      id=bus_id("merge-\{name}"),
+      left=@pattern.PatternDoc::atom(
+        id=bus_id("note-\{name}"),
+        value=played(@pattern.ControlMap::single(Note, note)),
+      ),
+      right=@pattern.PatternDoc::continuous(
+        id=bus_id("lpf-\{name}"),
+        key=Lpf,
+        f=(t, _) => 200.0 + 3800.0 * t,
+        signature="sweep",
+        source=Some(
+          @identity.SourceAtomId::SourceAtomId(
+            @identity.SourceEpoch::SourceEpoch(epoch),
+            7L,
+          ),
+        ),
+      ),
+    )
+  }
+  let snapshot = @pattern.PatternDoc::stack(id=bus_id("both"), docs=[
+    voice("old", 3L, 60.0),
+    voice("new", 4L, 64.0),
+  ]).lower()
+  let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
+  let scheduler = @scheduler.PatternScheduler(
+    bpm=240.0,
+    ctx~,
+    pools=[bus_pool(ctx)],
+    route=_ => 0,
+  )
+  let signals = @scheduler.SignalBuffer()
+  signals.enable(true)
+  scheduler.attach_signal_buffer(signals)
+  scheduler.queue_pattern_snapshot(snapshot)
+  let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
+  for _ in 0..<11 {
+    scheduler.render_block(left, right)
+  }
+  // Blocks 1 to 10 each give one row per epoch.
+  assert_eq(signals.count(), 20)
+  let epochs = Array::makei(signals.count(), index => signals.field(index, 1))
+  @debug.assert_eq(epochs.filter(epoch => epoch == 3.0).length(), 10)
+  @debug.assert_eq(epochs.filter(epoch => epoch == 4.0).length(), 10)
+}
