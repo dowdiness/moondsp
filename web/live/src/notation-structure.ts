@@ -245,10 +245,9 @@ function nodeAt(projection: NotationProjection, index: number): NotationNode {
 function requireAtomOrGroup(node: NotationNode): void {
   if (node.kind !== "atom" && node.kind !== "group") refuse("Select an atom or group");
 }
+/** A step has at most one `@`; the notation refuses a second. */
 function weightModifier(node: NotationNode): NotationModifier | undefined {
-  const all = node.modifiers.filter(mod => mod.kind === "weight");
-  if (all.length > 1) refuse("Cannot edit repeated weight modifiers");
-  return all[0];
+  return node.modifiers.find(mod => mod.kind === "weight");
 }
 function siblingNodes(projection: NotationProjection, node: NotationNode): { parent: NotationNode; index: number; children: NotationNode[] } {
   if (node.parent === null) refuse("This notation has no adjacent sibling");
@@ -348,8 +347,6 @@ export function boundaryInfo(projection: NotationProjection, index: number): { r
   if (at < 0 || at + 1 >= parent.children.length) return null;
   const right = projection.nodes[parent.children[at + 1]];
   if (!right || (right.kind !== "atom" && right.kind !== "group")) return null;
-  try { weightModifier(node); weightModifier(right); }
-  catch { return null; }
   const total = node.weight + right.weight;
   if (!(node.weight > 0) || !(right.weight > 0) || !Number.isFinite(total)) return null;
   return { right: parent.children[at + 1], ratio: node.weight / total };

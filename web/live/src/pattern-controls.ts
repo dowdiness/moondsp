@@ -451,7 +451,7 @@ class PatternWidgetDOM {
     if (multiple) this.selectionLabel.textContent = `${selectedRange.length} source steps`;
     this.length.value = String(node?.weight ?? 1);
     this.length.max = String(Math.min(16, 256 - total + (node?.weight ?? 1)));
-    this.length.disabled = unsupportedSelection || multiple || !node || node.modifiers.filter(m => m.kind === "weight").length > 1;
+    this.length.disabled = unsupportedSelection || multiple || !node;
     this.length.title = "Relative share within the parent group; changes the other shares too";
     const repeats = node?.modifiers.filter(m => m.kind === "repeat") ?? [];
     this.repeat.value = String(repeats.at(-1)?.value ?? 1);
