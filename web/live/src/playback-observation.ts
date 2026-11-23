@@ -1,7 +1,11 @@
 import type { EditorView } from "@codemirror/view";
-import type { AudioEngine, OnsetObservation } from "./audio";
+import type { AudioEngine, OnsetObservation, SignalObservation } from "./audio";
 import type { Draft, LocatedOnset } from "./authoring";
 import { setPlaybackHighlights, type PlaybackHighlight } from "./playback-highlights";
+import { setSignalPlayheads, type SignalPlayhead } from "./signal-preview";
+
+/** A signal value is held this long after its block, then retired: its notes have ended. */
+const SIGNAL_HOLD_MS = 250;
 
 const MAX_OBSERVATIONS = 256;
 type PendingOnset = OnsetObservation & { location: LocatedOnset | null };
@@ -30,6 +34,27 @@ export function soundingOnsets<T extends Timed>(pending: readonly T[], latest: n
   return pending.filter(onset => onset.fields[0] === latest && onset.at <= now);
 }
 
+/**
+ * The signal values sounding at `now`: for each signal identity, the rows of
+ * its latest due block, one per material that follows it, while that block is
+ * at most `SIGNAL_HOLD_MS` old. Later rows stay pending.
+ */
+export function soundingSignals<T extends Pick<SignalObservation, "at" | "epoch" | "serial">>(pending: readonly T[], now: number): { sounding: T[]; pending: T[] } {
+  const latest = new Map<string, number>();
+  for (const row of pending) {
+    const key = `${row.epoch}:${row.serial}`;
+    if (row.at <= now && row.at > (latest.get(key) ?? -Infinity)) latest.set(key, row.at);
+  }
+  const sounding: T[] = [];
+  const kept: T[] = [];
+  for (const row of pending) {
+    const at = latest.get(`${row.epoch}:${row.serial}`);
+    if (row.at > now) kept.push(row);
+    else if (row.at === at && now - row.at <= SIGNAL_HOLD_MS) { sounding.push(row); kept.push(row); }
+  }
+  return { sounding, pending: kept };
+}
+
 /** Presents executed events. Never queries patterns or advances a musical clock. */
 export function mountPlaybackObservation(
   view: EditorView,
@@ -47,11 +72,39 @@ export function mountPlaybackObservation(
   let changed = false;
   let pending: PendingOnset[] = [];
   let latestOnset = -Infinity;
+  let signals: SignalObservation[] = [];
+  let shownSignals = false;
+  /** Each signal identity's place in the current text; only an edit moves it. */
+  let signalLocations = new Map<string, Readonly<{ from: number; to: number }> | null>();
 
   function clear(): void {
     pending = [];
     latestOnset = -Infinity;
     setPlaybackHighlights(view, []);
+    signals = [];
+    signalLocations = new Map();
+    if (shownSignals) view.dispatch({ effects: setSignalPlayheads.of([]) });
+    shownSignals = false;
+  }
+  /** Shows each sounding signal value on the draft's graph for that exact signal; retired ones show nothing. */
+  function showSignals(now: number): void {
+    const result = soundingSignals([...signals, ...engine.readSignals(now)], now);
+    signals = result.pending;
+    const sounding = result.sounding;
+    if (!sounding.length && !shownSignals) return;
+    const key = (row: SignalObservation) => `${row.epoch}:${row.serial}`;
+    const unknown = [...new Map(sounding.filter(row => !signalLocations.has(key(row))).map(row => [key(row), row])).values()];
+    if (unknown.length) {
+      draft.locateSignals(unknown.map(row => [row.epoch, row.serial] as const))
+        .forEach((location, i) => signalLocations.set(key(unknown[i]), location));
+    }
+    const playheads: SignalPlayhead[] = [];
+    for (const row of sounding) {
+      const location = signalLocations.get(key(row));
+      if (location) playheads.push({ from: location.from, cycles: row.cycles, value: row.value });
+    }
+    view.dispatch({ effects: setSignalPlayheads.of(playheads) });
+    shownSignals = playheads.length > 0;
   }
   function schedule(): void {
     if (!frame && playing && !faulted && !disposed && !visibility.hidden) frame = requestAnimationFrame(tick);
@@ -73,6 +126,7 @@ export function mountPlaybackObservation(
       changed = false;
       setPlaybackHighlights(view, soundingOnsets(pending, latestOnset, now)
         .flatMap((onset): PlaybackHighlight[] => onset.location ? [onset.location] : []));
+      showSignals(now);
       schedule();
     } catch (error) {
       // A broken observation contract must be visible, but must not stop audio.
@@ -101,7 +155,7 @@ export function mountPlaybackObservation(
         clear();
       } else schedule();
     },
-    edited() { changed = true; schedule(); },
+    edited() { changed = true; signalLocations = new Map(); schedule(); },
     dispose() {
       if (disposed) return;
       disposed = true;

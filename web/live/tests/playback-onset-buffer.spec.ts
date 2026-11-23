@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import type * as OnsetTransport from "../../playback-onsets.js";
+import type * as OnsetTransport from "../../playback-observations.js";
 
 // Static Node imports treat this directly served worklet ES module as CommonJS.
-const moduleSource = await readFile(new URL("../../playback-onsets.js", import.meta.url));
+const moduleSource = await readFile(new URL("../../playback-observations.js", import.meta.url));
 const { OnsetRing, ONSET_BYTES, ONSET_CAPACITY } = await import(
   `data:text/javascript;base64,${moduleSource.toString("base64")}`
 ) as typeof OnsetTransport;

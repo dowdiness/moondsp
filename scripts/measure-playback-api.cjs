@@ -19,16 +19,16 @@ async function measureWorklet(page, scenario = null) {
   const instrumentation = await fs.readFile(path.join(__dirname, 'measure-playback-worklet.js'), 'utf8');
   const source = await response.text();
   const controllerUrl = new URL('./playback-controller.js', sourceUrl).href;
-  const onsetUrl = new URL('./playback-onsets.js', sourceUrl).href;
+  const observationUrl = new URL('./playback-observations.js', sourceUrl).href;
   const imported = source
     .replace('from "./playback-controller.js"', `from ${JSON.stringify(controllerUrl)}`)
-    .replace('from "./playback-onsets.js"', `from ${JSON.stringify(onsetUrl)}`);
+    .replace('from "./playback-observations.js"', `from ${JSON.stringify(observationUrl)}`);
   if (imported === source || imported.includes('from "./')) throw new Error('Cannot resolve processor imports');
   return page.evaluate(async ({ text, moduleSource, inputs, observe }) => {
     const context = new AudioContext({ sampleRate: 48000 });
     let node;
     let moduleUrl;
-    const { OnsetRing, ONSET_BYTES } = await import('/playback-onsets.js');
+    const { OnsetRing, ONSET_BYTES } = await import('/playback-observations.js');
     if (observe && !crossOriginIsolated) throw new Error('Observation requires cross-origin isolation');
     const onsets = observe ? new OnsetRing(new SharedArrayBuffer(ONSET_BYTES)) : null;
     let drainedOnsets = 0;

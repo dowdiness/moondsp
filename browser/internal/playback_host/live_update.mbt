@@ -690,3 +690,42 @@ pub fn player_onset_dropped() -> Double {
     None => 0.0
   }
 }
+
+///|
+pub fn player_signal_enable(enabled : Int32) -> Unit {
+  if player.val is Some(owner) {
+    owner.signals.enable(enabled == 1)
+  }
+}
+
+///|
+pub fn player_signal_count() -> Int32 {
+  match player.val {
+    Some(owner) => owner.signals.count()
+    None => 0
+  }
+}
+
+///|
+/// Read one scalar field of the bounded signal-value ring.
+pub fn player_signal_field(index : Int32, field : Int32) -> Double {
+  match player.val {
+    None => 0.0
+    Some(owner) => owner.signals.field(index, field)
+  }
+}
+
+///|
+pub fn player_signal_clear() -> Unit {
+  if player.val is Some(owner) {
+    owner.signals.clear()
+  }
+}
+
+///|
+pub fn player_signal_dropped() -> Double {
+  match player.val {
+    Some(owner) => owner.signals.dropped()
+    None => 0.0
+  }
+}

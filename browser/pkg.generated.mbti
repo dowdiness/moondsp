@@ -114,6 +114,16 @@ pub fn player_play() -> Int32
 
 pub fn player_restart_input() -> Int32
 
+pub fn player_signal_clear() -> Unit
+
+pub fn player_signal_count() -> Int32
+
+pub fn player_signal_dropped() -> Double
+
+pub fn player_signal_enable(Int32) -> Unit
+
+pub fn player_signal_field(Int32, Int32) -> Double
+
 pub fn player_skipped_count() -> Int32
 
 pub fn player_state() -> Int32

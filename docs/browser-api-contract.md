@@ -1043,6 +1043,46 @@ they and the complete audio engine are not certified allocation-free. See
 [measurement record](development/2026-10-03-musical-experience.md#actual-onset-linkage--2026-10-04)
 for evidence and timing limits.
 
+## Followed-signal observation
+
+The scheduler records the values sounding notes follow from authored signals,
+such as `saw.range(200, 4000)` in `.lpf(...)`. Only signals with tracked
+source identity (Draft playback input) are observed; plain-text input records
+nothing. Both browser export targets expose:
+
+| Function | Contract |
+|---|---|
+| `player_signal_enable(enabled)` | Enable with nonzero `Int`; disabled by default |
+| `player_signal_count()` | Number of retained rows, at most 256 |
+| `player_signal_field(index, field)` | `Double` field; invalid fields return zero |
+| `player_signal_clear()` | Clear rows and the drop count; followed voices stay followed |
+| `player_signal_dropped()` | Drops since clear, returned as `Double` |
+
+Each row is `[engine sample, source epoch, source serial, material cycles,
+value]`, taken at a block start after voices follow their buses. Each row
+reads a bus a voice follows, so only keys its instrument binds are observed.
+A voice is observed from its note-on until it is idle, release included, at
+most 64 followed signals at once. Each block gives
+one row per signal and material, so chord tones following one signal give one
+row. Material cycles are time on the dispatching material's own clock: cycles
+from the start of the pattern, or song time. The buffer keeps the newest rows
+on overflow; unsafe identities and follower overflow count as drops.
+
+The scheduler Worklet takes an optional `signalBuffer` (`SIGNAL_BYTES`, from
+`playback-observations.js`) and copies rows, with audio time and observation
+generation, into a 256-slot `SharedArrayBuffer`; the onset and signal rings
+share one implementation of the slot ownership. Generation changes clear it with the onset buffer. The live
+editor allocates it whenever onset observation is enabled.
+
+`browser_authoring.locate_signals(draft, wire)` accepts a JSON array of
+`[epoch, serial]` and returns an equal-length array of `{from,to}` or null:
+the signal's current text, or null once an edit to that text retired the
+identity. The editor shows, per located signal, the rows of its latest due
+block for at most 250 ms; Pause, run changes, and visibility changes clear them.
+
+Observation adds no Wasm GC construction on the render path; see the
+[allocation audit](performance/2026-11-19-signal-observation-allocations.md).
+
 ## Live editor playback ownership
 
 The live editor routes draft edits and Play/Pause/Restart through `Player` in
@@ -1319,7 +1359,7 @@ scheduler path selected through `useScheduler` and available WASM exports.
 The dedicated probe tests load their own modules into `OfflineAudioContext`;
 they do not select a live-editor mode. These two probe modules are separate
 from the three JS assets copied into the live app (`playback-controller.js`,
-`playback-onsets.js`, and `scheduler-processor.js`). Running the live suite does not
+`playback-observations.js`, and `scheduler-processor.js`). Running the live suite does not
 run these dedicated probe suites.
 
 Message responsibilities:

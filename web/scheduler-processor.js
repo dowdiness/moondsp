@@ -1,5 +1,5 @@
 import { PlaybackController } from "./playback-controller.js";
-import { OnsetRing } from "./playback-onsets.js";
+import { OnsetRing, SignalRing } from "./playback-observations.js";
 import { SampleLoader } from "./sample-loader.js";
 
 class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
@@ -17,6 +17,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.statusCountdown = 0;
     const onsetBuffer = options?.processorOptions?.onsetBuffer;
     this.onsets = onsetBuffer ? new OnsetRing(onsetBuffer) : null;
+    const signalBuffer = options?.processorOptions?.signalBuffer;
+    this.signals = signalBuffer ? new SignalRing(signalBuffer) : null;
     this.onsetGeneration = 0;
     this.samples = null;
 
@@ -46,6 +48,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     if (Number.isSafeInteger(data.onsetGeneration) && data.onsetGeneration > 0) {
       this.onsetGeneration = data.onsetGeneration;
       this.wasm.player_onset_clear();
+      this.wasm.player_signal_clear();
     }
     if (data.type === "observe-onsets") return;
     if (data.type === "sample-load") {
@@ -91,6 +94,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "init_sample_store", "sample_bank_count", "sample_bank_name_length",
         "sample_bank_name_char", "sample_load_begin", "sample_load_write",
         "sample_load_commit", "sample_loaded",
+        "player_signal_enable", "player_signal_count", "player_signal_field",
+        "player_signal_clear", "player_signal_dropped",
       ]);
       if (missingExports.length > 0) {
         throw new Error(`Scheduler browser exports not found: ${missingExports.join(", ")}`);
@@ -125,6 +130,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     this.graphBlockSize = ok ? blockSize : 0;
     if (ok) {
       this.wasm.player_onset_enable(this.onsets ? 1 : 0);
+      this.wasm.player_signal_enable(this.signals ? 1 : 0);
       // The page checks sources against the format the player really runs in.
       this.port.postMessage({ type: "ready", mode: "scheduler-dsp", sampleRate, blockSize });
       this.applySchedulerState();
@@ -169,7 +175,7 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
 
     // Copy before rendering, so a waveform finished now plays in this block.
     this.samples.step();
-    const engineBlockStart = this.onsets ? this.wasm.scheduler_sample_position() : 0;
+    const engineBlockStart = this.onsets || this.signals ? this.wasm.scheduler_sample_position() : 0;
     const processed = this.wasm.process_scheduler_block();
     if (!processed) {
       this.fillSilence(left, right);
@@ -181,6 +187,9 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     }
     if (this.onsets) {
       this.onsets.write(this.wasm, engineBlockStart, currentTime, sampleRate, this.onsetGeneration);
+    }
+    if (this.signals) {
+      this.signals.write(this.wasm, engineBlockStart, currentTime, sampleRate, this.onsetGeneration);
     }
 
     this.statusCountdown -= 1;

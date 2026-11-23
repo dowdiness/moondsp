@@ -10,6 +10,7 @@ import {
   vocabulary as vocabularyWire,
   methods_after as methodsAfterWire,
   draft_signals as draftSignals,
+  locate_signals as locateSignals,
   type DraftHandle,
 } from "./generated/authoring.js";
 
@@ -231,6 +232,15 @@ export class Draft {
       }
     }
     return result as (LocatedOnset | null)[];
+  }
+  /** Where each `[epoch, serial]` signal identity from playback is in the current text, or null once it is retired. */
+  locateSignals(identities: readonly (readonly [number, number])[]): readonly (Readonly<{ from: number; to: number }> | null)[] {
+    const result: unknown = JSON.parse(locateSignals(this.handle, JSON.stringify(identities)));
+    if (!Array.isArray(result) || result.length !== identities.length || !result.every(item => item === null ||
+        (Number.isSafeInteger(item?.from) && Number.isSafeInteger(item?.to) && item.to > item.from))) {
+      throw new Error("Invalid signal location");
+    }
+    return result;
   }
   /** The signal graphs of the current text; empty while it does not parse. */
   signalGraphs(): readonly SignalGraph[] {

@@ -30,6 +30,7 @@ options(
         "vocabulary",
         "methods_after",
         "draft_signals",
+        "locate_signals",
       ],
     },
   },

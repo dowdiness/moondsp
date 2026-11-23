@@ -420,6 +420,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`PatternDoc::continuous` takes an optional `source`); `ControlTrace` reads
   one bus at exact times, placed like events, with its period when its signals
   declare one. `Rational::lcm` is public.
+- While playing, each signal graph marks where its signal is and shows the
+  value the sounding notes follow from it, read from what the scheduler
+  executed, not recomputed by the editor. Signal arguments carry source
+  identity, so the marker stays with its signal across unrelated edits and
+  disappears once the signal's own text changes, until the edited signal
+  plays. A song's marker moves along the song timeline. The browser ABI gains
+  `player_signal_enable`, `player_signal_count`, `player_signal_field`,
+  `player_signal_clear`, and `player_signal_dropped`, plus
+  `browser_authoring.locate_signals`; the scheduler Worklet takes an optional
+  `signalBuffer` shared ring. `@scheduler.SignalBuffer`,
+  `PatternScheduler::attach_signal_buffer`, `@mini.Draft::
+  locate_signal_fields`, `@pattern.Controls::signal_source`,
+  `on_playback_clock`, `material_origin`, and `material_rate`, and `@voice.BoundVoicePool::
+  followed` with `VoiceFollower::key` and `read` are public. Observation
+  constructs nothing on the render path
+  ([audit](docs/performance/2026-11-19-signal-observation-allocations.md)).
 - Parameter automation through automatic control buses (ADR-0019). Control
   arguments in Mini take a number, a quoted step pattern such as
   `s("hh*8").gain("0.2 0.6 0.3 0.8")`, or a signal (`sine`, `cosine`, `saw`,

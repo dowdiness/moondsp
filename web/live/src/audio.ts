@@ -3,7 +3,7 @@
 import { decodeWorkletMessage, type AudioFormat } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId, SampleStatus } from "./playback-protocol";
-import { ONSET_BYTES, OnsetRing, type OnsetStatistics } from "../../playback-onsets.js";
+import { ONSET_BYTES, OnsetRing, SIGNAL_BYTES, SignalRing, type OnsetStatistics } from "../../playback-observations.js";
 import { sampleBank } from "../../sample-bank.js";
 
 function abortError(): DOMException {
@@ -80,6 +80,8 @@ export type OpenSessionResult =
   | { kind: "busy" };
 
 export type OnsetObservation = Readonly<{ fields: readonly number[]; at: number }>;
+/** The value a sounding note follows from one authored signal, at listener time `at` (ms). */
+export type SignalObservation = Readonly<{ at: number; epoch: number; serial: number; cycles: number; value: number }>;
 
 type Graph = Readonly<{
   ctx: AudioContext;
@@ -89,6 +91,7 @@ type Graph = Readonly<{
   onsets: OnsetRing | null;
   /** The format its worklet reported once its player was built. */
   format: AudioFormat;
+  signals: SignalRing | null;
 }>;
 type GraphRun = Readonly<{
   run: symbol;
@@ -107,6 +110,18 @@ type EngineState =
   | (GraphRun & { kind: "active" | "closing" })
   | { kind: "failed"; message: string };
 
+/**
+ * Milliseconds to add to audio-context seconds × 1000 to get listener time on
+ * the `performance.now()` clock. Timestamp mapping already includes output
+ * latency; the fallback adds the reported latency once.
+ */
+function listenerOffset(ctx: AudioContext, now: number): number {
+  const { contextTime = 0, performanceTime = 0 } = ctx.getOutputTimestamp();
+  return performanceTime > 0
+    ? performanceTime - contextTime * 1000
+    : now - ctx.currentTime * 1000 + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+}
+
 export class AudioEngine {
   private onsetEpoch = 0;
 
@@ -118,6 +133,7 @@ export class AudioEngine {
     const state = this.state;
     if ("graph" in state && state.graph.onsets) {
       state.graph.onsets.read(-1);
+      state.graph.signals?.read(-1);
       state.graph.node.port.postMessage({ type: "observe-onsets", onsetGeneration: this.onsetEpoch });
     }
   }
@@ -128,13 +144,18 @@ export class AudioEngine {
     if (state.kind !== "active" || state.graph.ctx.state !== "running" || !state.graph.onsets) return [];
     const rows = state.graph.onsets.read(this.onsetEpoch);
     if (!rows.length) return [];
-    const ctx = state.graph.ctx;
-    const { contextTime = 0, performanceTime = 0 } = ctx.getOutputTimestamp();
-    const outputStarted = performanceTime > 0;
-    const offset = outputStarted
-      ? performanceTime - contextTime * 1000
-      : now - ctx.currentTime * 1000 + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+    const offset = listenerOffset(state.graph.ctx, now);
     return rows.map(fields => ({ fields, at: offset + fields[0] * 1000 }));
+  }
+
+  /** Signal values in the current observation generation, at listener time. Main thread only. */
+  readSignals(now: number): readonly SignalObservation[] {
+    const state = this.state;
+    if (state.kind !== "active" || state.graph.ctx.state !== "running" || !state.graph.signals) return [];
+    const rows = state.graph.signals.read(this.onsetEpoch);
+    if (!rows.length) return [];
+    const offset = listenerOffset(state.graph.ctx, now);
+    return rows.map(([time, epoch, serial, cycles, value]) => ({ at: offset + time * 1000, epoch, serial, cycles, value }));
   }
 
   onsetStatistics(): OnsetStatistics | null {
@@ -296,10 +317,11 @@ export class AudioEngine {
       const onsets = this.options.enableOnsets !== false &&
         globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"
         ? new OnsetRing(new SharedArrayBuffer(ONSET_BYTES)) : null;
+      const signals = onsets ? new SignalRing(new SharedArrayBuffer(SIGNAL_BYTES)) : null;
       await abortable(() => ctx.audioWorklet.addModule("/scheduler-processor.js"), signal);
       node = new AudioWorkletNode(ctx, "moondsp-scheduler", {
         numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-        processorOptions: { wasmModule, onsetBuffer: onsets?.buffer },
+        processorOptions: { wasmModule, onsetBuffer: onsets?.buffer, signalBuffer: signals?.buffer },
       });
       const ready = this.waitForReady(node, signal);
       node.connect(gain);
@@ -307,7 +329,7 @@ export class AudioEngine {
       // The worklet copies the bank into its store a block's share at a time.
       for (const load of sampleBank(ctx.sampleRate)) node.port.postMessage(load, [load.data.buffer]);
       await abortable(() => running, signal);
-      return { ctx, node, gain, analyser, onsets, format };
+      return { ctx, node, gain, analyser, onsets, signals, format };
     } catch (error) {
       await release(ctx, node, analyser, gain);
       throw error;

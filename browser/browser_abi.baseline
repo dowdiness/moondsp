@@ -119,6 +119,16 @@ pub fn player_play() -> Int32
 
 pub fn player_restart_input() -> Int32
 
+pub fn player_signal_clear() -> Unit
+
+pub fn player_signal_count() -> Int32
+
+pub fn player_signal_dropped() -> Double
+
+pub fn player_signal_enable(Int32) -> Unit
+
+pub fn player_signal_field(Int32, Int32) -> Double
+
 pub fn player_skipped_count() -> Int32
 
 pub fn player_state() -> Int32
@@ -297,6 +307,11 @@ sample_load_begin
 sample_load_write
 sample_load_commit
 sample_loaded
+player_signal_enable
+player_signal_count
+player_signal_field
+player_signal_clear
+player_signal_dropped
 player_pending_count
 player_skipped_count
 get_playback_error
@@ -392,6 +407,11 @@ sample_load_begin
 sample_load_write
 sample_load_commit
 sample_loaded
+player_signal_enable
+player_signal_count
+player_signal_field
+player_signal_clear
+player_signal_dropped
 player_pending_count
 player_skipped_count
 get_playback_error

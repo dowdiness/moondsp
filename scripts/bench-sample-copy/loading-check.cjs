@@ -79,7 +79,7 @@ async function run(page, load) {
     const base = location.origin;
     const source = (await (await fetch('/scheduler-processor.js')).text())
       .replace('from "./playback-controller.js"', `from "${base}/playback-controller.js"`)
-      .replace('from "./playback-onsets.js"', `from "${base}/playback-onsets.js"`)
+      .replace('from "./playback-observations.js"', `from "${base}/playback-observations.js"`)
       .replace('from "./sample-loader.js"', `from "${base}/sample-loader.js"`);
     if (source.includes('from "./')) throw new Error('unresolved processor import');
     const url = URL.createObjectURL(new Blob([source + subclass], { type: 'text/javascript' }));

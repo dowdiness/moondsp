@@ -479,6 +479,28 @@ fn source_range_json(range : @mini.SourceRange) -> Json {
 }
 
 ///|
+/// Resolve `[[epoch, serial], ...]` signal identities from playback against
+/// the draft: `{ from, to }` while that exact signal is present, else null.
+pub fn locate_signals(draft : @mini.Draft, wire : String) -> String {
+  let decoded = @json.parse(wire) catch { _ => return "[]" }
+  guard decoded is Array(rows) else { return "[]" }
+  let resolved = rows.map(row => {
+    guard row is Array([epoch, serial]) &&
+      onset_wire_integer(epoch) is Some(epoch) &&
+      onset_wire_integer(serial) is Some(serial) &&
+      draft.locate_signal_fields(epoch, serial) is Some(range) else {
+      return Json::null()
+    }
+    let json : Json = {
+      "from": Json::number(range.start().to_double()),
+      "to": Json::number(range.end().to_double()),
+    }
+    json
+  })
+  Json::array(resolved).stringify()
+}
+
+///|
 /// Resolve dispatched onset wire rows against the draft's exact identities.
 /// Invalid or retired rows remain null and preserve their input position.
 pub fn locate_onsets(draft : @mini.Draft, wire : String) -> String {

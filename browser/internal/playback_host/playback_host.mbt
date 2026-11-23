@@ -2,6 +2,7 @@
 pub struct Player {
   priv scheduler : @scheduler.PatternScheduler
   priv onsets : @scheduler.OnsetBuffer
+  priv signals : @scheduler.SignalBuffer
   priv context : @moondsp.DspContext
   priv left : @moondsp.AudioBuffer
   priv right : @moondsp.AudioBuffer
@@ -22,9 +23,12 @@ fn Player::Player(
   let size = context.block_size()
   let onsets = @scheduler.OnsetBuffer()
   scheduler.attach_onset_buffer(onsets)
+  let signals = @scheduler.SignalBuffer()
+  scheduler.attach_signal_buffer(signals)
   {
     scheduler,
     onsets,
+    signals,
     context,
     left: @moondsp.AudioBuffer::filled(size),
     right: @moondsp.AudioBuffer::filled(size),

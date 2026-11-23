@@ -79,3 +79,27 @@ test("graphs stay with their signals while the draft does not parse, until their
   await expect(graphs).toHaveCount(2);
   await expect(graphs.first()).toHaveAttribute("aria-label", /end 8000/);
 });
+
+test("while playing, each graph marks where its signal is and shows the value it sounds", async ({ page }) => {
+  await page.goto("/");
+  await replaceCode(page, 'bpm(240); note("C2*8").lpf(saw.range(200, 4000).slow(4))');
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText("Playing");
+  const graph = page.locator(".cm-signal-preview");
+  await expect(graph).toHaveClass(/cm-signal-playing/);
+  const read = () => graph.evaluate(dom => ({
+    value: Number(dom.querySelector(".cm-signal-value")!.textContent),
+    marker: dom.querySelector(".signal-playhead")!.getAttribute("d"),
+  }));
+  const first = await read();
+  expect(first.value).toBeGreaterThanOrEqual(200);
+  expect(first.value).toBeLessThanOrEqual(4000);
+  expect(first.marker).toMatch(/^M[\d.]+ -1V11$/);
+  await expect.poll(async () => (await read()).marker).not.toBe(first.marker);
+  // Once the edited signal plays, its graph shows its own values.
+  await page.locator(".cm-content span", { hasText: /^4000$/ }).dblclick();
+  await insertText(page, "8000");
+  await expect.poll(async () => (await read()).value, { timeout: 10_000 }).toBeGreaterThan(4000);
+  await page.locator("#start").click();
+  await expect(graph).not.toHaveClass(/cm-signal-playing/);
+});

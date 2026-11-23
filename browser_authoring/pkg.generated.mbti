@@ -21,6 +21,8 @@ pub fn edit_draft(@mini.Draft, String) -> String
 
 pub fn locate_onsets(@mini.Draft, String) -> String
 
+pub fn locate_signals(@mini.Draft, String) -> String
+
 pub fn methods_after(String) -> String
 
 pub fn player_query_window(Double, Int32, (@pattern.QueryWindow) -> Unit, (String) -> Unit) -> Unit

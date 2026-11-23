@@ -238,3 +238,31 @@ pub fn sample_load_commit() -> Bool {
 pub fn sample_loaded(entry : Int32) -> Bool {
   @playback_host.sample_loaded(entry)
 }
+
+///|
+/// Enable recording of the values sounding notes follow from authored signals.
+pub fn player_signal_enable(enabled : Int32) -> Unit {
+  @playback_host.player_signal_enable(enabled)
+}
+
+///|
+pub fn player_signal_count() -> Int32 {
+  @playback_host.player_signal_count()
+}
+
+///|
+/// Read a zero-based field of a signal-value row: sample, source epoch,
+/// source serial, material time in cycles, value.
+pub fn player_signal_field(index : Int32, field : Int32) -> Double {
+  @playback_host.player_signal_field(index, field)
+}
+
+///|
+pub fn player_signal_clear() -> Unit {
+  @playback_host.player_signal_clear()
+}
+
+///|
+pub fn player_signal_dropped() -> Double {
+  @playback_host.player_signal_dropped()
+}
