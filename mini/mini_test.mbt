@@ -2384,3 +2384,88 @@ test "unknown names are errors that list their position's names" {
     }
   }
 }
+
+///|
+/// The first curve of the graph whose signal starts at `needle` in `source`.
+fn signal_curve_at(
+  source : String,
+  needle : String,
+) -> (@mini.SignalGraph, @mini.SignalCurve) {
+  let graphs = (try! @mini.Draft(source)).signal_graphs(buckets=16)
+  let start = source.find(needle).unwrap()
+  guard graphs.search_by(graph => graph.range().start() == start) is Some(index) else {
+    abort("no signal graph at \{needle}")
+  }
+  (graphs[index], graphs[index].curves()[0])
+}
+
+///|
+test "signal graphs follow transforms around the control" {
+  // The chain's slow(4) applies after the control, so the saw takes 4 cycles.
+  let (graph, curve) = signal_curve_at(
+    "note(\"C2\").lpf(saw.range(200, 4000)).slow(4)", "saw",
+  )
+  assert_eq(graph.window(), @pattern.Rational::from_int(4))
+  assert_eq(
+    (curve.first().get(), curve.last().get()),
+    (Some(200.0), Some(4000.0)),
+  )
+  // jux plays a reversed copy on the right: a second curve that falls.
+  let (graph, _) = signal_curve_at(
+    "note(\"C2\").lpf(saw.range(200, 4000)).jux(rev)", "saw",
+  )
+  let curves = graph.curves()
+  assert_eq(curves.length(), 2)
+  assert_eq(
+    (curves[0].first().get(), curves[0].last().get()),
+    (Some(200.0), Some(4000.0)),
+  )
+  assert_eq(
+    (curves[1].first().get(), curves[1].last().get()),
+    (Some(4000.0), Some(200.0)),
+  )
+  // every(3) repeats every 3 cycles; a half-cycle saw still fills whole cycles.
+  let (graph, _) = signal_curve_at(
+    "note(\"C2\").pan(saw.fast(2)).every(3, fast(2))", "saw",
+  )
+  assert_eq(graph.window(), @pattern.Rational::from_int(3))
+  // An outer gain multiplies an inner one: C2 follows saw × isaw, C3 isaw.
+  let (graph, _) = signal_curve_at(
+    "stack(note(\"C2\").gain(saw), note(\"C3\")).gain(isaw)", "isaw",
+  )
+  @debug.assert_eq(
+    graph.curves().map(curve => (curve.first().get(), curve.last().get())),
+    [(Some(1.0), Some(0.0)), (Some(0.0), Some(0.0))],
+  )
+}
+
+///|
+test "signal graphs place song sections on the song timeline" {
+  // Section b starts at cycle 4 and lasts 4 cycles, so a fade over 8 cycles
+  // only reaches halfway before the section ends.
+  let source =
+    #|song(section("a", 4, note("C2")),
+    #|  section("b", 4, note("C2").gain(saw.range(1, 0).slow(8))),
+    #|  part("p1", "a"), part("p2", "b"))
+  let (graph, curve) = signal_curve_at(source, "saw")
+  assert_true(graph.is_song())
+  assert_eq(graph.window(), @pattern.Rational::from_int(8))
+  assert_eq(curve.spans(), [
+    @pattern.TimeSpan(
+      @pattern.Rational::from_int(4),
+      @pattern.Rational::from_int(8),
+    ),
+  ])
+  assert_eq((curve.first().get(), curve.last().get()), (Some(1.0), Some(0.5)))
+  // No value while section a plays, then the fade's top in b's first bucket.
+  assert_true(curve.highs()[0].is_absent())
+  assert_eq(curve.highs()[8].get(), Some(1.0))
+}
+
+///|
+test "a draft that does not parse has no signal graphs" {
+  let graphs = (try! @mini.Draft("note(\"C2\").lpf(saw.range(1, 0)")).signal_graphs(
+    buckets=16,
+  )
+  assert_eq(graphs.length(), 0)
+}

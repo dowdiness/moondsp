@@ -29,6 +29,7 @@ options(
         "control_nesting",
         "vocabulary",
         "methods_after",
+        "draft_signals",
       ],
     },
   },

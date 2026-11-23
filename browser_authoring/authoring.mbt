@@ -53,6 +53,58 @@ pub fn draft_state(draft : @mini.Draft) -> String {
 }
 
 ///|
+/// Buckets per signal curve, about one per pixel of the editor's graph.
+const SIGNAL_GRAPH_BUCKETS : Int32 = 48
+
+///|
+/// The signal graphs of the draft's current text: `[{ from, to, window, song,
+/// curves: [{ lows, highs, spans: [[begin, end]], first, last }] }]`, times in
+/// cycles and `null` where a curve has no value.
+pub fn draft_signals(draft : @mini.Draft) -> String {
+  let value = (value : @control.ControlValue) => {
+    match value.get() {
+      Some(number) => Json::number(number)
+      None => Json::null()
+    }
+  }
+  let graphs = draft
+    .signal_graphs(buckets=SIGNAL_GRAPH_BUCKETS)
+    .map(graph => {
+      let json : Json = {
+        "from": Json::number(graph.range().start().to_double()),
+        "to": Json::number(graph.range().end().to_double()),
+        "window": Json::number(graph.window().to_double()),
+        "song": Json::boolean(graph.is_song()),
+        "curves": Json::array(
+          graph
+          .curves()
+          .map(curve => {
+            let json : Json = {
+              "lows": Json::array(curve.lows().map(value)),
+              "highs": Json::array(curve.highs().map(value)),
+              "spans": Json::array(
+                curve
+                .spans()
+                .map(span => {
+                  Json::array([
+                    Json::number(span.begin.to_double()),
+                    Json::number(span.end_.to_double()),
+                  ])
+                }),
+              ),
+              "first": value(curve.first()),
+              "last": value(curve.last()),
+            }
+            json
+          }),
+        ),
+      }
+      json
+    })
+  Json::array(graphs).stringify()
+}
+
+///|
 fn edit_offset(value : Json) -> Int32 raise EditWireError {
   guard value is Number(number, ..) && number >= 0.0 && number <= 2147483647.0 else {
     raise InvalidEdit("invalid UTF-16 edit offset")

@@ -4,6 +4,7 @@ import { history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import type { SyntaxNode, Tree } from "@lezer/common";
 import { syntaxTree } from "@codemirror/language";
 import { CONTROL_NESTING } from "./generated/control-nesting.js";
+import { layoutWidgets } from "./code-layout";
 
 /**
  * A knob's parameter: whether a later modifier for its control replaces it,
@@ -78,12 +79,7 @@ function controlTargets(tree: Tree, source: string): Target[] {
 }
 
 /** Code columns an inline knob occupies, so long lines can lay out by column count. */
-export const KNOB_COLUMNS = 2;
-
-/** Source positions where inline knobs are drawn. */
-export function controlPositions(tree: Tree, source: string): number[] {
-  return controlTargets(tree, source).map(target => target.from);
-}
+const KNOB_COLUMNS = 2;
 
 /** Whether `value` is a plain decimal number literal, as a knob writes. */
 export function isNumberLiteral(value: string): boolean {
@@ -315,7 +311,7 @@ export function inlineControls(): Extension {
       create: decorations,
       // The tree can also grow after the edit, as parsing completes in the background.
       update: (value, transaction) => syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? decorations(transaction.state) : value,
-      provide: field => EditorView.decorations.from(field),
+      provide: field => [EditorView.decorations.from(field), layoutWidgets.from(field, widgets => [widgets, KNOB_COLUMNS])],
     }),
     EditorView.baseTheme({
       ".cm-inline-control": { position: "relative", display: "inline-flex", justifyContent: "center", width: `${KNOB_COLUMNS}ch`, height: "1em", verticalAlign: "-0.1em", font: "inherit", color: "var(--ink)" },

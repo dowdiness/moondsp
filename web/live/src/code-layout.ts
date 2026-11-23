@@ -1,8 +1,7 @@
-import { StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
+import { Facet, StateEffect, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { syntaxTree } from "@codemirror/language";
-import { KNOB_COLUMNS, controlPositions } from "./inline-controls";
 
 // Display-only layout for statements longer than the editor is wide. Like a
 // code formatter, it breaks by syntax rather than wherever the text runs out:
@@ -57,7 +56,7 @@ function sameColumns(a: Columns, b: Columns): boolean {
 
 /**
  * Breaks for the top-level expression `node`, given the measured columns and
- * the columns of widgets drawn at source positions (inline knobs). Pure: no DOM.
+ * the columns of widgets drawn at source positions (inline knobs and signal graphs). Pure: no DOM.
  */
 export function layoutStatement(source: string, node: SyntaxNode, columns: Columns, widgetColumns: ReadonlyMap<number, number>): { breaks: Break[]; boxes: Box[] } {
   const lineStart = source.lastIndexOf("\n", node.from - 1) + 1;
@@ -162,15 +161,24 @@ const rowBreak = new RowBreak();
 
 const setMeasure = StateEffect.define<Columns>();
 
+/**
+ * Widgets drawn at source positions, such as inline knobs, so long lines can
+ * lay out by column count: each extension that draws them provides its
+ * widget decorations and the code columns one widget takes.
+ */
+export const layoutWidgets = Facet.define<readonly [widgets: DecorationSet, columns: number]>();
+
 function decorations(state: EditorState, columns: Columns | null): DecorationSet {
   if (!columns || columns.row <= 0) return Decoration.none;
   const source = state.doc.toString();
   const tree = syntaxTree(state);
-  const knobColumns = new Map(controlPositions(tree, source).map(pos => [pos, KNOB_COLUMNS]));
+  const widgetColumns = new Map<number, number>();
+  for (const [widgets, width] of state.facet(layoutWidgets))
+    for (let widget = widgets.iter(); widget.value; widget.next()) widgetColumns.set(widget.from, width);
   const ranges: Range<Decoration>[] = [];
   tree.iterate({ enter: ref => {
     if (ref.name !== "Expression") return;
-    const { breaks, boxes } = layoutStatement(source, ref.node, columns, knobColumns);
+    const { breaks, boxes } = layoutStatement(source, ref.node, columns, widgetColumns);
     // The break holds only the line break and the row's indent pads its start, so
     // nothing but text and knobs sits between rows and End and Home reach each
     // row's end and start; the narrow-screen layout test covers both.
@@ -197,13 +205,14 @@ const layout = StateField.define<{ columns: Columns | null; decorations: Decorat
     let columns = value.columns;
     for (const effect of transaction.effects) if (effect.is(setMeasure)) columns = effect.value;
     // The tree can also grow after the edit, as parsing completes in the background.
-    if (columns === value.columns && syntaxTree(transaction.state) === syntaxTree(transaction.startState)) return value;
+    if (columns === value.columns && syntaxTree(transaction.state) === syntaxTree(transaction.startState) &&
+        transaction.state.facet(layoutWidgets) === transaction.startState.facet(layoutWidgets)) return value;
     return { columns, decorations: decorations(transaction.state, columns) };
   },
   provide: field => EditorView.decorations.from(field, value => value.decorations),
 });
 
-const glyphCanvas = document.createElement("canvas").getContext("2d")!;
+let glyphCanvas: CanvasRenderingContext2D | undefined;
 
 /** The width a code row's text gets: the content box minus each line's inset, registered as CSS lengths. */
 function rowTextWidth(content: HTMLElement, style: CSSStyleDeclaration): number {
@@ -213,8 +222,10 @@ function rowTextWidth(content: HTMLElement, style: CSSStyleDeclaration): number 
 
 /** How wide the code font draws a wide character and a digit, measured on a canvas so the layout is untouched. */
 function glyphWidths(style: CSSStyleDeclaration): { wideGlyph: number; digitGlyph: number } {
-  glyphCanvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-  return { wideGlyph: glyphCanvas.measureText("国").width, digitGlyph: glyphCanvas.measureText("0").width };
+  // Made on first use, so the facet above can load without a document.
+  const canvas = glyphCanvas ??= document.createElement("canvas").getContext("2d")!;
+  canvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  return { wideGlyph: canvas.measureText("国").width, digitGlyph: canvas.measureText("0").width };
 }
 
 const measurer = ViewPlugin.fromClass(class {

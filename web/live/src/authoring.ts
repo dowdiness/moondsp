@@ -9,6 +9,7 @@ import {
   locate_onsets as locateOnsets,
   vocabulary as vocabularyWire,
   methods_after as methodsAfterWire,
+  draft_signals as draftSignals,
   type DraftHandle,
 } from "./generated/authoring.js";
 
@@ -110,6 +111,34 @@ export function methodsAfter(receiver: string): readonly Call[] {
   return list(JSON.parse(methodsAfterWire(receiver)), decodeCall);
 }
 
+/** One use of a signal, sampled into equal buckets; `null` where it has no value. Times are in cycles. */
+export type SignalCurve = Readonly<{
+  lows: readonly (number | null)[];
+  highs: readonly (number | null)[];
+  spans: readonly (readonly [number, number])[];
+  first: number | null;
+  last: number | null;
+}>;
+/** A signal argument at `from`–`to` and the curves the music gives it over `window` cycles from cycle 0. */
+export type SignalGraph = Readonly<{ from: number; to: number; window: number; song: boolean; curves: readonly SignalCurve[] }>;
+
+const isValue = (value: unknown): value is number | null => value === null || (typeof value === "number" && Number.isFinite(value));
+
+function isSignalGraph(value: unknown): value is SignalGraph {
+  if (typeof value !== "object" || value === null) return false;
+  const graph = value as Record<string, unknown>;
+  return Number.isSafeInteger(graph.from) && Number.isSafeInteger(graph.to) && Number(graph.to) > Number(graph.from) &&
+    typeof graph.window === "number" && graph.window > 0 && typeof graph.song === "boolean" &&
+    Array.isArray(graph.curves) && graph.curves.every(raw => {
+      if (typeof raw !== "object" || raw === null) return false;
+      const curve = raw as Record<string, unknown>;
+      return Array.isArray(curve.lows) && curve.lows.length > 0 && curve.lows.every(isValue) &&
+        Array.isArray(curve.highs) && curve.highs.length === curve.lows.length && curve.highs.every(isValue) &&
+        Array.isArray(curve.spans) && curve.spans.every(span => Array.isArray(span) && span.length === 2 && span.every(Number.isFinite)) &&
+        isValue(curve.first) && isValue(curve.last);
+    });
+}
+
 function decodeProblem(raw: unknown, text: string): SourceProblem | null | undefined {
   if (raw === null) return null;
   if (typeof raw !== "object") return undefined;
@@ -203,5 +232,10 @@ export class Draft {
     }
     return result as (LocatedOnset | null)[];
   }
-
+  /** The signal graphs of the current text; empty while it does not parse. */
+  signalGraphs(): readonly SignalGraph[] {
+    const result: unknown = JSON.parse(draftSignals(this.handle));
+    if (!Array.isArray(result) || !result.every(isSignalGraph)) throw new Error("Invalid signal graphs");
+    return result;
+  }
 }

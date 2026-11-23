@@ -100,10 +100,27 @@ fn bus_binding_for(
 
 ///|
 /// One bus of a compiled subtree: the signal one `MergeControl` gives `key`,
-/// and how that merge reads and writes the payload's controls.
+/// and the authored signal the merge's provider compiles, when it is one.
 priv struct ControlBus {
   key : @control.Control
   signal : BusSignal
+  source : @identity.SourceAtomId?
+}
+
+///|
+/// The authored signal a control-provider subtree compiles: the source of its
+/// single continuous leaf, through time transforms and references.
+fn[A] signal_source(
+  nodes : Map[String, PatternDocEntry[A]],
+  id : @identity.PatternNodeId,
+) -> @identity.SourceAtomId? {
+  guard nodes.get(id.value()) is Some(entry) else { return None }
+  match entry.node {
+    Continuous(_, _, _, source) => source
+    Reference(definition, _) => signal_source(definition.nodes, definition.root)
+    Fast(child, _) | Slow(child, _) | Rev(child) => signal_source(nodes, child)
+    _ => None
+  }
 }
 
 ///|
@@ -268,10 +285,16 @@ pub fn Controls::placed(self : Controls, placement : Placement) -> Controls {
 ///|
 /// `signal` on this event's clock.
 fn Controls::place(self : Controls, signal : BusSignal) -> BusSignal {
-  if self.placement.is_identity() {
+  place_signal(signal, self.placement)
+}
+
+///|
+/// `signal` moved as `placement` moves events, as `Event::placed` does.
+fn place_signal(signal : BusSignal, placement : Placement) -> BusSignal {
+  if placement.is_identity() {
     signal
   } else {
-    Mapped(self.placement.time_map(), [signal])
+    Mapped(placement.time_map(), [signal])
   }
 }
 
@@ -315,8 +338,9 @@ priv enum BusSignal {
   /// The same value everywhere; never `NaN` (see `BusSignal::of_value`).
   Const(Double)
   /// A time function `(cycles, before)`, as `PatternDoc::continuous` takes
-  /// it. A `NaN` result counts as absent.
-  Continuous((Double, Bool) -> Double)
+  /// it, and the cycles after which it repeats, when it does. A `NaN` result
+  /// counts as absent.
+  Continuous((Double, Bool) -> Double, Rational?)
   /// `(f, delay)`: a one-shot time function of the time since its material
   /// entered, `f(t − delay, before)` (ADR-0025).
   Once((Double, Bool) -> Double, Double)
@@ -346,7 +370,7 @@ fn BusSignal::eval(
   match self {
     Absent => @control.ControlValue::absent()
     Const(value) => @control.ControlValue::of(value)
-    Continuous(f) =>
+    Continuous(f, _) =>
       @control.ControlValue::of(f(num.to_double() / den.to_double(), left))
     Once(f, delay) =>
       @control.ControlValue::of(
@@ -408,6 +432,99 @@ fn BusSignal::eval(
 }
 
 ///|
+/// The longest period `BusSignal::period` reports, in cycles.
+const MAX_BUS_PERIOD : Int64 = 1024L
+
+///|
+/// Cycles after which the signal repeats: the least common multiple of its
+/// parts' periods, which a time map turns into its own as it does a
+/// pattern's (`TimeMap::period`). `None` when a time function declares no
+/// period, for a one-shot signal, or when the period exceeds
+/// `MAX_BUS_PERIOD` cycles.
+fn BusSignal::period(self : BusSignal) -> Rational? {
+  fn bounded(period : Rational) -> Rational? {
+    if period > Rational(MAX_BUS_PERIOD, 1L) {
+      None
+    } else {
+      Some(period)
+    }
+  }
+  fn lcm(periods : Array[Rational?]) -> Rational? {
+    let mut result = Rational::from_int(1)
+    for period in periods {
+      guard period is Some(p) && bounded(result.lcm(p)) is Some(next) else {
+        return None
+      }
+      result = next
+    }
+    Some(result)
+  }
+  match self {
+    Absent | Const(_) => Some(Rational::from_int(1))
+    Continuous(_, period) => period
+    Once(_, _) => None
+    Mapped(map, children) =>
+      lcm(children.map(child => child.period())).bind(period => {
+        bounded(map.period(period))
+      })
+    Every(n, plain, transformed) =>
+      lcm([Some(Rational(n, 1L)), plain.period(), transformed.period()])
+    Stack(children) => lcm(children.map(child => child.period()))
+    Product(inner, outer) => lcm([inner.period(), outer.period()])
+    Merge(presence, left, right) =>
+      lcm([presence.period(), left.period(), right.period()])
+  }
+}
+
+///|
+/// One control signal a provider gives a snapshot, in the snapshot's root time
+/// with every enclosing transform applied: the curve the voices it controls
+/// follow.
+pub struct ControlTrace {
+  priv signal : BusSignal
+}
+
+///|
+fn ControlTrace::ControlTrace(signal : BusSignal) -> ControlTrace {
+  { signal, }
+}
+
+///|
+/// The trace moved as `placement` moves events, as `Controls::placed` does.
+pub fn ControlTrace::placed(
+  self : ControlTrace,
+  placement : Placement,
+) -> ControlTrace {
+  ControlTrace(place_signal(self.signal, placement))
+}
+
+///|
+/// The value at `time`, as a voice following this trace reads it.
+pub fn ControlTrace::value_at(
+  self : ControlTrace,
+  time : Rational,
+) -> @control.ControlValue {
+  self.signal.eval(time.num, time.den, false)
+}
+
+///|
+/// The value just before `time`: its limit from below.
+pub fn ControlTrace::value_before(
+  self : ControlTrace,
+  time : Rational,
+) -> @control.ControlValue {
+  self.signal.eval(time.num, time.den, true)
+}
+
+///|
+/// The cycles after which the trace repeats, not necessarily whole. `None`
+/// when a time function declares no period, or the period is longer than 1024
+/// cycles.
+pub fn ControlTrace::period(self : ControlTrace) -> Rational? {
+  self.signal.period()
+}
+
+///|
 fn BusSignal::is_constant(self : BusSignal) -> Bool {
   match self {
     Absent | Const(_) => true
@@ -422,7 +539,7 @@ fn BusSignal::is_constant(self : BusSignal) -> Bool {
 fn BusSignal::has_once(self : BusSignal) -> Bool {
   match self {
     Once(_, _) => true
-    Absent | Const(_) | Continuous(_) => false
+    Absent | Const(_) | Continuous(_, _) => false
     Mapped(_, children) | Stack(children) =>
       children.iter().any(c => c.has_once())
     Every(_, plain, transformed) => plain.has_once() || transformed.has_once()
@@ -441,7 +558,7 @@ fn BusSignal::has_once(self : BusSignal) -> Bool {
 fn BusSignal::delayed(self : BusSignal, delay : Rational) -> BusSignal {
   match self {
     Once(f, before) => Once(f, before + delay.to_double())
-    Absent | Const(_) | Continuous(_) => self
+    Absent | Const(_) | Continuous(_, _) => self
     Mapped(map, children) => {
       let inner = match map {
         Affine(scale, _) => delay * scale
@@ -521,7 +638,7 @@ fn[A : WithControls] control_keys(
   match entry.node {
     Reference(definition, _) =>
       control_keys(definition.nodes, definition.root, keys)
-    Continuous(_, key, _) => add(key)
+    Continuous(_, key, _, _) => add(key)
     Pure(value) | Atom(_, value, _) =>
       value.controls().each((key, _) => add(key))
     Runtime(_) => raise UnsupportedControl(id)
@@ -566,7 +683,7 @@ fn[A : WithControls] compile_signal(
   match entry.node {
     Reference(definition, _) =>
       compile_signal(definition.nodes, definition.root, key)
-    Continuous(_, k, signal) =>
+    Continuous(_, k, signal, _) =>
       match key {
         None => Const(0.0)
         Some(key) => if k == key { signal } else { Absent }

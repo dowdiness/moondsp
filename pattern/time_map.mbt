@@ -196,29 +196,21 @@ fn TimeMap::coefficients(
 
 ///|
 /// The length after which the mapped pattern repeats, given the common
-/// period of its children (`period_lcm`). Cycle maps repeat every cycle, so
+/// period of its children (`Rational::lcm`). Cycle maps repeat every cycle, so
 /// they also need a whole number of cycles.
 fn TimeMap::period(self : TimeMap, children : Rational) -> Rational {
   match self {
     Affine(scale, _) => children / scale
-    MirrorCycles | Slots(_) => period_lcm(children, Rational::from_int(1))
+    MirrorCycles | Slots(_) => children.lcm(Rational::from_int(1))
   }
 }
 
 ///|
-/// The shortest length that is a whole multiple of both positive periods:
-/// `lcm(a, c) / gcd(b, d)` for `a / b` and `c / d` in lowest terms.
-fn period_lcm(left : Rational, right : Rational) -> Rational {
-  let numerator = left.num / gcd(left.num, right.num) * right.num
-  Rational(numerator, gcd(left.den, right.den))
-}
-
-///|
-/// `period_lcm` of every pattern's period; `pats` is not empty.
+/// `Rational::lcm` of every pattern's period; `pats` is not empty.
 fn[A] periods_lcm(pats : Array[Pat[A]]) -> Rational {
   let mut period = pats[0].metadata.period
   for pat in pats[1:] {
-    period = period_lcm(period, pat.metadata.period)
+    period = period.lcm(pat.metadata.period)
   }
   period
 }

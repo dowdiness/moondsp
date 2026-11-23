@@ -13,6 +13,8 @@ pub fn control_nesting() -> String
 
 pub fn create_draft(String, (@mini.Draft) -> Unit, (String) -> Unit) -> Unit
 
+pub fn draft_signals(@mini.Draft) -> String
+
 pub fn draft_state(@mini.Draft) -> String
 
 pub fn edit_draft(@mini.Draft, String) -> String

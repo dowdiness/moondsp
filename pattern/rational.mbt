@@ -149,6 +149,17 @@ pub impl Compare for Rational with fn compare(self : Rational, other : Rational)
 }
 
 ///|
+/// The least common multiple of two positive fractions: the shortest span that
+/// whole multiples of both fill.
+pub fn Rational::lcm(self : Rational, other : Rational) -> Rational {
+  // For reduced fractions, lcm(p/q, r/s) = lcm(p, r) / gcd(q, s).
+  Rational(
+    self.num / gcd(self.num, other.num) * other.num,
+    gcd(self.den, other.den),
+  )
+}
+
+///|
 pub fn Rational::floor(self : Rational) -> Int64 {
   let quotient = self.num / self.den
   if self.num % self.den < 0L {

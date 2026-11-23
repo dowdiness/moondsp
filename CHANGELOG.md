@@ -352,7 +352,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Breaking MoonBit API:** `PatternDoc::continuous` and `PatternDoc::once`
-  take `f(cycles, before)`, where `before` asks for the limit from below.
+  take `f(cycles, before)`, where `before` asks for the limit from below;
+  `continuous` also takes an optional `period`.
   `rev` reads that limit, so a reversed saw or square now starts a cycle at
   the value it approaches instead of the value after its jump: a note at a
   cycle start under `.lpf(saw).rev()` reads the saw's top, not its bottom.
@@ -402,6 +403,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `browser_authoring.control_nesting()` export returns the rules as JSON; the
   live editor reads them at build time instead of special-casing `gain`.
 
+- The live editor draws a small graph before each signal passed to a control,
+  such as `.lpf(saw.range(200, 4000).slow(4))`: the curve the voices it
+  controls follow, computed from the compiled score with every transform
+  around the control applied. A pattern's graph spans the whole cycles after
+  which it repeats (at most 64); a song's graph spans the song, with the
+  signal only where its sections play, placed as playback places them. A
+  reversed `range` shows as a falling line, `jux` shows its second copy, and
+  an outer `gain` over an inner one also shows their product. Hovering, or
+  tapping on a touch screen, shows the span and each curve's start, end, low,
+  and high. While the score does not parse, graphs stay with their signals
+  until their own text changes. The reference now names the arguments
+  `.range(from, to)`: 0 maps to `from` and 1 to `to`.
+- `@mini.Draft::signal_graphs` and `@pattern.PatternSnapshotWithOrigins::
+  control_traces` expose those curves, found by the signal's source identity
+  (`PatternDoc::continuous` takes an optional `source`); `ControlTrace` reads
+  one bus at exact times, placed like events, with its period when its signals
+  declare one. `Rational::lcm` is public.
 - Parameter automation through automatic control buses (ADR-0019). Control
   arguments in Mini take a number, a quoted step pattern such as
   `s("hh*8").gain("0.2 0.6 0.3 0.8")`, or a signal (`sine`, `cosine`, `saw`,

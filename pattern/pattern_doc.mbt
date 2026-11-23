@@ -16,8 +16,8 @@ pub(all) suberror PatternDocError {
 priv enum PatternDocNode[A] {
   Runtime(Pat[A])
   /// A continuous control as both its query form and its allocation-free
-  /// bus signal for one key.
-  Continuous(Pat[A], @control.Control, BusSignal)
+  /// bus signal for one key, and the authored signal it compiles.
+  Continuous(Pat[A], @control.Control, BusSignal, @identity.SourceAtomId?)
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
@@ -79,7 +79,7 @@ fn next_pattern_node_generation() -> Int64 {
 fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
   match self {
     Runtime(pat) => Runtime(pat)
-    Continuous(pat, key, signal) => Continuous(pat, key, signal)
+    Continuous(pat, key, signal, source) => Continuous(pat, key, signal, source)
     Reference(definition, binding) => Reference(definition, binding)
     Silence => Silence
     Pure(value) => Pure(value)
@@ -244,7 +244,7 @@ fn[A] pattern_node_cache_token_memoized(
                 ),
               )
             Runtime(_)
-            | Continuous(_, _, _)
+            | Continuous(_, _, _, _)
             | Silence
             | Pure(_)
             | Atom(_, _, _) => ()
@@ -333,8 +333,11 @@ fn[A] copy_reachable_pattern_nodes(
       target[key] = entry.snapshot()
       match entry.node {
         Reference(_, _) => ()
-        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) =>
-          ()
+        Runtime(_)
+        | Continuous(_, _, _, _)
+        | Silence
+        | Pure(_)
+        | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -374,7 +377,7 @@ fn[A] pattern_node_revision_memoized(
             Reference(definition, _) =>
               revision = revision.combine(definition.revision)
             Runtime(_)
-            | Continuous(_, _, _)
+            | Continuous(_, _, _, _)
             | Silence
             | Pure(_)
             | Atom(_, _, _) => ()
@@ -1055,8 +1058,11 @@ fn[A] append_reachable_pattern_source_ids(
             result,
             {},
           )
-        Runtime(_) | Continuous(_, _, _) | Silence | Pure(_) | Atom(_, _, _) =>
-          ()
+        Runtime(_)
+        | Continuous(_, _, _, _)
+        | Silence
+        | Pure(_)
+        | Atom(_, _, _) => ()
         Fast(child, _)
         | Slow(child, _)
         | Gate(child, _)
@@ -1292,7 +1298,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
         buses=target.buses,
       )
     }
-    Runtime(pat) | Continuous(pat, _, _) => {
+    Runtime(pat) | Continuous(pat, _, _, _) => {
       let origin : O = O::make_origin(id, None, context)
       let path = PatternNodePath(id)
       let source = pat.map_payload(value => ScopedValue(value, path, origin))
@@ -1461,14 +1467,16 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let chained : Map[Int32, Int32] = Map([])
       for key in keys {
         let signal = compile_signal(provider.nodes, provider.root, Some(key))
+        let source = signal_source(provider.nodes, provider.root)
         provided.push((key, buses.length()))
-        buses.push({ key, signal, })
+        buses.push({ key, signal, source, })
         for inner, bus in left.buses {
           if bus.key == key {
             chained[inner] = buses.length()
             buses.push({
               key,
               signal: nested_signal(key.nesting(), bus.signal, signal),
+              source,
             })
           }
         }
@@ -1928,6 +1936,23 @@ pub fn[A] PatternSnapshotWithOrigins::revision(
 }
 
 ///|
+/// The control signals the authored signal `source` gives this snapshot, one
+/// per bus that follows it: the curves the voices it controls follow, in root
+/// time. A reused binding or `jux` gives several.
+pub fn[A] PatternSnapshotWithOrigins::control_traces(
+  self : PatternSnapshotWithOrigins[A],
+  source : @identity.SourceAtomId,
+) -> Array[ControlTrace] {
+  self.buses.filter_map(bus => {
+    if bus.source == Some(source) {
+      Some(ControlTrace(bus.signal))
+    } else {
+      None
+    }
+  })
+}
+
+///|
 pub fn[A] PatternSnapshotWithOrigins::pat(
   self : PatternSnapshotWithOrigins[A],
 ) -> Pat[A] {
@@ -2134,7 +2159,10 @@ pub fn[A] PatternDoc::from_pattern(
 /// A continuous control `key = f(cycles, before)`: the value at `cycles`, or
 /// with `before`, its limit from below, which differs only where `f` jumps.
 /// Queried as a pattern, it is sampled at each query arc's start; its bus
-/// evaluates `f` at exact time, and `rev` reads limits from below.
+/// evaluates `f` at exact time, and `rev` reads limits from below. `period` is
+/// the cycles after which `f` repeats, when it does; `ControlTrace::period`
+/// reads it. `source` is the authored signal it compiles, by which
+/// `PatternSnapshotWithOrigins::control_traces` finds the buses it provides.
 /// `signature` names `f`: two signals with the same key and signature must
 /// compute the same function. A live edit keeps a material whose content,
 /// signatures included, is unchanged.
@@ -2143,6 +2171,8 @@ pub fn PatternDoc::continuous(
   key~ : @control.Control,
   f~ : (Double, Bool) -> Double,
   signature~ : String,
+  period~ : Rational? = None,
+  source~ : @identity.SourceAtomId? = None,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
     root=id,
@@ -2152,7 +2182,8 @@ pub fn PatternDoc::continuous(
       Continuous(
         signal_pattern(key, t => f(t, false), "continuous", signature),
         key,
-        Continuous(f),
+        Continuous(f, period),
+        source,
       ),
     ),
   )
@@ -2183,12 +2214,13 @@ fn signal_pattern(
 /// (ADR-0025); a song section starts it at the section's start. Queried as
 /// a pattern, it samples `f` at each query arc's start; `f` takes `before`
 /// as `PatternDoc::continuous`'s does.
-/// `signature` names `f` as for `PatternDoc::continuous`.
+/// `signature` and `source` are as for `PatternDoc::continuous`.
 pub fn PatternDoc::once(
   id~ : @identity.PatternNodeId,
   key~ : @control.Control,
   f~ : (Double, Bool) -> Double,
   signature~ : String,
+  source~ : @identity.SourceAtomId? = None,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
     root=id,
@@ -2199,6 +2231,7 @@ pub fn PatternDoc::once(
         signal_pattern(key, t => f(t, false), "once", signature),
         key,
         Once(f, 0.0),
+        source,
       ),
     ),
   )

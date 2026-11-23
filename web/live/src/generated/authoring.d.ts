@@ -11,3 +11,4 @@ export function project_notation(kind: string, content: string): string;
 export function control_nesting(): string;
 export function vocabulary(): string;
 export function methods_after(receiver: string): string;
+export function draft_signals(handle: DraftHandle): string;

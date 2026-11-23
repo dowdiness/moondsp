@@ -679,16 +679,27 @@ fn[A] MiniDocBuilder::control_value_doc(
       )
       let id = self.atom_id("signal", "\{key}:\{signature}")
       self.contents[id.value()] = "signal:\{key}:\{signature}"
+      let source = self.origins.bind(origins => {
+        origins.atom_at("signal", signal.span.start, signal.span.end)
+      })
       let shaped = match signal.shape {
         // A ramp rises once, from when its material enters.
         Ramp =>
-          @pattern.PatternDoc::once(id~, key~, f=signal.function(), signature~)
+          @pattern.PatternDoc::once(
+            id~,
+            key~,
+            f=signal.function(),
+            signature~,
+            source~,
+          )
         _ =>
           @pattern.PatternDoc::continuous(
             id~,
             key~,
             f=signal.function(),
             signature~,
+            period=Some(@pattern.Rational::from_int(1)),
+            source~,
           )
       }
       if signal.rate == @pattern.Rational::from_int(1) {

@@ -94,6 +94,7 @@ pub fn Draft::locate_origin(Self, @pattern.EventOrigin) -> OriginLocation
 pub fn Draft::locate_origin_fields(Self, Int64, Int64, Array[Int64]) -> OriginLocation
 pub fn Draft::prepare_playback(Self) -> Result[PlaybackInput, DraftDiagnostic]
 pub fn Draft::reset(Self, String) -> Result[DraftState, DraftEditError]
+pub fn Draft::signal_graphs(Self, buckets~ : Int32) -> Array[SignalGraph]
 pub fn Draft::state(Self) -> DraftState
 
 #derive(Eq, @debug.Debug)
@@ -227,6 +228,23 @@ pub(all) enum PreparedPlayback {
   Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
   Runtime(PlaySource)
 }
+
+pub struct SignalCurve {
+  // private fields
+}
+pub fn SignalCurve::first(Self) -> @control.ControlValue
+pub fn SignalCurve::highs(Self) -> Array[@control.ControlValue]
+pub fn SignalCurve::last(Self) -> @control.ControlValue
+pub fn SignalCurve::lows(Self) -> Array[@control.ControlValue]
+pub fn SignalCurve::spans(Self) -> Array[@pattern.TimeSpan]
+
+pub struct SignalGraph {
+  // private fields
+}
+pub fn SignalGraph::curves(Self) -> Array[SignalCurve]
+pub fn SignalGraph::is_song(Self) -> Bool
+pub fn SignalGraph::range(Self) -> SourceRange
+pub fn SignalGraph::window(Self) -> @pattern.Rational
 
 #derive(Eq, @debug.Debug)
 pub(all) enum SourceLimit {

@@ -70,6 +70,14 @@ pub fn ControlMap::to_string(Self) -> String
 pub impl WithControls for ControlMap
 pub impl Show for ControlMap
 
+pub struct ControlTrace {
+  // private fields
+}
+pub fn ControlTrace::period(Self) -> Rational?
+pub fn ControlTrace::placed(Self, Placement) -> Self
+pub fn ControlTrace::value_at(Self, Rational) -> @control.ControlValue
+pub fn ControlTrace::value_before(Self, Rational) -> @control.ControlValue
+
 pub struct Controls {
   // private fields
 }
@@ -145,7 +153,7 @@ pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom? : @identi
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
-pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double, Bool) -> Double, signature~ : String) -> Self[ControlMap]
+pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double, Bool) -> Double, signature~ : String, period? : Rational?, source? : @identity.SourceAtomId?) -> Self[ControlMap]
 pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : @control.Control, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int32) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int32, n~ : Int32, rotation? : Int32) -> Self[A] raise PatternDocError
@@ -162,7 +170,7 @@ pub fn[A] PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[
 pub fn[A, B] PatternDoc::merge_values(id~ : @identity.PatternNodeId, left~ : Self[A], right~ : Self[B], apply~ : (A, B) -> A) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::node_count(Self[A]) -> Int32
 pub fn[A] PatternDoc::node_revision(Self[A], @identity.PatternNodeId) -> @identity.Revision raise PatternDocError
-pub fn PatternDoc::once(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double, Bool) -> Double, signature~ : String) -> Self[ControlMap]
+pub fn PatternDoc::once(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double, Bool) -> Double, signature~ : String, source? : @identity.SourceAtomId?) -> Self[ControlMap]
 pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::reference(id~ : @identity.PatternNodeId, definition~ : Self[A]) -> Self[A]
 pub fn[A] PatternDoc::reference_with_binding(id~ : @identity.PatternNodeId, resolved_reference~ : ResolvedReference[A]) -> Self[A]
@@ -227,6 +235,7 @@ pub struct PatternSnapshotWithOrigins[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
+pub fn[A] PatternSnapshotWithOrigins::control_traces(Self[A], @identity.SourceAtomId) -> Array[ControlTrace]
 pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(Self[A], Rational) -> Self[A]
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A : WithControls] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
@@ -258,6 +267,7 @@ pub fn Rational::div(Self, Self) -> Self
 pub fn Rational::equal(Self, Self) -> Bool
 pub fn Rational::floor(Self) -> Int64
 pub fn Rational::from_int(Int32) -> Self
+pub fn Rational::lcm(Self, Self) -> Self
 pub fn Rational::mul(Self, Self) -> Self
 pub fn Rational::not_equal(Self, Self) -> Bool
 pub fn Rational::op_ge(Self, Self) -> Bool

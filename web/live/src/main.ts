@@ -1,7 +1,7 @@
 // Editor intents feed the Player's debounced source updates.
 // Current song and sounding material versions remain owned by the audio engine.
 
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorState, Prec, type StateEffect } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
 import { defaultKeymap, historyKeymap, undo, redo, undoDepth, redoDepth, isolateHistory } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
@@ -10,6 +10,7 @@ import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirro
 
 import { completion, minilive, miniliveLanguage } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
+import { setSignalGraphs, signalPreview } from "./signal-preview";
 import type * as PatternControls from "./pattern-controls";
 import { loadScore, mountScoreSession } from "./score-session";
 import { CM6Adapter } from "./canopy";
@@ -84,6 +85,7 @@ const view = new EditorView({
       bracketMatching(),
       closeBrackets(),
       inlineControls(),
+      signalPreview(),
       patternCompartment.of([]),
       completionCompartment.of(completion(null)),
       playbackHighlights(sources),
@@ -227,13 +229,28 @@ view.dispatch({
         }
         observation.edited();
         // Diagnostic decoration dispatch must happen outside CM's update turn.
-        queueMicrotask(() => activePlayback.editDraft());
+        queueMicrotask(() => {
+          activePlayback.editDraft();
+          const effects = signalGraphEffects(activeDraft);
+          if (effects.length) view.dispatch({ effects });
+        });
       } catch (error) {
         queueMicrotask(() => activePlayback.reportDraftFailure(error));
       }
     }),
   ]),
 });
+
+/**
+ * The Draft's signal graphs for the editor's text. While the text does not
+ * parse, or a later edit has not reached the Draft yet, there are none, and
+ * the editor keeps the graphs it shows.
+ */
+function signalGraphEffects(draft: Draft): StateEffect<unknown>[] {
+  const state = draft.state();
+  if (state.problem !== null || state.text !== view.state.doc.toString()) return [];
+  return [setSignalGraphs.of(draft.signalGraphs())];
+}
 
 /** Play the editor's score from the beginning. */
 function restart({ playback }: Tools): void {
@@ -324,6 +341,7 @@ async function prepareAuthoring(): Promise<void> {
         view.scrollSnapshot(),
         patternCompartment.reconfigure(controls.patternControls(sources)),
         completionCompartment.reconfigure(completion({ vocabulary: authoring.vocabulary(), methodsAfter: authoring.methodsAfter })),
+        ...signalGraphEffects(draft),
         controlsCompartment.reconfigure(controls.patternControlsVisible.of(dom.transport.sourceToggle.getAttribute("aria-pressed") === "true")),
       ],
     });

@@ -336,7 +336,13 @@ fn Parser::read_control_value(
           self.read_positive_factor(method_start, signal_method.name())
     }
   }
-  Signal({ shape, low, high, rate, })
+  let span : MiniSpan = { start, end: self.pos, }
+  // A signal has its own source identity, as an atom does, so playback can
+  // report its values against the draft by exact identity.
+  if self.recognition {
+    self.recognized_atoms.push(RecognizedAtom("signal", span))
+  }
+  Signal({ shape, low, high, rate, span, })
 }
 
 ///|

@@ -117,12 +117,13 @@ fn MiniShape::at(self : MiniShape, t : Double, before : Bool) -> Double {
 }
 
 ///|
-/// `low + (high - low) × shape(t × rate)`.
+/// `low + (high - low) × shape(t × rate)`, written at `span` in its source.
 priv struct MiniSignal {
   shape : MiniShape
   low : Double
   high : Double
   rate : @pattern.Rational
+  span : MiniSpan
 }
 
 ///|
@@ -379,6 +380,8 @@ fn Parser::parse_method(
           0.0
         },
         rate: @pattern.Rational::from_int(1) / cycles,
+        // No signal argument is written, so the fade has no signal identity.
+        span: { start: method_start, end: self.pos, },
       }
       Control(Gain, { value: Signal(fade), method_at: method_start, })
     }
