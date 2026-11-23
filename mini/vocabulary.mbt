@@ -735,9 +735,9 @@ fn SignalMethod::call(self : SignalMethod) -> Call {
 fn SignalMethod::signature(self : SignalMethod) -> Signature {
   match self {
     Range =>
-      signature("map 0–1 onto low–high", required=[
-        argument("low", Number),
-        argument("high", Number),
+      signature("map 0→from, 1→to", required=[
+        argument("from", Number),
+        argument("to", Number),
       ])
     Fast => signature("n× faster", required=[argument("factor", Number)])
     Slow => signature("n× slower", required=[argument("factor", Number)])

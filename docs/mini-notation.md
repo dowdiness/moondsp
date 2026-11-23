@@ -70,7 +70,7 @@ in the browser bundle.
   <dt>ramp</dt><dd>rise from 0 to 1 once over the first cycle, then hold 1</dd>
   <dt>.fadeIn(n)</dt><dd>fade up from silence over n cycles</dd>
   <dt>.fadeOut(n)</dt><dd>fade to silence over n cycles, then stay silent</dd>
-  <dt>.range(lo, hi)</dt><dd>map a signal onto lo–hi</dd>
+  <dt>.range(from, to)</dt><dd>map signal 0 to <code>from</code> and 1 to <code>to</code>; <code>saw.range(1, 0)</code> falls from 1 to 0</dd>
   <dt>.slow(n) .fast(n)</dt><dd>stretch or speed up a signal</dd>
 </dl>
 <p><code>note("C2").slow(4)<br>&nbsp;&nbsp;.lpf(saw.range(200, 4000).slow(4))<br>&nbsp;&nbsp;.pan(sine)</code></p>

@@ -2276,8 +2276,8 @@ fn sample(argument : @mini.Argument) -> String raise {
     SongItem => "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
     Number =>
       match argument.name {
-        "tempo" | "factor" | "cycles" | "k" | "n" | "length" | "high" => "2"
-        "fraction" | "p" | "low" => "0.5"
+        "tempo" | "factor" | "cycles" | "k" | "n" | "length" | "to" => "2"
+        "fraction" | "p" | "from" => "0.5"
         "start" => "8"
         name => fail("no sample for number '\{name}'")
       }

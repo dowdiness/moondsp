@@ -161,7 +161,7 @@ test("MiniLive completes signals inside control arguments and their methods", as
   await expect(labels.filter({ hasText: /^range$/ })).toBeVisible();
   await expect(labels.filter({ hasText: /^gain$/ })).toHaveCount(0);
   await labels.filter({ hasText: /^range$/ }).click();
-  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(saw.range(low, high)');
+  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(saw.range(from, to)');
 
   // A pattern's own chain still offers pattern methods.
   await replaceCode(page, 'note("C4").');
