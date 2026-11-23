@@ -351,6 +351,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Breaking MoonBit API:** `PatternDoc::continuous` and `PatternDoc::once`
+  take `f(cycles, before)`, where `before` asks for the limit from below.
+  `rev` reads that limit, so a reversed saw or square now starts a cycle at
+  the value it approaches instead of the value after its jump: a note at a
+  cycle start under `.lpf(saw).rev()` reads the saw's top, not its bottom.
 - A `$:` layer may now continue over several lines, as in the editor's
   grammar: a new layer starts only at a `$:` that begins its line, outside
   quotes and comments. Continued method chains, `+`, line breaks inside

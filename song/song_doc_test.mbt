@@ -535,7 +535,7 @@ test "song events read their buses on the song clock" {
     right=@pattern.PatternDoc::continuous(
       id=id("ramp"),
       key=Lpf,
-      f=t => 100.0 * t,
+      f=(t, _) => 100.0 * t,
       signature="100t",
     ),
   ).lower_with_origins()

@@ -97,9 +97,12 @@ fn MiniShape::description(self : MiniShape) -> String {
 }
 
 ///|
-/// The shape at cycle position `t`. Allocates nothing.
-fn MiniShape::at(self : MiniShape, t : Double) -> Double {
+/// The shape at cycle position `t`, or with `before`, its limit from below:
+/// a saw approaches its top as each period ends, and a square is still low
+/// just before its midpoint. Allocates nothing.
+fn MiniShape::at(self : MiniShape, t : Double, before : Bool) -> Double {
   let phase = t - t.floor()
+  let phase = if before && phase == 0.0 { 1.0 } else { phase }
   match self {
     // `t` counts from the material's entry, so a ramp's end value lasts
     // through the material's remaining cycles and its notes' release.
@@ -109,7 +112,7 @@ fn MiniShape::at(self : MiniShape, t : Double) -> Double {
     Saw => phase
     Isaw => 1.0 - phase
     Tri => if phase < 0.5 { 2.0 * phase } else { 2.0 - 2.0 * phase }
-    Square => if phase < 0.5 { 0.0 } else { 1.0 }
+    Square => if phase < 0.5 || (before && phase == 0.5) { 0.0 } else { 1.0 }
   }
 }
 
@@ -123,12 +126,12 @@ priv struct MiniSignal {
 }
 
 ///|
-/// The signal before its rate, as a function of cycle position.
-fn MiniSignal::function(self : MiniSignal) -> (Double) -> Double {
+/// The signal before its rate, as `PatternDoc::continuous` takes it.
+fn MiniSignal::function(self : MiniSignal) -> (Double, Bool) -> Double {
   let shape = self.shape
   let low = self.low
   let span = self.high - self.low
-  t => low + span * shape.at(t)
+  (t, before) => low + span * shape.at(t, before)
 }
 
 ///|

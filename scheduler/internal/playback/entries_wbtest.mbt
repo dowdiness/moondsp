@@ -597,7 +597,7 @@ fn faded_layer(
     content=sound.content(),
   )
   guard fade else { return atom }
-  fn fall(t : Double) -> Double {
+  fn fall(t : Double, _before : Bool) -> Double {
     1.0 - t.max(0.0).min(1.0)
   }
   @pattern.PatternDoc::merge_control(

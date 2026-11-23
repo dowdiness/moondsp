@@ -277,7 +277,7 @@ test "time transforms place events where the reference map does" {
 
 ///|
 /// A signal that reads its own time.
-fn tm_time(t : Double) -> Double {
+fn tm_time(t : Double, _before : Bool) -> Double {
   t
 }
 

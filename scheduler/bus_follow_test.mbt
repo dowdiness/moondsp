@@ -30,7 +30,7 @@ fn bus_doc(
     right=@pattern.PatternDoc::continuous(
       id=bus_id("lpf"),
       key=Lpf,
-      f=cutoff,
+      f=(t, _) => cutoff(t),
       signature="cutoff",
     ),
   )

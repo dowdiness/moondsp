@@ -314,11 +314,12 @@ priv enum BusSignal {
   Absent
   /// The same value everywhere; never `NaN` (see `BusSignal::of_value`).
   Const(Double)
-  /// A function of time; a `NaN` result counts as absent.
-  Continuous((Double) -> Double)
-  /// `(f, delay)`: a one-shot function of the time since its material
-  /// entered, `f(t − delay)` (ADR-0025).
-  Once((Double) -> Double, Double)
+  /// A time function `(cycles, before)`, as `PatternDoc::continuous` takes
+  /// it. A `NaN` result counts as absent.
+  Continuous((Double, Bool) -> Double)
+  /// `(f, delay)`: a one-shot time function of the time since its material
+  /// entered, `f(t − delay, before)` (ADR-0025).
+  Once((Double, Bool) -> Double, Double)
   /// Each piece of the map reads its child (one per slot) at the mapped
   /// time; a silent slot's child is `Absent`.
   Mapped(TimeMap, Array[BusSignal])
@@ -346,9 +347,11 @@ fn BusSignal::eval(
     Absent => @control.ControlValue::absent()
     Const(value) => @control.ControlValue::of(value)
     Continuous(f) =>
-      @control.ControlValue::of(f(num.to_double() / den.to_double()))
+      @control.ControlValue::of(f(num.to_double() / den.to_double(), left))
     Once(f, delay) =>
-      @control.ControlValue::of(f(num.to_double() / den.to_double() - delay))
+      @control.ControlValue::of(
+        f(num.to_double() / den.to_double() - delay, left),
+      )
     Mapped(map, children) => {
       let cycle = map.cycle_at(num, den, left)
       let slot = map.slot_at(num, den, left, cycle)

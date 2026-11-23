@@ -2131,15 +2131,17 @@ pub fn[A] PatternDoc::from_pattern(
 }
 
 ///|
-/// A continuous control `key = f(cycles)`, sampled at each query arc's start
-/// when queried as a pattern; its bus evaluates `f` at exact time.
+/// A continuous control `key = f(cycles, before)`: the value at `cycles`, or
+/// with `before`, its limit from below, which differs only where `f` jumps.
+/// Queried as a pattern, it is sampled at each query arc's start; its bus
+/// evaluates `f` at exact time, and `rev` reads limits from below.
 /// `signature` names `f`: two signals with the same key and signature must
 /// compute the same function. A live edit keeps a material whose content,
 /// signatures included, is unchanged.
 pub fn PatternDoc::continuous(
   id~ : @identity.PatternNodeId,
   key~ : @control.Control,
-  f~ : (Double) -> Double,
+  f~ : (Double, Bool) -> Double,
   signature~ : String,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
@@ -2148,7 +2150,7 @@ pub fn PatternDoc::continuous(
     nodes=singleton_pattern_nodes(
       id,
       Continuous(
-        signal_pattern(key, f, "continuous", signature),
+        signal_pattern(key, t => f(t, false), "continuous", signature),
         key,
         Continuous(f),
       ),
@@ -2179,12 +2181,13 @@ fn signal_pattern(
 /// A one-shot control `key = f(cycles since its material entered)`. A live
 /// edit's replacement and a newly added material start it at their entry
 /// (ADR-0025); a song section starts it at the section's start. Queried as
-/// a pattern, it samples `f` at each query arc's start.
+/// a pattern, it samples `f` at each query arc's start; `f` takes `before`
+/// as `PatternDoc::continuous`'s does.
 /// `signature` names `f` as for `PatternDoc::continuous`.
 pub fn PatternDoc::once(
   id~ : @identity.PatternNodeId,
   key~ : @control.Control,
-  f~ : (Double) -> Double,
+  f~ : (Double, Bool) -> Double,
   signature~ : String,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
@@ -2192,7 +2195,11 @@ pub fn PatternDoc::once(
     revision=@identity.Revision::zero(),
     nodes=singleton_pattern_nodes(
       id,
-      Continuous(signal_pattern(key, f, "once", signature), key, Once(f, 0.0)),
+      Continuous(
+        signal_pattern(key, t => f(t, false), "once", signature),
+        key,
+        Once(f, 0.0),
+      ),
     ),
   )
 }

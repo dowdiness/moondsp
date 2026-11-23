@@ -16,7 +16,7 @@ fn bus_ramp(name : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
   @pattern.PatternDoc::continuous(
     id=bus_id(name),
     key=Gain,
-    f=t => t,
+    f=(t, _) => t,
     signature="time",
   )
 }

@@ -10,7 +10,7 @@ test "bench/control_bus/per_block" (b : @bench.T) {
   let sweep = @pattern.PatternDoc::continuous(
     id=id("sweep"),
     key=Lpf,
-    f=t => 200.0 + 3800.0 * t,
+    f=(t, _) => 200.0 + 3800.0 * t,
     signature="sweep",
   )
   let chord = @pattern.PatternDoc::from_pattern(
