@@ -59,7 +59,7 @@ def generated_test(document: Path, blocks: list[tuple[int, str, str]]) -> str:
                 f"test {test_name} {{",
                 f"  match {parser}({input_text}) {{",
                 "    Ok(_) => ()",
-                f"    Err(message) => fail({failure_prefix} + message)",
+                f"    Err(problem) => fail({failure_prefix} + problem.to_string())",
                 "  }",
                 "}",
                 "",
