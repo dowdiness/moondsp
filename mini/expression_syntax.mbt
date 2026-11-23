@@ -7,11 +7,11 @@ priv struct MiniSpan {
 }
 
 ///|
+/// The kind of a quoted pattern literal such as `s("bd sd")`.
 priv enum MiniLiteral {
   Sound
   Note
   Chord
-  Silence
 }
 
 ///|
@@ -114,37 +114,42 @@ fn MiniSignal::function(self : MiniSignal) -> (Double) -> Double {
 }
 
 ///|
-/// A control argument: one value, a quoted Mini pattern of numbers, or a
-/// continuous signal.
-priv enum MiniValue {
+/// A control argument: one value, quoted notation of numbers, or a
+/// continuous signal. `S` is the notation as written, or as read.
+priv enum MiniValue[S] {
   Number(Double)
-  /// Quoted notation, the source offset of its content, and its numbers.
-  Steps(String, Int32, Array[Double])
+  Steps(S)
   Signal(MiniSignal)
 }
 
 ///|
-/// Whether every value this argument can take satisfies `ok`. A signal stays
-/// between its two range endpoints.
-fn MiniValue::all(self : MiniValue, ok : (Double) -> Bool) -> Bool {
-  match self {
-    Number(value) => ok(value)
-    Steps(_, _, values) => values.iter().all(ok)
-    Signal(signal) => ok(signal.low) && ok(signal.high)
-  }
+/// A control argument as written in a method call such as `.room("0.2 0.4")`.
+priv struct ControlArgument {
+  value : MiniValue[QuotedNotation]
+  /// Where a value outside the control's domain is marked: the method name.
+  method_at : Int32
 }
 
 ///|
-priv enum MiniTransform {
+/// A transform; `A` is its control arguments, as written or as read.
+priv enum MiniTransform[A] {
   Fast(@pattern.Rational)
   Slow(@pattern.Rational)
   Gate(@pattern.Rational)
   Rev
   Degrade(Double)
-  Control(@control.Control, MiniValue)
-  Filter(MiniFilterKind, MiniValue, MiniValue?)
+  Control(@control.Control, A)
+  Filter(MiniFilterKind, A, A?)
   Every(Int32, MiniCallback)
   Jux(MiniCallback)
+}
+
+///|
+/// The quoted content of a notation, as written.
+priv struct QuotedNotation {
+  text : String
+  /// Whole-source position of the content's first code unit.
+  at : Int32
 }
 
 ///|
@@ -155,10 +160,15 @@ priv struct MiniExpr {
 
 ///|
 priv enum MiniExprNode {
-  Literal(MiniLiteral, String, Int32)
+  /// A quoted pattern literal such as `note("c4 e4")`. Its notation is a
+  /// language of its own, read when the expression is resolved, so a mistake
+  /// in it does not hide the rest of the expression from source recognition.
+  Literal(MiniLiteral, QuotedNotation)
+  /// `silence()`
+  Silence
   Stack(Array[MiniExpr])
   Reference(String)
-  Apply(MiniExpr, MiniTransform)
+  Apply(MiniExpr, MiniTransform[ControlArgument])
 }
 
 ///|
@@ -272,14 +282,18 @@ fn Parser::parse_syntax_primary(
     self.expect_char(')')
     return inner
   }
+  if self.match_keyword("silence()") {
+    if self.recognition {
+      self.recognized_pattern = true
+    }
+    return { span: { start, end: self.pos, }, node: Silence, }
+  }
   let kind = if self.match_keyword("s(") {
     Some(Sound)
   } else if self.match_keyword("note(") {
     Some(Note)
   } else if self.match_keyword("chord(") {
     Some(Chord)
-  } else if self.match_keyword("silence()") {
-    Some(Silence)
   } else {
     None
   }
@@ -287,21 +301,13 @@ fn Parser::parse_syntax_primary(
     if self.recognition {
       self.recognized_pattern = true
     }
-    if kind is Silence {
-      return {
-        span: { start, end: self.pos, },
-        node: Literal(kind, "", start),
-      }
-    }
-    let (content, content_start) = self.read_quoted_string_with_start()
+    let (text, at) = self.read_quoted_string_with_start()
+    let notation = { text, at, }
     if self.recognition {
-      self.record_literal_fact(kind, content, content_start)
+      self.record_literal_facts(kind, notation)
     }
     self.expect_char(')')
-    return {
-      span: { start, end: self.pos, },
-      node: Literal(kind, content, content_start),
-    }
+    return { span: { start, end: self.pos, }, node: Literal(kind, notation), }
   }
   let name = self.read_ident()
   if !name.is_empty() {
@@ -318,7 +324,9 @@ fn Parser::parse_syntax_primary(
 }
 
 ///|
-fn Parser::parse_transform(self : Parser) -> MiniTransform raise SourceProblem {
+fn Parser::parse_transform(
+  self : Parser,
+) -> MiniTransform[ControlArgument] raise SourceProblem {
   let method_start = self.pos
   let name = self.read_ident()
   match name {
@@ -393,18 +401,11 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise SourceProblem {
     "lpf" | "hpf" => {
       self.expect_char('(')
       let kind : MiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
-      let frequency_hz = self.read_control_value(kind.control_key())
+      let frequency_hz = self.read_control_argument(method_start)
       self.skip_whitespace()
       let resonance = if !self.at_end() && self.input[self.pos] == ',' {
         self.pos += 1
-        let q = self.read_control_value(kind.resonance_control_key())
-        guard q.all(q => kind.resonance_control_key().admits(q)) else {
-          raise Mistake(
-            method_start,
-            "\{name}() expects finite resonance above 0",
-          )
-        }
-        Some(q)
+        Some(self.read_control_argument(method_start))
       } else {
         None
       }
@@ -412,18 +413,13 @@ fn Parser::parse_transform(self : Parser) -> MiniTransform raise SourceProblem {
       self.expect_char(')')
       Filter(kind, frequency_hz, resonance)
     }
-    "attack" => self.read_seconds_control(Attack, method_start)
-    "hold" => self.read_seconds_control(Hold, method_start)
-    "release" => self.read_seconds_control(Release, method_start)
-    "gain" => Control(Gain, self.read_method_control_argument(Gain))
-    "pan" => Control(Pan, self.read_method_control_argument(Pan))
-    "room" => {
-      let send = self.read_method_control_argument(Room)
-      guard send.all(s => @control.Control::Room.admits(s)) else {
-        raise Mistake(method_start, "room() expects a send between 0 and 1")
-      }
-      Control(Room, send)
-    }
+    "attack" => Control(Attack, self.read_method_control_argument(method_start))
+    "hold" => Control(Hold, self.read_method_control_argument(method_start))
+    "release" =>
+      Control(Release, self.read_method_control_argument(method_start))
+    "gain" => Control(Gain, self.read_method_control_argument(method_start))
+    "pan" => Control(Pan, self.read_method_control_argument(method_start))
+    "room" => Control(Room, self.read_method_control_argument(method_start))
     "every" => {
       self.expect_char('(')
       self.skip_whitespace()

@@ -113,12 +113,12 @@ test("saturated sibling weights are reduced before finding a representable bound
   expect(after[2].start).toBe(before[2].start);
 });
 
-test("ambiguous modifiers and unusable boundary targets fail cleanly", () => {
-  const content = "C4@2@3 D4";
+test("a repeated weight is a notation mistake, and unusable boundary targets fail cleanly", () => {
+  expect(projectNotation("note", "C4@2@3 D4").error).toMatch(/at most one '@'/);
+  const content = "C4 D4";
   const projection = projectNotation("note", content);
   expect(projection.error).toBeNull();
-  const atom = leafNodes(projection)[0];
-  expect(weightNode(content, projection, atom, 4)).toMatchObject({ ok: false, reason: expect.stringMatching(/repeated weight/i) });
+  const atom = leafNodes(projection)[1];
   expect(boundaryInfo(projection, atom)).toBeNull();
   expect(moveBoundary(content, projection, atom, 0)).toMatchObject({ ok: false });
   expect(moveBoundary(content, projection, atom, 1)).toMatchObject({ ok: false });

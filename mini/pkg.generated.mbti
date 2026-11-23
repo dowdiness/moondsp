@@ -188,7 +188,6 @@ pub(all) enum SourceLimit {
   ArrangementExpansion
   Occurrences
   EuclideanSteps
-  DurationSum
   NotationNodes
 }
 pub fn SourceLimit::equal(Self, Self) -> Bool

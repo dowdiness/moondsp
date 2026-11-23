@@ -109,39 +109,42 @@ fn[A] unique_definition(
 }
 
 ///|
-/// The ordinary notation parser emits complete atom facts before a later
-/// group/postfix error. It does not repair or accept an invalid expression.
-fn Parser::record_literal_fact(
+/// Records a quoted pattern literal and its complete words. Damaged notation
+/// keeps the words written before its mistake.
+fn Parser::record_literal_facts(
   self : Parser,
   kind : MiniLiteral,
-  content : String,
-  content_start : Int32,
+  notation : QuotedNotation,
 ) -> Unit {
-  guard !(kind is Silence) else { return }
-  let kind_name = match kind {
-    Sound => "drum"
-    Note => "note"
-    Chord => "chord"
-    Silence => "silence"
+  let (literal_kind, atom_kind, complete_words) = match kind {
+    Sound => ("drum", "sound", notation.complete_words(drum_names()))
+    Note => ("note", "note", notation.complete_words(pitches()))
+    Chord => ("chord", "chord", notation.complete_words(chord_names()))
   }
   self.recognized_literals.push(
-    RecognizedLiteral(kind_name, {
-      start: content_start,
-      end: content_start + content.length(),
+    RecognizedLiteral(literal_kind, {
+      start: notation.at,
+      end: notation.at + notation.text.length(),
     }),
   )
-  let parser = NotationParser(
-    content,
-    sound=kind is Sound,
-    chord=kind is Chord,
-    source_offset=content_start,
-    assess=true,
-    recognized_atoms=Some(self.recognized_atoms),
-  )
-  try parser.parse_notation() catch {
-    _ => ()
-  } noraise {
-    _ => ()
+  for span in complete_words {
+    self.recognized_atoms.push(RecognizedAtom(atom_kind, span))
+  }
+}
+
+///|
+/// The spans of the complete words of this notation, in source order.
+fn[W] QuotedNotation::complete_words(
+  self : QuotedNotation,
+  vocabulary : NotationVocabulary[W],
+) -> Array[MiniSpan] {
+  match NotationSyntax::read(self.text, vocabulary, at=self.at) {
+    Parsed(syntax) => {
+      let spans = []
+      syntax.each_word((_, span) => spans.push(span))
+      spans
+    }
+    Damaged(complete_words~, ..) => complete_words
   }
 }
 

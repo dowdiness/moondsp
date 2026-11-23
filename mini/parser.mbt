@@ -253,55 +253,39 @@ fn Parser::read_number(self : Parser) -> Double raise SourceProblem {
 }
 
 ///|
+/// `(value)` after a control method's name at `method_at`.
 fn Parser::read_method_control_argument(
   self : Parser,
-  key : @control.Control,
-) -> MiniValue raise SourceProblem {
+  method_at : Int32,
+) -> ControlArgument raise SourceProblem {
   self.expect_char('(')
-  let value = self.read_control_value(key)
+  let argument = self.read_control_argument(method_at)
   self.skip_whitespace()
   self.expect_char(')')
-  value
+  argument
 }
 
 ///|
-/// A control in seconds: `attack`, `hold`, or `release`.
-fn Parser::read_seconds_control(
+fn Parser::read_control_argument(
   self : Parser,
-  key : @control.Control,
-  method_start : Int32,
-) -> MiniTransform raise SourceProblem {
-  let seconds = self.read_method_control_argument(key)
-  guard seconds.all(s => key.admits(s)) else {
-    raise Mistake(
-      method_start,
-      "\{key}() expects seconds between 0 and \{@control.MAX_SECONDS}",
-    )
-  }
-  Control(key, seconds)
+  method_at : Int32,
+) -> ControlArgument raise SourceProblem {
+  { value: self.read_control_value(), method_at, }
 }
 
 ///|
 /// A control argument: a number, a quoted Mini pattern of numbers such as
 /// `"0.3 <0.6 0.9>"`, or a signal such as `sine.range(200, 4000).slow(4)`.
+/// The quoted notation is read when the expression is resolved.
 fn Parser::read_control_value(
   self : Parser,
-  key : @control.Control,
-) -> MiniValue raise SourceProblem {
+) -> MiniValue[QuotedNotation] raise SourceProblem {
   self.skip_whitespace()
   let start = self.pos
   guard !self.at_end() else { raise Mistake(start, "expected a control value") }
   if self.input[self.pos] == '"' {
-    let (content, offset) = self.read_quoted_string_with_start()
-    guard !content.is_empty() else { raise Mistake(offset, "empty notation") }
-    let notation = NotationParser(
-      content,
-      sound=false,
-      control=key,
-      source_offset=offset,
-    )
-    ignore(notation.parse_notation())
-    return Steps(content, offset, notation.control_values)
+    let (text, at) = self.read_quoted_string_with_start()
+    return Steps({ text, at, })
   }
   let name = self.read_ident()
   if name.is_empty() {
@@ -529,18 +513,19 @@ fn Parser::parse_bindings(
   while true {
     self.skip_whitespace()
     guard self.read_binding_name() is Some(name) else { break }
-    let syntax = self.parse_syntax_expr()
-    if self.admission is Some(admission) {
-      admission.definitions[name] = admission.expression(syntax)
-    }
     // Resolve before checking the terminator to preserve diagnostic precedence.
     // Compile unused declarations too; publish a name only after success.
-    let body = resolve_mini_expr(syntax, self.bindings)
+    let syntax = resolve_mini_expr(self.parse_syntax_expr(), self.bindings)
+    let name_span = self.last_binding_span
+    if self.admission is Some(admission) {
+      ignore(admission.definition(name_span, syntax))
+    }
     self.skip_whitespace()
     self.expect_char(';')
-    self.bindings[name] = MiniDefinition::MiniDefinition(
-      compile_mini_doc(body, builder),
-      self.last_binding_span,
-    )
+    self.bindings[name] = {
+      syntax,
+      body: compile_mini_doc(syntax, builder),
+      name_span,
+    }
   }
 }

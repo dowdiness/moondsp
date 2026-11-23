@@ -137,3 +137,50 @@ test "current source indices stay bounded across unique historical names" {
   assert_true(draft.locate_origin(origin) is Unavailable(AtomRetired))
   assert_true(wb_draft_origin(draft).atom() != origin.atom())
 }
+
+///|
+test "a mistake in one literal keeps the identity of the rest of its expression" {
+  let draft = Draft(
+    "let beat = s(\"bd\");\nstack(note(\"c4 e4\"), s(\"bd sd\"), beat)",
+  )
+  let atoms = draft.sources.atoms.map(atom => atom.id)
+  let literals = draft.sources.literals.map(literal => literal.id)
+  let references = draft.sources.references.map(reference => reference.id)
+  // The note literal's content is at 32..37; `e4` becomes `??` and back.
+  for inserted in ["??", "e4"] {
+    let state = draft.state()
+    assert_true(
+      draft.edit(
+        EditTransaction(base=state.version(), edits=[
+          TextEdit(from=35, to=37, inserted~),
+        ]),
+      )
+      is Ok(_),
+    )
+  }
+  let after = draft.sources
+  // Only `e4` and the note literal around it were edited; every other atom,
+  // literal and reference keeps its identity.
+  assert_eq(after.atoms.length(), atoms.length())
+  for index, atom in after.atoms {
+    if index != 2 {
+      assert_eq(atom.id, atoms[index])
+    }
+  }
+  assert_eq(after.literals.length(), literals.length())
+  for index, literal in after.literals {
+    if index != 1 {
+      assert_eq(literal.id, literals[index])
+    }
+  }
+  assert_eq(after.references.map(reference => reference.id), references)
+}
+
+///|
+test "a mistake in a control string keeps the literals after it" {
+  let facts = recognize_mini_source(
+    "stack(note(\"c4\").gain(\"0.5 y\"), s(\"bd sd\"))",
+  )
+  assert_eq(facts.literals.map(literal => literal.kind), ["note", "drum"])
+  assert_eq(facts.atoms.map(atom => atom.kind), ["note", "sound", "sound"])
+}

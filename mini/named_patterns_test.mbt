@@ -148,14 +148,27 @@ fn[T] assert_undefined_pattern_at(
 }
 
 ///|
-test "undefined names are reported before invalid notes" {
-  let prefix = "stack(note(\"NotANote\"), "
-  let source = prefix + "missing)"
-  assert_undefined_pattern_at(@mini.parse(source), "missing", prefix.length())
+test "notation mistakes and undefined names are reported in source order" {
+  let invalid_note_first = "stack(note(\"NotANote\"), missing)"
+  let undefined_name_first = "stack(missing, note(\"NotANote\"))"
+  for
+    parsed in [
+      @mini.parse(invalid_note_first).map(_ => ()),
+      @mini.parse_doc(invalid_note_first).map(_ => ()),
+    ] {
+    assert_eq(parsed, Err("position 12: expected note name or number"))
+  }
+  // Control values are read in the same pass as the notation before them.
+  let control_after_note = "note(\"c4 x\").gain(\"0.5 y\")"
+  assert_eq(
+    @mini.parse(control_after_note).map(_ => ()),
+    Err("position 9: expected note name or number"),
+  )
+  assert_undefined_pattern_at(@mini.parse(undefined_name_first), "missing", 6)
   assert_undefined_pattern_at(
-    @mini.parse_doc(source),
+    @mini.parse_doc(undefined_name_first),
     "missing",
-    prefix.length(),
+    6,
   )
 }
 

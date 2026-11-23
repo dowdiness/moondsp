@@ -185,7 +185,8 @@ fn check_playback_source_size(input : String) -> Unit raise SourceProblem {
 ///|
 priv struct PlaybackAdmission {
   width : Double
-  definitions : Map[String, MiniQueryWork]
+  /// The work of each definition assessed so far, by its name's position.
+  definitions : Map[Int32, MiniQueryWork]
   sections : Map[String, MiniQueryWork]
   roots : Array[MiniQueryWork]
   mut nodes : Int32
@@ -199,23 +200,30 @@ fn PlaybackAdmission::PlaybackAdmission(width : Double) -> PlaybackAdmission {
 ///|
 /// Merging this argument into `child`. A number or signal answers each query
 /// with one event per cycle, like a scalar.
-fn MiniValue::merge_work(
-  self : MiniValue,
-  key : @control.Control,
+fn control_value_work(
+  value : ControlValue,
   child : MiniQueryWork,
 ) -> MiniQueryWork raise SourceProblem {
-  match self {
+  match value {
     Number(_) | Signal(_) => MergeScalar(child)
-    Steps(content, offset, _) => {
-      let notation = NotationParser(
-        content,
-        sound=false,
-        control=key,
-        source_offset=offset,
-        assess=true,
-      )
-      ignore(notation.parse_notation())
-      MergeWith(child, notation.query_work.unwrap())
+    Steps(notation) => MergeWith(child, notation.query_work())
+  }
+}
+
+///|
+/// The work of the definition named at `name_span`, assessed once however
+/// often it is used.
+fn PlaybackAdmission::definition(
+  self : PlaybackAdmission,
+  name_span : MiniSpan,
+  body : ResolvedMiniExpr,
+) -> MiniQueryWork raise SourceProblem {
+  match self.definitions.get(name_span.start) {
+    Some(work) => work
+    None => {
+      let work = self.expression(body)
+      self.definitions[name_span.start] = work
+      work
     }
   }
 }
@@ -235,33 +243,18 @@ fn MiniCallback::query_work(
 ///|
 fn PlaybackAdmission::expression(
   self : PlaybackAdmission,
-  expr : MiniExpr,
+  expr : ResolvedMiniExpr,
   depth~ : Int32 = 0,
 ) -> MiniQueryWork raise SourceProblem {
   self.nodes += 1
   guard self.nodes <= 512 && depth <= 32 else { raise OverLimit(SyntaxNodes) }
   let work = match expr.node {
-    Literal(Silence, _, _) => Quiet
-    Literal(kind, content, content_start) => {
-      let notation = NotationParser(
-        content,
-        sound=kind is Sound,
-        chord=kind is Chord,
-        source_offset=content_start,
-        assess=true,
-      )
-      ignore(notation.parse_notation())
-      notation.query_work.unwrap()
-    }
-    Reference(name) =>
-      match self.definitions.get(name) {
-        Some(work) => work
-        None =>
-          raise Mistake(
-            expr.span.start,
-            "undefined pattern '\{name}'; define it before use",
-          )
-      }
+    Silence => Quiet
+    Sounds(notation) => notation.query_work()
+    Notes(notation) => notation.query_work()
+    Chords(notation) => notation.query_work(word_work=ChordName::query_work)
+    Reference(_, definition) =>
+      self.definition(definition.name_span, definition.syntax)
     Stack(children) =>
       Overlay(children.map(child => self.expression(child, depth=depth + 1)))
     Apply(child, transform) => {
@@ -279,11 +272,11 @@ fn PlaybackAdmission::expression(
           )
         Gate(_) | Degrade(_) => MapEvents(child)
         Rev => Split(child)
-        Control(key, value) => value.merge_work(key, child)
-        Filter(kind, frequency_hz, resonance) => {
-          let filtered = frequency_hz.merge_work(kind.control_key(), child)
+        Control(_, value) => control_value_work(value, child)
+        Filter(_, frequency_hz, resonance) => {
+          let filtered = control_value_work(frequency_hz, child)
           match resonance {
-            Some(q) => q.merge_work(kind.resonance_control_key(), filtered)
+            Some(q) => control_value_work(q, filtered)
             None => filtered
           }
         }
@@ -338,4 +331,78 @@ fn[C] PlaybackAdmission::arrangement(
   guard MiniQueryBound(events * queries, work * queries).allowed() else {
     raise OverLimit(ArrangementExpansion)
   }
+}
+
+///|
+const EUCLIDEAN_STEP_LIMIT : Int32 = 128
+
+///|
+/// The query work this notation costs playback, refusing a step whose own
+/// work no query could afford. `word_work` is the work of one word.
+fn[W] NotationSyntax::query_work(
+  self : NotationSyntax[W],
+  word_work~ : (W) -> MiniQueryWork = _ => Atom,
+) -> MiniQueryWork raise SourceProblem {
+  notation_layers_work(self.layers, word_work)
+}
+
+///|
+fn[W] notation_layers_work(
+  layers : Array[NotationLayer[W]],
+  word_work : (W) -> MiniQueryWork,
+) -> MiniQueryWork raise SourceProblem {
+  let works = layers.map(layer => {
+    let slots = []
+    for step in layer.steps {
+      slots.push(notation_step_work(step, word_work))
+      for _ in 1..<step.slots() {
+        slots.push(Quiet)
+      }
+    }
+    if slots.length() == 1 {
+      slots[0]
+    } else {
+      Slots(slots)
+    }
+  })
+  if works.length() == 1 {
+    works[0]
+  } else {
+    Overlay(works)
+  }
+}
+
+///|
+fn[W] notation_step_work(
+  step : NotationStep[W],
+  word_work : (W) -> MiniQueryWork,
+) -> MiniQueryWork raise SourceProblem {
+  let mut work : MiniQueryWork = match step.body {
+    Rest(_) => Quiet
+    Word(word, _) => word_work(word)
+    Group(layers, _) => notation_layers_work(layers, word_work)
+  }
+  for modifier in step.modifiers {
+    work = match modifier.kind {
+      Euclid(Silent, ..) => Quiet
+      Euclid(Pulses(steps~, ..), ..) => {
+        guard steps <= EUCLIDEAN_STEP_LIMIT else {
+          raise OverLimit(EuclideanSteps)
+        }
+        Slots(Array::make(steps, work))
+      }
+      Repeat(n) => Precision(Accelerate(work, n.to_double()), n.to_double())
+      Slow(n) => Precision(Accelerate(work, 1.0 / n.to_double()), n.to_double())
+      Degrade(..) => MapEvents(work)
+    }
+    work.check(0.0)
+  }
+  work.check(0.0)
+  work
+}
+
+///|
+/// A chord plays each of its notes.
+fn ChordName::query_work(self : ChordName) -> MiniQueryWork {
+  Overlay(Array::make(self.notes.length(), Atom))
 }

@@ -33,8 +33,6 @@ pub(all) enum SourceLimit {
   Occurrences
   /// A Euclidean rhythm over 128 steps.
   EuclideanSteps
-  /// Relative durations in one sequence summing over 256.
-  DurationSum
   /// A notation projection over 256 source nodes.
   NotationNodes
 }
@@ -60,7 +58,6 @@ pub fn SourceProblem::message(self : SourceProblem) -> String {
           "playback arrangement exceeds the query expansion limit"
         Occurrences => "playback arrangement exceeds 128 occurrences"
         EuclideanSteps => "playback Euclidean rhythm exceeds 128 steps"
-        DurationSum => "relative duration sum must not exceed 256"
         NotationNodes => "notation projection exceeds 256 source nodes"
       }
   }

@@ -9,16 +9,10 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 
 ///|
 priv struct MiniDefinition {
+  /// The resolved body, which playback admission assesses.
+  syntax : ResolvedMiniExpr
   body : @pattern.PatternDoc
   name_span : MiniSpan
-}
-
-///|
-fn MiniDefinition::MiniDefinition(
-  body : @pattern.PatternDoc,
-  name_span : MiniSpan,
-) -> MiniDefinition {
-  { body, name_span, }
 }
 
 ///|
@@ -29,23 +23,110 @@ priv struct ResolvedMiniExpr {
 
 ///|
 priv enum ResolvedMiniExprNode {
-  Literal(MiniLiteral, String, Int32)
+  Sounds(NotationSyntax[DrumName])
+  Notes(NotationSyntax[Pitch])
+  Chords(NotationSyntax[ChordName])
+  Silence
   Stack(Array[ResolvedMiniExpr])
   Reference(String, MiniDefinition)
-  Apply(ResolvedMiniExpr, MiniTransform)
+  Apply(ResolvedMiniExpr, MiniTransform[ControlValue])
 }
 
 ///|
+/// A control argument as read: its quoted notation parsed, and every value in
+/// its control's domain.
+type ControlValue = MiniValue[NotationSyntax[ControlNumber]]
+
+///|
+/// What an author reads when a control value is outside its domain.
+fn control_domain_message(key : @control.Control) -> String {
+  match key {
+    Attack | Hold | Release =>
+      "\{key}() expects seconds between 0 and \{@control.MAX_SECONDS}"
+    Room => "room() expects a send between 0 and 1"
+    LpfResonance => "lpf() expects finite resonance above 0"
+    HpfResonance => "hpf() expects finite resonance above 0"
+    Note | Sound | Gain | Pan | Lpf | Hpf | Decay | Sustain =>
+      "\{key}() expects a number"
+  }
+}
+
+///|
+/// Reads the argument as a value of `key`. A signal stays between its two
+/// range endpoints.
+fn ControlArgument::read(
+  self : ControlArgument,
+  key : @control.Control,
+) -> ControlValue raise SourceProblem {
+  let (value, admitted) : (ControlValue, Bool) = match self.value {
+    Number(number) => (Number(number), key.admits(number))
+    Signal(signal) =>
+      (Signal(signal), key.admits(signal.low) && key.admits(signal.high))
+    Steps(quoted) => {
+      let notation = quoted.parse(control_numbers(key))
+      let mut admitted = true
+      notation.each_word((number, _) => {
+        admitted = admitted && key.admits(number.value)
+      })
+      (Steps(notation), admitted)
+    }
+  }
+  guard admitted else {
+    raise Mistake(self.method_at, control_domain_message(key))
+  }
+  value
+}
+
+///|
+fn read_transform_controls(
+  transform : MiniTransform[ControlArgument],
+) -> MiniTransform[ControlValue] raise SourceProblem {
+  match transform {
+    Fast(n) => Fast(n)
+    Slow(n) => Slow(n)
+    Gate(n) => Gate(n)
+    Rev => Rev
+    Degrade(p) => Degrade(p)
+    Control(key, argument) => Control(key, argument.read(key))
+    Filter(kind, frequency_hz, resonance) => {
+      let frequency_hz = frequency_hz.read(kind.control_key())
+      let resonance = match resonance {
+        Some(q) => Some(q.read(kind.resonance_control_key()))
+        None => None
+      }
+      Filter(kind, frequency_hz, resonance)
+    }
+    Every(n, callback) => Every(n, callback)
+    Jux(callback) => Jux(callback)
+  }
+}
+
+///|
+fn[W] QuotedNotation::parse(
+  self : QuotedNotation,
+  vocabulary : NotationVocabulary[W],
+) -> NotationSyntax[W] raise SourceProblem {
+  NotationSyntax::parse(self.text, vocabulary, at=self.at)
+}
+
+///|
+/// Reads the expression's notation and control values and binds its names,
+/// in source order.
 fn resolve_mini_expr(
   expr : MiniExpr,
   definitions : Map[String, MiniDefinition],
 ) -> ResolvedMiniExpr raise SourceProblem {
   let node : ResolvedMiniExprNode = match expr.node {
-    Literal(kind, content, offset) => Literal(kind, content, offset)
+    Literal(Sound, quoted) => Sounds(quoted.parse(drum_names()))
+    Literal(Note, quoted) => Notes(quoted.parse(pitches()))
+    Literal(Chord, quoted) => Chords(quoted.parse(chord_names()))
+    Silence => Silence
     Stack(children) =>
       Stack(children.map(child => resolve_mini_expr(child, definitions)))
-    Apply(child, transform) =>
-      Apply(resolve_mini_expr(child, definitions), transform)
+    Apply(child, transform) => {
+      let child = resolve_mini_expr(child, definitions)
+      Apply(child, read_transform_controls(transform))
+    }
     Reference(name) =>
       match unique_definition(definitions.get(name).iter(), false) {
         Ok(definition) => Reference(name, definition)
@@ -73,30 +154,18 @@ fn compile_mini_doc(
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc raise SourceProblem {
   match expr.node {
-    Literal(kind, content, offset) => {
-      let doc = match kind {
-        Sound =>
-          parse_sound_doc_notation(content, builder, source_offset=offset)
-        Note => parse_note_doc_notation(content, builder, source_offset=offset)
-        Chord =>
-          parse_chord_doc_notation(content, builder, source_offset=offset)
-        Silence => {
-          let id = builder.atom_id_at("silence", "~", offset, offset + 9)
-          builder.rest_doc(id)
-        }
-      }
-      match builder.source_frame_at(offset, offset + content.length()) {
-        Some(frame) =>
-          doc.with_source_frame(frame~) catch {
-            _ => raise Internal("internal source-frame construction failed")
-          }
-        None => {
-          if builder.origins is Some(_) && !(kind is Silence) {
-            raise Internal("missing source-frame identity at \{offset}")
-          }
-          doc
-        }
-      }
+    Sounds(notation) => builder.literal_doc(notation, MiniDocBuilder::drum_doc)
+    Notes(notation) => builder.literal_doc(notation, MiniDocBuilder::pitch_doc)
+    Chords(notation) =>
+      builder.literal_doc(notation, MiniDocBuilder::chord_name_doc)
+    Silence => {
+      let id = builder.atom_id_at(
+        "silence",
+        "~",
+        expr.span.start,
+        expr.span.end,
+      )
+      builder.rest_doc(id)
     }
     Stack(children) =>
       builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))

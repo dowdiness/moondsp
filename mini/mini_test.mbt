@@ -75,12 +75,14 @@ test "relative duration weights reject invalid values and excessive sums" {
     ] {
     assert_true(@mini.parse(source) is Err(_))
   }
-  assert_true(
-    @mini.parse(
-      "note(\"C4@16 D4@16 E4@16 F4@16 G4@16 A4@16 B4@16 C5@16 D5@16 E5@16 F5@16 G5@16 A5@16 B5@16 C6@16 D6@16 E6@16\")",
-    )
-    is Err(_),
-  )
+  // The sum is a rule of the language: the step that goes over is a mistake.
+  let sixteen_full_steps = "note(\"C4@16 D4@16 E4@16 F4@16 G4@16 A4@16 B4@16 C5@16 D5@16 E5@16 F5@16 G5@16 A5@16 B5@16 C6@16 D6@16 "
+  let source = sixteen_full_steps + "E6@16\")"
+  guard @mini.parse_play_source(source) is Err(Mistake(at, _)) else {
+    fail("expected a mistake")
+  }
+  assert_eq(at, sixteen_full_steps.length())
+  assert_true(@mini.parse(source) is Err(_))
 }
 
 ///|
@@ -658,6 +660,29 @@ fn edit_draft(
   inserted : String,
 ) -> Unit raise {
   apply_draft_edits(draft, [@mini.TextEdit::TextEdit(from~, to~, inserted~)])
+}
+
+///|
+test "Draft prepares notation that is only over a playback limit and refuses it within the window" {
+  // Valid notation that no player admits: an Euclidean rhythm over 128 steps,
+  // and replication that expands one query too far. Preparing compiles each
+  // atom against its tracked source atom, so it fails if a limit cut source
+  // recognition short before `e4`.
+  let window = @pattern.QueryWindow::from_span(@pattern.Rational(1, 90)).unwrap()
+  let refused = [
+    ("note(\"c4(3,200) e4\")", @mini.SourceLimit::EuclideanSteps),
+    ("note(\"[[c4*40000]*40000] e4\")", PatternExpansion),
+  ]
+  for case_ in refused {
+    let (source, limit) = case_
+    let draft = @mini.Draft(source)
+    assert_true(draft.state().diagnostic() is None)
+    assert_true(draft.prepare_playback() is Ok(_))
+    assert_eq(
+      draft.check_playback_within(window).diagnostic().map(d => d.problem()),
+      Some(OverLimit(limit)),
+    )
+  }
 }
 
 ///|

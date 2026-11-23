@@ -733,19 +733,14 @@ fn MiniDocBuilder::control_value_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc,
   key : @control.Control,
-  value : MiniValue,
+  value : ControlValue,
 ) -> @pattern.PatternDoc raise SourceProblem {
   let control_doc = match value {
     Number(value) => return self.scalar_control_doc(doc, key, value)
-    Steps(content, offset, _) => {
-      let notation = NotationParser(
-        content,
-        sound=false,
-        control=key,
-        source_offset=offset,
-      )
-      notation.parse_doc_notation(self)
-    }
+    Steps(notation) =>
+      self.notation_doc(notation, (builder, number, span) => {
+        builder.control_number_doc(key, number, span)
+      })
     Signal(signal) => {
       let signature = mini_doc_id_fragment(
         "\{signal.shape.name()}:\{signal.low}:\{signal.high}:\{signal.rate.num}:\{signal.rate.den}",
@@ -881,12 +876,11 @@ fn Parser::parse_doc_expr(
   self : Parser,
   builder : MiniDocBuilder,
 ) -> @pattern.PatternDoc raise SourceProblem {
-  let syntax = self.parse_syntax_expr()
+  let resolved = resolve_mini_expr(self.parse_syntax_expr(), self.bindings)
   if self.admission is Some(admission) {
-    admission.roots.push(admission.expression(syntax))
+    admission.roots.push(admission.expression(resolved))
     Overlay(admission.roots).check(admission.width)
   }
-  let resolved = resolve_mini_expr(syntax, self.bindings)
   compile_mini_doc(resolved, builder)
 }
 
@@ -905,348 +899,144 @@ fn Parser::read_quoted_string_with_start(
 }
 
 ///|
-fn parse_sound_doc_notation(
-  content : String,
-  builder : MiniDocBuilder,
-  source_offset~ : Int32,
-) -> @pattern.PatternDoc raise SourceProblem {
-  guard !content.is_empty() else {
-    raise Mistake(source_offset, "empty notation")
-  }
-  let sub = NotationParser(content, sound=true, source_offset~)
-  sub.parse_doc_notation(builder)
+/// Builds the document of one notation; `word_doc` builds each word's.
+priv struct NotationDocReader[W] {
+  builder : MiniDocBuilder
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem
 }
 
 ///|
-fn parse_note_doc_notation(
-  content : String,
-  builder : MiniDocBuilder,
-  source_offset~ : Int32,
+/// The document this notation plays, building each word's with `word_doc`.
+fn[W] MiniDocBuilder::notation_doc(
+  self : MiniDocBuilder,
+  syntax : NotationSyntax[W],
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem,
 ) -> @pattern.PatternDoc raise SourceProblem {
-  guard !content.is_empty() else {
-    raise Mistake(source_offset, "empty notation")
-  }
-  let sub = NotationParser(content, sound=false, source_offset~)
-  sub.parse_doc_notation(builder)
+  NotationDocReader::{ builder: self, word_doc, }.layers(syntax.layers)
 }
 
 ///|
-fn parse_chord_doc_notation(
-  content : String,
-  builder : MiniDocBuilder,
-  source_offset~ : Int32,
+fn[W] NotationDocReader::layers(
+  self : NotationDocReader[W],
+  layers : Array[NotationLayer[W]],
 ) -> @pattern.PatternDoc raise SourceProblem {
-  guard !content.is_empty() else {
-    raise Mistake(source_offset, "empty notation")
-  }
-  let sub = NotationParser(content, sound=false, chord=true, source_offset~)
-  sub.parse_doc_notation(builder)
+  self.builder.stack_doc(layers.map(layer => self.layer(layer)))
 }
 
 ///|
-fn NotationParser::parse_doc_notation(
-  self : NotationParser,
-  builder : MiniDocBuilder,
+fn[W] NotationDocReader::layer(
+  self : NotationDocReader[W],
+  layer : NotationLayer[W],
 ) -> @pattern.PatternDoc raise SourceProblem {
-  let first = self.parse_doc_layer(builder)
-  let layers : Array[@pattern.PatternDoc] = [first]
-  while !self.at_end() && self.input[self.pos] == ',' {
-    self.pos += 1
-    self.skip_spaces()
-    layers.push(self.parse_doc_layer(builder))
+  let steps = layer.steps.map(step => self.step(step))
+  match layer.timing {
+    EqualSlots => self.builder.sequence_doc(steps)
+    RelativeDurations =>
+      self.builder.weighted_sequence_doc(
+        steps,
+        layer.steps.map(step => step.slots()),
+      )
   }
-  builder.stack_doc(layers)
 }
 
 ///|
-fn NotationParser::parse_doc_layer(
-  self : NotationParser,
-  builder : MiniDocBuilder,
+fn[W] NotationDocReader::step(
+  self : NotationDocReader[W],
+  step : NotationStep[W],
 ) -> @pattern.PatternDoc raise SourceProblem {
-  self.skip_spaces()
-  let elements : Array[@pattern.PatternDoc] = []
-  let weights : Array[Int32] = []
-  let mut total_weight = 0
-  let mut weighted = false
-  while !self.at_end() &&
-        self.input[self.pos] != ',' &&
-        self.input[self.pos] != ']' {
-    let (element, weight) = self.parse_doc_element(builder)
-    elements.push(element)
-    weights.push(weight)
-    total_weight += weight
-    weighted = weighted || weight != 1
-    guard !weighted || total_weight <= 256 else { raise OverLimit(DurationSum) }
-    self.require_element_boundary()
-    self.skip_spaces()
+  let builder = self.builder
+  let mut doc = match step.body {
+    Rest(span) =>
+      builder.rest_doc(builder.atom_id_at("rest", "~", span.start, span.end))
+    Word(word, span) => (self.word_doc)(builder, word, span)
+    Group(layers, _) => self.layers(layers)
   }
-  guard !elements.is_empty() else {
-    raise self.mistake(self.pos, "expected at least one element in layer")
-  }
-  if !weighted {
-    return builder.sequence_doc(elements)
-  }
-  builder.weighted_sequence_doc(elements, weights)
-}
-
-///|
-fn NotationParser::parse_doc_element(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-) -> (@pattern.PatternDoc, Int32) raise SourceProblem {
-  self.skip_spaces()
-  guard !self.at_end() else {
-    raise self.mistake(self.pos, "unexpected end of notation")
-  }
-  let base = if self.input[self.pos] == '[' {
-    self.pos += 1
-    let inner = self.parse_doc_notation(builder)
-    guard !self.at_end() && self.input[self.pos] == ']' else {
-      raise self.mistake(self.pos, "expected ']'")
-    }
-    self.pos += 1
-    inner
-  } else {
-    self.parse_doc_atom(builder)
-  }
-  let mut doc = base
-  let mut weight = 1
-  let mut applied = true
-  while applied {
-    applied = false
-    if !self.at_end() {
-      let c = self.input[self.pos]
-      if c == '(' {
-        doc = self.maybe_apply_doc_euclid(builder, doc)
-        applied = true
-      } else if c == '*' {
-        doc = self.apply_doc_replicate(builder, doc)
-        applied = true
-      } else if c == '/' {
-        doc = self.apply_doc_step_slow(builder, doc)
-        applied = true
-      } else if c == '?' {
-        self.pos += 1
-        doc = builder.degrade_doc(doc, 0.5, step=self.degrade_steps)
-        self.degrade_steps += 1
-        applied = true
-      } else if c == '@' {
-        weight = self.read_relative_duration()
-        applied = true
-      }
-    }
-  }
-  (doc, weight)
-}
-
-///|
-fn NotationParser::apply_doc_replicate(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let op_pos = self.pos
-  self.pos += 1
-  let n = self.read_int_signed(op_pos)
-  guard n > 0 else {
-    raise self.mistake(op_pos, "'*' requires a positive integer, got \{n}")
-  }
-  builder.fast_doc(doc, @pattern.Rational::from_int(n))
-}
-
-///|
-fn NotationParser::apply_doc_step_slow(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let op_pos = self.pos
-  self.pos += 1
-  let n = self.read_int_signed(op_pos)
-  guard n > 0 else {
-    raise self.mistake(op_pos, "'/' requires a positive integer, got \{n}")
-  }
-  builder.slow_doc(doc, @pattern.Rational::from_int(n))
-}
-
-///|
-fn NotationParser::maybe_apply_doc_euclid(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise SourceProblem {
-  if self.at_end() || self.input[self.pos] != '(' {
-    return doc
-  }
-  let euclid_start = self.pos
-  self.pos += 1
-  self.skip_spaces()
-  let k = self.read_int_signed(euclid_start)
-  self.skip_spaces()
-  guard !self.at_end() && self.input[self.pos] == ',' else {
-    raise self.mistake(self.pos, "expected ',' in euclid (k,n)")
-  }
-  self.pos += 1
-  self.skip_spaces()
-  let n = self.read_int_signed(euclid_start)
-  self.skip_spaces()
-  let mut rotation = 0
-  if !self.at_end() && self.input[self.pos] == ',' {
-    self.pos += 1
-    self.skip_spaces()
-    rotation = self.read_int_signed(euclid_start)
-    self.skip_spaces()
-  }
-  guard !self.at_end() && self.input[self.pos] == ')' else {
-    raise self.mistake(self.pos, "expected ')' to close euclid")
-  }
-  self.pos += 1
-  builder.euclid_doc(doc, k, n, rotation)
-}
-
-///|
-fn NotationParser::parse_doc_atom(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let start = self.pos
-  if self.input[self.pos] == '~' {
-    self.pos += 1
-    let id = builder.atom_id_at(
-      "rest",
-      "~",
-      self.source_offset + start,
-      self.source_offset + self.pos,
-    )
-    return builder.rest_doc(id)
-  }
-  if self.control is Some(key) {
-    let (value, token, token_start, token_end) = self.read_control_number(start)
-    let id = builder.atom_id_at(
-      "control",
-      "\{key}:\{token}",
-      self.source_offset + token_start,
-      self.source_offset + token_end,
-    )
-    return builder.control_doc(id, key, value)
-  }
-  if self.sound {
-    let name = self.read_ident()
-    guard !name.is_empty() else {
-      raise self.mistake(start, "expected sound name")
-    }
-    match drum_midi(name) {
-      Some(midi) => {
-        let id = builder.atom_id_at(
-          "sound",
-          name,
-          self.source_offset + start,
-          self.source_offset + self.pos,
+  for modifier in step.modifiers {
+    doc = match modifier.kind {
+      Euclid(Pulses(pulses~, steps~, rotation~), ..) =>
+        builder.euclid_doc(doc, pulses, steps, rotation)
+      Euclid(Silent, ..) =>
+        builder.rest_doc(
+          builder.atom_id_at(
+            "rest",
+            "euclid",
+            modifier.span.start,
+            modifier.span.end,
+          ),
         )
-        builder.control_doc(id, Sound, midi.to_double())
-      }
-      None => raise self.mistake(start, "unknown drum name '\{name}'")
-    }
-  } else if self.chord {
-    // Read chord name (including accidentals like #, b) → stack of note docs
-    let name_start = self.pos
-    let name = self.read_chord_name_text()
-    guard !name.is_empty() else {
-      raise self.mistake(start, "expected chord name")
-    }
-    match @pattern.parse_chord(name) {
-      Some(notes) => {
-        let id = builder.atom_id_at(
-          "chord",
-          name,
-          self.source_offset + name_start,
-          self.source_offset + self.pos,
-        )
-        builder.chord_doc_from_notes(id, notes)
-      }
-      None => raise self.mistake(start, "unknown chord '\{name}'")
-    }
-  } else {
-    // Try number first, then note name
-    try {
-      let (note, token, token_start, token_end) = self.read_note_number_value(
-        start,
-      )
-      let id = builder.atom_id_at(
-        "note",
-        token,
-        self.source_offset + token_start,
-        self.source_offset + token_end,
-      )
-      builder.control_doc(id, Note, note)
-    } catch {
-      _ => self.parse_doc_note_name_atom(builder, start)
-    } noraise {
-      doc => doc
+      Repeat(n) => builder.fast_doc(doc, @pattern.Rational::from_int(n))
+      Slow(n) => builder.slow_doc(doc, @pattern.Rational::from_int(n))
+      Degrade(draw~) => builder.degrade_doc(doc, 0.5, step=draw)
     }
   }
+  doc
 }
 
 ///|
-/// Parse a note name atom (e.g., "C4", "F#3") in the doc parser.
-fn NotationParser::parse_doc_note_name_atom(
-  self : NotationParser,
-  builder : MiniDocBuilder,
-  start : Int32,
+/// The document of a quoted pattern literal, framed by its source literal.
+fn[W] MiniDocBuilder::literal_doc(
+  self : MiniDocBuilder,
+  notation : NotationSyntax[W],
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem,
 ) -> @pattern.PatternDoc raise SourceProblem {
-  let name_start = self.pos
-  let name = self.read_note_name_text()
-  guard !name.is_empty() else {
-    raise self.mistake(start, "expected note name or number")
-  }
-  match @pattern.note_name_to_midi(name) {
-    Some(midi) => {
-      let id = builder.atom_id_at(
-        "note",
-        name,
-        self.source_offset + name_start,
-        self.source_offset + self.pos,
-      )
-      builder.control_doc(id, Note, midi)
+  let doc = self.notation_doc(notation, word_doc)
+  let { start, end, } = notation.content
+  match self.source_frame_at(start, end) {
+    Some(frame) =>
+      doc.with_source_frame(frame~) catch {
+        _ => raise Internal("internal source-frame construction failed")
+      }
+    None => {
+      if self.origins is Some(_) {
+        raise Internal("missing source-frame identity at \{start}")
+      }
+      doc
     }
-    None => raise self.mistake(start, "unknown note name '\{name}'")
   }
 }
 
 ///|
-fn NotationParser::read_note_number_value(
-  self : NotationParser,
-  start : Int32,
-) -> (Double, String, Int32, Int32) raise SourceProblem {
-  let num_start = self.pos
-  if !self.at_end() && self.input[self.pos] == '-' {
-    self.pos += 1
-  }
-  let mut has_digit = false
-  while !self.at_end() &&
-        self.input[self.pos] >= '0' &&
-        self.input[self.pos] <= '9' {
-    self.pos += 1
-    has_digit = true
-  }
-  if !self.at_end() && self.input[self.pos] == '.' {
-    self.pos += 1
-    while !self.at_end() &&
-          self.input[self.pos] >= '0' &&
-          self.input[self.pos] <= '9' {
-      self.pos += 1
-      has_digit = true
-    }
-  }
-  guard has_digit else {
-    self.pos = num_start
-    raise self.mistake(start, "expected number")
-  }
-  let token = self.input[num_start:self.pos].to_owned()
-  (
-    parse_double_manual(self.input, num_start, self.pos),
-    token,
-    num_start,
-    self.pos,
+fn MiniDocBuilder::drum_doc(
+  self : MiniDocBuilder,
+  drum : DrumName,
+  span : MiniSpan,
+) -> @pattern.PatternDoc raise SourceProblem {
+  let id = self.atom_id_at("sound", drum.name, span.start, span.end)
+  self.control_doc(id, Sound, drum.midi.to_double())
+}
+
+///|
+fn MiniDocBuilder::pitch_doc(
+  self : MiniDocBuilder,
+  pitch : Pitch,
+  span : MiniSpan,
+) -> @pattern.PatternDoc raise SourceProblem {
+  let id = self.atom_id_at("note", pitch.text, span.start, span.end)
+  self.control_doc(id, Note, pitch.midi)
+}
+
+///|
+fn MiniDocBuilder::chord_name_doc(
+  self : MiniDocBuilder,
+  chord : ChordName,
+  span : MiniSpan,
+) -> @pattern.PatternDoc raise SourceProblem {
+  let id = self.atom_id_at("chord", chord.name, span.start, span.end)
+  self.chord_doc_from_notes(id, chord.notes)
+}
+
+///|
+fn MiniDocBuilder::control_number_doc(
+  self : MiniDocBuilder,
+  key : @control.Control,
+  number : ControlNumber,
+  span : MiniSpan,
+) -> @pattern.PatternDoc raise SourceProblem {
+  let id = self.atom_id_at(
+    "control",
+    "\{key}:\{number.text}",
+    span.start,
+    span.end,
   )
+  self.control_doc(id, key, number.value)
 }

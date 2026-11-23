@@ -13,13 +13,10 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
   let widths = [@pattern.Rational(1L, 1000L), @pattern.Rational(1L, 8L)]
   for source in sources {
     let parser = Parser(source)
-    let syntax = parser.parse_syntax_expr()
+    let syntax = resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings)
     let admission = PlaybackAdmission(0.125)
     let work = admission.expression(syntax)
-    let pat = compile_mini_doc(
-        resolve_mini_expr(syntax, parser.bindings),
-        MiniDocBuilder(previous=None),
-      )
+    let pat = compile_mini_doc(syntax, MiniDocBuilder(previous=None))
       .lower()
       .pat()
     for start in starts {
@@ -122,7 +119,10 @@ test "generated transform compositions respect estimated events and preserve out
       for second in transforms {
         let source = atom + first + second
         let parser = Parser(source)
-        let syntax = parser.parse_syntax_expr()
+        let syntax = resolve_mini_expr(
+          parser.parse_syntax_expr(),
+          parser.bindings,
+        )
         let admission = PlaybackAdmission(0.125)
         let work = admission.expression(syntax)
         let ordinary = parse(source).unwrap()

@@ -202,11 +202,11 @@ fn[C] Parser::parse_song_section(
   self.expect_comma()
   // A section plays only within its occurrences, which `arrangement` bounds,
   // so it is not overlaid with the other sections.
-  let syntax = self.parse_syntax_expr()
+  let syntax = resolve_mini_expr(self.parse_syntax_expr(), self.bindings)
   if self.admission is Some(admission) {
     admission.sections[name] = admission.expression(syntax)
   }
-  let doc = compile_mini_doc(resolve_mini_expr(syntax, self.bindings), builder)
+  let doc = compile_mini_doc(syntax, builder)
   self.skip_whitespace()
   self.expect_char(')')
   let compile_error = Internal("could not compile section '\{name}'")

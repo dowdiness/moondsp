@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Notation that is valid but over a playback limit, such as
+  `note("c4(3,200) e4")`, no longer reports "Couldn't prepare this code"
+  before the player's format is known. Quoted notation is now parsed once into
+  a syntax tree that the pattern, document, projection, source facts and
+  playback admission all read, so the player's limits no longer cut short
+  the reading of source facts.
+- A stray `]` at the top level of quoted notation, as in `note("c4 e4]")`, is
+  now reported as a mistake instead of being ignored.
+- An expression's syntax is checked first; then its quoted notation, control
+  values and names are read in source order. An undefined name, or a mistake
+  in a control string such as `.gain("0.5 y")`, used to be reported before an
+  earlier mistake in a pattern's notation. A mistake in one quoted string no
+  longer hides the rest of its expression from the editor's source tracking.
+- Relative durations in one layer adding up to more than 256, such as
+  seventeen `c4@16` steps, are now marked at the step that goes over. Quoted
+  notation nesting 32 or more brackets is now refused by every parser, not
+  only during playback admission.
+- A step with more than one `@`, such as `c4@2@3`, is now a mistake. The
+  last weight used to win silently, and the editor refused to edit it.
+- A Euclidean rhythm with no pulses or no steps, such as `c4(0,200)`, is no
+  longer refused as over 128 steps, since it plays nothing, and its pattern
+  is a rest. Rhythms that play the same, such as `(3,8,-1)` and `(3,8,7)`,
+  now share one pattern identity.
 - The live editor marks only real mistakes in the code. A score that is valid
   but too large to play, such as one with too many overlapping parts, now shows
   "Score is too large to play" with its reason instead of an error mark on the
