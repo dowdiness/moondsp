@@ -111,7 +111,7 @@ in the browser bundle.
   <dt>stack(a, b)</dt><dd>the explicit form of a + b</dd>
   <dt>a + b.fast(2)</dt><dd>speed up only b; method chains bind before +</dd>
   <dt>(a + b).fast(2)</dt><dd>speed up both layers; parentheses group the expression</dd>
-  <dt>$: a<br>$: b</dt><dd>combine top-level layers on separate lines</dd>
+  <dt>$: a<br>$: b</dt><dd>combine top-level layers; each layer starts with <code>$:</code> at the start of a line and may continue over several lines</dd>
   <dt>.jux(f)</dt><dd>original left, transformed copy right</dd>
 </dl>
 <p><code>s("bd") + s("hh").fast(2)</code></p>

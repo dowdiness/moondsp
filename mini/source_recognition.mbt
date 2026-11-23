@@ -171,22 +171,12 @@ fn mini_recognition_boundary(parser : Parser) -> (Int32, Bool) {
   let mut member_name = false
   let mut can_end_primary = false
   while !parser.at_end() {
-    if input[parser.pos] == '"' {
-      member_name = false
-      can_end_primary = false
-      parser.pos += 1
-      while !parser.at_end() && input[parser.pos] != '"' {
-        parser.pos += 1
+    if mini_opaque_end(input, parser.pos) is Some(end_) {
+      if input[parser.pos] == '"' {
+        member_name = false
+        can_end_primary = false
       }
-      if !parser.at_end() {
-        parser.pos += 1
-      }
-    } else if mini_comment_end(input, parser.pos) is Some(end_) {
       parser.pos = end_
-    } else if parser.pos + 1 < input.length() &&
-      input[parser.pos] == '/' &&
-      input[parser.pos + 1] == '*' {
-      parser.pos = input.length()
     } else if input[parser.pos] == ';' {
       break
     } else if mini_is_space(input[parser.pos]) {
@@ -367,20 +357,17 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
         }
         parser.pos = start
         parser.recognized_pattern = false
-        match
-          (mini_collect_dollar_stack_lines(input, start~, partial=true) catch {
-            _ => None
-          }) {
-          Some(lines) => {
+        match mini_collect_dollar_blocks(input, start~) {
+          Some(blocks) => {
             mode = Some(Pattern)
-            for line in lines {
-              parser.pos = line.start
-              parser.limit = line.end
+            for block in blocks {
+              parser.pos = block.start
+              parser.limit = block.end
               recognize_expression(parser, scope_opaque, references)
             }
             break
           }
-          _ => {
+          None => {
             parser.limit = boundary
             recognize_expression(parser, scope_opaque, references)
             if parser.recognized_pattern {

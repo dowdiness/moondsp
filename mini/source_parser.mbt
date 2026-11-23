@@ -142,9 +142,9 @@ fn parse_play_source_with_origins(
     }
   } else {
     guard !parser.at_end() else { raise Mistake(body_at, "empty input") }
-    let doc = match mini_collect_dollar_stack_lines(input, start=parser.pos) {
-      Some(lines) =>
-        parse_doc_dollar_stack_program(input, parser, builder, lines)
+    let doc = match mini_collect_dollar_blocks(input, start=parser.pos) {
+      Some(blocks) =>
+        parse_doc_dollar_stack_program(input, parser, builder, blocks)
       None => {
         let doc = parser.parse_doc_expr(builder)
         parser.skip_whitespace()

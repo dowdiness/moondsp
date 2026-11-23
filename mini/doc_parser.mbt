@@ -737,8 +737,8 @@ fn parse_doc_body(
   builder : MiniDocBuilder,
 ) -> ScoreDoc raise SourceProblem {
   p.parse_bindings(builder)
-  if mini_collect_dollar_stack_lines(input, start=p.pos) is Some(lines) {
-    return parse_doc_dollar_stack_program(input, p, builder, lines)
+  if mini_collect_dollar_blocks(input, start=p.pos) is Some(blocks) {
+    return parse_doc_dollar_stack_program(input, p, builder, blocks)
   }
   let result = p.parse_doc_expr(builder)
   p.skip_whitespace()
@@ -756,17 +756,25 @@ fn parse_doc_dollar_stack_program(
   input : String,
   parser : Parser,
   builder : MiniDocBuilder,
-  lines : Array[MiniDollarStackLine],
+  blocks : Array[MiniDollarBlock],
 ) -> ScoreDoc raise SourceProblem {
   let args : Array[ScoreDoc] = []
-  for line in lines {
-    parser.pos = line.start
+  for block in blocks {
+    parser.pos = block.start
+    parser.skip_whitespace()
+    guard parser.pos < block.end else {
+      raise Mistake(block.start - 2, "$: requires an expression")
+    }
     let doc = parser.parse_doc_expr(builder)
-    parser.skip_inline_whitespace()
-    if parser.pos != line.end {
+    parser.skip_whitespace()
+    if parser.pos != block.end {
+      let mut end_ = block.end
+      while mini_is_space(input[end_ - 1]) {
+        end_ -= 1
+      }
       raise Mistake(
         parser.pos,
-        "unexpected trailing input '\{input[parser.pos:line.end].to_owned()}'",
+        "unexpected trailing input '\{input[parser.pos:end_].to_owned()}'",
       )
     }
     args.push(doc)

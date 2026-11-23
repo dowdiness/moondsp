@@ -1787,13 +1787,41 @@ test "Draft accepts dollar stack lines with independent exact origins" {
 }
 
 ///|
-test "parse Strudel-style dollar stack rejects non-dollar content after stack starts" {
+test "dollar stack blocks continue across lines and comments until a line starts with $:" {
   let input =
-    #|$: s("bd")
-    #|s("hh")
-  match @mini.parse(input) {
-    Err(_) => ()
-    Ok(_) => fail("expected Err for non-dollar line in dollar stack")
+    #|$: note("C2")
+    #|  // brighter
+    #|  .lpf(1800)
+    #|  + s("bd")
+    #|/*
+    #|$: s("hh")
+    #|*/
+    #|$: s("sd").fast(
+    #|  2)
+  let one_line = "$: note(\"C2\").lpf(1800) + s(\"bd\")\n$: s(\"sd\").fast(2)"
+  inspect(
+    unwrap_mini_snapshot(@mini.parse_snapshot(input)).root().value(),
+    content=unwrap_mini_snapshot(@mini.parse_snapshot(one_line)).root().value(),
+  )
+  let draft = @mini.Draft(input)
+  let events = draft_snapshot(draft).query(draft_arc())
+  assert_named_events(
+    events.map(e => e.event()),
+    query_one_cycle(unwrap_ok(@mini.parse(one_line))),
+  )
+}
+
+///|
+test "parse Strudel-style dollar stack rejects non-dollar content after stack starts" {
+  // A new layer needs `$:` at the start of its line; `+` or a method continues one.
+  for
+    input in [
+      "$: s(\"bd\")\ns(\"hh\")", "$: s(\"bd\") $: s(\"hh\")", "$: // empty\n$: s(\"hh\")",
+    ] {
+    match @mini.parse(input) {
+      Err(_) => ()
+      Ok(_) => fail("expected Err for \{input}")
+    }
   }
 }
 

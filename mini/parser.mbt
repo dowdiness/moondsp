@@ -3,7 +3,7 @@
 ///
 /// Grammar:
 ///   binding  = "let" identifier "=" expr ";"
-///   dollar_stack = ( "$:" expr newline? )+
+///   dollar_stack = ( "$:" expr )+    (each "$:" starts its line)
 ///   expr     = chain ( "+" chain )*
 ///   chain    = primary ( "." method )*
 ///   primary  = "s(" string ")" | "note(" string ")"
@@ -39,7 +39,8 @@ priv struct Parser {
 }
 
 ///|
-priv struct MiniDollarStackLine {
+/// One `$:` block: from after its `$:` to where the next block's `$:` begins.
+priv struct MiniDollarBlock {
   start : Int32
   end : Int32
 }
@@ -67,58 +68,52 @@ fn Parser::Parser(
 }
 
 ///|
-fn mini_collect_dollar_stack_lines(
+/// Split a `$:` program into its blocks, as the Loom grammar does. A block
+/// runs from its `$:` across lines and comments to the next `$:` that is the
+/// first token on its line, outside quotes and comments. Returns `None` when
+/// the source does not start with `$:`.
+fn mini_collect_dollar_blocks(
   input : String,
   start~ : Int32 = 0,
-  partial~ : Bool = false,
-) -> Array[MiniDollarStackLine]? raise SourceProblem {
-  let lines : Array[MiniDollarStackLine] = []
-  let mut saw_program = false
+) -> Array[MiniDollarBlock]? {
+  let markers : Array[Int32] = []
+  // Whether a newline came before this point since the last token.
+  let mut line_start = true
   let mut pos = start
   while pos < input.length() {
-    let line_start = pos
-    let mut line_end = pos
-    while line_end < input.length() && input[line_end] != '\n' {
-      line_end += 1
-    }
-    let mut content_end = line_end
-    if content_end > line_start && input[content_end - 1] == '\r' {
-      content_end -= 1
-    }
-    let mut first = line_start
-    while first < content_end && input[first] == ' ' {
-      first += 1
-    }
-    if first < content_end {
-      if first + 2 <= content_end &&
-        input[first] == '$' &&
-        input[first + 1] == ':' {
-        saw_program = true
-        let expr_start = first + 2
-        let mut expr_first = expr_start
-        while expr_first < content_end && input[expr_first] == ' ' {
-          expr_first += 1
-        }
-        if expr_first == content_end && !partial {
-          raise Mistake(first, "$: requires an expression")
-        }
-        lines.push({ start: expr_start, end: content_end, })
-      } else if saw_program {
-        if partial {
-          break
-        }
-        raise Mistake(first, "expected '$:' stack line")
-      } else {
-        return None
+    let c = input[pos]
+    if mini_is_space(c) {
+      line_start = line_start || c == '\n'
+      pos += 1
+    } else if c != '"' && mini_opaque_end(input, pos) is Some(end_) {
+      for i in pos..<end_ {
+        line_start = line_start || input[i] == '\n'
       }
+      pos = end_
+    } else if line_start &&
+      c == '$' &&
+      pos + 1 < input.length() &&
+      input[pos + 1] == ':' {
+      markers.push(pos)
+      pos += 2
+      line_start = false
+    } else {
+      guard !markers.is_empty() else { return None }
+      pos = mini_opaque_end(input, pos).unwrap_or(pos + 1)
+      line_start = false
     }
-    pos = if line_end < input.length() { line_end + 1 } else { line_end }
   }
-  if saw_program {
-    Some(lines)
-  } else {
-    None
-  }
+  guard !markers.is_empty() else { return None }
+  Some(
+    markers.mapi((i, marker) => {
+      start: marker + 2,
+      end: if i + 1 < markers.length() {
+        markers[i + 1]
+      } else {
+        input.length()
+      },
+    }),
+  )
 }
 
 ///|
@@ -153,6 +148,31 @@ fn mini_comment_end(input : String, start : Int32) -> Int32? {
 }
 
 ///|
+/// The end of the quote or comment that starts at `start`, as the parser reads
+/// them: a quote runs to the next quote, and an unterminated quote or block
+/// comment to the end of the input.
+fn mini_opaque_end(input : String, start : Int32) -> Int32? {
+  if input[start] == '"' {
+    let mut end_ = start + 1
+    while end_ < input.length() && input[end_] != '"' {
+      end_ += 1
+    }
+    return Some(if end_ < input.length() { end_ + 1 } else { end_ })
+  }
+  match mini_comment_end(input, start) {
+    Some(end_) => Some(end_)
+    None =>
+      if start + 1 < input.length() &&
+        input[start] == '/' &&
+        input[start + 1] == '*' {
+        Some(input.length())
+      } else {
+        None
+      }
+  }
+}
+
+///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
   while true {
     while !self.at_end() && mini_is_space(self.input[self.pos]) {
@@ -162,14 +182,6 @@ fn Parser::skip_whitespace(self : Parser) -> Unit {
       Some(end_) if end_ <= self.limit => self.pos = end_
       _ => break
     }
-  }
-}
-
-///|
-fn Parser::skip_inline_whitespace(self : Parser) -> Unit {
-  while !self.at_end() &&
-        (self.input[self.pos] == ' ' || self.input[self.pos] == '\t') {
-    self.pos += 1
   }
 }
 

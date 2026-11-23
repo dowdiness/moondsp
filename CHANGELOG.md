@@ -351,6 +351,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `$:` layer may now continue over several lines, as in the editor's
+  grammar: a new layer starts only at a `$:` that begins its line, outside
+  quotes and comments. Continued method chains, `+`, line breaks inside
+  arguments, and comments between layers, including a layer commented out
+  with `/* */`, no longer fail with `expected '$:' stack line`.
+
 - A merged control's value no longer depends on the query length: an onset
   reads the value at its own start instead of the last value overlapping the
   queried span, which could differ between a 1/8-cycle and a 1-cycle query.
