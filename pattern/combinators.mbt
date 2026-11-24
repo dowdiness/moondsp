@@ -1,92 +1,18 @@
 ///|
-priv struct SequenceSlot {
-  index : Rational
-  begin : Rational
-  end_ : Rational
-}
-
-///|
 pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
   let n = pats.length()
   if n == 0 {
     return Pat::silence()
   }
   let pats = pats.copy()
-  let n_rat = Rational::from_int(n)
-  let one = Rational::from_int(1)
-  let slots : Array[SequenceSlot] = Array::makei(n, i => {
-    let i_rat = Rational::from_int(i)
-    { index: i_rat, begin: i_rat / n_rat, end_: (i_rat + one) / n_rat, }
-  })
-  // Every complete slot maps to [0,1), independent of its index and cycle.
-  let full_pat_arc = TimeSpan(Rational::from_int(0), one)
+  let map = TimeMap::Slots(Array::makei(n + 1, i => i.to_int64()))
   make_pat(
-    fn(arc) {
-      let result : Array[Event[A]] = []
-      let cycles = arc.whole_cycles()
-      for cycle_arc in cycles {
-        // Determine the full cycle start from cycle_arc.begin
-        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
-        for i in 0..<n {
-          let slot = slots[i]
-          let i_rat = slot.index
-          // Slot arc within the cycle: [i/n, (i+1)/n) + cycle_start
-          let slot_begin = cycle_start + slot.begin
-          let slot_end = cycle_start + slot.end_
-          let slot_arc = TimeSpan(slot_begin, slot_end)
-          // Intersect slot with the original query arc
-          let query_intersect = match slot_arc.intersect(arc) {
-            Some(ts) => ts
-            None => continue
-          }
-          // To query the i-th pattern: compress slot time by n and offset back to [0,1) cycle space.
-          // A time t in the slot maps to: (t - cycle_start) * n - i
-          // Scale the intersected query arc into pattern time
-          let pat_begin = (query_intersect.begin - cycle_start) * n_rat - i_rat
-          let pat_end = (query_intersect.end_ - cycle_start) * n_rat - i_rat
-          let query_pat_arc = TimeSpan(pat_begin, pat_end)
-          // Capture i by value to avoid closure capture-by-reference issue
-          let i_val = i
-          let pat = pats[i_val]
-          let events = pat.query(full_pat_arc)
-          for ev in events {
-            // Intersect event part (in pattern space) with the query pat arc
-            let ev_part_clipped = match ev.part.intersect(query_pat_arc) {
-              Some(ts) => ts
-              None => continue
-            }
-            // Map part back to original time: t_orig = (t_pat + i) / n + cycle_start
-            let part_begin_orig = (ev_part_clipped.begin + i_rat) / n_rat +
-              cycle_start
-            let part_end_orig = (ev_part_clipped.end_ + i_rat) / n_rat +
-              cycle_start
-            let new_part = TimeSpan(part_begin_orig, part_end_orig)
-            let new_whole = match ev.whole {
-              Some(w) => {
-                let wb = (w.begin + i_rat) / n_rat + cycle_start
-                let we = (w.end_ + i_rat) / n_rat + cycle_start
-                Some(TimeSpan(wb, we))
-              }
-              None => None
-            }
-            result.push({ whole: new_whole, part: new_part, value: ev.value, })
-          }
-        }
-      }
-      result
-    },
-    one,
+    arc => map.query(pats, arc),
+    map.period(Rational::from_int(1)),
     Opaque([]),
     Anonymous,
     combine_signature("sequence", pats),
   )
-}
-
-///|
-priv struct RelativeSequenceSlot {
-  begin : Rational
-  end_ : Rational
-  duration : Rational
 }
 
 ///|
@@ -106,65 +32,14 @@ pub fn[A] sequence_weighted(
     guard total <= 256 else { return Pat::silence() }
   }
   let pats = pats.copy()
-  let total_rat = Rational::from_int(total)
-  let one = Rational::from_int(1)
-  let mut elapsed = 0
-  let slots = Array::makei(n, i => {
-    let weight = weights[i]
-    let begin = Rational::from_int(elapsed) / total_rat
-    elapsed += weight
-    let end_ = Rational::from_int(elapsed) / total_rat
-    { begin, end_, duration: Rational::from_int(weight) / total_rat, }
-  })
-  let full_pat_arc = TimeSpan(Rational::from_int(0), one)
+  let map = TimeMap::Slots(weight_bounds(weights))
   let signature = combine_signature(
     "weighted_sequence:\{weights.map(weight => "\{weight}").join(",")}",
     pats,
   )
   make_pat(
-    fn(arc) {
-      let result : Array[Event[A]] = []
-      for cycle_arc in arc.whole_cycles() {
-        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
-        for i in 0..<n {
-          let slot = slots[i]
-          let slot_begin = cycle_start + slot.begin
-          let slot_end = cycle_start + slot.end_
-          let slot_arc = TimeSpan(slot_begin, slot_end)
-          let query_intersect = match slot_arc.intersect(arc) {
-            Some(ts) => ts
-            None => continue
-          }
-          let query_pat_arc = TimeSpan(
-            (query_intersect.begin - slot_begin) / slot.duration,
-            (query_intersect.end_ - slot_begin) / slot.duration,
-          )
-          for ev in pats[i].query(full_pat_arc) {
-            let ev_part_clipped = match ev.part.intersect(query_pat_arc) {
-              Some(ts) => ts
-              None => continue
-            }
-            let part_begin_orig = slot_begin +
-              ev_part_clipped.begin * slot.duration
-            let part_end_orig = slot_begin +
-              ev_part_clipped.end_ * slot.duration
-            let new_whole = ev.whole.map(w => {
-              TimeSpan(
-                slot_begin + w.begin * slot.duration,
-                slot_begin + w.end_ * slot.duration,
-              )
-            })
-            result.push({
-              whole: new_whole,
-              part: TimeSpan(part_begin_orig, part_end_orig),
-              value: ev.value,
-            })
-          }
-        }
-      }
-      result
-    },
-    one,
+    arc => map.query(pats, arc),
+    map.period(Rational::from_int(1)),
     Opaque([]),
     Anonymous,
     signature,

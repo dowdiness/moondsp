@@ -134,40 +134,25 @@ pub fn[A] Pat::query(self : Pat[A], arc : TimeSpan) -> Array[Event[A]] {
 }
 
 ///|
-/// WHY two-step time scaling: query the inner pattern in compressed time
-/// (arc * factor), then scale returned events back (timestamps / factor).
-/// The inner pattern "sees" time passing faster, but events are reported
-/// in the caller's real-time frame. Both whole and part are scaled.
+/// The inner pattern sees time `factor` times faster; its events come back on
+/// the caller's clock (`TimeMap::Affine`).
 pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
   guard factor.num > 0L else { return Pat::silence() }
+  let map = TimeMap::Affine(factor, Rational::from_int(0))
   guard !(self.body is Silence) else {
     return make_pat(
       self.query,
-      self.metadata.period / factor,
+      map.period(self.metadata.period),
       Silence,
       self.metadata.scope,
       self.metadata.content,
     )
   }
-  let inner = self
+  let inner = [self]
   let children = self.transform_children(p => p.fast(factor))
   make_pat(
-    fn(arc) {
-      // Scale the query arc forward in time by factor (compress)
-      let scaled_begin = arc.begin * factor
-      let scaled_end = arc.end_ * factor
-      let scaled_arc = TimeSpan(scaled_begin, scaled_end)
-      let inv = Rational(1L, 1L) / factor
-      // Scale the returned events back by 1/factor
-      inner
-      .query(scaled_arc)
-      .map(ev => {
-        let new_part = TimeSpan(ev.part.begin * inv, ev.part.end_ * inv)
-        let new_whole = ev.whole.map(w => TimeSpan(w.begin * inv, w.end_ * inv))
-        { whole: new_whole, part: new_part, value: ev.value, }
-      })
-    },
-    self.metadata.period / factor,
+    arc => map.query(inner, arc),
+    map.period(self.metadata.period),
     Opaque(children),
     self.metadata.scope,
     transformed_signature(
@@ -187,38 +172,12 @@ pub fn[A] Pat::slow(self : Pat[A], factor : Rational) -> Pat[A] {
 ///|
 pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
   guard !(self.body is Silence) else { return self }
-  let inner = self
+  let inner = [self]
   let children = self.transform_children(p => p.rev())
+  let map = TimeMap::MirrorCycles
   make_pat(
-    fn(arc) {
-      let one = Rational::from_int(1)
-      arc
-      .whole_cycles()
-      .iter()
-      .flat_map(cycle_arc => {
-        // Mirror within cycle c: t -> 2c + 1 - t, which keeps the cycle, so
-        // a pattern longer than one cycle reverses each of its own cycles.
-        let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
-        let mirror = cycle_start + cycle_start + one
-        let mirror_arc = TimeSpan(
-          mirror - cycle_arc.end_,
-          mirror - cycle_arc.begin,
-        )
-        inner
-        .query(mirror_arc)
-        .iter()
-        .map(ev => {
-          // Mirror part back
-          let new_part = TimeSpan(mirror - ev.part.end_, mirror - ev.part.begin)
-          let new_whole = ev.whole.map(w => {
-            TimeSpan(mirror - w.end_, mirror - w.begin)
-          })
-          { whole: new_whole, part: new_part, value: ev.value, }
-        })
-      })
-      .collect()
-    },
-    self.metadata.period,
+    arc => map.query(inner, arc),
+    map.period(self.metadata.period),
     Opaque(children),
     self.metadata.scope,
     transformed_signature(self.entry_signature(), "rev"),
