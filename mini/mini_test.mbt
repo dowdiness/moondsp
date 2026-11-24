@@ -2174,3 +2174,31 @@ test "takes_instruments follows the rule that rejects .s" {
     assert_eq(@mini.takes_instruments(receiver), expected, msg=receiver)
   }
 }
+
+///|
+test "unknown names are errors that list their position's names" {
+  for
+    case in [
+      ("note(\"60\").wobble(1)", "position 11: unknown method 'wobble'"),
+      (
+        "note(\"60\").jux(spin)", "jux() callback must be fast(N), slow(N), or rev; got 'spin'",
+      ),
+      (
+        "note(\"60\").gain(sine.wobble(2))", "unknown signal method 'wobble'; use range, fast, or slow",
+      ),
+      (
+        "song(verse(\"a\"))", "expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
+      ),
+      ("+", "expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('"),
+    ] {
+    let (source, message) = case
+    match @mini.parse_play_source(source) {
+      Err(problem) =>
+        assert_true(
+          problem.to_string().contains(message),
+          msg=problem.to_string(),
+        )
+      Ok(_) => fail("expected an error: \{source}")
+    }
+  }
+}

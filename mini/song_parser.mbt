@@ -57,7 +57,14 @@ pub fn parse_song(
   p.parse_bindings(builder) catch {
     problem => return Err(problem.to_string())
   }
-  let result = p.parse_song_expr(builder, lower=doc => doc.lower().pat()) catch {
+  p.skip_whitespace()
+  let song_at = p.pos
+  guard p.read_call(StatementCall::parse) is Some(Song) else {
+    return Err("position \{song_at}: expected 'song('")
+  }
+  let result = p.parse_song_body(song_at, builder, lower=doc => {
+    doc.lower().pat()
+  }) catch {
     problem => return Err(problem.to_string())
   }
   p.skip_whitespace()
@@ -70,17 +77,14 @@ pub fn parse_song(
 }
 
 ///|
+/// The items of the `song(` opened at `song_start`, from after its `(`.
 /// `lower` turns each section's compiled document into the song's content.
-fn[C] Parser::parse_song_expr(
+fn[C] Parser::parse_song_body(
   self : Parser,
+  song_start : Int32,
   builder : MiniDocBuilder,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> ParsedSong[C] raise SourceProblem {
-  self.skip_whitespace()
-  let song_start = self.pos
-  guard self.match_keyword("song(") else {
-    raise Mistake(song_start, "expected 'song('")
-  }
   self.skip_whitespace()
   guard !self.at_end() && self.input[self.pos] != ')' else {
     raise Mistake(song_start, "song() requires at least one item")
@@ -146,27 +150,27 @@ fn[C] Parser::parse_song_item(
 ) -> Unit raise SourceProblem {
   self.skip_whitespace()
   let item_start = self.pos
-  if self.match_keyword("section(") {
-    let section = self.parse_song_section(item_start, builder~, lower~)
-    if sections.contains(section.name()) {
-      raise Mistake(item_start, "duplicate section '\{section.name()}'")
+  guard self.read_call(SongItem::parse) is Some(item) else {
+    let expected = or_list(SongItem::all().map(item => "\{item.name()}(...)"))
+    raise Mistake(item_start, "expected \{expected}")
+  }
+  match item {
+    Section => {
+      let section = self.parse_song_section(item_start, builder~, lower~)
+      if sections.contains(section.name()) {
+        raise Mistake(item_start, "duplicate section '\{section.name()}'")
+      }
+      sections[section.name()] = section
     }
-    sections[section.name()] = section
-  } else if self.match_keyword("bpm(") {
-    if !bpm_values.is_empty() {
-      raise Mistake(item_start, "duplicate bpm(...)")
+    Bpm => {
+      if !bpm_values.is_empty() {
+        raise Mistake(item_start, "duplicate bpm(...)")
+      }
+      bpm_values.push(self.parse_song_bpm(item_start))
     }
-    bpm_values.push(self.parse_song_bpm(item_start))
-  } else if self.match_keyword("part_id(") {
-    part_specs.push(self.parse_song_part_with_id(item_start))
-  } else if self.match_keyword("part(") {
-    part_specs.push(self.parse_song_part(item_start))
-  } else if self.match_keyword("fill(") {
-    fill_specs.push(self.parse_song_fill(item_start))
-  } else {
-    raise Mistake(
-      item_start, "expected bpm(...), section(...), part(...), part_id(...), or fill(...)",
-    )
+    PartId => part_specs.push(self.parse_song_part_with_id(item_start))
+    Part => part_specs.push(self.parse_song_part(item_start))
+    Fill => fill_specs.push(self.parse_song_fill(item_start))
   }
   if self.admission is Some(_) && part_specs.length() > 128 {
     raise OverLimit(Occurrences)

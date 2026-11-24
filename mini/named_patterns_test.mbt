@@ -37,6 +37,9 @@ test "binding diagnostics reject duplicates unresolved names and recursive defin
     ("let a = a; a", "undefined pattern 'a'"),
     ("let a = b; let b = a; a", "undefined pattern 'b'"),
     ("let s = note(\"60\"); s", "reserved pattern name 's'"),
+    // Every call name is reserved, including silence and bpm.
+    ("let silence = note(\"60\"); silence", "reserved pattern name 'silence'"),
+    ("let bpm = note(\"60\"); bpm", "reserved pattern name 'bpm'"),
     ("let a = note(\"60\") a", "expected ';'"),
   ]
   for item in cases {

@@ -256,7 +256,7 @@ fn Parser::recognize_song_sections(
       break
     } else {
       self.pos = cursor
-      if self.match_keyword("section(") {
+      if self.read_call(SongItem::parse) is Some(Section) {
         let first_reference = self.recognized_references.length()
         let body_start = try {
           self.skip_whitespace()
@@ -348,10 +348,10 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
       }
       Ok(None) => {
         parser.pos = start
+        let statement = parser.read_call(StatementCall::parse)
         // Tempo is a declaration, not an expression reference.
-        if parser.match_keyword("bpm(") {
-          parser.pos = start
-          try parse_play_bpm_declaration(parser) catch {
+        if statement is Some(Bpm) {
+          try parser.parse_bpm_statement(start) catch {
             _ => ()
           } noraise {
             _ => ()
@@ -361,8 +361,7 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
           parser.pos = boundary + 1
           continue
         }
-        parser.pos = start
-        if parser.match_keyword("song(") {
+        if statement is Some(Song) {
           mode = Some(Song)
           parser.recognize_song_sections(scope_opaque, references)
           break

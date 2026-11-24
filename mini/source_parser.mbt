@@ -33,17 +33,18 @@ pub fn PlaySource::bpm(self : PlaySource) -> Double {
 }
 
 ///|
-fn parse_play_bpm_declaration(parser : Parser) -> Double raise SourceProblem {
-  let start = parser.pos
-  guard parser.match_keyword("bpm(") else {
-    raise Mistake(start, "expected bpm(...)")
-  }
-  parser.skip_whitespace()
-  let value = parser.read_number()
-  parser.skip_whitespace()
-  parser.expect_char(')')
-  parser.skip_whitespace()
-  parser.expect_char(';')
+/// The tempo of the `bpm(` statement written at `start`, read from after its
+/// `(` through its `;`.
+fn Parser::parse_bpm_statement(
+  self : Parser,
+  start : Int32,
+) -> Double raise SourceProblem {
+  self.skip_whitespace()
+  let value = self.read_number()
+  self.skip_whitespace()
+  self.expect_char(')')
+  self.skip_whitespace()
+  self.expect_char(';')
   guard value > 0.0 else {
     raise Mistake(start, "bpm() requires a positive number, got \{value}")
   }
@@ -97,22 +98,29 @@ fn parse_play_source_with_origins(
   let builder = MiniDocBuilder(origins~)
   // A top-level `bpm(...)` and where it was written.
   let mut authored_bpm : (Int32, Double)? = None
-  while true {
+  // Where `song(` opens the body, when it does.
+  let song_at : Int32? = while true {
     parser.parse_bindings(builder)
     parser.skip_whitespace()
-    let bpm_at = parser.pos
-    guard parser.match_keyword("bpm(") else { break }
-    guard authored_bpm is None else {
-      raise Mistake(bpm_at, "duplicate bpm(...)")
+    let at = parser.pos
+    match parser.read_call(StatementCall::parse) {
+      Some(Bpm) => {
+        guard authored_bpm is None else {
+          raise Mistake(at, "duplicate bpm(...)")
+        }
+        authored_bpm = Some((at, parser.parse_bpm_statement(at)))
+      }
+      Some(Song) => break Some(at)
+      None => break None
     }
-    parser.pos = bpm_at
-    authored_bpm = Some((bpm_at, parse_play_bpm_declaration(parser)))
+  } nobreak {
+    None
   }
   let body_at = parser.pos
-  if parser.match_keyword("song(") {
-    parser.pos = body_at
+  if song_at is Some(song_at) {
     if origins is Some(_) {
       let (song, repeating, bpm) = parser.parse_play_song(
+        song_at,
         builder,
         admission,
         authored_bpm,
@@ -121,6 +129,7 @@ fn parse_play_source_with_origins(
       { body: ExactArrangement(song, repeating), bpm, }
     } else {
       let (song, repeating, bpm) = parser.parse_play_song(
+        song_at,
         builder,
         admission,
         authored_bpm,
@@ -153,18 +162,34 @@ fn parse_play_source_with_origins(
 }
 
 ///|
-/// Parse a `song(...)` body and its optional `.repeat()`, returning the song,
-/// whether it repeats, and its tempo.
+/// Parse the `song(` body opened at `song_at`, from after its `(`, and its
+/// optional `.repeat()`, returning the song, whether it repeats, and its tempo.
 fn[C] Parser::parse_play_song(
   self : Parser,
+  song_at : Int32,
   builder : MiniDocBuilder,
   admission : PlaybackAdmission?,
   authored_bpm : (Int32, Double)?,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> (@song.Song[C], Bool, Double) raise SourceProblem {
-  let parsed = self.parse_song_expr(builder, lower~)
+  let parsed = self.parse_song_body(song_at, builder, lower~)
   self.skip_whitespace()
-  let repeating = self.match_keyword(".repeat()")
+  let before_method = self.pos
+  let repeating = if !self.at_end() && self.input[self.pos] == '.' {
+    self.pos += 1
+    match self.read_call(ArrangementMethod::parse) {
+      Some(Repeat) => {
+        self.expect_char(')')
+        true
+      }
+      None => {
+        self.pos = before_method
+        false
+      }
+    }
+  } else {
+    false
+  }
   self.skip_whitespace()
   guard self.at_end() else {
     raise Mistake(

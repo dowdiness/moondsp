@@ -57,16 +57,14 @@ priv enum MiniShape {
 }
 
 ///|
-fn MiniShape::from_name(name : String) -> MiniShape? {
-  match name {
-    "sine" => Some(Sine)
-    "cosine" => Some(Cosine)
-    "saw" => Some(Saw)
-    "isaw" => Some(Isaw)
-    "tri" => Some(Tri)
-    "square" => Some(Square)
-    _ => None
-  }
+/// Every signal shape. Keep this the only expression that constructs one.
+fn MiniShape::all() -> Array[MiniShape] {
+  [Sine, Cosine, Saw, Isaw, Tri, Square]
+}
+
+///|
+fn MiniShape::parse(name : String) -> MiniShape? {
+  MiniShape::all().iter().find_first(shape => shape.name() == name)
 }
 
 ///|
@@ -237,13 +235,7 @@ fn Parser::parse_syntax_chain(
     if self.syntax_depth_limit is Some(limit) {
       guard chain_depth < limit else { raise OverLimit(Nesting(limit)) }
     }
-    let node : MiniExprNode = if self.match_keyword("s(") {
-      let (text, at) = self.read_quoted_string_with_start()
-      self.expect_char(')')
-      Instruments(expr, { text, at, })
-    } else {
-      Apply(expr, self.parse_transform())
-    }
+    let node = self.parse_method(expr)
     expr = { span: { start, end: self.pos, }, node, }
   }
   expr
@@ -261,24 +253,6 @@ fn Parser::parse_syntax_primary(
     raise Mistake(self.pos, "unexpected end of input")
   }
   let start = self.pos
-  if self.match_keyword("stack(") {
-    if self.recognition {
-      self.recognized_pattern = true
-    }
-    self.skip_whitespace()
-    guard !self.at_end() && self.input[self.pos] != ')' else {
-      raise Mistake(start, "stack() requires at least one argument")
-    }
-    let args = [self.parse_syntax_expr(depth=depth + 1)]
-    self.skip_whitespace()
-    while !self.at_end() && self.input[self.pos] == ',' {
-      self.pos += 1
-      args.push(self.parse_syntax_expr(depth=depth + 1))
-      self.skip_whitespace()
-    }
-    self.expect_char(')')
-    return { span: { start, end: self.pos, }, node: Stack(args), }
-  }
   if self.input[self.pos] == '(' {
     if self.recognition {
       self.recognized_pattern = true
@@ -290,87 +264,81 @@ fn Parser::parse_syntax_primary(
     self.expect_char(')')
     return inner
   }
-  if self.match_keyword("silence()") {
-    if self.recognition {
-      self.recognized_pattern = true
+  match self.read_call(PatternCall::parse) {
+    None => {
+      let name = self.read_ident()
+      guard !name.is_empty() else {
+        let expected = PatternCall::all().map(call => "'\{call.opening()}'")
+        expected.push("'('")
+        raise Mistake(self.pos, "expected \{or_list(expected)}")
+      }
+      if self.recognition {
+        self.recognized_pattern = true
+        self.record_reference_fact(name, start, self.pos)
+      }
+      { span: { start, end: self.pos, }, node: Reference(name), }
     }
-    return { span: { start, end: self.pos, }, node: Silence, }
-  }
-  let kind = if self.match_keyword("s(") {
-    Some(Sound)
-  } else if self.match_keyword("note(") {
-    Some(Note)
-  } else if self.match_keyword("chord(") {
-    Some(Chord)
-  } else {
-    None
-  }
-  if kind is Some(kind) {
-    if self.recognition {
-      self.recognized_pattern = true
+    Some(Stack) => {
+      if self.recognition {
+        self.recognized_pattern = true
+      }
+      self.skip_whitespace()
+      guard !self.at_end() && self.input[self.pos] != ')' else {
+        raise Mistake(start, "stack() requires at least one argument")
+      }
+      let args = [self.parse_syntax_expr(depth=depth + 1)]
+      self.skip_whitespace()
+      while !self.at_end() && self.input[self.pos] == ',' {
+        self.pos += 1
+        args.push(self.parse_syntax_expr(depth=depth + 1))
+        self.skip_whitespace()
+      }
+      self.expect_char(')')
+      { span: { start, end: self.pos, }, node: Stack(args), }
     }
-    let (text, at) = self.read_quoted_string_with_start()
-    let notation = { text, at, }
-    if self.recognition {
-      self.record_literal_facts(kind, notation)
+    Some(Silence) => {
+      self.expect_char(')')
+      if self.recognition {
+        self.recognized_pattern = true
+      }
+      { span: { start, end: self.pos, }, node: Silence, }
     }
-    self.expect_char(')')
-    return { span: { start, end: self.pos, }, node: Literal(kind, notation), }
-  }
-  let name = self.read_ident()
-  if !name.is_empty() {
-    if self.recognition {
-      self.recognized_pattern = true
-      self.record_reference_fact(name, start, self.pos)
+    Some(Literal(literal)) => {
+      if self.recognition {
+        self.recognized_pattern = true
+      }
+      let (text, at) = self.read_quoted_string_with_start()
+      let notation = { text, at, }
+      if self.recognition {
+        self.record_literal_facts(literal, notation)
+      }
+      self.expect_char(')')
+      { span: { start, end: self.pos, }, node: Literal(literal, notation), }
     }
-    return { span: { start, end: self.pos, }, node: Reference(name), }
   }
-  raise Mistake(
-    self.pos,
-    "expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('",
-  )
 }
 
 ///|
-fn Parser::parse_transform(
+/// The method after `receiver` and its `.`, applied to `receiver`.
+fn Parser::parse_method(
   self : Parser,
-) -> MiniTransform[ControlArgument] raise SourceProblem {
+  receiver : MiniExpr,
+) -> MiniExprNode raise SourceProblem {
   let method_start = self.pos
   let name = self.read_ident()
-  match name {
-    "fast" | "slow" => {
+  guard Method::parse(name) is Some(called) else {
+    raise Mistake(method_start, "unknown method '\{name}'")
+  }
+  let transform : MiniTransform[ControlArgument] = match called {
+    Instruments => {
       self.expect_char('(')
-      self.skip_whitespace()
-      let value_start = self.pos
-      let value = self.read_number()
-      let value_end = self.pos
-      self.skip_whitespace()
+      let (text, at) = self.read_quoted_string_with_start()
       self.expect_char(')')
-      guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
-        raise Mistake(
-          method_start,
-          "\{name}() requires a finite positive number, got \{value}",
-        )
-      }
-      let factor = parse_decimal_rational(
-        self.input,
-        value_start,
-        value_end,
-        method_start,
-      )
-      guard factor > @pattern.Rational::from_int(0) else {
-        raise Mistake(
-          method_start,
-          "\{name}() requires a representable positive factor",
-        )
-      }
-      if name == "fast" {
-        Fast(factor)
-      } else {
-        Slow(factor)
-      }
+      return Instruments(receiver, { text, at, })
     }
-    "gate" => {
+    Fast => Fast(self.read_method_factor(method_start, name))
+    Slow => Slow(self.read_method_factor(method_start, name))
+    Gate => {
       self.expect_char('(')
       self.skip_whitespace()
       let value_start = self.pos
@@ -393,12 +361,12 @@ fn Parser::parse_transform(
       }
       Gate(factor)
     }
-    "rev" => {
+    Rev => {
       self.expect_char('(')
       self.expect_char(')')
       Rev
     }
-    "degradeBy" => {
+    DegradeBy => {
       self.expect_char('(')
       self.skip_whitespace()
       let p = self.read_number()
@@ -406,39 +374,23 @@ fn Parser::parse_transform(
       self.expect_char(')')
       Degrade(p)
     }
-    "lpf" | "hpf" => {
-      self.expect_char('(')
-      let kind : MiniFilterKind = if name == "lpf" { LowPass } else { HighPass }
-      let frequency_hz = self.read_control_argument(method_start)
-      self.skip_whitespace()
-      let resonance = if !self.at_end() && self.input[self.pos] == ',' {
-        self.pos += 1
-        Some(self.read_control_argument(method_start))
-      } else {
-        None
-      }
-      self.skip_whitespace()
-      self.expect_char(')')
-      Filter(kind, frequency_hz, resonance)
-    }
-    "attack" => Control(Attack, self.read_method_control_argument(method_start))
-    "hold" => Control(Hold, self.read_method_control_argument(method_start))
-    "release" =>
-      Control(Release, self.read_method_control_argument(method_start))
-    "gain" => Control(Gain, self.read_method_control_argument(method_start))
-    "pan" => Control(Pan, self.read_method_control_argument(method_start))
-    "room" => Control(Room, self.read_method_control_argument(method_start))
-    "every" => {
+    Lpf => self.read_filter(LowPass, method_start)
+    Hpf => self.read_filter(HighPass, method_start)
+    Attack => Control(Attack, self.read_method_control_argument(method_start))
+    Hold => Control(Hold, self.read_method_control_argument(method_start))
+    Release => Control(Release, self.read_method_control_argument(method_start))
+    Gain => Control(Gain, self.read_method_control_argument(method_start))
+    Pan => Control(Pan, self.read_method_control_argument(method_start))
+    Room => Control(Room, self.read_method_control_argument(method_start))
+    Every => {
       self.expect_char('(')
       self.skip_whitespace()
       let n_dbl = self.read_number()
       self.skip_whitespace()
       self.expect_char(',')
       self.skip_whitespace()
-      let f_name = self.read_ident()
       let f = self.parse_transform_callback(
         method_start,
-        f_name,
         calling_method="every",
       )
       self.skip_whitespace()
@@ -452,32 +404,34 @@ fn Parser::parse_transform(
       }
       Every(n, f)
     }
-    "jux" => {
+    Jux => {
       self.expect_char('(')
       self.skip_whitespace()
-      let f_name = self.read_ident()
-      let f = self.parse_transform_callback(
-        method_start,
-        f_name,
-        calling_method="jux",
-      )
+      let f = self.parse_transform_callback(method_start, calling_method="jux")
       self.skip_whitespace()
       self.expect_char(')')
       Jux(f)
     }
-    _ => raise Mistake(method_start, "unknown method '\{name}'")
   }
+  Apply(receiver, transform)
 }
 
 ///|
 fn Parser::parse_transform_callback(
   self : Parser,
   method_start : Int32,
-  name : String,
   calling_method~ : String,
 ) -> MiniCallback raise SourceProblem {
-  match name {
-    "fast" => {
+  let name = self.read_ident()
+  guard Callback::parse(name) is Some(callback) else {
+    let expected = or_list(Callback::all().map(Callback::written))
+    raise Mistake(
+      method_start,
+      "\{calling_method}() callback must be \{expected}; got '\{name}'",
+    )
+  }
+  match callback {
+    Fast => {
       self.expect_char('(')
       self.skip_whitespace()
       let k_dbl = self.read_number()
@@ -492,7 +446,7 @@ fn Parser::parse_transform_callback(
       }
       Fast(k)
     }
-    "slow" => {
+    Slow => {
       self.expect_char('(')
       self.skip_whitespace()
       let k_dbl = self.read_number()
@@ -507,7 +461,7 @@ fn Parser::parse_transform_callback(
       }
       Slow(k)
     }
-    "rev" => {
+    Rev => {
       // Accept both `rev` and `rev()` as the callback form.
       if !self.at_end() && self.input[self.pos] == '(' {
         self.expect_char('(')
@@ -515,10 +469,43 @@ fn Parser::parse_transform_callback(
       }
       Rev
     }
-    _ =>
-      raise Mistake(
-        method_start,
-        "\{calling_method}() callback must be fast(N), slow(N), or rev; got '\{name}'",
-      )
   }
+}
+
+///|
+/// The positive factor of a `fast(n)` or `slow(n)` method named `name`.
+fn Parser::read_method_factor(
+  self : Parser,
+  method_start : Int32,
+  name : String,
+) -> @pattern.Rational raise SourceProblem {
+  let factor = self.read_positive_factor(method_start, name)
+  guard factor > @pattern.Rational::from_int(0) else {
+    raise Mistake(
+      method_start,
+      "\{name}() requires a representable positive factor",
+    )
+  }
+  factor
+}
+
+///|
+/// The arguments of `.lpf(hz[, q])` or `.hpf(hz[, q])`, after the name.
+fn Parser::read_filter(
+  self : Parser,
+  kind : MiniFilterKind,
+  method_start : Int32,
+) -> MiniTransform[ControlArgument] raise SourceProblem {
+  self.expect_char('(')
+  let frequency_hz = self.read_control_argument(method_start)
+  self.skip_whitespace()
+  let resonance = if !self.at_end() && self.input[self.pos] == ',' {
+    self.pos += 1
+    Some(self.read_control_argument(method_start))
+  } else {
+    None
+  }
+  self.skip_whitespace()
+  self.expect_char(')')
+  Filter(kind, frequency_hz, resonance)
 }

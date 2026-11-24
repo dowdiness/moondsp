@@ -71,8 +71,10 @@ parses with the same enums and keeps its own recovery. A control method
 such as `.gain` or `.pan` is the `Method` case that names its
 `@control.Control`.
 
-The names a binding may not take are `let` and every call name, derived from
-the enums' `all()`. `bpm` is a case of both `StatementCall` and `SongItem`:
+The names a binding may not take are `let` and the names of the calls that
+can stand where a reference is read, the `StatementCall` and `PatternCall`
+cases, derived from their `all()`. Song items and methods follow `song(` or
+`.`, so a reference never stands where they are read. `bpm` is a case of both `StatementCall` and `SongItem`:
 one name in two positions, ending in `;` only as a statement.
 
 ### 3. `mini` publishes the vocabulary as data
@@ -180,7 +182,7 @@ Snippets fill in the required arguments only.
    `@mini.takes_instruments`, the instrument rule of Decision 4; the editor
    completes sound names and offers `.s` from them. Done.
 2. Parse every position through its enum and derive the reserved names. No
-   other behaviour changes, except the two new reserved names.
+   other behaviour changes, except the two new reserved names. Done.
 3. Publish `@mini.vocabulary()` and `@mini.methods_after`, replacing
    `sound_vocabulary()` and `takes_instruments`.
 4. Complete every position from the vocabulary in the editor and remove its

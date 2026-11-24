@@ -186,25 +186,6 @@ fn Parser::expect_char(self : Parser, c : Char) -> Unit raise SourceProblem {
 }
 
 ///|
-/// If `kw` matches the input at `self.pos`, consume it and return true.
-/// Otherwise leave `self.pos` untouched and return false. Char-by-char
-/// to avoid the StringView→String allocation `to_owned`/`to_string` would
-/// require.
-fn Parser::match_keyword(self : Parser, kw : String) -> Bool {
-  let len = kw.length()
-  if self.pos + len > self.limit {
-    return false
-  }
-  for i in 0..<len {
-    if self.input[self.pos + i] != kw[i] {
-      return false
-    }
-  }
-  self.pos += len
-  true
-}
-
-///|
 /// Read an identifier: [a-zA-Z_][a-zA-Z0-9_]*
 fn Parser::read_ident(self : Parser) -> String {
   let start = self.pos
@@ -291,10 +272,11 @@ fn Parser::read_control_value(
   if name.is_empty() {
     return Number(self.read_number())
   }
-  guard MiniShape::from_name(name) is Some(shape) else {
+  guard MiniShape::parse(name) is Some(shape) else {
+    let signals = MiniShape::all().map(MiniShape::name).join(", ")
     raise Mistake(
       start,
-      "expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got '\{name}'",
+      "expected a number, a quoted pattern, or a signal (\{signals}), got '\{name}'",
     )
   }
   let mut low = 0.0
@@ -309,8 +291,16 @@ fn Parser::read_control_value(
     }
     self.pos += 1
     let method_start = self.pos
-    match self.read_ident() {
-      "range" => {
+    let name = self.read_ident()
+    guard SignalMethod::parse(name) is Some(signal_method) else {
+      let expected = or_list(SignalMethod::all().map(SignalMethod::name))
+      raise Mistake(
+        method_start,
+        "unknown signal method '\{name}'; use \{expected}",
+      )
+    }
+    match signal_method {
+      Range => {
         self.expect_char('(')
         self.skip_whitespace()
         let from = self.read_number()
@@ -326,33 +316,12 @@ fn Parser::read_control_value(
         high = from + span * high
         low = next_low
       }
-      "fast" | "slow" as op => {
-        self.expect_char('(')
-        self.skip_whitespace()
-        let value_start = self.pos
-        let value = self.read_number()
-        let value_end = self.pos
-        self.skip_whitespace()
-        self.expect_char(')')
-        guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
-          raise Mistake(
-            method_start,
-            "\{op}() requires a finite positive number, got \{value}",
-          )
-        }
-        let factor = parse_decimal_rational(
-          self.input,
-          value_start,
-          value_end,
-          method_start,
-        )
-        rate = if op == "fast" { rate * factor } else { rate / factor }
-      }
-      other =>
-        raise Mistake(
-          method_start,
-          "unknown signal method '\{other}'; use range, fast, or slow",
-        )
+      Fast =>
+        rate = rate *
+          self.read_positive_factor(method_start, signal_method.name())
+      Slow =>
+        rate = rate /
+          self.read_positive_factor(method_start, signal_method.name())
     }
   }
   Signal({ shape, low, high, rate, })
@@ -488,10 +457,8 @@ fn Parser::read_binding_name(self : Parser) -> String? raise SourceProblem {
   guard !name.is_empty() else {
     raise Mistake(name_start, "expected pattern name")
   }
-  match name {
-    "let" | "s" | "note" | "chord" | "stack" | "song" =>
-      raise Mistake(name_start, "reserved pattern name '\{name}'")
-    _ => ()
+  if is_reserved_name(name) {
+    raise Mistake(name_start, "reserved pattern name '\{name}'")
   }
   if self.bindings.contains(name) {
     raise Mistake(name_start, "duplicate pattern '\{name}'")
@@ -528,4 +495,27 @@ fn Parser::parse_bindings(
       name_span,
     }
   }
+}
+
+///|
+/// `(n)` after a method named `name`: a finite positive decimal, exactly.
+fn Parser::read_positive_factor(
+  self : Parser,
+  method_start : Int32,
+  name : String,
+) -> @pattern.Rational raise SourceProblem {
+  self.expect_char('(')
+  self.skip_whitespace()
+  let value_start = self.pos
+  let value = self.read_number()
+  let value_end = self.pos
+  self.skip_whitespace()
+  self.expect_char(')')
+  guard !value.is_nan() && !value.is_inf() && value > 0.0 else {
+    raise Mistake(
+      method_start,
+      "\{name}() requires a finite positive number, got \{value}",
+    )
+  }
+  parse_decimal_rational(self.input, value_start, value_end, method_start)
 }

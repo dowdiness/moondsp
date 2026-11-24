@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at its onset, and the browser host takes its sounds with
   `init_scheduler_graph_with_sounds(drum~, instrument~)`.
 
+### Changed
+
+- Every Mini parser reads call, method, callback, and signal names through
+  one closed set of names per position (ADR-0023), and the names a `let`
+  binding may not take derive from them: `let silence = …` and
+  `let bpm = …` are now mistakes.
+
 ### Fixed
 
 - Notation that is valid but over a playback limit, such as
