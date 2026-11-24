@@ -107,7 +107,8 @@ fn played_on(
   match event.sound {
     Note(_, pitch~) => { ..event, sound: Note(instrument, pitch~), }
     // Unreachable: a `NoteDoc` holds no hits. Pattern queries run on the
-    // audio thread, so the event stays as it is instead of aborting.
+    // audio thread, so the event stays as it is instead of aborting. A
+    // payload that rules out hits is rejected in ADR-0022.
     Hit(_) => event
   }
 }

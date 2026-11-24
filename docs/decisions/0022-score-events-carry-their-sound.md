@@ -171,6 +171,24 @@ which every node of that payload shares.
 - **One pattern per pool**, so events need not name their sound. Repeats the
   score's structure and its query once per pool, and random transforms such
   as `degradeBy` must agree across the copies. Rejected.
+- **Give notes a payload of their own** (`NoteEvent`), so a document that
+  `.s` applies to cannot hold a hit. `played_on`, the `apply` of `.s`'s
+  `merge_values`, would then have no case for a hit; today it leaves one as
+  it is, a case the compiler never reaches because only a `NoteDoc` takes
+  instruments, and it cannot abort, because pattern queries run on the
+  audio thread. Notes would have to become `ScoreEvent` wherever they join
+  drums and at the root of a body or section, through a document node that
+  holds a `PatternDoc[NoteEvent]` inside a `PatternDoc[ScoreEvent]`. MoonBit
+  has no existential types and no trait methods with type parameters, so
+  that node cannot lower its nested document generically over the origin
+  type: it would need one closure per origin type and a selector passed
+  through every lowering call. The nested document would also fall outside
+  the lowering cache, which is typed by payload, so a score of only notes
+  would be lowered from scratch on every edit unless a second cache were
+  added. The guarantee belongs to the score language, which already gives
+  it as the type `NoteDoc`; carrying it into the generic document layer
+  would cost more than the one unreachable case it removes. Rejected while
+  the language lacks existential types.
 - **Remove `Note` from `Control` too.** Then voice bindings need a second key
   type for parameters the engine applies, which also covers `Decay` and
   `Sustain`. Deferred; `Note` in a `ControlMap` is unreachable from Mini.
