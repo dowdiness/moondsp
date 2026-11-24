@@ -23,6 +23,14 @@ pub(all) enum Control {
   Sustain
   /// Seconds.
   Hold
+  /// Where a sample starts, as a fraction of its waveform (0–1). Fixed at
+  /// onset (ADR-0026 Decision 4).
+  Begin
+  /// Where a sample stops, as a fraction of its waveform (0–1). Fixed at
+  /// onset.
+  End
+  /// A sample's playback-rate multiplier; a negative speed plays backwards.
+  Speed
   /// The number of the sample a sampler voice plays. Like `Note`, the
   /// scheduler sets it from the event's sound at note-on and no score method
   /// names it (ADR-0026 Decision 1).
@@ -47,6 +55,9 @@ pub fn Control::name(self : Control) -> String {
     Decay => "decay"
     Sustain => "sustain"
     Hold => "hold"
+    Begin => "begin"
+    End => "end"
+    Speed => "speed"
     SampleNumber => "sample_number"
     Release => "release"
   }
@@ -75,8 +86,11 @@ pub impl Hash for Control with fn hash(self) {
     Decay => 9
     Sustain => 10
     Hold => 11
-    SampleNumber => 12
-    Release => 13
+    Begin => 12
+    End => 13
+    Speed => 14
+    SampleNumber => 15
+    Release => 16
   }
 }
 
@@ -102,6 +116,9 @@ pub fn Control::all() -> FixedArray[Control] {
     Decay,
     Sustain,
     Hold,
+    Begin,
+    End,
+    Speed,
     SampleNumber,
     Release,
   ]
@@ -141,8 +158,36 @@ pub fn Control::nesting(self : Control) -> Nesting {
     | Decay
     | Sustain
     | Hold
+    | Begin
+    | End
+    | Speed
     | SampleNumber
     | Release => Override
+  }
+}
+
+///|
+/// Whether a sounding voice keeps following this control when its value
+/// varies (ADR-0026 Decision 4); the only place that states it. A control
+/// that does not follow keeps its onset value: moving where a sample starts
+/// or stops, or which sample plays, would jump within or between waveforms.
+pub fn Control::follows(self : Control) -> Bool {
+  match self {
+    Begin | End | SampleNumber => false
+    Note
+    | Gain
+    | Pan
+    | Room
+    | Lpf
+    | LpfResonance
+    | Hpf
+    | HpfResonance
+    | Attack
+    | Decay
+    | Sustain
+    | Hold
+    | Speed
+    | Release => true
   }
 }
 
@@ -157,7 +202,8 @@ pub const MAX_SECONDS : Double = 86400.0
 pub fn Control::admits(self : Control, value : Double) -> Bool {
   match self {
     Attack | Hold | Release => value >= 0.0 && value <= MAX_SECONDS
-    Room => value >= 0.0 && value <= 1.0
+    Room | Begin | End => value >= 0.0 && value <= 1.0
+    Speed => !value.is_nan() && !value.is_inf()
     LpfResonance | HpfResonance => value > 0.0 && !value.is_inf()
     Note | Gain | Pan | Lpf | Hpf | Decay | Sustain => !value.is_nan()
     SampleNumber => value >= 0.0 && value == value.floor() && !value.is_inf()

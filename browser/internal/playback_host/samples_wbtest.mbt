@@ -125,3 +125,35 @@ test "scores play bank samples through s and .s, shaped by lpf and gain" {
   let root = sample_score_energy("note(\"69\").slow(40).s(\"ping\").lpf(300)")
   assert_true(low > root * 2.0)
 }
+
+///|
+test "begin, end and speed slice and pace a sample from the score" {
+  load_sine_for_test(@score.Sample::parse("ping").unwrap().number())
+  // The window is 48 blocks, 6,144 samples, of the one-second sine.
+  let whole = sample_score_energy("s(\"ping\").slow(40)")
+  // `end(0.05)` stops after 2,400 samples; `begin(0.98)` plays the last 960.
+  let ended = sample_score_energy("s(\"ping\").slow(40).end(0.05)")
+  let begun = sample_score_energy("s(\"ping\").slow(40).begin(0.98)")
+  assert_true((ended / whole - 2400.0 / 6144.0).abs() < 0.02)
+  assert_true((begun / whole - 960.0 / 6144.0).abs() < 0.02)
+  // Backwards from the end fills the window as forwards does.
+  let backwards = sample_score_energy("s(\"ping\").slow(40).speed(-1)")
+  assert_true((backwards / whole - 1.0).abs() < 0.02)
+  // Twice as fast reads 440 Hz as 880 Hz: still a full window of sine.
+  let fast = sample_score_energy("s(\"ping\").slow(40).speed(2)")
+  assert_true((fast / whole - 1.0).abs() < 0.02)
+  // Within `end(0.05)`, speed 2 reads its 2,400 samples in 1,200 and speed
+  // 0.5 in 4,800, so speed reaches the sampler voice.
+  let ended_fast = sample_score_energy(
+    "s(\"ping\").slow(40).end(0.05).speed(2)",
+  )
+  let ended_slow = sample_score_energy(
+    "s(\"ping\").slow(40).end(0.05).speed(0.5)",
+  )
+  assert_true((ended_fast / ended - 0.5).abs() < 0.02)
+  assert_true((ended_slow / ended - 2.0).abs() < 0.04)
+  assert_eq(
+    sample_score_energy("s(\"ping\").slow(40).begin(0.5).end(0.25)"),
+    0.0,
+  )
+}

@@ -48,6 +48,8 @@ fn process_node_block(
         number=node.value0(),
         pitch=node.value1(),
         speed=node.value2(),
+        begin=node.value3(),
+        end=node.value4(),
       )
     Adsr => graph.env_states[index].unwrap().process(context, buffer)
     Biquad => {

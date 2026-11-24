@@ -573,8 +573,9 @@ pub fn BoundVoicePool::follow(
 /// their bindings' units, and voice-frame keys set the new voice's frame. Keys
 /// this pool does not bind are ignored.
 ///
-/// Each key whose value varies keeps following it while the voice sounds;
-/// `update_follows` applies it.
+/// Each key whose value varies keeps following it while the voice sounds,
+/// unless the key is fixed at onset (`Control::follows`); `update_follows`
+/// applies it.
 pub fn[C : @control.ControlSource] BoundVoicePool::note_on(
   self : BoundVoicePool,
   controls : C,
@@ -607,6 +608,9 @@ pub fn[C : @control.ControlSource] BoundVoicePool::note_on(
     })
     let slot = self.pool.slots[handle.slot]
     controls.each_varying((key, read) => {
+      // A control fixed at onset gets no follower, so it costs nothing per
+      // block (ADR-0026 Decision 4).
+      guard key.follows() else { return }
       guard self.follower(key, read) is Some(follower) else { return }
       slot.follows.push(follower)
       // The voice already holds its onset value, so only a change applies.

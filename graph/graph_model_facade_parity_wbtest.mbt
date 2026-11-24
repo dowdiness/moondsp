@@ -225,6 +225,7 @@ fn parity_slot_cases() -> Array[(String, GraphParamSlot, @model.GraphParamSlot)]
     ("Value1", GraphParamSlot::Value1, @model.GraphParamSlot::Value1),
     ("Value2", GraphParamSlot::Value2, @model.GraphParamSlot::Value2),
     ("Value3", GraphParamSlot::Value3, @model.GraphParamSlot::Value3),
+    ("Value4", GraphParamSlot::Value4, @model.GraphParamSlot::Value4),
     (
       "DelaySamples",
       GraphParamSlot::DelaySamples,

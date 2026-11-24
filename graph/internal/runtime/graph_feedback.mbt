@@ -84,6 +84,8 @@ fn CompiledGraph::process_feedback_graph_impl(
               number=node.value0(),
               pitch=node.value1(),
               speed=node.value2(),
+              begin=node.value3(),
+              end=node.value4(),
             )
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)

@@ -44,6 +44,7 @@ pub(all) enum GraphParamSlot {
   Value1
   Value2
   Value3
+  Value4
   DelaySamples
 }
 
@@ -170,6 +171,11 @@ pub fn DspNode::value3(self : DspNode) -> Double {
 }
 
 ///|
+pub fn DspNode::value4(self : DspNode) -> Double {
+  self.raw.value4()
+}
+
+///|
 pub fn DspNode::waveform(self : DspNode) -> Waveform {
   self.raw.waveform()
 }
@@ -220,14 +226,20 @@ pub fn DspNode::noise(seed : UInt32) -> DspNode {
 
 ///|
 /// Create a node that plays sample `number` of the compile context's sample
-/// store at MIDI `pitch`, times `speed` (ADR-0026). Slots: `Value0` number,
-/// `Value1` pitch, `Value2` speed.
+/// store at MIDI `pitch`, times `speed`, from `begin` to `end` as fractions
+/// of the waveform (ADR-0026). Slots: `Value0` number, `Value1` pitch,
+/// `Value2` speed, `Value3` begin, `Value4` end. A voice reads `begin` and
+/// `end` once, when it starts its waveform.
 pub fn DspNode::sample_player(
   number~ : Double,
   pitch~ : Double,
   speed~ : Double,
+  begin~ : Double = 0.0,
+  end~ : Double = 1.0,
 ) -> DspNode {
-  DspNode::from_model(@model.DspNode::sample_player(number~, pitch~, speed~))
+  DspNode::from_model(
+    @model.DspNode::sample_player(number~, pitch~, speed~, begin~, end~),
+  )
 }
 
 ///|
@@ -443,6 +455,7 @@ fn GraphParamSlot::to_model(self : GraphParamSlot) -> @model.GraphParamSlot {
     Value1 => @model.GraphParamSlot::Value1
     Value2 => @model.GraphParamSlot::Value2
     Value3 => @model.GraphParamSlot::Value3
+    Value4 => @model.GraphParamSlot::Value4
     DelaySamples => @model.GraphParamSlot::DelaySamples
   }
 }
@@ -454,6 +467,7 @@ fn graph_param_slot_from_model(slot : @model.GraphParamSlot) -> GraphParamSlot {
     @model.GraphParamSlot::Value1 => GraphParamSlot::Value1
     @model.GraphParamSlot::Value2 => GraphParamSlot::Value2
     @model.GraphParamSlot::Value3 => GraphParamSlot::Value3
+    @model.GraphParamSlot::Value4 => GraphParamSlot::Value4
     @model.GraphParamSlot::DelaySamples => GraphParamSlot::DelaySamples
   }
 }

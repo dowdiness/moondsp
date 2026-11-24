@@ -285,6 +285,30 @@ test "room send must stay between zero and one" {
 }
 
 ///|
+test "begin, end and speed take numbers, patterns and signals in their domains" {
+  for
+    source in [
+      "s(\"ping\").begin(0.25).end(0.75).speed(-1)", "s(\"ping*4\").begin(\"0 0.25 0.5 0.75\")",
+      "note(\"C4\").s(\"ping\").speed(sine.range(0.5, 2))",
+    ] {
+    assert_true(@mini.parse(source) is Ok(_), msg=source)
+  }
+  for
+    case in [
+      ("s(\"ping\").begin(1.5)", "begin() expects a fraction between 0 and 1"),
+      ("s(\"ping\").end(-0.1)", "end() expects a fraction between 0 and 1"),
+      (
+        "s(\"ping\").begin(sine.range(0, 2))", "begin() expects a fraction between 0 and 1",
+      ),
+    ] {
+    match @mini.parse(case.0) {
+      Ok(_) => fail("expected \{case.0} to fail")
+      Err(message) => assert_true(message.contains(case.1), msg=message)
+    }
+  }
+}
+
+///|
 test "parse_snapshot lowers mini output through PatternDoc" {
   let snapshot = unwrap_mini_snapshot(@mini.parse_snapshot("s(\"bd sd\")"))
   inspect(
@@ -2240,7 +2264,8 @@ test ".s keeps exact origins; default instruments keep chord tone paths" {
 test "methods_after names the methods the compiler accepts after a receiver" {
   let pattern = [
     "fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf",
-    "attack", "hold", "release", "gain", "pan", "room", "every", "jux",
+    "attack", "hold", "release", "gain", "pan", "room", "begin", "end", "speed",
+    "every", "jux",
   ]
   let notes = [..pattern, "s"]
   let song = "song(section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\"))"

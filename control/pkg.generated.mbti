@@ -25,11 +25,15 @@ pub(all) enum Control {
   Decay
   Sustain
   Hold
+  Begin
+  End
+  Speed
   SampleNumber
   Release
 }
 pub fn Control::admits(Self, Double) -> Bool
 pub fn Control::all() -> FixedArray[Self]
+pub fn Control::follows(Self) -> Bool
 pub fn Control::name(Self) -> String
 pub fn Control::nesting(Self) -> Nesting
 pub impl Hash for Control

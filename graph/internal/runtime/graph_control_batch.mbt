@@ -98,6 +98,7 @@ fn Dsp::resolve_targets(
           Value1 => node.value1()
           Value2 => node.value2()
           Value3 => node.value3()
+          Value4 => node.value4()
           DelaySamples => node.delay_samples().to_double()
         }
         guard model_node_param_valid(

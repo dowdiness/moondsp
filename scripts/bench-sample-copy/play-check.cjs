@@ -1,5 +1,6 @@
-// Real-browser check for ADR-0026 stage 4: built-in samples play through
-// s("…") and .s("…"), and .lpf and .gain shape them. It runs the production
+// Real-browser check for ADR-0026 stages 4 and 5: built-in samples play
+// through s("…") and .s("…"), .lpf and .gain shape them, and begin, end and
+// speed slice and pace them. It runs the production
 // scheduler-processor.js from web/live/public in a realtime AudioContext,
 // sends the bank exactly as web/live/src/audio.ts does (web/sample-bank.js),
 // waits for the status channel to report it loaded, then plays each score
@@ -26,10 +27,16 @@ const SCORES = [
   ['s("ping").lpf(200)', 's("ping").slow(4).lpf(200)'],
   ['note("69").s("ping").lpf(200)', 'note("69").slow(4).s("ping").lpf(200)'],
   ['s("burst")', 's("burst").slow(4)'],
+  ['s("ping").end(0.25)', 's("ping").slow(4).end(0.25)'],
+  ['s("ping").begin(0.5)', 's("ping").slow(4).begin(0.5)'],
+  ['s("ping").speed(-1)', 's("ping").slow(4).speed(-1)'],
+  ['s("ping").speed(2)', 's("ping").slow(4).speed(2)'],
+  ['s("ping").begin(0.5).end(0.25)', 's("ping").slow(4).begin(0.5).end(0.25)'],
   ['s("bd")', 's("bd").slow(4)'],
 ];
 
 const SUBCLASS = `
+const HEAD_BLOCKS = 37; // 0.1 s at 48 kHz
 class EnergyProcessor extends MoonDspSchedulerProcessor {
   constructor(options) {
     super(options);
@@ -37,15 +44,20 @@ class EnergyProcessor extends MoonDspSchedulerProcessor {
     this.blocks = -1;
     const handle = this.port.onmessage;
     this.port.onmessage = event => {
-      if (event.data?.type === 'measure') { this.energy = 0; this.blocks = event.data.blocks; return; }
+      if (event.data?.type === 'measure') { this.energy = 0; this.blocks = event.data.blocks; this.total = event.data.blocks; this.head = 0; return; }
       handle(event);
     };
   }
   process(inputs, outputs, parameters) {
     const result = super.process(inputs, outputs, parameters);
     if (this.blocks > 0) {
-      for (const x of outputs[0][0]) this.energy += x * x;
-      if (--this.blocks === 0) this.port.postMessage({ type: 'energy', energy: this.energy });
+      const out = outputs[0][0];
+      for (let i = 0; i < out.length; i++) {
+        const x = out[i];
+        this.energy += x * x;
+        if (this.total - this.blocks < HEAD_BLOCKS) this.head += x * x;
+      }
+      if (--this.blocks === 0) this.port.postMessage({ type: 'energy', energy: this.energy, head: this.head });
     }
     return result;
   }
@@ -84,37 +96,50 @@ server.listen(0, '127.0.0.1', async () => {
       });
       const waiters = [];
       const statuses = [];
+      const seen = [];
       node.port.onmessage = ({ data }) => {
+        seen.push(data.type);
+        if (data.type === 'error') for (const w of waiters.splice(0)) w.reject(new Error(data.message));
         if (data.type === 'sample-status') statuses.push(data);
         for (const w of [...waiters]) if (w.test(data)) { waiters.splice(waiters.indexOf(w), 1); w.resolve(data); }
       };
       const wait = test => new Promise((resolve, reject) => {
-        waiters.push({ test, resolve });
-        setTimeout(() => reject(new Error('timed out')), 10000);
+        waiters.push({ test, resolve, reject });
+        setTimeout(() => reject(new Error(`timed out; messages seen: ${seen.join(', ') || 'none'}`)), 30000);
       });
+      // Wait for `ready` before resuming: the worklet may send it before
+      // `resume()` settles, as the editor's `waitForReady` also allows.
+      const ready = wait(d => d.type === 'ready');
       node.connect(ctx.destination);
       await ctx.resume();
-      await wait(d => d.type === 'ready');
+      await ready;
       for (const load of sampleBank(ctx.sampleRate)) node.port.postMessage(load, [load.data.buffer]);
       await wait(d => d.type === 'sample-status' && d.loading.length === 0);
       const energies = {};
+      const heads = {};
       let id = 0;
       for (const [label, text] of scores) {
         const wire = JSON.stringify({ schema: 1, kind: 'text', text });
+        // A restart starts playing at cycle 0 in the block that handles it.
+        // Arm the window first, in message order on the audio thread, so it
+        // holds the first onset however long the receipt takes to return.
+        node.port.postMessage({ type: 'measure', blocks: Math.round(1.5 * 48000 / 128) });
+        const measured = wait(d => d.type === 'energy');
         node.port.postMessage({ type: 'player-restart', id: ++id, input: wire });
         const receipt = await wait(d => d.type === 'player-receipt' && d.id === id);
         if (!receipt.accepted) throw new Error(`${label}: ${receipt.message}`);
-        node.port.postMessage({ type: 'player-play', id: ++id });
-        await wait(d => d.type === 'player-receipt' && d.id === id);
-        node.port.postMessage({ type: 'measure', blocks: Math.round(1.5 * 48000 / 128) });
-        energies[label] = (await wait(d => d.type === 'energy')).energy;
+        if (receipt.state !== 'Playing') throw new Error(`${label}: restart left the player ${receipt.state}`);
+        const result = await measured;
+        energies[label] = result.energy;
+        heads[label] = result.head;
         node.port.postMessage({ type: 'player-pause', id: ++id });
         await wait(d => d.type === 'player-receipt' && d.id === id);
       }
       await ctx.close();
-      return { energies, statuses, ua: navigator.userAgent };
+      return { energies, heads, statuses, ua: navigator.userAgent };
     }, { subclass: SUBCLASS, scores: SCORES });
     const e = result.energies;
+    const h = result.heads;
     const checks = {
       sPlaysSample: e['s("ping")'] > 1,
       dotSPlaysSampleAtRoot: Math.abs(e['note("69").s("ping")'] / e['s("ping")'] - 1) < 0.05,
@@ -123,8 +148,20 @@ server.listen(0, '127.0.0.1', async () => {
       lpfCutsDotS: e['note("69").s("ping").lpf(200)'] < 0.1 * e['note("69").s("ping")'],
       burstPlays: e['s("burst")'] > 1,
       silenceSilent: e.silence === 0,
+      // ping decays, so its first quarter holds most of its energy and its
+      // second half little.
+      endKeepsHead: e['s("ping").end(0.25)'] < e['s("ping")'] && e['s("ping").end(0.25)'] > 0.8 * e['s("ping")'],
+      beginSkipsHead: e['s("ping").begin(0.5)'] > 0 && e['s("ping").begin(0.5)'] < 0.1 * e['s("ping")'],
+      // Backwards, ping starts from its decayed tail, so the first 0.1 s
+      // holds a small share of what it holds forwards; total energy alone
+      // cannot tell the directions apart.
+      backwardsPlays: e['s("ping").speed(-1)'] > 0.1 * e['s("ping")'] &&
+        h['s("ping").speed(-1)'] < 0.1 * h['s("ping")'],
+      // Twice as fast, the whole decay plays in half the time.
+      doubleSpeedHalves: Math.abs(e['s("ping").speed(2)'] / e['s("ping")'] - 0.5) < 0.02,
+      emptySliceSilent: e['s("ping").begin(0.5).end(0.25)'] === 0,
     };
-    console.log(JSON.stringify({ browser: browserName, ua: result.ua, energies: e, checks,
+    console.log(JSON.stringify({ browser: browserName, ua: result.ua, energies: e, heads: result.heads, checks,
       statuses: result.statuses.map(s => ({ loading: s.loading, overLimit: s.overLimit, unknown: s.unknown })) }));
     if (!Object.values(checks).every(Boolean)) process.exitCode = 1;
   } finally {

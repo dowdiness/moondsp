@@ -353,7 +353,7 @@ test "control nesting names every control's rule" {
   guard @json.parse(control_nesting()) is Object(rules) else {
     fail("expected a JSON object")
   }
-  assert_eq(rules.length(), 14)
+  assert_eq(rules.length(), 17)
   assert_eq(rules.get("gain"), Some(Json::string("multiply")))
   assert_eq(rules.get("lpf"), Some(Json::string("override")))
   assert_eq(rules.get("lpf_resonance"), Some(Json::string("override")))

@@ -379,7 +379,7 @@ fn invalid_compile_node(
       )
     Oscillator => invalid_oscillator_node(index, node, node_count)
     Noise => None
-    SamplePlayer => invalid_finite_params(index, node, 3)
+    SamplePlayer => invalid_finite_params(index, node, 5)
     Adsr => invalid_finite_params(index, node, 4)
     Biquad | StereoBiquad =>
       invalid_biquad_node(index, node, node_count, sample_rate)
@@ -425,6 +425,7 @@ fn invalid_finite_params(
     (GraphParamSlot::Value1, node.value1()),
     (GraphParamSlot::Value2, node.value2()),
     (GraphParamSlot::Value3, node.value3()),
+    (GraphParamSlot::Value4, node.value4()),
   ]
   for param in params[:count] {
     match invalid_finite_param(index, node.kind(), param.0, param.1) {

@@ -1,6 +1,6 @@
 # ADR-0026: Scores play recorded samples
 
-- **Status:** Accepted 2026-11-24. Stages 3 and 4 are implemented.
+- **Status:** Accepted 2026-11-24. Stages 3 to 5 are implemented.
 - **Date:** 2026-11-24
 - **Source:** [Amp thread T-01a20be3](https://ampcode.com/threads/T-01a20be3-8157-751b-b637-37a8a4bda36b)
 - **Related:** [ADR-0019 automatic control buses](0019-automatic-control-buses.md),
@@ -274,7 +274,13 @@ used as names in `mini`, `control`, or `score` today.
    ([record](../performance/2026-11-24-sample-copy.md#stage-4-loading-while-a-realtime-context-plays)).
    The editor's vocabulary lists the samples, so completion offers them in
    both strings. Not done: reclaiming a replaced waveform's memory.
-5. `begin`, `end`, and `speed`, and the `follows` rule.
+5. `begin`, `end`, and `speed`, and the `follows` rule. Done. `DspNode`
+   gains `value4` and `GraphParamSlot` gains `Value4`: the player takes
+   speed on `Value2`, begin on `Value3` and end on `Value4`. `Value5` was not
+   needed. The slice covers waveform samples from `⌈begin × length⌉` up to,
+   not including, `⌈end × length⌉`, where a product within rounding error
+   of a whole sample counts as that sample; a negative speed starts at its
+   last sample.
 6. Samples declared in the score.
 
 ## Not covered

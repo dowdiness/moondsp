@@ -26,3 +26,18 @@ test "admits states each control's domain at its boundaries" {
   assert_true(@control.Control::Gain.admits(-3.0))
   assert_false(@control.Control::Note.admits(nan))
 }
+
+///|
+test "begin, end and the sample number are fixed at onset; the rest follow" {
+  for control in @control.Control::all() {
+    let fixed = control is (Begin | End | SampleNumber)
+    assert_eq(control.follows(), !fixed, msg=control.name())
+  }
+  assert_true(@control.Control::Begin.admits(0.0))
+  assert_true(@control.Control::End.admits(1.0))
+  assert_false(@control.Control::Begin.admits(-0.001))
+  assert_false(@control.Control::End.admits(1.001))
+  assert_true(@control.Control::Speed.admits(-2.0))
+  assert_false(@control.Control::Speed.admits(1.0 / 0.0))
+  assert_false(@control.Control::Speed.admits(0.0 / 0.0))
+}

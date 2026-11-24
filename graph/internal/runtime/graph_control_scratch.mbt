@@ -93,6 +93,7 @@ fn copy_node_parameters(
   @model.set_node_value1(target, source.value1())
   @model.set_node_value2(target, source.value2())
   @model.set_node_value3(target, source.value3())
+  @model.set_node_value4(target, source.value4())
   @model.set_node_delay_samples(target, source.delay_samples())
 }
 

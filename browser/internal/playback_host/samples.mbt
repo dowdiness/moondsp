@@ -184,7 +184,10 @@ fn make_sample_pool(
         node_index=0,
         slot=@moondsp.GraphParamSlot::Value0,
       )
-      .bind(key=Note, node_index=0, slot=@moondsp.GraphParamSlot::Value1),
+      .bind(key=Note, node_index=0, slot=@moondsp.GraphParamSlot::Value1)
+      .bind(key=Speed, node_index=0, slot=@moondsp.GraphParamSlot::Value2)
+      .bind(key=Begin, node_index=0, slot=@moondsp.GraphParamSlot::Value3)
+      .bind(key=End, node_index=0, slot=@moondsp.GraphParamSlot::Value4),
       max_voices=voice.voices,
     ),
   ) catch {

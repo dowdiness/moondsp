@@ -4,7 +4,8 @@
 /// The player takes its waveform from the store the first time it renders
 /// after a reset, or when its sample number changes, and keeps it: a waveform
 /// the store replaces later plays to its end. Its state is that waveform and
-/// a read position, and `reset` clears both.
+/// a read position, and `reset` clears both. It reads `begin` and `end` at
+/// the same moment, so a voice's slice is fixed at its onset.
 pub struct SamplePlayer {
   priv store : SampleStore
   priv mut bound : Bool
@@ -12,6 +13,10 @@ pub struct SamplePlayer {
   priv mut start : Int32
   /// 0 when the sample number had no waveform.
   priv mut length : Int32
+  /// The slice that plays: waveform samples `first` to `last`, inclusive.
+  /// Empty when `last < first`.
+  priv mut first : Int32
+  priv mut last : Int32
   priv mut root : Double
   priv mut position : Double
   /// Whether `rate` was computed from `pitch` and `speed` and the root.
@@ -30,6 +35,8 @@ pub fn SamplePlayer::SamplePlayer(store : SampleStore) -> SamplePlayer {
     number: 0.0,
     start: 0,
     length: 0,
+    first: 0,
+    last: -1,
     root: 0.0,
     position: 0.0,
     rate_known: false,
@@ -46,6 +53,8 @@ pub fn SamplePlayer::reset(self : SamplePlayer) -> Unit {
   self.number = 0.0
   self.start = 0
   self.length = 0
+  self.first = 0
+  self.last = -1
   self.root = 0.0
   self.position = 0.0
   self.rate_known = false
@@ -65,6 +74,8 @@ pub fn SamplePlayer::copy_state_from(
     self.number = source.number
     self.start = source.start
     self.length = source.length
+    self.first = source.first
+    self.last = source.last
     self.root = source.root
     self.position = source.position
     self.rate_known = source.rate_known
@@ -79,6 +90,8 @@ fn SamplePlayer::bind(
   self : SamplePlayer,
   number : Double,
   speed : Double,
+  begin : Double,
+  end : Double,
 ) -> Unit {
   let store = self.store
   let entry = number.to_int()
@@ -93,25 +106,60 @@ fn SamplePlayer::bind(
     self.length = 0
     self.root = 0.0
   }
-  self.position = if speed < 0.0 { (self.length - 1).to_double() } else { 0.0 }
+  // The slice covers samples from `begin × length` up to, not including,
+  // `end × length`, clamped to the waveform.
+  self.first = slice_bound(begin, self.length)
+  self.last = slice_bound(end, self.length) - 1
+  self.position = if speed < 0.0 {
+    self.last.to_double()
+  } else {
+    self.first.to_double()
+  }
   // The root may differ, so the next tick recomputes the rate.
   self.rate_known = false
+}
+
+///|
+/// The first waveform sample at or after `fraction` of `length` samples,
+/// with `fraction` clamped to 0–1. A product within rounding error of a whole
+/// sample counts as that sample, so `0.07 × 100`, which is
+/// 7.000000000000001 in doubles, is sample 7 rather than 8.
+fn slice_bound(fraction : Double, length : Int32) -> Int32 {
+  let clamped = if fraction < 0.0 {
+    0.0
+  } else if fraction > 1.0 {
+    1.0
+  } else {
+    fraction
+  }
+  let position = clamped * length.to_double()
+  let nearest = position.round()
+  let snapped = if (position - nearest).abs() <= 1.0e-9 * (nearest + 1.0) {
+    nearest
+  } else {
+    position.ceil()
+  }
+  snapped.to_int()
 }
 
 ///|
 /// The next sample of sample `number` at MIDI pitch `pitch`, times `speed`,
 /// read from the read position with linear interpolation. A waveform plays at
 /// its recorded rate at its root pitch and speed 1; a negative speed plays
-/// backwards. Outside the first and last samples, or for a number with no
+/// backwards. Only the slice from `begin` to `end`, as fractions of the
+/// waveform, plays; they are read when the waveform is bound, so later
+/// changes do not move the voice. Outside the slice, or for a number with no
 /// waveform, it is 0.
 pub fn SamplePlayer::tick(
   self : SamplePlayer,
   number~ : Double,
   pitch~ : Double,
   speed~ : Double,
+  begin~ : Double = 0.0,
+  end~ : Double = 1.0,
 ) -> Double {
   if !self.bound || self.number != number {
-    self.bind(number, speed)
+    self.bind(number, speed, begin, end)
   }
   if !self.rate_known || pitch != self.pitch || speed != self.speed {
     self.rate_known = true
@@ -121,8 +169,9 @@ pub fn SamplePlayer::tick(
     self.rate = if is_finite(rate) { rate } else { 0.0 }
   }
   let position = self.position
-  let last = self.length - 1
-  guard position >= 0.0 && position <= last.to_double() else { return 0.0 }
+  guard position >= self.first.to_double() && position <= self.last.to_double() else {
+    return 0.0
+  }
   let memory = self.store.memory
   let whole = position.to_int()
   let fraction = position - whole.to_double()
@@ -131,7 +180,8 @@ pub fn SamplePlayer::tick(
   if fraction == 0.0 {
     current
   } else {
-    // A fractional position at most `last` lies before the last sample.
+    // A fractional position at most `last` lies before the slice's last
+    // sample, which lies in the waveform.
     let next = memory[self.start + whole + 1].to_double()
     current + (next - current) * fraction
   }
@@ -146,10 +196,12 @@ pub fn SamplePlayer::process(
   number~ : Double,
   pitch~ : Double,
   speed~ : Double,
+  begin~ : Double = 0.0,
+  end~ : Double = 1.0,
 ) -> Unit {
   let sample_count = effective_sample_count(context, output)
   for index in 0..<sample_count {
-    output.set(index, self.tick(number~, pitch~, speed~))
+    output.set(index, self.tick(number~, pitch~, speed~, begin~, end~))
   }
   for index in sample_count..<output.length() {
     output.set(index, 0.0)

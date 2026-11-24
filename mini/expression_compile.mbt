@@ -46,6 +46,8 @@ fn control_domain_message(key : @control.Control) -> String {
     Attack | Hold | Release =>
       "\{key}() expects seconds between 0 and \{@control.MAX_SECONDS}"
     Room => "room() expects a send between 0 and 1"
+    Begin | End => "\{key}() expects a fraction between 0 and 1"
+    Speed => "speed() expects a finite number"
     LpfResonance => "lpf() expects finite resonance above 0"
     HpfResonance => "hpf() expects finite resonance above 0"
     Note | Gain | Pan | Lpf | Hpf | Decay | Sustain | SampleNumber =>

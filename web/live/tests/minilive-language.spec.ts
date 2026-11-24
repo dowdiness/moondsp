@@ -259,7 +259,7 @@ test("completion offers each position's names from the vocabulary", () => {
     ['s("|', ["bd", "sd", "cp", "hh", "oh", "ping", "burst"]],
     ['note("C4").s("|', ["triangle", "bass", "pad", "pluck", "sawtooth", "ping", "burst"]],
     ['note("|', null],
-    ['note("C4").|', ["fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "every", "jux", "s"]],
+    ['note("C4").|', ["fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "begin", "end", "speed", "every", "jux", "s"]],
   ] as const) {
     expect(offered(source, language), source).toEqual(expected);
   }

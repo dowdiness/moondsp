@@ -84,9 +84,15 @@ let sample_player_probe_context : @ref.Ref[@moondsp.DspContext] = Ref(
 
 ///|
 /// Register one second of a 440 Hz sine as sample 0, root pitch 69, and
-/// compile a sample player of it at `pitch` and `speed` at 48 kHz in blocks
-/// of 128, for the allocation audit. Returns 1, or 0 when compiling fails.
-pub fn sample_player_probe_init(pitch : Double, speed : Double) -> Int32 {
+/// compile a sample player of it at `pitch` and `speed`, playing the slice
+/// from `begin` to `end`, at 48 kHz in blocks of 128, for the allocation
+/// audit. Returns 1, or 0 when compiling fails.
+pub fn sample_player_probe_init(
+  pitch : Double,
+  speed : Double,
+  begin : Double,
+  end : Double,
+) -> Int32 {
   let store = @moondsp.SampleStore(entries=1, max_length=48000, capacity=48000)
   let sine = FixedArray::makei(48000, index => {
     Float::from_double(
@@ -102,7 +108,7 @@ pub fn sample_player_probe_init(pitch : Double, speed : Double) -> Int32 {
   sample_player_probe_context.val = context
   sample_player_probe_graph.val = @moondsp.Dsp::compile(
     @moondsp.AnalyzedGraph::analyze([
-      @moondsp.DspNode::sample_player(number=0.0, pitch~, speed~),
+      @moondsp.DspNode::sample_player(number=0.0, pitch~, speed~, begin~, end~),
       @moondsp.DspNode::output(0),
     ]),
     context,

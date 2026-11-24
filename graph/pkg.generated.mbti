@@ -180,7 +180,7 @@ pub fn DspNode::oscillator(@dsp.Waveform, Double) -> Self
 pub fn DspNode::oscillator_from(Int32, @dsp.Waveform) -> Self
 pub fn DspNode::output(Int32) -> Self
 pub fn DspNode::pan(Int32, Double) -> Self
-pub fn DspNode::sample_player(number~ : Double, pitch~ : Double, speed~ : Double) -> Self
+pub fn DspNode::sample_player(number~ : Double, pitch~ : Double, speed~ : Double, begin? : Double, end? : Double) -> Self
 pub fn DspNode::seed(Self) -> UInt32
 pub fn DspNode::signal_shape(Self) -> Int32
 pub fn DspNode::stereo_biquad(input~ : Int32, mode~ : @dsp.BiquadMode, cutoff_hz~ : Double, q~ : Double) -> Self
@@ -193,6 +193,7 @@ pub fn DspNode::value0(Self) -> Double
 pub fn DspNode::value1(Self) -> Double
 pub fn DspNode::value2(Self) -> Double
 pub fn DspNode::value3(Self) -> Double
+pub fn DspNode::value4(Self) -> Double
 pub fn DspNode::waveform(Self) -> @dsp.Waveform
 pub impl NodeEditable for DspNode
 pub impl NodeFoldable for DspNode
@@ -369,6 +370,7 @@ pub(all) enum GraphParamSlot {
   Value1
   Value2
   Value3
+  Value4
   DelaySamples
 }
 pub fn GraphParamSlot::equal(Self, Self) -> Bool

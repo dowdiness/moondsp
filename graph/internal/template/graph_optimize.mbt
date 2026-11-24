@@ -6,6 +6,7 @@ fn has_runtime_control_identity(node : @model.DspNode) -> Bool {
   @model.node_accepts_slot(node, @model.GraphParamSlot::Value1) ||
   @model.node_accepts_slot(node, @model.GraphParamSlot::Value2) ||
   @model.node_accepts_slot(node, @model.GraphParamSlot::Value3) ||
+  @model.node_accepts_slot(node, @model.GraphParamSlot::Value4) ||
   @model.node_accepts_slot(node, @model.GraphParamSlot::DelaySamples)
 }
 

@@ -176,6 +176,9 @@ fn Method::follows(self : Method, score : Score) -> Bool {
     | Gain
     | Pan
     | Room
+    | Begin
+    | End
+    | Speed
     | Every
     | Jux => true
   }

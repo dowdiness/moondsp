@@ -199,9 +199,9 @@ pub struct SamplePlayer {
 }
 pub fn SamplePlayer::SamplePlayer(SampleStore) -> Self
 pub fn SamplePlayer::copy_state_from(Self, Self) -> Unit
-pub fn SamplePlayer::process(Self, DspContext, AudioBuffer, number~ : Double, pitch~ : Double, speed~ : Double) -> Unit
+pub fn SamplePlayer::process(Self, DspContext, AudioBuffer, number~ : Double, pitch~ : Double, speed~ : Double, begin? : Double, end? : Double) -> Unit
 pub fn SamplePlayer::reset(Self) -> Unit
-pub fn SamplePlayer::tick(Self, number~ : Double, pitch~ : Double, speed~ : Double) -> Double
+pub fn SamplePlayer::tick(Self, number~ : Double, pitch~ : Double, speed~ : Double, begin? : Double, end? : Double) -> Double
 
 pub struct SampleStore {
   // private fields

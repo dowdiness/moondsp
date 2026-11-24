@@ -141,7 +141,10 @@ renders 1,000 blocks of 128 frames in four cases:
 - root pitch at speed 1, which reaches the end of the waveform after 375 blocks;
 - pitch 62 at speed 1.5, which interpolates;
 - speed −1;
-- a `reset_runtime_state` every 50 blocks, which binds the waveform again.
+- a `reset_runtime_state` every 50 blocks, which binds the waveform again;
+- stage 5: a `begin`/`end` slice, forwards and backwards, with the same
+  resets, so each bind computes the slice. Rerun after stage 5 added
+  `begin` and `end`.
 
 | Case | Constructions while rendering | Energy, counted = reference |
 |---|---:|---:|
@@ -149,6 +152,8 @@ renders 1,000 blocks of 128 frames in four cases:
 | Pitch 62, speed 1.5 | 0 | 23,959.7 |
 | Speed −1 | 0 | 24,000.0 |
 | Reset every 50 blocks | 0 | 63,917.4 |
+| Slice 0.25–0.75, reset every 50 blocks (stage 5) | 0 | 63,917.4 |
+| Slice 0.25–0.75 backwards, reset every 50 blocks (stage 5) | 0 | 63,932.4 |
 
 Building the store and graph is the positive control: its counters are
 nonzero. The instrumented output matched the uninstrumented build exactly.
@@ -262,3 +267,54 @@ NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/play-check.cjs ch
 
 Chromium only. Firefox and Safari remain required before the browser path is
 called done.
+
+## Stage 5: begin, end and speed in a realtime context
+
+Measured 2026-11-24 after `begin`, `end` and `speed` landed, with the same
+[`play-check.cjs`](../../scripts/bench-sample-copy/play-check.cjs) run in
+Chromium 159. Energies over 1.5 s; `s("ping")` alone is 32.84.
+
+| Score | Energy | Ratio |
+|---|---:|---:|
+| `s("ping").end(0.25)` | 31.19 | 0.950 |
+| `s("ping").begin(0.5)` | 0.081 | 0.002 |
+| `s("ping").speed(-1)` | 32.96 | 1.004 |
+| `s("ping").speed(2)` | 16.37 | 0.498 |
+| `s("ping").begin(0.5).end(0.25)` | 0 | 0 |
+
+`ping` decays, so its first quarter holds 95% of its energy and its second
+half 0.2%. Backwards it holds the same total energy, so the harness also sums
+the first 0.1 s (37 blocks): backwards that is 0.00001× of forwards (17.85),
+because the reversed ping starts from its decayed tail. Twice as fast, the
+whole decay plays in half the time. A slice whose `begin` is not before its
+`end` is silent.
+
+Total energy alone could not tell whether `speed` reached the sampler voice.
+With the `Speed` binding removed from the browser pool, the backwards and
+double-speed checks now fail, and they pass with it.
+
+The render-path allocation audit was rerun with two slice cases; see
+[No construction while a sample player renders](#no-construction-while-a-sample-player-renders).
+
+### Firefox, and a harness correction
+
+`play-check.cjs` was then run in Firefox 159 (Playwright). Every score, in
+stages 4 and 5, gave the same energy as in Chromium to the last digit.
+
+Two harness races turned up first, and both are fixed:
+
+- **Measuring window.** A `player-restart` starts playing at cycle 0 in the
+  block that handles it. The harness opened its measuring window only after
+  the restart's receipt came back. In Chromium the receipt returned within
+  the same block, so the earlier figures stand. In Firefox it took about 7
+  blocks (cycle 0.0093 at Play), so the start of each note fell before the
+  window and `s("ping")` read 24–28 instead of 32.84. The window now opens
+  before the restart, in message order on the audio thread. The one figure
+  this changed is `begin(0.5)`, from 0.075 to 0.081.
+- **`ready` before `resume()`.** The harness registered its wait for
+  `ready` after `await ctx.resume()`. In Firefox the worklet sometimes sent
+  `ready` first, and the run timed out (2 of 7 runs). It now waits before
+  resuming. The editor already does this (`waitForReady` in
+  `web/live/src/audio.ts`), and so does `loading-check.cjs`.
+
+Safari still needs its own run on a Mac.

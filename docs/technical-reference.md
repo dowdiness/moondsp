@@ -814,6 +814,7 @@ Current `set_param(node_index, slot, value)` support matrix:
 | `Oscillator` | `Value0` | Finite frequency values only |
 | `Oscillator` (FM mode) | none | FM mode: frequency comes from input buffer, no runtime freq param |
 | `Noise` | none | No runtime seed update yet |
+| `SamplePlayer` | `Value0`–`Value4` | Sample number, MIDI pitch, speed, begin, end (ADR-0026). Finite values only. The player reads the number, begin and end when it starts a waveform, after a reset or when the number changes; pitch and speed apply while it plays |
 | `Adsr` | `Value0`–`Value3` | Attack ms, decay ms, sustain level, release ms. Times must be finite and nonnegative; sustain is in `[0, 1]`. Parameter changes preserve stage and level; note-on applies settings before opening the gate. |
 | `Biquad` | `Value0`, `Value1` | `Value0 = cutoff`, `Value1 = q`; validated against the compile-time sample rate |
 | `Delay` | `Value0`, `DelaySamples` | `Value0 = feedback`; finite values in `[-0.99, 0.99]` only. `DelaySamples` requires exact integer values. Both are applied to the live `DelayLine` state |

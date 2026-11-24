@@ -75,7 +75,10 @@ test "a sample player rejects non-finite params at compile and at runtime" {
   ).unwrap()
   assert_true(graph.set_param_bool(0, @graph.GraphParamSlot::Value2, 2.0))
   assert_true(!graph.set_param_bool(0, @graph.GraphParamSlot::Value1, nan))
-  assert_true(!graph.set_param_bool(0, @graph.GraphParamSlot::Value3, 1.0))
+  assert_true(!graph.set_param_bool(0, @graph.GraphParamSlot::Value4, nan))
+  assert_true(
+    !graph.set_param_bool(0, @graph.GraphParamSlot::DelaySamples, 1.0),
+  )
 }
 
 ///|

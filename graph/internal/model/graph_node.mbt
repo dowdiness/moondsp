@@ -37,6 +37,7 @@ pub(all) enum GraphParamSlot {
   Value1
   Value2
   Value3
+  Value4
   DelaySamples
 }
 
@@ -118,7 +119,7 @@ pub fn GraphControl::value(self : GraphControl) -> Double {
 ///|
 /// Flat graph node representation for compiled DSP graphs.
 ///
-/// Design decision: DspNode uses a flat struct with generic fields (value0-value3)
+/// Design decision: DspNode uses a flat struct with generic fields (value0-value4)
 /// rather than per-kind structs or a tagged union with payloads. This is deliberate:
 ///
 /// 1. **Flat memory layout** — all nodes are the same size, enabling fixed-array
@@ -140,6 +141,7 @@ pub struct DspNode {
   priv mut value1 : Double
   priv mut value2 : Double
   priv mut value3 : Double
+  priv mut value4 : Double
   priv waveform : Waveform
   priv filter_mode : BiquadMode
   priv delay_max_samples : Int32
@@ -156,6 +158,7 @@ fn DspNode::DspNode(
   value1 : Double,
   value2 : Double,
   value3 : Double,
+  value4 : Double,
   waveform : Waveform,
   filter_mode : BiquadMode,
   delay_max_samples : Int32,
@@ -170,6 +173,7 @@ fn DspNode::DspNode(
     value1,
     value2,
     value3,
+    value4,
     waveform,
     filter_mode,
     delay_max_samples,
@@ -204,6 +208,7 @@ pub impl Eq for DspNode with fn equal(self, other) {
   graph_authoring_double_equal(self.value1, other.value1) &&
   graph_authoring_double_equal(self.value2, other.value2) &&
   graph_authoring_double_equal(self.value3, other.value3) &&
+  graph_authoring_double_equal(self.value4, other.value4) &&
   self.waveform == other.waveform &&
   self.filter_mode == other.filter_mode &&
   self.delay_max_samples == other.delay_max_samples &&
@@ -250,6 +255,11 @@ pub fn DspNode::value3(self : DspNode) -> Double {
 }
 
 ///|
+pub fn DspNode::value4(self : DspNode) -> Double {
+  self.value4
+}
+
+///|
 pub fn DspNode::waveform(self : DspNode) -> Waveform {
   self.waveform
 }
@@ -285,6 +295,7 @@ pub fn clone_node(node : DspNode) -> DspNode {
     node.value1(),
     node.value2(),
     node.value3(),
+    node.value4(),
     node.waveform(),
     node.filter_mode(),
     node.delay_max_samples(),
@@ -318,6 +329,7 @@ pub fn restore_node_runtime_params(node : DspNode, defaults : DspNode) -> Unit {
   node.value1 = defaults.value1()
   node.value2 = defaults.value2()
   node.value3 = defaults.value3()
+  node.value4 = defaults.value4()
   node.delay_samples = defaults.delay_samples()
 }
 
@@ -329,6 +341,7 @@ pub fn DspNode::constant(value : Double) -> DspNode {
     -1,
     -1,
     value,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -351,6 +364,7 @@ pub fn DspNode::oscillator(waveform : Waveform, freq : Double) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     waveform,
     BiquadMode::LowPass,
     0,
@@ -366,6 +380,7 @@ pub fn DspNode::oscillator_from(input : Int32, waveform : Waveform) -> DspNode {
     DspNodeKind::Oscillator,
     input,
     -1,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -389,6 +404,7 @@ pub fn DspNode::noise(seed : UInt32) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -400,12 +416,15 @@ pub fn DspNode::noise(seed : UInt32) -> DspNode {
 ///|
 /// Create a node that plays a recorded waveform from the compile context's
 /// sample store (ADR-0026): sample `number` (value0) at MIDI `pitch` (value1),
-/// times `speed` (value2). At the waveform's root pitch and speed 1 it plays
-/// the waveform as recorded; a number with no waveform plays silence.
+/// times `speed` (value2), from `begin` (value3) to `end` (value4) as
+/// fractions of the waveform. At the waveform's root pitch and speed 1 it
+/// plays the waveform as recorded; a number with no waveform plays silence.
 pub fn DspNode::sample_player(
   number~ : Double,
   pitch~ : Double,
   speed~ : Double,
+  begin~ : Double = 0.0,
+  end~ : Double = 1.0,
 ) -> DspNode {
   DspNode(
     DspNodeKind::SamplePlayer,
@@ -414,7 +433,8 @@ pub fn DspNode::sample_player(
     number,
     pitch,
     speed,
-    0.0,
+    begin,
+    end,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -443,6 +463,7 @@ pub fn DspNode::adsr(
     decay_ms,
     sustain,
     release_ms,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -465,6 +486,7 @@ pub fn DspNode::biquad(
     -1,
     cutoff_hz,
     q,
+    0.0,
     0.0,
     0.0,
     Waveform::Sine,
@@ -491,6 +513,7 @@ pub fn DspNode::delay(
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     max_delay_samples,
@@ -507,6 +530,7 @@ pub fn DspNode::gain(input : Int32, amount : Double) -> DspNode {
     input,
     -1,
     amount,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -534,6 +558,7 @@ pub fn DspNode::envelope_gain(
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -549,6 +574,7 @@ pub fn DspNode::mul(left : Int32, right : Int32) -> DspNode {
     DspNodeKind::Mul,
     left,
     right,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -572,6 +598,7 @@ pub fn DspNode::mix(left : Int32, right : Int32) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -591,6 +618,7 @@ pub fn DspNode::clip(input : Int32, threshold : Double) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -606,6 +634,7 @@ pub fn DspNode::output(input : Int32) -> DspNode {
     DspNodeKind::Output,
     input,
     -1,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -629,6 +658,7 @@ pub fn DspNode::pan(input : Int32, position : Double) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -648,6 +678,7 @@ pub fn DspNode::stereo_gain(input~ : Int32, amount~ : Double) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -664,6 +695,7 @@ pub fn DspNode::stereo_clip(input~ : Int32, threshold~ : Double) -> DspNode {
     input,
     -1,
     threshold,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -691,6 +723,7 @@ pub fn DspNode::stereo_biquad(
     q,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     mode,
     0,
@@ -715,6 +748,7 @@ pub fn DspNode::stereo_delay(
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     max_delay_samples,
@@ -734,6 +768,7 @@ pub fn DspNode::stereo_mixdown(input : Int32) -> DspNode {
     0.0,
     0.0,
     0.0,
+    0.0,
     Waveform::Sine,
     BiquadMode::LowPass,
     0,
@@ -749,6 +784,7 @@ pub fn DspNode::stereo_output(input : Int32) -> DspNode {
     DspNodeKind::StereoOutput,
     input,
     -1,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -817,6 +853,7 @@ pub fn node_with_inputs(
     node.value1,
     node.value2,
     node.value3,
+    node.value4,
     node.waveform,
     node.filter_mode,
     node.delay_max_samples,
@@ -842,6 +879,7 @@ pub fn node_with_value0(node : DspNode, value0 : Double) -> DspNode {
     node.value1,
     node.value2,
     node.value3,
+    node.value4,
     node.waveform,
     node.filter_mode,
     node.delay_max_samples,
@@ -860,6 +898,7 @@ pub fn node_with_value1(node : DspNode, value1 : Double) -> DspNode {
     value1,
     node.value2,
     node.value3,
+    node.value4,
     node.waveform,
     node.filter_mode,
     node.delay_max_samples,
@@ -881,6 +920,7 @@ pub fn node_with_delay_samples(
     node.value1,
     node.value2,
     node.value3,
+    node.value4,
     node.waveform,
     node.filter_mode,
     node.delay_max_samples,
@@ -927,7 +967,7 @@ pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
     Constant => slot is Value0
     Oscillator => node.input0 < 0 && slot is Value0
     Noise => false
-    SamplePlayer => slot is Value0 || slot is Value1 || slot is Value2
+    SamplePlayer => !(slot is DelaySamples)
     Adsr => slot is Value0 || slot is Value1 || slot is Value2 || slot is Value3
     Biquad => slot is Value0 || slot is Value1
     Delay => slot is Value0 || slot is DelaySamples
@@ -985,5 +1025,18 @@ pub fn set_node_value3(node : DspNode, value : Double) -> Unit {
 pub fn node_with_value3(node : DspNode, value : Double) -> DspNode {
   let copy = node_with_value0(node, node.value0)
   copy.value3 = value
+  copy
+}
+
+///|
+/// Mutate runtime value4 in place. Intended for compiled graph hot paths.
+pub fn set_node_value4(node : DspNode, value : Double) -> Unit {
+  node.value4 = value
+}
+
+///|
+pub fn node_with_value4(node : DspNode, value : Double) -> DspNode {
+  let copy = node_with_value0(node, node.value0)
+  copy.value4 = value
   copy
 }

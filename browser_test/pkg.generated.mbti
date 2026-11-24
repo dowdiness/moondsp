@@ -64,7 +64,7 @@ pub fn sample_copy_sample(Int32) -> Double
 
 pub fn sample_copy_write(Int32, Float) -> Unit
 
-pub fn sample_player_probe_init(Double, Double) -> Int32
+pub fn sample_player_probe_init(Double, Double, Double, Double) -> Int32
 
 pub fn sample_player_probe_process(Int32, Int32) -> Double
 

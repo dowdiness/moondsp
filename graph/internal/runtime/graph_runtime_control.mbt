@@ -259,6 +259,7 @@ fn CompiledGraph::prepare_control(
         Value1 => @model.set_node_value1(node, value)
         Value2 => @model.set_node_value2(node, value)
         Value3 => @model.set_node_value3(node, value)
+        Value4 => @model.set_node_value4(node, value)
         DelaySamples => @model.set_node_delay_samples(node, value.to_int())
       }
       self.controls.touched[compiled_index] = true
@@ -463,9 +464,7 @@ fn model_node_param_valid(
         _ => false
       })
     Noise => false
-    SamplePlayer =>
-      (slot is Value0 || slot is Value1 || slot is Value2) &&
-      @dsp.is_finite(value)
+    SamplePlayer => !(slot is DelaySamples) && @dsp.is_finite(value)
     Biquad =>
       match slot {
         Value0 => valid_biquad_graph_params(sample_rate, value, node.value1())
@@ -600,6 +599,14 @@ fn set_model_node_param_in_place(
         }
         Value2 if @dsp.is_finite(value) => {
           @model.set_node_value2(node, value)
+          true
+        }
+        Value3 if @dsp.is_finite(value) => {
+          @model.set_node_value3(node, value)
+          true
+        }
+        Value4 if @dsp.is_finite(value) => {
+          @model.set_node_value4(node, value)
           true
         }
         _ => false
@@ -755,6 +762,10 @@ fn updated_model_node_param(
           Some(@model.node_with_value1(node, value))
         Value2 if @dsp.is_finite(value) =>
           Some(@model.node_with_value2(node, value))
+        Value3 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value3(node, value))
+        Value4 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value4(node, value))
         _ => None
       }
     Biquad =>

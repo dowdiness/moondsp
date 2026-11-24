@@ -28,12 +28,14 @@ fn sample_test_play(
   number~ : Double = 0.0,
   pitch~ : Double = 60.0,
   speed~ : Double = 1.0,
+  begin~ : Double = 0.0,
+  end~ : Double = 1.0,
 ) -> Array[Double] {
   let context = @dsp.DspContext(sample_rate=48000.0, block_size=4)
   let block = @dsp.AudioBuffer::filled(4)
   let played = []
   while played.length() < count {
-    player.process(context, block, number~, pitch~, speed~)
+    player.process(context, block, number~, pitch~, speed~, begin~, end~)
     for index in 0..<4 {
       played.push(block.get(index))
     }
@@ -101,6 +103,68 @@ test "half speed interpolates between samples, and a negative speed plays backwa
     speed=-1.0,
   )
   assert_eq(backwards, [0.25, -0.5, 0.5, 1.0, 0.0])
+}
+
+///|
+test "begin and end play a slice forwards and backwards; an empty slice is silent" {
+  let store = sample_test_store()
+  // Values 1 to 8, so each played value names its waveform sample.
+  let waveform = sample_test_waveform(8, index => (index + 1).to_double())
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+  let play = (begin, end, speed) => {
+    sample_test_play(@dsp.SamplePlayer(store), 6, speed~, begin~, end~)
+  }
+  // 0.25 × 8 = 2 and 0.75 × 8 = 6: samples 2 to 5.
+  assert_eq(play(0.25, 0.75, 1.0), [3.0, 4.0, 5.0, 6.0, 0.0, 0.0])
+  assert_eq(play(0.25, 0.75, -1.0), [6.0, 5.0, 4.0, 3.0, 0.0, 0.0])
+  // 0.3 × 8 = 2.4 starts at sample 3; 0.6 × 8 = 4.8 ends before sample 5.
+  assert_eq(play(0.3, 0.6, 1.0), [4.0, 5.0, 0.0, 0.0, 0.0, 0.0])
+  // Out-of-range fractions clamp to the waveform.
+  assert_eq(play(-1.0, 0.25, 1.0), [1.0, 2.0, 0.0, 0.0, 0.0, 0.0])
+  assert_eq(play(0.875, 2.0, -1.0), [8.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+  for slice in [(0.5, 0.5), (0.75, 0.25)] {
+    assert_eq(play(slice.0, slice.1, 1.0), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert_eq(play(slice.0, slice.1, -1.0), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+  }
+}
+
+///|
+test "a slice bound within rounding error of a whole sample lands on it" {
+  let store = @dsp.SampleStore(entries=1, max_length=100, capacity=100)
+  let waveform = sample_test_waveform(100, index => (index + 1).to_double())
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+  // 0.07 × 100 is 7.000000000000001 in doubles; the slice is samples 7 to 9.
+  let played = sample_test_play(
+    @dsp.SamplePlayer(store),
+    4,
+    begin=0.07,
+    end=0.1,
+  )
+  assert_eq(played, [8.0, 9.0, 10.0, 0.0])
+  // A fraction genuinely between samples still starts at the next one.
+  let between = sample_test_play(
+    @dsp.SamplePlayer(store),
+    2,
+    begin=0.0705,
+    end=0.09,
+  )
+  assert_eq(between, [9.0, 0.0])
+}
+
+///|
+test "begin and end are fixed at onset; reset reads them again" {
+  let store = sample_test_store()
+  let waveform = sample_test_waveform(8, index => (index + 1).to_double())
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+  let player = @dsp.SamplePlayer(store)
+  let head = sample_test_play(player, 4, begin=0.5)
+  // A later begin and end do not move the sounding voice.
+  let tail = sample_test_play(player, 4, begin=0.0, end=0.25)
+  assert_eq([..head, ..tail], [5.0, 6.0, 7.0, 8.0, 0.0, 0.0, 0.0, 0.0])
+  player.reset()
+  assert_eq(sample_test_play(player, 4, begin=0.0, end=0.25), [
+    1.0, 2.0, 0.0, 0.0,
+  ])
 }
 
 ///|

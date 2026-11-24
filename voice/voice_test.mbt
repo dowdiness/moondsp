@@ -1439,3 +1439,59 @@ test "a reused voice plays its sample from the start of the current waveform" {
     }
   }
 }
+
+///|
+/// Begin, end, speed and gain all vary while the note sounds.
+struct SliceRamp {}
+
+///|
+impl @control.ControlSource for SliceRamp with fn value(_, key) {
+  match key {
+    Begin => @control.ControlValue::of(0.25)
+    End => @control.ControlValue::of(0.75)
+    Speed | Gain => @control.ControlValue::of(1.0)
+    _ => @control.ControlValue::absent()
+  }
+}
+
+///|
+impl @control.ControlSource for SliceRamp with fn each_varying(_, f) {
+  let ramp = (num : Int64, den : Int64) => {
+    @control.ControlValue::of(num.to_double() / den.to_double())
+  }
+  for key in [@control.Control::Begin, End, Speed, Gain] {
+    f(key, ramp)
+  }
+}
+
+///|
+test "controls fixed at onset get no follower; speed and gain follow" {
+  let ctx = DspContext(sample_rate=48000.0, block_size=4)
+  let pool = @voice.BoundVoicePool(
+    AnalyzedGraph::analyze([
+      DspNode::sample_player(number=0.0, pitch=60.0, speed=1.0),
+      DspNode::output(0),
+    ]),
+    ctx,
+    ControlBindingBuilder()
+    .bind(
+      key=@control.Control::Speed,
+      node_index=0,
+      slot=GraphParamSlot::Value2,
+    )
+    .bind(
+      key=@control.Control::Begin,
+      node_index=0,
+      slot=GraphParamSlot::Value3,
+    )
+    .bind(key=@control.Control::End, node_index=0, slot=GraphParamSlot::Value4)
+    .bind_voice(key=@control.Control::Gain, param=Gain),
+    max_voices=1,
+  )
+  let handle = pool.note_on(SliceRamp::{ }).unwrap()
+  let followed = []
+  while pool.followed(handle, followed.length()) is Some(follower) {
+    followed.push(follower.key())
+  }
+  assert_eq(followed, [@control.Control::Speed, Gain])
+}

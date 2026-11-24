@@ -429,6 +429,9 @@ fn Parser::parse_method(
     Gain => Control(Gain, self.read_method_control_argument(method_start))
     Pan => Control(Pan, self.read_method_control_argument(method_start))
     Room => Control(Room, self.read_method_control_argument(method_start))
+    Begin => Control(Begin, self.read_method_control_argument(method_start))
+    End => Control(End, self.read_method_control_argument(method_start))
+    Speed => Control(Speed, self.read_method_control_argument(method_start))
     Every => {
       self.expect_char('(')
       self.skip_whitespace()

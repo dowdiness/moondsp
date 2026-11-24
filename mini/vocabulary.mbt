@@ -161,6 +161,10 @@ priv enum Method {
   Gain
   Pan
   Room
+  /// `begin`, `end` and `speed`, which slice and pace samples (ADR-0026).
+  Begin
+  End
+  Speed
   Every
   Jux
   /// `.s("…")`, which chooses the instrument of notes.
@@ -185,6 +189,9 @@ fn Method::all() -> Array[Method] {
     Gain,
     Pan,
     Room,
+    Begin,
+    End,
+    Speed,
     Every,
     Jux,
     Instrument,
@@ -209,6 +216,9 @@ fn Method::name(self : Method) -> String {
     Gain => "gain"
     Pan => "pan"
     Room => "room"
+    Begin => "begin"
+    End => "end"
+    Speed => "speed"
     Every => "every"
     Jux => "jux"
     Instrument => "s"
@@ -696,6 +706,9 @@ fn Method::signature(self : Method) -> Signature {
     Gain => control("voice level")
     Pan => control("stereo position (0 left, 1 right)")
     Room => control("send to shared room (0–1)")
+    Begin => control("where a sample starts (0–1), fixed at onset")
+    End => control("where a sample stops (0–1), fixed at onset")
+    Speed => control("sample playback rate; negative plays backwards")
     Every =>
       signature("apply f every nth cycle", required=[
         argument("n", Number),
