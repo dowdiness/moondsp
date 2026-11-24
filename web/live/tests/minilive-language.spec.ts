@@ -252,14 +252,14 @@ test("completion offers each position's names from the vocabulary", () => {
     ['note("C4").jux(|', ["fast", "slow", "rev"]],
     ['note("C4").every(2, |', ["fast", "slow", "rev"]],
     ['note("C4").every(|', null],
-    ['note("C4").pan(|', ["sine", "cosine", "saw", "isaw", "tri", "square"]],
-    ['note("C4").lpf(200, |', ["sine", "cosine", "saw", "isaw", "tri", "square"]],
+    ['note("C4").pan(|', ["ramp", "sine", "cosine", "saw", "isaw", "tri", "square"]],
+    ['note("C4").lpf(200, |', ["ramp", "sine", "cosine", "saw", "isaw", "tri", "square"]],
     ['note("C4").lpf(sine.range(0, |', null],
     ['note("C4").fast(|', null],
     ['s("|', ["bd", "sd", "cp", "hh", "oh"]],
     ['note("C4").s("|', ["triangle", "bass", "pad", "pluck", "sawtooth"]],
     ['note("|', null],
-    ['note("C4").|', ["fast", "slow", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "every", "jux", "s"]],
+    ['note("C4").|', ["fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "every", "jux", "s"]],
   ] as const) {
     expect(offered(source, language), source).toEqual(expected);
   }
