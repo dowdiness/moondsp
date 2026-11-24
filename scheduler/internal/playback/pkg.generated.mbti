@@ -5,6 +5,7 @@ import {
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler/internal/model",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
 }
 
@@ -21,15 +22,15 @@ pub(all) struct PlaybackInspection {
 }
 
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot)
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
-pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot) -> Self
-pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins) -> Self
-pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(SongMaterial) -> Self
@@ -38,9 +39,9 @@ pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 pub struct PlaybackSourcedEvent {
   // private fields
 }
-pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@pattern.ControlMap]) -> Self
+pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@score.ScoreEvent]) -> Self
 pub fn PlaybackSourcedEvent::controls(Self) -> @pattern.Controls
-pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@pattern.ControlMap]
+pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@score.ScoreEvent]
 pub fn PlaybackSourcedEvent::origin(Self) -> @model.VoiceOrigin
 pub fn PlaybackSourcedEvent::source_frame(Self) -> @identity.SourceFrameId?
 pub fn PlaybackSourcedEvent::source_origin(Self) -> @pattern.EventOrigin?
@@ -56,15 +57,15 @@ pub fn PlaybackState::has_pending(Self) -> Bool
 pub fn PlaybackState::inspect(Self) -> PlaybackInspection
 pub fn PlaybackState::install_acceptance(Self, Self) -> Unit
 pub fn PlaybackState::prepare_acceptance(Self, PlaybackSnapshot, @pattern.Rational, material_limit~ : Int32, restart~ : Bool) -> Self?
-pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Array[PlaybackSourcedEvent]
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
 pub fn PlaybackState::reset(Self) -> Unit
 pub fn PlaybackState::skipped_entry_count(Self) -> Int32
 
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
-  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]])
 }
 
 // Type aliases

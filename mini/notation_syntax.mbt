@@ -1,11 +1,4 @@
 ///|
-/// A drum name, as in `s("bd sd")`.
-priv struct DrumName {
-  name : String
-  midi : Int32
-}
-
-///|
 /// A MIDI number or note name as written, as in `note("60 e4")`.
 priv struct Pitch {
   text : String
@@ -43,7 +36,7 @@ priv struct NotationVocabulary[W] {
 }
 
 ///|
-fn drum_names() -> NotationVocabulary[DrumName] {
+fn drum_names() -> NotationVocabulary[@score.Drum] {
   { read_word: NotationCursor::read_drum_name, random_drop: Allowed, }
 }
 
@@ -507,14 +500,14 @@ fn NotationCursor::read_euclid_arguments(
 ///|
 fn NotationCursor::read_drum_name(
   self : NotationCursor,
-) -> DrumName raise SourceProblem {
+) -> @score.Drum raise SourceProblem {
   let start = self.pos
   let name = self.read_ident()
   guard !name.is_empty() else {
     raise self.mistake(start, "expected sound name")
   }
-  match drum_midi(name) {
-    Some(midi) => { name, midi, }
+  match @score.Drum::parse(name) {
+    Some(drum) => drum
     None => raise self.mistake(start, "unknown drum name '\{name}'")
   }
 }

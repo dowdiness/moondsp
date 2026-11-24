@@ -1,39 +1,4 @@
 ///|
-test "note_name c3 = 48" {
-  let pat = @pattern.note_name("c3")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(48.0))
-}
-
-///|
-test "note_name e3 = 52" {
-  let pat = @pattern.note_name("e3")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(52.0))
-}
-
-///|
-test "note_name g3 = 55" {
-  let pat = @pattern.note_name("g3")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(55.0))
-}
-
-///|
-test "note_name fs4 = 66" {
-  let pat = @pattern.note_name("fs4")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(66.0))
-}
-
-///|
-test "note_name a4 = 69" {
-  let pat = @pattern.note_name("a4")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(69.0))
-}
-
-///|
 test "s_lpf and s_hpf carry cutoff and resonance on one event" {
   let lpf = @pattern.s_lpf(800.0, resonance=2.0).query(span(0, 1, 1, 1))
   let hpf = @pattern.s_hpf(120.0).query(span(0, 1, 1, 1))
@@ -57,7 +22,10 @@ test "s_lpf and s_hpf carry cutoff and resonance on one event" {
 
 ///|
 test "jux(rev): event count and pan keys" {
-  let pat = @pattern.sequence([@pattern.sound(36.0), @pattern.sound(38.0)])
+  let pat = @pattern.sequence([
+    @pattern.control(Note, 36.0),
+    @pattern.control(Note, 38.0),
+  ])
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 4)
@@ -80,8 +48,8 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   // drops a control key while routing through merge_control. Without
   // a non-pan secondary key, the test only proves part+sound parity.
   let pat = @pattern.sequence([
-    @pattern.controls(@pattern.ControlMap::single(Sound, 36.0).set(Lpf, 800.0)),
-    @pattern.controls(@pattern.ControlMap::single(Sound, 38.0).set(Lpf, 800.0)),
+    @pattern.controls(@pattern.ControlMap::single(Note, 36.0).set(Lpf, 800.0)),
+    @pattern.controls(@pattern.ControlMap::single(Note, 38.0).set(Lpf, 800.0)),
   ])
   let result = pat.jux(fn(p) { p.rev() })
   let arc = span(0, 1, 1, 1)
@@ -103,13 +71,13 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
   @debug.assert_eq(left.length(), self_events.length())
   for i in 0..<left.length() {
     @debug.assert_eq(left[i].part, self_events[i].part)
-    @debug.assert_eq(left[i].value.get(Sound), self_events[i].value.get(Sound))
+    @debug.assert_eq(left[i].value.get(Note), self_events[i].value.get(Note))
     @debug.assert_eq(left[i].value.get(Lpf), self_events[i].value.get(Lpf))
   }
   @debug.assert_eq(right.length(), f_events.length())
   for i in 0..<right.length() {
     @debug.assert_eq(right[i].part, f_events[i].part)
-    @debug.assert_eq(right[i].value.get(Sound), f_events[i].value.get(Sound))
+    @debug.assert_eq(right[i].value.get(Note), f_events[i].value.get(Note))
     @debug.assert_eq(right[i].value.get(Lpf), f_events[i].value.get(Lpf))
   }
 }
@@ -118,7 +86,7 @@ test "jux(rev): channel identity (pan=-1 matches self, pan=+1 matches f(self))" 
 test "jux: overrides pre-existing pan" {
   // Pre-pan to 0.5, then jux — result should have only ±1 pan values.
   let pat = @pattern.controls(
-    @pattern.ControlMap::single(Sound, 36.0).set(Pan, 0.5),
+    @pattern.ControlMap::single(Note, 36.0).set(Pan, 0.5),
   )
   let result = pat.jux(fn(p) { p.rev() })
   let events = result.query(span(0, 1, 1, 1))
@@ -133,7 +101,10 @@ test "jux: overrides pre-existing pan" {
 
 ///|
 test "jux(fast(2)): right channel doubles event count" {
-  let pat = @pattern.sequence([@pattern.sound(36.0), @pattern.sound(38.0)])
+  let pat = @pattern.sequence([
+    @pattern.control(Note, 36.0),
+    @pattern.control(Note, 38.0),
+  ])
   let result = pat.jux(fn(p) { p.fast(@pattern.Rational::from_int(2)) })
   let events = result.query(span(0, 1, 1, 1))
   // Left: 2 events. Right: fast(2) of 2-event = 4 events. Total 6.
@@ -141,39 +112,11 @@ test "jux(fast(2)): right channel doubles event count" {
 }
 
 ///|
-test "note_name bf4 = 70 (B-flat)" {
-  let pat = @pattern.note_name("bf4")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(70.0))
-}
-
-///|
-test "note_name ef3 = 51 (E-flat)" {
-  let pat = @pattern.note_name("ef3")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(51.0))
-}
-
-///|
-test "note_name f4 = 65 (F natural, not flat)" {
-  let pat = @pattern.note_name("f4")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(65.0))
-}
-
-///|
-test "note_name cs3 = 49 (C-sharp)" {
-  let pat = @pattern.note_name("cs3")
-  let events = pat.query(span(0, 1, 1, 1))
-  @debug.assert_eq(events[0].value.get(Note), Some(49.0))
-}
-
-///|
 test "deliverable: sequence c3 e3 g3 fast 2 produces 6 events" {
   let pat = @pattern.sequence([
-    @pattern.note_name("c3"),
-    @pattern.note_name("e3"),
-    @pattern.note_name("g3"),
+    @pattern.control(Note, 48.0),
+    @pattern.control(Note, 52.0),
+    @pattern.control(Note, 55.0),
   ]).fast(@pattern.Rational::from_int(2))
   let events = pat.query(span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), 6)

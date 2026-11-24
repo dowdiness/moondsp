@@ -4,9 +4,12 @@
 /// A song's sections are lowered while parsing: to exact snapshots when the
 /// source is tracked, to anonymous runtime patterns otherwise.
 pub enum PlayBody {
-  Pattern(@pattern.PatternDoc)
-  Arrangement(@song.Song[@pattern.Pat[@pattern.ControlMap]], Bool)
-  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins], Bool)
+  Pattern(ScoreDoc)
+  Arrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  ExactArrangement(
+    @song.Song[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+    Bool,
+  )
 }
 
 ///|
@@ -59,13 +62,11 @@ fn parse_play_bpm_declaration(parser : Parser) -> Double raise SourceProblem {
 /// including future conditional branches; no pattern queries are executed.
 pub fn parse_play_source(
   input : String,
-  previous~ : @pattern.PatternDoc? = None,
   query_window? : @pattern.QueryWindow,
 ) -> Result[PlaySource, SourceProblem] {
   try
     parse_play_source_with_origins(
       input,
-      previous,
       query_window,
       origins=None,
       syntax_depth_limit=None,
@@ -80,7 +81,6 @@ pub fn parse_play_source(
 ///|
 fn parse_play_source_with_origins(
   input : String,
-  previous : @pattern.PatternDoc?,
   query_window : @pattern.QueryWindow?,
   origins~ : SourceMap? = None,
   syntax_depth_limit~ : Int32? = None,
@@ -94,7 +94,7 @@ fn parse_play_source_with_origins(
     PlaybackAdmission(window.span().to_double())
   })
   let parser = Parser(input, admission~, syntax_depth_limit~)
-  let builder = MiniDocBuilder(previous~, origins~)
+  let builder = MiniDocBuilder(origins~)
   // A top-level `bpm(...)` and where it was written.
   let mut authored_bpm : (Int32, Double)? = None
   while true {
@@ -160,7 +160,7 @@ fn[C] Parser::parse_play_song(
   builder : MiniDocBuilder,
   admission : PlaybackAdmission?,
   authored_bpm : (Int32, Double)?,
-  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+  lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> (@song.Song[C], Bool, Double) raise SourceProblem {
   let parsed = self.parse_song_expr(builder, lower~)
   self.skip_whitespace()

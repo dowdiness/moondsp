@@ -24,12 +24,12 @@ fn make_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.Section[@pattern.Pat[@pattern.ControlMap]] {
+) -> @song.Section[@pattern.Pat[@score.ScoreEvent]] {
   @song.Section(
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(@pattern.note(midi)),
+    body=@song.SectionBody::single(@score.note(midi)),
   ) catch {
     _ => abort("section creation failed")
   }
@@ -41,12 +41,12 @@ fn make_scoped_section(
   length : @pattern.Rational,
   scope : @song.TimeScope,
   midi : Double,
-) -> @song.Section[@pattern.Pat[@pattern.ControlMap]] {
+) -> @song.Section[@pattern.Pat[@score.ScoreEvent]] {
   @song.Section(
     name~,
     length_cycles=length,
     scope~,
-    body=@song.SectionBody::single(@pattern.note(midi)),
+    body=@song.SectionBody::single(@score.note(midi)),
   ) catch {
     _ => abort("section creation failed")
   }
@@ -96,7 +96,7 @@ test "Song constructor computes contiguous duration and occurrences" {
 
 ///|
 test "Song constructor rejects empty layout" {
-  let parts : Array[SongPart[@pattern.Pat[@pattern.ControlMap]]] = []
+  let parts : Array[SongPart[@pattern.Pat[@score.ScoreEvent]]] = []
   try Song(parts~) catch {
     SongBuildError::EmptySong => ()
     _ => assert_true(false)
@@ -242,8 +242,8 @@ test "SongPart explicit starts can overlap and range lookup returns all hits" {
   @debug.assert_eq(range_hits.length(), 2)
   let events = song.query(span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(60.0))
-  assert_true(events[1].value.get(Note) == Some(64.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 64.0)
 }
 
 ///|
@@ -354,8 +354,8 @@ test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
   @debug.assert_eq(filled.gap_spans().length(), 0)
   let events = filled.query(span(1L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(70.0))
-  assert_true(events[1].value.get(Note) == Some(70.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 70.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 70.0)
 }
 
 ///|
@@ -428,8 +428,8 @@ test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
   @debug.assert_eq(overlap_hits[1].name(), "early1")
   let events = filled.query(span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(60.0))
-  assert_true(events[1].value.get(Note) == Some(64.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 64.0)
 }
 
 ///|
@@ -523,9 +523,9 @@ test "Song allows repeated sections with distinct occurrence names" {
   ])
   let events = song.query(span(0L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
   assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
-  assert_true(events[1].value.get(Note) == Some(60.0))
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 60.0)
   assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
 }
 
@@ -545,7 +545,7 @@ test "Song::query shifts event whole and part into song time" {
   assert_true(events[1].part.begin == @pattern.Rational::from_int(1))
   assert_true(events[2].whole.unwrap().begin == @pattern.Rational::from_int(2))
   assert_true(events[2].part.begin == @pattern.Rational::from_int(2))
-  assert_true(events[2].value.get(Note) == Some(64.0))
+  assert_true(events[2].value.sound is Note(_, pitch~) && pitch == 64.0)
 }
 
 ///|

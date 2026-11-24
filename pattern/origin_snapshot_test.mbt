@@ -13,7 +13,7 @@ fn origin_note(
   name : String,
   serial : Int64,
   pitch : Double,
-) -> @pattern.PatternDoc raise @identity.StableIdError {
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise @identity.StableIdError {
   @pattern.PatternDoc::control_atom(
     id=pid(name),
     source_atom=atom_id(serial),
@@ -25,10 +25,10 @@ fn origin_note(
 ///|
 fn resolved_use(
   name : String,
-  definition : @pattern.PatternDoc,
+  definition : @pattern.PatternDoc[@pattern.ControlMap],
   reference_serial : Int64,
   binding_serial : Int64,
-) -> @pattern.PatternDoc raise @identity.StableIdError {
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise @identity.StableIdError {
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
   @pattern.PatternDoc::reference_with_binding(
     id=pid(name),
@@ -57,7 +57,10 @@ test "exact compiler shares musical kernels without changing material metadata" 
   let a = origin_note("a", 1L, 60.0)
   let b = origin_note("b", 2L, 64.0)
   let base = @pattern.PatternDoc::sequence(id=pid("sequence"), docs=[a, b])
-  let raw = @pattern.sequence([@pattern.note(60.0), @pattern.note(64.0)])
+  let raw = @pattern.sequence([
+    @pattern.control(Note, 60.0),
+    @pattern.control(Note, 64.0),
+  ])
   let factor = @pattern.Rational::from_int(2)
   let docs = [
     base,
@@ -89,8 +92,8 @@ test "exact compiler shares musical kernels without changing material metadata" 
     @pattern.every(2, p => p.fast(factor), raw),
     raw.jux(p => p.rev()),
     @pattern.stack([
-      @pattern.note(60.0).slow(factor),
-      @pattern.note(64.0).fast(factor),
+      @pattern.control(Note, 60.0).slow(factor),
+      @pattern.control(Note, 64.0).fast(factor),
     ]),
   ]
   let arc = doc_span(-5, 4, 9, 4)
@@ -261,7 +264,7 @@ test "nested reference bindings are immutable outer to inner and distinct per us
 
 ///|
 test "same music refreshes origins through reused cache without changing entry identity" {
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let before_doc = resolved_use("use", origin_note("atom", 1L, 60.0), 3L, 4L)
   let after_doc = resolved_use("use", origin_note("atom", 2L, 60.0), 3L, 5L)
   // Populate general specialization first; exact compilation must not reuse it.
@@ -308,7 +311,7 @@ test "same music refreshes origins through reused cache without changing entry i
 
 ///|
 test "exact lowering rejects missing attribution before returning a snapshot" {
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=n(1))
   ignore(runtime.lower_with_cache(cache))
   let missing_atom = try {
@@ -353,7 +356,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     missing_binding,
     Some(@pattern.PatternDocError::MissingReferenceBinding(pid("reference"))),
   )
-  let silence : @pattern.PatternDoc = @pattern.PatternDoc::silence(
+  let silence : @pattern.PatternDoc[@pattern.ControlMap] = @pattern.PatternDoc::silence(
     id=pid("silence"),
   )
   @debug.assert_eq(
@@ -368,7 +371,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
 
 ///|
 test "prepared reference contexts outlive cache clearing before their first query" {
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let definition = resolved_use("inner", origin_note("atom", 1L, 60.0), 3L, 4L)
   let standalone = definition.lower_with_origins(cache~)
   let left = resolved_use("left", definition, 5L, 6L)
@@ -403,7 +406,7 @@ test "prepared reference contexts outlive cache clearing before their first quer
 
 ///|
 test "origin cache retains full witnesses when binding serials coincide" {
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let definition = origin_note("atom", 1L, 60.0)
   let uses = [
     resolved_use("first", definition, 10L, 7L),
@@ -438,7 +441,11 @@ test "source frame distinguishes repeated atoms through reference slow and rever
   let events = transformed.query(doc_span(0, 1, 2, 1))
   let rows = events.map(event => {
     let whole = event.event().whole.unwrap()
-    (whole.begin.to_double(), event.source_start(), event.source_pitch())
+    (
+      whole.begin.to_double(),
+      event.source_start(),
+      event.event().value.get(Note).unwrap(),
+    )
   })
   rows.sort_by((a, b) => a.0.compare(b.0))
   @debug.assert_eq(rows, [
@@ -455,7 +462,13 @@ test "source frame distinguishes repeated atoms through reference slow and rever
     )
     @debug.assert_eq(
       event.origin().atom(),
-      atom_id(if event.source_pitch() == 60.0 { 1L } else { 2L }),
+      atom_id(
+        if event.event().value.get(Note).unwrap() == 60.0 {
+          1L
+        } else {
+          2L
+        },
+      ),
     )
   }
 }
@@ -479,7 +492,9 @@ test "source frame uses full whole-cycle repeat span for rational notation rates
     )
     let events = snapshot.query(arc)
     @debug.assert_eq(
-      events.map(event => (event.source_start(), event.source_pitch())),
+      events.map(event => {
+        (event.source_start(), event.event().value.get(Note).unwrap())
+      }),
       [(0.0, 60.0), (0.75, 64.0), (1.5, 60.0), (2.25, 64.0)],
     )
     for index, event in events {

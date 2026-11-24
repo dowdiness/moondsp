@@ -524,8 +524,8 @@ fn weight_bounds(weights : Array[Int32]) -> Array[Int64] {
 
 ///|
 /// Every key a control-provider subtree can set, in first-seen order.
-fn control_keys(
-  nodes : Map[String, PatternDocEntry],
+fn[A : WithControls] control_keys(
+  nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   keys : Array[@control.Control],
 ) -> Unit raise PatternDocError {
@@ -541,7 +541,8 @@ fn control_keys(
     Reference(definition, _) =>
       control_keys(definition.nodes, definition.root, keys)
     Continuous(_, key, _) => add(key)
-    Pure(value) | Atom(_, value, _, _) => value.each((key, _) => add(key))
+    Pure(value) | Atom(_, value, _) =>
+      value.controls().each((key, _) => add(key))
     Runtime(_) => raise UnsupportedControl(id)
     Silence => ()
     Fast(child, _)
@@ -555,7 +556,7 @@ fn control_keys(
     | Jux(child, _) => control_keys(nodes, child, keys)
     MergeControl(left, right) => {
       control_keys(nodes, left, keys)
-      control_keys(nodes, right, keys)
+      control_keys(right.nodes, right.root, keys)
     }
     Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
       for child in children {
@@ -568,8 +569,8 @@ fn control_keys(
 /// Compile one key of a control-provider subtree into its signal. With
 /// `key=None`, compile its presence instead: `0` wherever the subtree has an
 /// event, whichever keys it sets, and `Absent` elsewhere.
-fn compile_signal(
-  nodes : Map[String, PatternDocEntry],
+fn[A : WithControls] compile_signal(
+  nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   key : @control.Control?,
 ) -> BusSignal raise PatternDocError {
@@ -587,11 +588,11 @@ fn compile_signal(
         None => Const(0.0)
         Some(key) => if k == key { Continuous(f) } else { Absent }
       }
-    Pure(value) | Atom(_, value, _, _) =>
+    Pure(value) | Atom(_, value, _) =>
       match key {
         None => Const(0.0)
         Some(key) =>
-          match value.get(key) {
+          match value.controls().get(key) {
             Some(v) => BusSignal::of_value(v)
             None => Absent
           }
@@ -622,7 +623,11 @@ fn compile_signal(
           Merge(
             compile_signal(nodes, left, None),
             inner,
-            nested_signal(key.nesting(), inner, sub(right)),
+            nested_signal(
+              key.nesting(),
+              inner,
+              compile_signal(right.nodes, right.root, Some(key)),
+            ),
           )
         }
       }

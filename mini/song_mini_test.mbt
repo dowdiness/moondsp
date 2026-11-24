@@ -1,7 +1,7 @@
 ///|
 fn unwrap_parsed_song(
-  result : Result[@mini.ParsedSong[@pattern.Pat[@pattern.ControlMap]], String],
-) -> @song.Song[@pattern.Pat[@pattern.ControlMap]] {
+  result : Result[@mini.ParsedSong[@pattern.Pat[@score.ScoreEvent]], String],
+) -> @song.Song[@pattern.Pat[@score.ScoreEvent]] {
   match result {
     Ok(parsed) => parsed.song()
     Err(msg) => abort("expected parsed song, got Err(\{msg})")
@@ -49,8 +49,8 @@ test "parse_song builds sections and implicit parts" {
   }
   let events = song.query(song_span(0L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 3)
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[1].value.get(Note) == Some(60.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(pitch_of(events[1].value) == Some(60.0))
 }
 
 ///|
@@ -88,10 +88,10 @@ test "parse_song accepts multiline whitespace and notation newlines" {
   let song = unwrap_parsed_song(@mini.parse_song(input))
   let events = song.query(song_span(0L, 1L, 4L, 1L))
   @debug.assert_eq(events.length(), 5)
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[1].value.get(Note) == Some(64.0))
-  assert_true(events[3].value.get(Note) == Some(65.0))
-  assert_true(events[4].value.get(Note) == Some(67.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(pitch_of(events[1].value) == Some(64.0))
+  assert_true(pitch_of(events[3].value) == Some(65.0))
+  assert_true(pitch_of(events[4].value) == Some(67.0))
 }
 
 ///|
@@ -124,8 +124,8 @@ test "parse_song preserves authoring order for explicit overlaps" {
   @debug.assert_eq(hits[1].name(), "early1")
   let events = song.query(song_span(1L, 1L, 2L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[1].value.get(Sound) == Some(38.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(drum_of(events[1].value) == Some("sd"))
 }
 
 ///|
@@ -149,8 +149,8 @@ test "parse_song applies boundary fill directives" {
   @debug.assert_eq(song.gap_spans().length(), 0)
   let events = song.query(song_span(1L, 1L, 3L, 1L))
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Sound) == Some(42.0))
-  assert_true(events[1].value.get(Sound) == Some(42.0))
+  assert_true(drum_of(events[0].value) == Some("hh"))
+  assert_true(drum_of(events[1].value) == Some("hh"))
 }
 
 ///|

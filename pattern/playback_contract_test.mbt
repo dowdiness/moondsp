@@ -1,7 +1,11 @@
 ///|
 test "document control merge preserves material clocks and broad voice scopes" {
-  let bass = @pattern.note(60.0).slow(@pattern.Rational::from_int(2)).material()
-  let lead = @pattern.note(64.0).fast(@pattern.Rational::from_int(2)).material()
+  let bass = @pattern.control(Note, 60.0)
+    .slow(@pattern.Rational::from_int(2))
+    .material()
+  let lead = @pattern.control(Note, 64.0)
+    .fast(@pattern.Rational::from_int(2))
+    .material()
   let source = @pattern.PatternDoc::stack(id=pid("parts"), docs=[
     @pattern.PatternDoc::from_pattern(id=pid("bass"), pat=bass),
     @pattern.PatternDoc::from_pattern(id=pid("lead"), pat=lead),
@@ -108,7 +112,10 @@ test "document jux preserves atomic material pan precedence and its content" {
         @pattern.ControlMap::single(Note, 60.0).set(Pan, 0.25),
       ),
     ),
-    @pattern.PatternDoc::from_pattern(id=pid("right"), pat=@pattern.note(64.0)),
+    @pattern.PatternDoc::from_pattern(
+      id=pid("right"),
+      pat=@pattern.control(Note, 64.0),
+    ),
   ])
   let snapshot = source
     .jux(id=pid("jux"), transform=@pattern.TimeTransform::Reverse)

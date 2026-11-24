@@ -44,14 +44,14 @@ between pattern queries and the scheduler:
 
 `Section[C]` gives content a name, duration in cycles, and local `TimeScope`.
 Structure never looks inside `C`; querying a section as a pattern requires
-`C : SongContent`, which runtime patterns (`Pat[ControlMap]`) and exact
-snapshots (`PatternSnapshotWithOrigins`) implement (ADR-0021).
+`C : SongContent`, which runtime patterns (`Pat[ScoreEvent]`) and exact
+snapshots (`PatternSnapshotWithOrigins[ScoreEvent]`) implement (ADR-0021).
 `single` is the concise one-cycle constructor.
 
 ```mbt check
 ///|
 test "wrap a pattern as a section" {
-  let section = @song.Section::single(name="verse", body=@pattern.note(60.0))
+  let section = @song.Section::single(name="verse", body=@score.note(60.0))
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -63,7 +63,7 @@ test "wrap a pattern as a section" {
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
   assert_true(section.scope().is_identity())
   assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
 }
 ```
 
@@ -80,10 +80,10 @@ of adding a duplicate.
 ```mbt check
 ///|
 test "combine named section layers" {
-  let section = @song.Section::single(name="groove", body=@pattern.sound(36.0)).layer(
-    name="bass",
-    body=@pattern.note(36.0),
-  )
+  let section = @song.Section::single(
+    name="groove",
+    body=@score.hit(@score.Drum::parse("bd").unwrap()),
+  ).layer(name="bass", body=@score.note(36.0))
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -114,9 +114,9 @@ test "arrange sections sequentially" {
     name="intro",
     length_cycles=@pattern.Rational::from_int(2),
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(@pattern.note(60.0)),
+    body=@song.SectionBody::single(@score.note(60.0)),
   )
-  let chorus = @song.Section::single(name="chorus", body=@pattern.note(67.0))
+  let chorus = @song.Section::single(name="chorus", body=@score.note(67.0))
   let arrangement = @song.Song::from_sections([intro, chorus])
   let events = arrangement.query(
     @pattern.TimeSpan(
@@ -128,8 +128,8 @@ test "arrange sections sequentially" {
   assert_true(arrangement.duration() == @pattern.Rational::from_int(3))
   assert_eq(arrangement.occurrence_count(), 2)
   assert_eq(events.length(), 3)
-  assert_true(events[0].value.get(Note) == Some(60.0))
-  assert_true(events[2].value.get(Note) == Some(67.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
+  assert_true(events[2].value.sound is Note(_, pitch~) && pitch == 67.0)
 }
 ```
 
@@ -144,8 +144,8 @@ gaps or overlap; `Song::query` preserves all overlapping events.
 ```mbt check
 ///|
 test "query explicitly placed occurrences" {
-  let a = @song.Section::single(name="a", body=@pattern.note(60.0))
-  let b = @song.Section::single(name="b", body=@pattern.note(64.0))
+  let a = @song.Section::single(name="a", body=@score.note(60.0))
+  let b = @song.Section::single(name="b", body=@score.note(64.0))
   let arrangement = @song.Song::Song(parts=[
     @song.SongPart::at(
       start=@pattern.Rational::from_int(0),

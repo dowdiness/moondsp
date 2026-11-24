@@ -4,7 +4,7 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
     name : String,
     note : Int32,
     period : Int32,
-  ) -> @pattern.PatternDoc raise {
+  ) -> @pattern.PatternDoc[@score.ScoreEvent] raise {
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string(name),
       pat=material(name, note, period),
@@ -58,9 +58,9 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
 
 ///|
 test "internal metadata changes do not reserve a material replacement" {
-  let a = @pattern.note(60.0)
-  let b = @pattern.note(64.0)
-  let c = @pattern.note(67.0)
+  let a = @score.note(60.0)
+  let b = @score.note(64.0)
+  let c = @score.note(67.0)
   let period = @pattern.Rational::from_int(3)
   let before = addressed((a + b + c).material().slow(period), "track")
   let after = addressed(

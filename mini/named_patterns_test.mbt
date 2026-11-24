@@ -72,20 +72,24 @@ test "one definition edit changes every section while preserving song layout" {
   for i in 0..<events.length() {
     @debug.assert_eq(events[i].whole, old_events[i].whole)
     @debug.assert_eq(events[i].part, old_events[i].part)
-    @debug.assert_eq(old_events[i].value.get(Note), Some(60.0))
-    @debug.assert_eq(events[i].value.get(Note), Some(72.0))
+    @debug.assert_eq(pitch_of(old_events[i].value), Some(60.0))
+    @debug.assert_eq(pitch_of(events[i].value), Some(72.0))
   }
 }
 
 ///|
 fn assert_named_events(
-  actual : Array[@pattern.Event[@pattern.ControlMap]],
-  expected : Array[@pattern.Event[@pattern.ControlMap]],
+  actual : Array[@pattern.Event[@score.ScoreEvent]],
+  expected : Array[@pattern.Event[@score.ScoreEvent]],
 ) -> Unit raise {
   // Compare the complete audible event, without depending on source identities.
   @debug.assert_eq(
-    actual.map(event => (event.whole, event.part, event.value.entries())),
-    expected.map(event => (event.whole, event.part, event.value.entries())),
+    actual.map(event => {
+      (event.whole, event.part, event.value.controls.entries())
+    }),
+    expected.map(event => {
+      (event.whole, event.part, event.value.controls.entries())
+    }),
   )
 }
 

@@ -12,7 +12,9 @@ test "bench/control_bus/per_block" (b : @bench.T) {
   })
   let chord = @pattern.PatternDoc::from_pattern(
     id=id("chord"),
-    pat=@pattern.chord("Dm9"),
+    pat=@pattern.stack(
+      [62.0, 65.0, 69.0, 72.0, 76.0].map(pitch => @pattern.control(Note, pitch)),
+    ),
   )
   let doc = @pattern.PatternDoc::merge_control(
     id=id("merge"),

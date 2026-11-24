@@ -18,7 +18,7 @@ test "prepared song respects section boundaries differing periods and finite end
   let snapshot = song_update_snapshot(song)
   let span = cycle_span(0, 5)
   let events = snapshot.song().query(span)
-  assert_eq(events.map(e => e.value.get(Note)), [
+  assert_eq(events.map(e => pitch_of(e.value)), [
     Some(60.0),
     Some(72.0),
     Some(74.0),
@@ -49,10 +49,19 @@ test "snapshot thinning is deterministic across query partitions" {
     let events = snapshot.song().query(cycle_span(cycle, cycle + 1))
     for event in events {
       assert_eq(event.part, whole[count].part)
-      assert_eq(event.value.get(Note), whole[count].value.get(Note))
+      assert_eq(event.value, whole[count].value)
       count = count + 1
     }
   }
   assert_eq(count, whole.length())
   assert_true(count > 0 && count < 32)
+}
+
+///|
+/// The pitch `event` plays, if it is a note.
+fn pitch_of(event : @score.ScoreEvent) -> Double? {
+  match event.sound {
+    Note(_, pitch~) => Some(pitch)
+    Hit(_) => None
+  }
 }

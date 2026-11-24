@@ -66,16 +66,16 @@ fn bench_scheduler(
   ctx : @moondsp.DspContext,
   pool : @moondsp.BoundVoicePool,
 ) -> PatternScheduler raise {
-  PatternScheduler(bpm=120.0, ctx~, instruments=[(AllEvents, pool)])
+  PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => 0)
 }
 
 ///|
-fn bench_jux_pattern() -> @pattern.Pat[@pattern.ControlMap] {
+fn bench_jux_pattern() -> @pattern.Pat[@score.ScoreEvent] {
   @pattern.sequence([
-    @pattern.note(60.0),
-    @pattern.note(64.0),
-    @pattern.note(67.0),
-    @pattern.note(72.0),
+    @score.note(60.0),
+    @score.note(64.0),
+    @score.note(67.0),
+    @score.note(72.0),
   ]).jux(fn(p) { p.rev() })
 }
 

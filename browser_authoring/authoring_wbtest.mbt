@@ -243,7 +243,7 @@ test "onset lookup keeps exact references but retires edited literal geometry" {
     Json(origin.atom().serial().to_double()),
     Json(frame.serial().to_double()),
     Json(source_event.source_start()),
-    Json(source_event.source_pitch()),
+    Json(authored_pitch(source_event.event().value)),
     Json(bindings.length()),
   ]
   for binding in bindings {
@@ -323,10 +323,9 @@ test "negative pitch is distinct from an unpitched drum onset" {
     guard event.source_frame() is Some(frame) else {
       fail("expected source frame")
     }
-    let wire_pitch = if event.source_pitch().is_nan() {
-      Json::null()
-    } else {
-      Json(event.source_pitch())
+    let wire_pitch = match event.event().value.sound {
+      Note(_, pitch~) => Json(pitch)
+      Hit(_) => Json::null()
     }
     assert_true(wire_pitch == pitch)
     let row : Json = [
@@ -354,8 +353,17 @@ test "control nesting names every control's rule" {
   guard @json.parse(control_nesting()) is Object(rules) else {
     fail("expected a JSON object")
   }
-  assert_eq(rules.length(), 14)
+  assert_eq(rules.length(), 13)
   assert_eq(rules.get("gain"), Some(Json::string("multiply")))
   assert_eq(rules.get("lpf"), Some(Json::string("override")))
   assert_eq(rules.get("lpf_resonance"), Some(Json::string("override")))
+}
+
+///|
+/// The pitch an exact event's atom wrote, or NaN for a drum hit.
+fn authored_pitch(event : @score.ScoreEvent) -> Double {
+  match event.sound {
+    Note(_, pitch~) => pitch
+    Hit(_) => @double.not_a_number
+  }
 }

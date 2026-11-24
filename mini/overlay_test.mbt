@@ -1,10 +1,10 @@
 ///|
 fn overlay_event_signatures(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[@pattern.Event[@score.ScoreEvent]],
 ) -> Array[
   (@pattern.TimeSpan?, @pattern.TimeSpan, Map[@control.Control, Double]),
 ] {
-  events.map(event => (event.whole, event.part, event.value.entries()))
+  events.map(event => (event.whole, event.part, event.value.controls.entries()))
 }
 
 ///|
@@ -123,7 +123,7 @@ test "overlay rejects missing operands and unmatched groups" {
 test "plus inside quoted chord notation remains chord content" {
   let pat = unwrap_ok(@mini.parse("chord(\"C+7\")"))
   let events = query_one_cycle(pat)
-  @debug.assert_eq(events.map(event => event.value.get(Note)), [
+  @debug.assert_eq(events.map(event => pitch_of(event.value)), [
     Some(60.0),
     Some(64.0),
     Some(68.0),
@@ -144,7 +144,7 @@ test "editing a binding keeps the playback identity of its use site" {
     after.pat().entries()[0].entry_key(),
   )
   @debug.assert_eq(
-    after.query(song_span(0L, 1L, 1L, 1L)).map(event => event.value.get(Note)),
+    after.query(song_span(0L, 1L, 1L, 1L)).map(event => pitch_of(event.value)),
     [Some(72.0)],
   )
 }

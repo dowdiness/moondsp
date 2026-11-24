@@ -2,12 +2,12 @@
 package "dowdiness/moondsp/scheduler"
 
 import {
-  "dowdiness/moondsp/control",
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler/internal/transport",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
   "dowdiness/moondsp/voice",
   "moonbitlang/core/debug",
@@ -49,16 +49,6 @@ pub struct BlockFrame {
   logical_arc : @pattern.TimeSpan
 }
 
-#derive(Eq, @debug.Debug)
-pub(all) enum InstrumentSelector {
-  AllEvents
-  HasControl(@control.Control)
-  ControlEquals(@control.Control, Double)
-}
-pub fn InstrumentSelector::equal(Self, Self) -> Bool
-pub fn InstrumentSelector::not_equal(Self, Self) -> Bool
-pub fn InstrumentSelector::to_repr(Self) -> @debug.Repr
-
 pub struct OnsetBuffer {
   // private fields
 }
@@ -72,7 +62,7 @@ pub fn OnsetBuffer::field(Self, Int32, Int32) -> Double
 pub struct PatternScheduler {
   // private fields
 }
-pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, instruments~ : Array[(InstrumentSelector, @voice.BoundVoicePool)]) -> Self raise @transport.TransportError
+pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, pools~ : Array[@voice.BoundVoicePool], route~ : (@score.Sound) -> Int32) -> Self raise @transport.TransportError
 pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int32, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
 pub fn PatternScheduler::accept_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::accepted_snapshot(Self) -> PlaybackSnapshot?
@@ -89,14 +79,14 @@ pub fn PatternScheduler::kill_all_voices(Self) -> Unit
 pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
 pub fn PatternScheduler::max_query_window(Self) -> @pattern.QueryWindow
 pub fn PatternScheduler::pending_material_change_count(Self) -> Int32
-pub fn PatternScheduler::process_block(Self, @pattern.Pat[@pattern.ControlMap], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
-pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@pattern.ControlMap]], @pattern.TimeSpan) -> Unit
+pub fn PatternScheduler::process_block(Self, @pattern.Pat[@score.ScoreEvent], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
+pub fn PatternScheduler::process_events(Self, Array[@pattern.Event[@score.ScoreEvent]], @pattern.TimeSpan) -> Unit
 pub fn[C : @song.SongContent] PatternScheduler::process_section_block(Self, @song.Section[C], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn[C : @song.SongContent] PatternScheduler::process_song_block(Self, @song.Song[C], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, Int32, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::push_active_note_until(Self, Int32, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
-pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot) -> Unit
-pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.PatternSnapshot[@score.ScoreEvent]) -> Unit
+pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.PatternSnapshot[@score.ScoreEvent], PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::queue_song_snapshot(Self, SongMaterial) -> Unit
 pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, SongMaterial, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
@@ -131,23 +121,23 @@ pub(all) enum PlaybackAdmissionError {
 }
 
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot)
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
-pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot) -> Self
-pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins) -> Self
-pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
-  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]])
 }
 
 #derive(Eq, @debug.Debug)

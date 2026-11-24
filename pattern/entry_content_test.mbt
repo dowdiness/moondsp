@@ -1,6 +1,6 @@
 ///|
 test "editing event controls leaves source content unchanged" {
-  let source = @pattern.note(60.0)
+  let source = @pattern.control(Note, 60.0)
   let arc = span(0, 1, 1, 1)
   let value = source.query(arc)[0].value
   let with_lpf = value.set(Lpf, 800.0)
@@ -10,43 +10,48 @@ test "editing event controls leaves source content unchanged" {
   assert_eq(with_lpf.entries(), Map([(Note, 60.0), (Lpf, 800.0)]))
   assert_eq(replaced.entries(), Map([(Note, 72.0), (Lpf, 800.0)]))
   assert_eq(source.query(arc)[0].value.entries(), Map([(Note, 60.0)]))
-  assert_true(source.same_content(@pattern.note(60.0)))
+  assert_true(source.same_content(@pattern.control(Note, 60.0)))
 }
 
 ///|
 test "content comparison distinguishes values but ignores material grouping" {
-  let a = @pattern.stack([@pattern.note(60.0).material()]).material()
-  let b = @pattern.stack([@pattern.note(60.0)]).material()
-  let changed = @pattern.stack([@pattern.note(61.0).material()]).material()
+  let a = @pattern.stack([@pattern.control(Note, 60.0).material()]).material()
+  let b = @pattern.stack([@pattern.control(Note, 60.0)]).material()
+  let changed = @pattern.stack([@pattern.control(Note, 61.0).material()]).material()
   assert_true(a.same_content(b))
   assert_false(a.same_content(changed))
 }
 
 ///|
 test "sequence owns its inputs so content and events stay consistent" {
-  let inputs = [@pattern.note(60.0)]
+  let inputs = [@pattern.control(Note, 60.0)]
   let sequence = @pattern.sequence(inputs)
-  inputs[0] = @pattern.note(72.0)
+  inputs[0] = @pattern.control(Note, 72.0)
   assert_eq(sequence.query(span(0, 1, 1, 1))[0].value.get(Note), Some(60.0))
-  assert_true(sequence.same_content(@pattern.sequence([@pattern.note(60.0)])))
+  assert_true(
+    sequence.same_content(@pattern.sequence([@pattern.control(Note, 60.0)])),
+  )
 }
 
 ///|
 test "control selection tracks both predicate and selected events" {
-  let source = @pattern.stack([@pattern.note(60.0), @pattern.sound(36.0)])
+  let source = @pattern.stack([
+    @pattern.control(Note, 60.0),
+    @pattern.control(Gain, 0.5),
+  ])
   let notes = source.select_control(Note)
-  let missing = source.select_control(Sound, value=38.0)
+  let missing = source.select_control(Note, value=38.0)
   assert_eq(notes.query(span(0, 1, 1, 1)).map(e => e.value.entries()), [
     Map([(Note, 60.0)]),
   ])
   assert_eq(missing.query(span(0, 1, 1, 1)).length(), 0)
   assert_true(notes.same_content(source.select_control(Note)))
-  assert_false(missing.same_content(source.select_control(Sound, value=36.0)))
+  assert_false(missing.same_content(source.select_control(Note, value=60.0)))
 }
 
 ///|
 test "known time operations track their operation and parameters" {
-  let source = @pattern.note(60.0)
+  let source = @pattern.control(Note, 60.0)
   let reverse = @pattern.TimeTransform::Reverse
   let fast = @pattern.TimeTransform::Fast(@pattern.Rational::from_int(2))
   assert_true(reverse.every(2, source).same_content(reverse.every(2, source)))
@@ -57,21 +62,23 @@ test "known time operations track their operation and parameters" {
 
 ///|
 test "grouping and known transforms cannot identify arbitrary code" {
-  let unknown = @pattern.Pat::from_query(@pattern.note(60.0).query)
+  let unknown = @pattern.Pat::from_query(@pattern.control(Note, 60.0).query)
   assert_false(unknown.same_content(unknown))
   let grouped = unknown.material().slow(@pattern.Rational::from_int(3))
   assert_false(grouped.same_content(grouped))
-  let filtered = @pattern.note(60.0).filter_map(v => Some(v)).material()
+  let filtered = @pattern.control(Note, 60.0)
+    .filter_map(v => Some(v))
+    .material()
   assert_false(filtered.same_content(filtered))
-  let combined = @pattern.stack([@pattern.note(60.0), unknown]).material()
+  let combined = @pattern.stack([@pattern.control(Note, 60.0), unknown]).material()
   assert_false(combined.same_content(combined))
 }
 
 ///|
 test "overlay content ignores material boundaries" {
-  let a = @pattern.note(60.0)
-  let b = @pattern.note(64.0)
-  let c = @pattern.note(67.0)
+  let a = @pattern.control(Note, 60.0)
+  let b = @pattern.control(Note, 64.0)
+  let c = @pattern.control(Note, 67.0)
   let plain = (a + b + c).material()
   let arc = span(0, 1, 2, 1)
   for subgroup in [a + b, (a + b).material()] {
@@ -87,7 +94,7 @@ test "overlay content ignores material boundaries" {
 
 ///|
 test "silent playback placeholders do not change overlay content" {
-  let a = @pattern.note(60.0)
+  let a = @pattern.control(Note, 60.0)
   let silent = @pattern.Pat::silence().material()
   let annotated = a + silent
   assert_eq(annotated.entries().length(), 2)
@@ -101,9 +108,9 @@ test "silent playback placeholders do not change overlay content" {
 
 ///|
 test "content normalization preserves opaque queries order and unknown callbacks" {
-  let a = @pattern.note(60.0)
-  let b = @pattern.note(64.0)
-  let c = @pattern.note(67.0)
+  let a = @pattern.control(Note, 60.0)
+  let b = @pattern.control(Note, 64.0)
+  let c = @pattern.control(Note, 67.0)
   let wrapped = (a + b).rev().material()
   assert_false(
     (wrapped + c).material().same_content((a.rev() + b.rev() + c).material()),

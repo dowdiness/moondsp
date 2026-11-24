@@ -1,38 +1,29 @@
 ///|
 fn copy_control_events(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  events : Array[@pattern.Event[@score.ScoreEvent]],
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   @voice_runtime.copy_control_events(events)
 }
 
 ///|
-/// Which events an instrument plays. The scheduler routes each event to the
-/// first instrument whose selector matches its controls; an event no
-/// instrument selects stays silent.
-#derive(Eq, Debug)
-pub(all) enum InstrumentSelector {
-  AllEvents
-  HasControl(@control.Control)
-  ControlEquals(@control.Control, Double)
+/// What a voice reads at note-on: the event's controls, and the pitch of a
+/// note as `Note` (ADR-0022).
+priv struct NoteOnControls {
+  sound : @score.Sound
+  controls : @pattern.Controls
 }
 
 ///|
-pub extend InstrumentSelector with Eq::{not_equal, equal}
-
-///|
-pub extend InstrumentSelector with @moonbitlang/core/debug.Debug::{to_repr}
-
-///|
-fn InstrumentSelector::selects(
-  self : InstrumentSelector,
-  controls : @pattern.ControlMap,
-) -> Bool {
-  match self {
-    AllEvents => true
-    HasControl(key) => controls.get(key) is Some(_)
-    ControlEquals(key, expected) =>
-      controls.get(key) is Some(v) && v == expected
+impl @control.ControlSource for NoteOnControls with fn value(self, key) {
+  match (key, self.sound) {
+    (Note, Note(_, pitch~)) => @control.ControlValue::of(pitch)
+    _ => @control.ControlSource::value(self.controls, key)
   }
+}
+
+///|
+impl @control.ControlSource for NoteOnControls with fn each_varying(self, f) {
+  @control.ControlSource::each_varying(self.controls, f)
 }
 
 ///|
@@ -49,8 +40,8 @@ pub struct PatternScheduler {
   priv mut previous_events : Array[@playback.PlaybackSourcedEvent]
   priv mut previous_clock : @transport.Clock
   priv ctx : @moondsp.DspContext
-  priv selectors : Array[InstrumentSelector]
   priv pools : Array[@moondsp.BoundVoicePool]
+  priv route : (@score.Sound) -> Int32
   priv active_notes : @voice_runtime.ActiveNotes
   priv playback_state : @playback.PlaybackState
   priv mut onsets : OnsetBuffer?
@@ -58,12 +49,14 @@ pub struct PatternScheduler {
 
 ///|
 ///
-/// `instruments` lists every voice pool this scheduler plays, in routing
-/// order. All instruments share one clock, one accepted score, and one mix.
+/// `pools` lists every voice pool this scheduler plays, and `route` gives the
+/// index in `pools` of the pool that plays a sound. All pools share one clock,
+/// one accepted score, and one mix.
 pub fn PatternScheduler::PatternScheduler(
   bpm~ : Double,
   ctx~ : @moondsp.DspContext,
-  instruments~ : Array[(InstrumentSelector, @moondsp.BoundVoicePool)],
+  pools~ : Array[@moondsp.BoundVoicePool],
+  route~ : (@score.Sound) -> Int32,
 ) -> PatternScheduler raise @transport.TransportError {
   let tempo = @transport.Tempo::from_bpm(bpm).unwrap_or_error()
   let clock = @transport.Clock::at_start(tempo, ctx.sample_rate()).unwrap_or_error()
@@ -85,8 +78,8 @@ pub fn PatternScheduler::PatternScheduler(
     previous_events: [],
     previous_clock: clock,
     ctx,
-    selectors: instruments.map(instrument => instrument.0),
-    pools: instruments.map(instrument => instrument.1),
+    pools,
+    route,
     active_notes: @voice_runtime.ActiveNotes(),
     playback_state: @playback.PlaybackState(),
     onsets: None,
@@ -136,7 +129,7 @@ pub fn PatternScheduler::expire_notes(
 /// continuous signals (no onset) and are skipped.
 pub fn PatternScheduler::process_events(
   self : PatternScheduler,
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[@pattern.Event[@score.ScoreEvent]],
   arc : @pattern.TimeSpan,
 ) -> Unit {
   self.process_events_with_origin(
@@ -149,7 +142,7 @@ pub fn PatternScheduler::process_events(
 ///|
 fn PatternScheduler::process_single_event(
   self : PatternScheduler,
-  event : @pattern.Event[@pattern.ControlMap],
+  event : @pattern.Event[@score.ScoreEvent],
   origin : @model.VoiceOrigin,
   source_origin : @pattern.EventOrigin?,
   source_frame : @identity.SourceFrameId?,
@@ -159,13 +152,7 @@ fn PatternScheduler::process_single_event(
   onset_sample : Int64,
   arc : @pattern.TimeSpan,
 ) -> Unit {
-  let instrument = for i in 0..<self.selectors.length() {
-    if self.selectors[i].selects(event.value) {
-      break i
-    }
-  } nobreak {
-    return
-  }
+  let instrument = (self.route)(event.value.sound)
   let pool = self.pools[instrument]
   match event.whole {
     None => ()
@@ -174,6 +161,7 @@ fn PatternScheduler::process_single_event(
         ()
       } else {
         // The pool's bindings decide what each key sets and in which unit.
+        let controls = NoteOnControls::{ sound: event.value.sound, controls, }
         let gate = pool.note_gate(controls)
         let endpoint = match gate {
           EventEnd => self.clock.sample_at(whole.end_)
@@ -226,7 +214,7 @@ fn PatternScheduler::process_single_event(
 ///|
 fn PatternScheduler::process_events_with_origin(
   self : PatternScheduler,
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[@pattern.Event[@score.ScoreEvent]],
   arc : @pattern.TimeSpan,
   origin : @model.VoiceOrigin,
 ) -> Unit {
@@ -241,7 +229,7 @@ fn PatternScheduler::process_events_with_origin(
       None,
       -1.0,
       -1.0,
-      @pattern.Controls::fixed(event.value),
+      @pattern.Controls::fixed(event.value.controls),
       -1L,
       arc,
     )
@@ -251,16 +239,16 @@ fn PatternScheduler::process_events_with_origin(
 ///|
 fn PatternScheduler::query_pattern_block(
   self : PatternScheduler,
-  pat : @pattern.Pat[@pattern.ControlMap],
+  pat : @pattern.Pat[@score.ScoreEvent],
   frame : BlockFrame,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   ignore(self)
   pat.query(frame.logical_arc)
 }
 
 ///|
 fn anonymous_playback_events(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[@pattern.Event[@score.ScoreEvent]],
 ) -> Array[@playback.PlaybackSourcedEvent] {
   events.map(event => @playback.PlaybackSourcedEvent::anonymous(event))
 }
@@ -437,7 +425,7 @@ fn PatternScheduler::process_block_events(
 /// new events, triggers voices, advances the sample counter, and renders.
 pub fn PatternScheduler::process_block(
   self : PatternScheduler,
-  pat : @pattern.Pat[@pattern.ControlMap],
+  pat : @pattern.Pat[@score.ScoreEvent],
   left : @moondsp.AudioBuffer,
   right : @moondsp.AudioBuffer,
 ) -> Unit {

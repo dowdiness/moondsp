@@ -10,10 +10,10 @@ test "Unrepresentable render frame silences dry and send without accepting queue
     @moondsp.ControlBindingBuilder(),
     max_voices=1,
   )
-  let sched = PatternScheduler(bpm=1000.0, ctx~, instruments=[(AllEvents, pool)])
+  let sched = PatternScheduler(bpm=1000.0, ctx~, pools=[pool], route=_ => 0)
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("unaccepted"),
-    pat=@pattern.note(60.0),
+    pat=@score.note(60.0),
   ).lower()
   sched.queue_pattern_snapshot(snapshot)
   // Move directly to the last representable sample at 1000 BPM without

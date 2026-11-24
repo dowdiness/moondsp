@@ -297,7 +297,7 @@ pub struct SongEntry[C] {
   priv origin : SongEventOrigin
   priv content : C
   priv index : Int32
-  priv body : @pattern.Pat[@pattern.ControlMap]
+  priv body : @pattern.Pat[@score.ScoreEvent]
 }
 
 ///|
@@ -310,7 +310,7 @@ pub fn[C] SongEntry::origin(self : SongEntry[C]) -> SongEventOrigin {
 /// time.
 pub fn[C] SongEntry::body(
   self : SongEntry[C],
-) -> @pattern.Pat[@pattern.ControlMap] {
+) -> @pattern.Pat[@score.ScoreEvent] {
   self.body
 }
 

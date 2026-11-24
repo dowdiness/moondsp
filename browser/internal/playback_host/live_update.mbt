@@ -31,7 +31,6 @@ priv struct PreparedSong {
   source : String
   tempo : @scheduler.Tempo
   layout : PlaybackLayout
-  doc : @pattern.PatternDoc?
   snapshot : @scheduler.PlaybackSnapshot
   span : PlaybackSpan
 }
@@ -221,13 +220,9 @@ fn Player::prepare(
   self : Player,
   input : @mini.PlaybackInput,
 ) -> Result[PreparedSong, PlayerError] {
-  let previous = match self.session.song() {
-    Some(song) => song.doc
-    None => None
-  }
   // Admission covers every supported future tempo, including the demo control.
   let prepared = match
-    input.compile(query_window=self.scheduler.max_query_window(), previous~) {
+    input.compile(query_window=self.scheduler.max_query_window()) {
     Ok(prepared) => prepared
     Err(message) => return Err(InvalidSource(message))
   }
@@ -242,7 +237,6 @@ fn Player::prepare(
         source,
         tempo,
         layout: PatternLayout,
-        doc: None,
         snapshot: @scheduler.PlaybackSnapshot::pattern_with_origins(snapshot),
         span: Continuous,
       })
@@ -264,7 +258,6 @@ fn Player::prepare(
             source,
             tempo,
             layout: PatternLayout,
-            doc: Some(doc),
             snapshot: @scheduler.PlaybackSnapshot::pattern(snapshot),
             span: Continuous,
           })
@@ -318,7 +311,6 @@ fn[C : @song.SongContent] Player::prepare_arrangement(
     source,
     tempo,
     layout: song_layout(song, repeated),
-    doc: None,
     snapshot: if repeated {
       @scheduler.PlaybackSnapshot::repeat_song(material(snapshot))
     } else {

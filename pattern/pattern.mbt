@@ -103,7 +103,10 @@ pub fn[A] Pat::silence() -> Pat[A] {
 }
 
 ///|
-pub fn[A] Pat::pure(value : A) -> Pat[A] {
+/// One `value` per cycle. `content` describes the value for playback
+/// entries; equal content must mean an equal value. Without it, the content
+/// is unknown, and no other pattern has the same content.
+pub fn[A] Pat::pure(value : A, content~ : String = "") -> Pat[A] {
   make_pat(
     fn(arc) {
       arc
@@ -121,7 +124,7 @@ pub fn[A] Pat::pure(value : A) -> Pat[A] {
     Rational::from_int(1),
     Opaque([]),
     Anonymous,
-    "",
+    content,
   )
 }
 

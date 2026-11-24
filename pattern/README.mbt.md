@@ -25,7 +25,7 @@ streams, situated between text notation and audio-rate scheduling:
 ```
 
 - **Upstream consumers**: [`mini/`](../mini/) parses mini notation strings
-  into `Pat[ControlMap]` or `PatternDoc`.
+  into `Pat[ScoreEvent]` or `PatternDoc[ScoreEvent]`.
 - **Downstream dependencies**: [`identity/`](../identity/) provides stable node
   identifiers and revisions for `PatternDoc`. [`song/`](../song/) and
   [`scheduler/`](../scheduler/) consume patterns over time spans. `pattern` has
@@ -39,7 +39,7 @@ streams, situated between text notation and audio-rate scheduling:
 | **Core Query & Events** | `Pat[A]`, `Event[A]` | `Pat::pure`, `Pat::silence`, `Pat::from_query`, `Pat::query`, `Pat::same_content`, `Event::shift` |
 | **Combinators** | `sequence`, `stack`, `controls`, `+` | `sequence`, `stack`, `controls`, `Pat::entries`, `Pat::material`, `Pat::select_control` |
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
-| **Control Helpers** | `ControlMap`, helper functions | `note`, `note_name`, `chord`, `sound`, `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
+| **Control Helpers** | `ControlMap`, helper functions | `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
 | **Document & Identity** | `PatternDoc`, `PatternSnapshot`, `PatternLoweringCache` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
 | **Exact Origins** | `PatternSnapshotWithOrigins`, `EventWithOrigin`, `EventOrigin`, `ResolvedReference` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::lower_with_origins` |
 
@@ -140,8 +140,8 @@ Use `+` to play patterns together:
 ```mbt check
 ///|
 test "overlay keeps separate events" {
-  let notes = @pattern.note(60.0)
-  let drums = @pattern.sound(36.0)
+  let notes = @pattern.control(Note, 60.0)
+  let drums = @pattern.control(Note, 36.0)
   let cycle = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -150,7 +150,7 @@ test "overlay keeps separate events" {
 
   assert_eq(events.length(), 2)
   assert_true(events[0].value.get(Note) == Some(60.0))
-  assert_true(events[1].value.get(Sound) == Some(36.0))
+  assert_true(events[1].value.get(Note) == Some(36.0))
 }
 ```
 
@@ -211,20 +211,20 @@ let half_speed = pat.slow(@pattern.Rational::from_int(2))
 
 Audio-facing helpers produce `Pat[ControlMap]` values:
 
-- `note` and `note_name` set `note`;
-- `chord` overlays several note events;
-- `sound` sets `sound`;
 - `control` creates any scalar control;
 - `continuous` creates a control whose value is a function of exact time;
 - `s_gain`, `s_lpf`, `s_hpf`, and `s_pan` create common control patterns.
 
-The pattern package only carries these values. A scheduler or host decides how
-a control maps to an instrument or DSP parameter.
+The pattern package only carries these values. Which sound an event plays is
+not a control: score events (`@score.ScoreEvent`) carry it beside their
+controls. Operations that touch controls work on any payload that implements
+`WithControls`. A scheduler or host decides how a control maps to a DSP
+parameter.
 
 ## Live-editing identity
 
-`PatternDoc` adds stable `PatternNodeId` values and revisions to an authored
-`ControlMap` pattern tree. General lowering produces a `PatternSnapshot` with voice-scope
+`PatternDoc[A]` adds stable `PatternNodeId` values and revisions to an
+authored pattern tree. General lowering produces a `PatternSnapshot` with voice-scope
 paths. A scope may contain several leaves; its last node is not an exact source
 atom. Use `pattern_node_path()` for scope operations, not source highlighting.
 
@@ -276,9 +276,8 @@ structure nodes; an opaque `from_pattern` provider raises
 
 `doc.with_source_frame(frame~)` captures literal-local onset coordinates before
 enclosing transforms. It annotates the root without adding a musical graph node
-or changing node paths. Exact events expose `source_frame()`, `source_start()`,
-and `source_pitch()`; absent pitch is NaN, not `-1`, since negative numeric notes
-are valid. Local time wraps over the notation's whole-cycle repeat span.
+or changing node paths. Exact events expose `source_frame()` and `source_start()`;
+the pitch belongs to the event payload. Local time wraps over the notation's whole-cycle repeat span.
 `EventOrigin::write_binding_serials(storage, offset, limit)` writes complete
 reference/binding/definition triples into caller-owned storage. It returns the
 binding count, or `-1` without writing if capacity, epoch, or scalar bounds fail.

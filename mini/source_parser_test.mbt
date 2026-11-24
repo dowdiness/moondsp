@@ -4,16 +4,8 @@ fn play_source_song() -> String {
 }
 
 ///|
-test "play source parses pattern and preserves previous document" {
-  let first = @mini.parse_play_source("s(\"bd\")").unwrap()
-  let first_doc = match first.body() {
-    Pattern(doc) => doc
-    _ => fail("expected pattern")
-  }
-  let edited = @mini.parse_play_source(
-    "// header\ns(\"sd\") // tail",
-    previous=Some(first_doc),
-  ).unwrap()
+test "play source parses a pattern with comments" {
+  let edited = @mini.parse_play_source("// header\ns(\"sd\") // tail").unwrap()
   assert_eq(edited.bpm(), 120.0)
   match edited.body() {
     Pattern(_) => ()
@@ -123,8 +115,8 @@ test "bounded play source preserves ordinary musical output" {
       ),
     )
   assert_eq(events.length(), 4)
-  assert_eq(events[0].value.get(Note), Some(60.0))
-  assert_eq(events[1].value.get(Note), Some(64.0))
+  assert_eq(pitch_of(events[0].value), Some(60.0))
+  assert_eq(pitch_of(events[1].value), Some(64.0))
 }
 
 ///|

@@ -12,7 +12,7 @@ fn bus_r(num : Int64, den : Int64) -> @pattern.Rational {
 
 ///|
 /// Continuous control whose value is the absolute time it is sampled at.
-fn bus_ramp(name : String) -> @pattern.PatternDoc {
+fn bus_ramp(name : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
   @pattern.PatternDoc::continuous(id=bus_id(name), key=Gain, f=t => t)
 }
 
@@ -21,7 +21,7 @@ fn bus_ramp(name : String) -> @pattern.PatternDoc {
 fn bus_steps(
   name : String,
   values : Array[Double],
-) -> @pattern.PatternDoc raise {
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
   @pattern.PatternDoc::sequence(
     id=bus_id(name),
     docs=values.mapi((i, v) => {
@@ -37,8 +37,8 @@ fn bus_steps(
 fn bus_with(
   source : String,
   name : String,
-  right : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise {
+  right : @pattern.PatternDoc[@pattern.ControlMap],
+) -> @pattern.PatternDoc[@score.ScoreEvent] raise {
   @pattern.PatternDoc::merge_control(
     id=bus_id(name),
     left=bus_doc(source),
@@ -47,7 +47,7 @@ fn bus_with(
 }
 
 ///|
-fn bus_doc(source : String) -> @pattern.PatternDoc {
+fn bus_doc(source : String) -> @pattern.PatternDoc[@score.ScoreEvent] {
   match @mini.parse_doc(source) {
     Ok(doc) => doc
     Err(message) => abort(message)
@@ -55,7 +55,10 @@ fn bus_doc(source : String) -> @pattern.PatternDoc {
 }
 
 ///|
-fn bus_with_ramp(source : String, name : String) -> @pattern.PatternDoc raise {
+fn bus_with_ramp(
+  source : String,
+  name : String,
+) -> @pattern.PatternDoc[@score.ScoreEvent] raise {
   bus_with(source, name, bus_ramp(name + "-ramp"))
 }
 
@@ -80,7 +83,7 @@ fn bus_first_onset(
     None => abort("no bus for \{key}")
   }
   (
-    onset.event().value.get(key),
+    onset.event().value.controls.get(key),
     times.map(t => read(t.num, t.den).get().unwrap()),
   )
 }
@@ -185,7 +188,10 @@ test "a provider that is itself a merge sets the key wherever its left has an ev
   )
   @debug.assert_eq(
     events.map(event => {
-      (event.event().value.get(Gain), event.event().value.get(Lpf))
+      (
+        event.event().value.controls.get(Gain),
+        event.event().value.controls.get(Lpf),
+      )
     }),
     [(Some(0.3), Some(800.0)), (Some(0.6), Some(800.0))],
   )
@@ -227,7 +233,7 @@ test "continuous bus signal is exact under rev and inside sequence" {
     bus_with_ramp("note(\"60 64\")", "a"),
     bus_doc("note(\"67\")"),
   ]).lower()
-  let gain_reader = (snapshot : @pattern.PatternSnapshot) => {
+  let gain_reader = (snapshot : @pattern.PatternSnapshot[@score.ScoreEvent]) => {
     snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
@@ -251,12 +257,14 @@ test "continuous bus signal is exact under rev and inside sequence" {
 ///|
 test "filter_map that rewrites a bound value unbinds it" {
   let snapshot = bus_with("note(\"60\")", "m", bus_steps("st", [0.5]))
-    .filter_map(id=bus_id("f"), f=c => Some(c.set(Gain, 1.0)))
+    .filter_map(id=bus_id("f"), f=event => {
+      Some({ ..event, controls: event.controls.set(Gain, 1.0), })
+    })
     .lower()
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
-  @debug.assert_eq(onset.event().value.get(Gain), Some(1.0))
+  @debug.assert_eq(onset.event().value.controls.get(Gain), Some(1.0))
   @debug.assert_eq(onset.controls().reader(Gain) is None, true)
   // An unchanged value keeps following its bus.
   let kept = bus_with("note(\"60\")", "k", bus_steps("st", [0.5]))
@@ -279,7 +287,7 @@ test "cached subtree buses follow their new position after an edit" {
     bus_with("note(\"64\")", "b", bus_steps("sb", [0.6, 0.8])),
   ])
   fn gain_buses(
-    snapshot : @pattern.PatternSnapshot,
+    snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
   ) -> Array[(Double?, Double)] {
     let arc = @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L))
     snapshot
@@ -289,10 +297,10 @@ test "cached subtree buses follow their new position after an edit" {
         Some(read) => read(3L, 4L).get().unwrap()
         None => -1.0
       }
-      (event.event().value.get(Note), value)
+      (pitch_of(event.event().value), value)
     })
   }
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@score.ScoreEvent] = @pattern.PatternLoweringCache::new()
   let original = doc.lower_with_cache(cache)
   @debug.assert_eq(gain_buses(original), [(Some(60.0), 0.4), (Some(64.0), 0.8)])
   let edited = doc.replace_with_silence(id=bus_id("a"))
@@ -321,7 +329,7 @@ fn mini_control_at(
   guard onset.controls().reader(key) is Some(read) else {
     fail("no \{key} bus")
   }
-  (onset.event().value.get(key), read(at.num, at.den).get().unwrap())
+  (onset.event().value.controls.get(key), read(at.num, at.den).get().unwrap())
 }
 
 ///|
@@ -430,7 +438,7 @@ test "step argument spelling does not change identity or degrade drops" {
 fn bus_gain_or_rest(
   name : String,
   values : Array[Double],
-) -> @pattern.PatternDoc raise {
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise {
   @pattern.PatternDoc::sequence(
     id=bus_id(name),
     docs=values.mapi((i, v) => {
@@ -449,13 +457,15 @@ fn bus_gain_or_rest(
 
 ///|
 /// The first onset's `gain`, and its gain bus read at 1/4 and 3/4.
-fn bus_gain_reads(doc : @pattern.PatternDoc) -> (Double?, Array[Double]) raise {
+fn[A : @pattern.WithControls] bus_gain_reads(
+  doc : @pattern.PatternDoc[A],
+) -> (Double?, Array[Double]) raise {
   let onset = doc
     .lower()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   let read = onset.controls().reader(Gain).unwrap()
   (
-    onset.event().value.get(Gain),
+    onset.event().value.controls().get(Gain),
     [read(1L, 4L).get().unwrap(), read(3L, 4L).get().unwrap()],
   )
 }
@@ -560,9 +570,9 @@ test "a voice follows only the keys whose bus varies" {
     followed.push("\{key} \{read(1L, 2L)}")
   })
   @debug.assert_eq(followed, ["gain 0.5"])
-  let keys : Array[@control.Control] = [Note, Lpf, Gain, Pan]
+  let keys : Array[@control.Control] = [Lpf, Gain, Pan]
   @debug.assert_eq(
     keys.map(key => "\{@control.ControlSource::value(controls, key)}"),
-    ["60", "1200", "0", "absent"],
+    ["1200", "0", "absent"],
   )
 }

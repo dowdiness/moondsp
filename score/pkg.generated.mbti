@@ -1,0 +1,66 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/score"
+
+import {
+  "dowdiness/moondsp/pattern",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn hit(Drum) -> @pattern.Pat[ScoreEvent]
+
+pub fn note(Double) -> @pattern.Pat[ScoreEvent]
+
+// Errors
+
+// Types and methods
+#derive(Eq, @debug.Debug)
+pub enum Drum {
+  Bd
+  Sd
+  Cp
+  Hh
+  Oh
+}
+pub fn Drum::all() -> Array[Self]
+pub fn Drum::equal(Self, Self) -> Bool
+pub fn Drum::name(Self) -> String
+pub fn Drum::not_equal(Self, Self) -> Bool
+pub fn Drum::parse(String) -> Self?
+pub fn Drum::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub enum Instrument {
+  Triangle
+}
+pub fn Instrument::all() -> Array[Self]
+pub fn Instrument::default() -> Self
+pub fn Instrument::equal(Self, Self) -> Bool
+pub fn Instrument::name(Self) -> String
+pub fn Instrument::not_equal(Self, Self) -> Bool
+pub fn Instrument::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) struct ScoreEvent {
+  sound : Sound
+  controls : @pattern.ControlMap
+}
+pub fn ScoreEvent::ScoreEvent(Sound) -> Self
+pub fn ScoreEvent::equal(Self, Self) -> Bool
+pub fn ScoreEvent::not_equal(Self, Self) -> Bool
+pub fn ScoreEvent::to_repr(Self) -> @debug.Repr
+pub impl @pattern.WithControls for ScoreEvent
+
+#derive(Eq, @debug.Debug)
+pub(all) enum Sound {
+  Hit(Drum)
+  Note(Instrument, pitch~ : Double)
+}
+pub fn Sound::content(Self) -> String
+pub fn Sound::equal(Self, Self) -> Bool
+pub fn Sound::not_equal(Self, Self) -> Bool
+pub fn Sound::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

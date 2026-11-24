@@ -3,9 +3,9 @@ fn allocation_bench_snapshot(dense : Bool) -> PlaybackSnapshot raise {
   let note = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("bench-notes"),
     pat=@pattern.sequence([
-      @pattern.note(60.0),
-      @pattern.note(64.0),
-      @pattern.note(67.0),
+      @score.note(60.0),
+      @score.note(64.0),
+      @score.note(67.0),
     ]),
   )
   if !dense {
@@ -41,11 +41,7 @@ fn allocation_bench_snapshot(dense : Bool) -> PlaybackSnapshot raise {
   )
   let chord = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("bench-chord"),
-    pat=@pattern.stack([
-      @pattern.note(60.0),
-      @pattern.note(64.0),
-      @pattern.note(67.0),
-    ]),
+    pat=@pattern.stack([@score.note(60.0), @score.note(64.0), @score.note(67.0)]),
   ).fast(
     id=@identity.PatternNodeId::from_string("bench-chord-fast"),
     factor=@pattern.Rational::from_int(16),

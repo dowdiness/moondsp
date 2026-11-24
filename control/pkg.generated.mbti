@@ -14,7 +14,6 @@ pub const MAX_SECONDS : Double = 86400.0
 #derive(Eq, @debug.Debug)
 pub(all) enum Control {
   Note
-  Sound
   Gain
   Pan
   Room

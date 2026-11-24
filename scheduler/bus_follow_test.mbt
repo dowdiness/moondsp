@@ -18,13 +18,14 @@ fn bus_id(name : String) -> @identity.PatternNodeId {
 ///|
 /// One note held for 2 cycles under `slow(2)`, with `lpf` read from `cutoff`
 /// over the first cycle before the stretch.
-fn bus_doc(cutoff : (Double) -> Double) -> @pattern.PatternSnapshot raise {
+fn bus_doc(
+  cutoff : (Double) -> Double,
+) -> @pattern.PatternSnapshot[@score.ScoreEvent] raise {
   @pattern.PatternDoc::merge_control(
     id=bus_id("merge"),
-    left=@pattern.PatternDoc::control_atom(
+    left=@pattern.PatternDoc::atom(
       id=bus_id("note"),
-      key=Note,
-      value=60.0,
+      value=played(@pattern.ControlMap::single(Note, 60.0)),
     ),
     right=@pattern.PatternDoc::continuous(id=bus_id("lpf"), key=Lpf, f=cutoff),
   )
@@ -65,11 +66,16 @@ fn bus_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool raise {
 ///|
 /// Per-block brightness (RMS of the first difference, which rises with the
 /// lowpass cutoff) of two cycles played through the scheduler.
-fn bus_brightness(snapshot : @pattern.PatternSnapshot) -> Array[Double] raise {
+fn bus_brightness(
+  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+) -> Array[Double] raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
-  let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-    (@scheduler.InstrumentSelector::AllEvents, bus_pool(ctx)),
-  ])
+  let scheduler = @scheduler.PatternScheduler(
+    bpm=120.0,
+    ctx~,
+    pools=[bus_pool(ctx)],
+    route=_ => 0,
+  )
   scheduler.queue_pattern_snapshot(snapshot)
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
@@ -128,7 +134,9 @@ test "a held voice follows a stretched lpf sweep through its bus" {
 
 ///|
 /// RMS of the first block of `doc` played with gain bound to the voice frame.
-fn bus_first_block_rms(doc : @pattern.PatternDoc) -> Double raise {
+fn bus_first_block_rms(
+  doc : @pattern.PatternDoc[@score.ScoreEvent],
+) -> Double raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let pool = @moondsp.BoundVoicePool(
     @moondsp.AnalyzedGraph::analyze([
@@ -142,9 +150,9 @@ fn bus_first_block_rms(doc : @pattern.PatternDoc) -> Double raise {
     ),
     max_voices=4,
   )
-  let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-    (@scheduler.InstrumentSelector::AllEvents, pool),
-  ])
+  let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => {
+    0
+  })
   scheduler.queue_pattern_snapshot(doc.lower())
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
@@ -161,15 +169,17 @@ test "a voice starts from its bus value, which rev defines" {
   // Reversed, the second slot's note sounds first. Its bus reads the step
   // just before the slot's end (0.9); the slot's own query samples its
   // start (0.1).
-  let doc = (gain : @pattern.PatternDoc) => {
+  let doc = (gain : @pattern.PatternDoc[@pattern.ControlMap]) => {
     @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
-      @pattern.PatternDoc::control_atom(id=bus_id("other"), key=Gain, value=0.0),
+      @pattern.PatternDoc::atom(
+        id=bus_id("other"),
+        value=played(@pattern.ControlMap::single(Gain, 0.0)),
+      ),
       @pattern.PatternDoc::merge_control(
         id=bus_id("merge"),
-        left=@pattern.PatternDoc::control_atom(
+        left=@pattern.PatternDoc::atom(
           id=bus_id("note"),
-          key=Note,
-          value=60.0,
+          value=played(@pattern.ControlMap::single(Note, 60.0)),
         ),
         right=gain,
       ),

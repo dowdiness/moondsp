@@ -43,9 +43,7 @@ fn transport_fixture(
     max_voices=4,
   )
   (
-    @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-      (@scheduler.AllEvents, pool),
-    ]),
+    @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => 0),
     pool,
     ctx.make_buffer(),
     ctx.make_buffer(),
@@ -57,13 +55,15 @@ fn single_span(
   begin : @pattern.Rational,
   end_ : @pattern.Rational,
   control~ : @pattern.ControlMap = @pattern.ControlMap::empty(),
-) -> @song.Song[@pattern.Pat[@pattern.ControlMap]] raise {
+) -> @song.Song[@pattern.Pat[@score.ScoreEvent]] raise {
   let duration = end_ - begin
   let section = @song.Section::Section(
     name="note",
     length_cycles=duration,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(@pattern.Pat::pure(control).slow(duration)),
+    body=@song.SectionBody::single(
+      @pattern.Pat::pure(played(control)).slow(duration),
+    ),
   )
   @song.Song::Song(parts=[
     @song.SongPart::at(start=begin, name="once", section~),
@@ -205,12 +205,14 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
 ///|
 test "zero hold finishes immediately and invalid hold does not start a voice" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
-  let silent = @pattern.Pat::pure(@pattern.ControlMap::empty().set(Hold, 0.0))
+  let silent = @pattern.Pat::pure(
+    played(@pattern.ControlMap::empty().set(Hold, 0.0)),
+  )
   sched.process_block(silent, left, right)
   assert_eq(left.get(0), 0.0)
   assert_eq(sched.active_note_count(), 0)
   let invalid = @pattern.Pat::pure(
-    @pattern.ControlMap::empty().set(Attack, 2.0).set(Hold, -1.0),
+    played(@pattern.ControlMap::empty().set(Attack, 2.0).set(Hold, -1.0)),
   )
   sched.process_block(invalid, left, right)
   assert_eq(sched.active_note_count(), 0)
@@ -287,9 +289,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
     @scheduler.PlaybackSnapshot::pattern(
       @pattern.PatternDoc::from_pattern(
         id=@identity.PatternNodeId::from_string(name),
-        pat=@pattern.note(note)
-          .slow(@pattern.Rational::from_int(1000))
-          .material(),
+        pat=@score.note(note).slow(@pattern.Rational::from_int(1000)).material(),
       ).lower(),
     )
   }
@@ -310,7 +310,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
     @pattern.Rational::from_int(1),
   )
   assert_eq(
-    second.accepted_snapshot().unwrap().query(arc)[0].value.get(Note),
+    pitch_of(second.accepted_snapshot().unwrap().query(arc)[0].value),
     Some(60.0),
   )
   second.render_block(left, right)
@@ -320,7 +320,7 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(second.sample_counter(), 0L)
   assert_eq(second.pending_material_change_count(), 0)
   assert_eq(
-    second.accepted_snapshot().unwrap().query(arc)[0].value.get(Note),
+    pitch_of(second.accepted_snapshot().unwrap().query(arc)[0].value),
     Some(80.0),
   )
 }

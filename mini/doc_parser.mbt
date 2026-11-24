@@ -1,6 +1,5 @@
 ///|
 pub struct MiniDocBuilder {
-  priv previous : @pattern.PatternDoc?
   priv counters : Map[String, Int32]
   priv origins : SourceMap?
   priv source_atom_by_graph_id : Map[String, @identity.SourceAtomId]
@@ -36,11 +35,9 @@ fn mini_doc_id_fragment(value : String) -> String {
 
 ///|
 fn MiniDocBuilder::MiniDocBuilder(
-  previous~ : @pattern.PatternDoc?,
   origins~ : SourceMap? = None,
 ) -> MiniDocBuilder {
   {
-    previous,
     counters: Map([]),
     origins,
     source_atom_by_graph_id: Map([]),
@@ -61,12 +58,9 @@ fn MiniDocBuilder::source_frame_at(
 }
 
 ///|
-/// Create a reusable mini `PatternDoc` semantic builder for external
-/// frontends. Pass the last successful document to preserve subtree reuse.
-pub fn MiniDocBuilder::with_previous(
-  previous : @pattern.PatternDoc?,
-) -> MiniDocBuilder {
-  MiniDocBuilder(previous~)
+/// Create a mini `PatternDoc` semantic builder for external frontends.
+pub fn MiniDocBuilder::new() -> MiniDocBuilder {
+  MiniDocBuilder()
 }
 
 ///|
@@ -75,15 +69,11 @@ pub fn MiniDocBuilder::sound_atom(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   name : String,
-) -> Result[@pattern.PatternDoc, String] {
-  let doc = match drum_midi(name) {
-    Some(midi) =>
-      self.control_doc(id, Sound, midi.to_double()) catch {
-        problem => return Err(problem.to_string())
-      }
-    None => return Err("unknown drum name '\{name}'")
+) -> Result[ScoreDoc, String] {
+  match @score.Drum::parse(name) {
+    Some(drum) => Ok(self.sound_doc(id, Hit(drum)))
+    None => Err("unknown drum name '\{name}'")
   }
-  Ok(doc)
 }
 
 ///|
@@ -92,15 +82,10 @@ pub fn MiniDocBuilder::note_atom(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   text : String,
-) -> Result[@pattern.PatternDoc, String] {
-  let note = match parse_mini_doc_builder_note_text(text) {
-    Ok(note) => note
-    Err(msg) => return Err(msg)
-  }
-  let doc = self.control_doc(id, Note, note) catch {
-    problem => return Err(problem.to_string())
-  }
-  Ok(doc)
+) -> Result[ScoreDoc, String] {
+  parse_mini_doc_builder_note_text(text).map(pitch => {
+    self.sound_doc(id, Note(@score.Instrument::default(), pitch~))
+  })
 }
 
 ///|
@@ -118,27 +103,25 @@ fn MiniDocBuilder::chord_doc_from_notes(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   notes : Array[Int32],
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   self.contents[id.value()] = "chord:\{notes.map(note => "\{note}").join(":")}"
-  match self.reuse_doc(id) {
-    Some(doc) => doc
-    None => {
-      let note_docs : Array[@pattern.PatternDoc] = []
-      let mut tone_index = 0
-      for midi in notes {
-        let note_id = self.chord_tone_id(id, tone_index, midi)
-        match self.source_atom_by_graph_id.get(id.value()) {
-          Some(source_atom) =>
-            self.source_atom_by_graph_id[note_id.value()] = source_atom
-          None => ()
-        }
-        note_docs.push(self.control_doc(note_id, Note, midi.to_double()))
-        tone_index += 1
-      }
-      @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let note_docs : Array[ScoreDoc] = []
+  for tone_index, midi in notes {
+    let note_id = self.chord_tone_id(id, tone_index, midi)
+    match self.source_atom_by_graph_id.get(id.value()) {
+      Some(source_atom) =>
+        self.source_atom_by_graph_id[note_id.value()] = source_atom
+      None => ()
     }
+    note_docs.push(
+      self.sound_doc(
+        note_id,
+        Note(@score.Instrument::default(), pitch=midi.to_double()),
+      ),
+    )
+  }
+  @pattern.PatternDoc::stack(id~, docs=note_docs) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
@@ -149,7 +132,7 @@ pub fn MiniDocBuilder::chord_atom(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
   name : String,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[ScoreDoc, String] {
   match @pattern.parse_chord(name) {
     Some(notes) => {
       let doc = self.chord_doc_from_notes(id, notes) catch {
@@ -191,12 +174,12 @@ fn parse_mini_doc_builder_note_text(text : String) -> Result[Double, String] {
 }
 
 ///|
-/// Build a mini fast transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::fast(
+/// Build a mini fast transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::fast(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   factor : @pattern.Rational,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.fast_doc(doc, factor) catch {
     problem => return Err(problem.to_string())
   }
@@ -204,12 +187,12 @@ pub fn MiniDocBuilder::fast(
 }
 
 ///|
-/// Build a mini slow transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::slow(
+/// Build a mini slow transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::slow(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   factor : @pattern.Rational,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.slow_doc(doc, factor) catch {
     problem => return Err(problem.to_string())
   }
@@ -217,11 +200,11 @@ pub fn MiniDocBuilder::slow(
 }
 
 ///|
-/// Build a mini rev transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::rev(
+/// Build a mini rev transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::rev(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
-) -> Result[@pattern.PatternDoc, String] {
+  doc : @pattern.PatternDoc[A],
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.rev_doc(doc) catch {
     problem => return Err(problem.to_string())
   }
@@ -229,14 +212,14 @@ pub fn MiniDocBuilder::rev(
 }
 
 ///|
-/// Build a mini euclid transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::euclid(
+/// Build a mini euclid transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::euclid(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   k : Int32,
   n : Int32,
   rotation : Int32,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.euclid_doc(doc, k, n, rotation) catch {
     problem => return Err(problem.to_string())
   }
@@ -244,14 +227,14 @@ pub fn MiniDocBuilder::euclid(
 }
 
 ///|
-/// Build a mini degrade transform using production root-ID, seed, and reuse rules.
+/// Build a mini degrade transform using production root-ID and seed rules.
 /// A notation `?` passes its `step`, the count of earlier `?` in its string.
-pub fn MiniDocBuilder::degrade(
+pub fn[A] MiniDocBuilder::degrade(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   p : Double,
   step? : Int32,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.degrade_doc(doc, p, step?) catch {
     problem => return Err(problem.to_string())
   }
@@ -259,13 +242,13 @@ pub fn MiniDocBuilder::degrade(
 }
 
 ///|
-/// Merge `key = value` into `doc` using production root-ID and reuse rules.
-pub fn MiniDocBuilder::control(
+/// Merge `key = value` into `doc` using production root-ID rules.
+pub fn[A] MiniDocBuilder::control(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   key : @control.Control,
   value : Double,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.scalar_control_doc(doc, key, value) catch {
     problem => return Err(problem.to_string())
   }
@@ -273,13 +256,13 @@ pub fn MiniDocBuilder::control(
 }
 
 ///|
-/// Build a mini every transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::every(
+/// Build a mini every transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::every(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   n : Int32,
   transform : @pattern.TimeTransform,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.every_doc(doc, n, transform) catch {
     problem => return Err(problem.to_string())
   }
@@ -287,12 +270,12 @@ pub fn MiniDocBuilder::every(
 }
 
 ///|
-/// Build a mini jux transform using production root-ID and reuse rules.
-pub fn MiniDocBuilder::jux(
+/// Build a mini jux transform using production root-ID rules.
+pub fn[A] MiniDocBuilder::jux(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   transform : @pattern.TimeTransform,
-) -> Result[@pattern.PatternDoc, String] {
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.jux_doc(doc, transform) catch {
     problem => return Err(problem.to_string())
   }
@@ -300,11 +283,11 @@ pub fn MiniDocBuilder::jux(
 }
 
 ///|
-/// Build a mini sequence document using production root-ID and reuse rules.
-pub fn MiniDocBuilder::sequence(
+/// Build a mini sequence document using production root-ID rules.
+pub fn[A] MiniDocBuilder::sequence(
   self : MiniDocBuilder,
-  docs : Array[@pattern.PatternDoc],
-) -> Result[@pattern.PatternDoc, String] {
+  docs : Array[@pattern.PatternDoc[A]],
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.sequence_doc(docs) catch {
     problem => return Err(problem.to_string())
   }
@@ -312,11 +295,11 @@ pub fn MiniDocBuilder::sequence(
 }
 
 ///|
-/// Build a mini stack document using production root-ID and reuse rules.
-pub fn MiniDocBuilder::stack(
+/// Build a mini stack document using production root-ID rules.
+pub fn[A] MiniDocBuilder::stack(
   self : MiniDocBuilder,
-  docs : Array[@pattern.PatternDoc],
-) -> Result[@pattern.PatternDoc, String] {
+  docs : Array[@pattern.PatternDoc[A]],
+) -> Result[@pattern.PatternDoc[A], String] {
   let doc = self.stack_doc(docs) catch {
     problem => return Err(problem.to_string())
   }
@@ -381,10 +364,10 @@ fn MiniDocBuilder::atom_id_at(
 fn MiniDocBuilder::node_id(
   self : MiniDocBuilder,
   kind : String,
-  inputs : Array[@pattern.PatternDoc],
+  inputs : Array[@identity.PatternNodeId],
   params : String,
 ) -> @identity.PatternNodeId raise SourceProblem {
-  let parts = inputs.map(input => input.root().value())
+  let parts = inputs.map(input => input.value())
   let mut content = "\{kind}("
   for input in inputs {
     let input_content = self.content(input)
@@ -403,55 +386,21 @@ fn MiniDocBuilder::node_id(
 /// root ID stands in: its seeds then follow that ID, as before content keys.
 fn MiniDocBuilder::content(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  root : @identity.PatternNodeId,
 ) -> String {
-  match self.contents.get(doc.root().value()) {
+  match self.contents.get(root.value()) {
     Some(content) => content
-    None => "doc:\{doc.root().value()}"
+    None => "doc:\{root.value()}"
   }
 }
 
 ///|
-fn MiniDocBuilder::reuse_doc(
+fn[A] MiniDocBuilder::rest_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
-  inputs~ : Array[@pattern.PatternDoc] = [],
-) -> @pattern.PatternDoc? raise SourceProblem {
-  guard self.origins is None else { return None }
-  match self.previous {
-    None => None
-    Some(previous) =>
-      if previous.contains_node(id) {
-        for input in inputs {
-          guard previous.contains_node(input.root()) else { return None }
-          let old_input = previous.subdoc(root=input.root()) catch {
-            _ => raise Internal("internal mini input could not be reused")
-          }
-          guard old_input.revision() == input.revision() else { return None }
-        }
-        let doc = previous.subdoc(root=id) catch {
-          _ =>
-            raise Internal(
-              "internal mini id could not be reused: \{id.value()}",
-            )
-        }
-        Some(doc)
-      } else {
-        None
-      }
-  }
-}
-
-///|
-fn MiniDocBuilder::rest_doc(
-  self : MiniDocBuilder,
-  id : @identity.PatternNodeId,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] {
   self.contents[id.value()] = "silence"
-  match self.reuse_doc(id) {
-    Some(doc) => doc
-    None => @pattern.PatternDoc::silence(id~)
-  }
+  @pattern.PatternDoc::silence(id~)
 }
 
 ///|
@@ -460,18 +409,31 @@ fn MiniDocBuilder::control_doc(
   id : @identity.PatternNodeId,
   key : @control.Control,
   value : Double,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[@pattern.ControlMap] {
   self.contents[id.value()] = "control:\{key}:\{value}"
-  match self.reuse_doc(id) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::control_atom(
-        id~,
-        source_atom?=self.source_atom_by_graph_id.get(id.value()),
-        key~,
-        value~,
-      )
-  }
+  @pattern.PatternDoc::control_atom(
+    id~,
+    source_atom?=self.source_atom_by_graph_id.get(id.value()),
+    key~,
+    value~,
+  )
+}
+
+///|
+/// An atom that plays `sound`.
+fn MiniDocBuilder::sound_doc(
+  self : MiniDocBuilder,
+  id : @identity.PatternNodeId,
+  sound : @score.Sound,
+) -> ScoreDoc {
+  let content = sound.content()
+  self.contents[id.value()] = content
+  @pattern.PatternDoc::atom(
+    id~,
+    source_atom?=self.source_atom_by_graph_id.get(id.value()),
+    value=@score.ScoreEvent(sound),
+    content~,
+  )
 }
 
 ///|
@@ -481,9 +443,9 @@ fn MiniDocBuilder::reference_doc(
   start : Int32,
   end : Int32,
   definition_span : MiniSpan,
-  definition : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise SourceProblem {
-  self.contents[id.value()] = self.content(definition)
+  definition : ScoreDoc,
+) -> ScoreDoc raise SourceProblem {
+  self.contents[id.value()] = self.content(definition.root())
   match self.origins {
     None => @pattern.PatternDoc::reference(id~, definition~)
     Some(origins) => {
@@ -496,149 +458,117 @@ fn MiniDocBuilder::reference_doc(
 }
 
 ///|
-fn MiniDocBuilder::sequence_doc(
+fn[A] MiniDocBuilder::sequence_doc(
   self : MiniDocBuilder,
-  docs : Array[@pattern.PatternDoc],
-) -> @pattern.PatternDoc raise SourceProblem {
+  docs : Array[@pattern.PatternDoc[A]],
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   if docs.length() == 1 {
     return docs[0]
   }
-  let id = self.node_id("seq", docs, "")
-  match self.reuse_doc(id, inputs=docs) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::sequence(id~, docs~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let id = self.node_id("seq", docs.map(doc => doc.root()), "")
+  @pattern.PatternDoc::sequence(id~, docs~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::weighted_sequence_doc(
+fn[A] MiniDocBuilder::weighted_sequence_doc(
   self : MiniDocBuilder,
-  docs : Array[@pattern.PatternDoc],
+  docs : Array[@pattern.PatternDoc[A]],
   weights : Array[Int32],
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let id = self.node_id(
     "weighted_seq",
-    docs,
+    docs.map(doc => doc.root()),
     weights.map(weight => "\{weight}").join(":"),
   )
-  match self.reuse_doc(id, inputs=docs) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::sequence_weighted(id~, docs~, weights~) catch {
-        _ => raise Internal("invalid relative duration sequence")
-      }
+  @pattern.PatternDoc::sequence_weighted(id~, docs~, weights~) catch {
+    _ => raise Internal("invalid relative duration sequence")
   }
 }
 
 ///|
-fn MiniDocBuilder::stack_doc(
+fn[A] MiniDocBuilder::stack_doc(
   self : MiniDocBuilder,
-  docs : Array[@pattern.PatternDoc],
-) -> @pattern.PatternDoc raise SourceProblem {
+  docs : Array[@pattern.PatternDoc[A]],
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   if docs.length() == 1 {
     return docs[0]
   }
-  let id = self.node_id("stack", docs, "")
-  match self.reuse_doc(id, inputs=docs) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::stack(id~, docs~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let id = self.node_id("stack", docs.map(doc => doc.root()), "")
+  @pattern.PatternDoc::stack(id~, docs~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::fast_doc(
+fn[A] MiniDocBuilder::fast_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("fast", [doc], "\{factor.num}:\{factor.den}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.fast(id~, factor~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id("fast", [doc.root()], "\{factor.num}:\{factor.den}")
+  doc.fast(id~, factor~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::slow_doc(
+fn[A] MiniDocBuilder::slow_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("slow", [doc], "\{factor.num}:\{factor.den}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.slow(id~, factor~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id("slow", [doc.root()], "\{factor.num}:\{factor.den}")
+  doc.slow(id~, factor~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::gate_doc(
+fn[A] MiniDocBuilder::gate_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   factor : @pattern.Rational,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("gate", [doc], "\{factor.num}:\{factor.den}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.gate(id~, factor~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id("gate", [doc.root()], "\{factor.num}:\{factor.den}")
+  doc.gate(id~, factor~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::rev_doc(
+fn[A] MiniDocBuilder::rev_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("rev", [doc], "")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.rev(id~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  doc : @pattern.PatternDoc[A],
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id("rev", [doc.root()], "")
+  doc.rev(id~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::euclid_doc(
+fn[A] MiniDocBuilder::euclid_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   k : Int32,
   n : Int32,
   rotation : Int32,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("euclid", [doc], "\{k}:\{n}:\{rotation}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.euclid(id~, k~, n~, rotation~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id("euclid", [doc.root()], "\{k}:\{n}:\{rotation}")
+  doc.euclid(id~, k~, n~, rotation~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::degrade_doc(
+fn[A] MiniDocBuilder::degrade_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   p : Double,
   step? : Int32,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   // Seed by content so a named pattern drops the events its inline form does.
   // Like Strudel, each `?` of a notation string draws its own seed; the seed
   // never depends on `p`, so a higher probability drops a superset.
@@ -646,48 +576,40 @@ fn MiniDocBuilder::degrade_doc(
     None => ""
     Some(step) => ":step:\{step}"
   }
-  let seed = stable_seed(self.content(doc) + salt)
-  let id = self.node_id("degrade", [doc], "\{p}\{salt}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.degrade_by(id~, p~, seed~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let seed = stable_seed(self.content(doc.root()) + salt)
+  let id = self.node_id("degrade", [doc.root()], "\{p}\{salt}")
+  doc.degrade_by(id~, p~, seed~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::every_doc(
+fn[A] MiniDocBuilder::every_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   n : Int32,
   transform : @pattern.TimeTransform,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let signature = time_transform_signature(transform)
-  let id = self.node_id("every", [doc], "\{n}:\{signature}")
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.every(id~, n~, transform~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let id = self.node_id("every", [doc.root()], "\{n}:\{signature}")
+  doc.every(id~, n~, transform~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
-fn MiniDocBuilder::jux_doc(
+fn[A] MiniDocBuilder::jux_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   transform : @pattern.TimeTransform,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.node_id("jux", [doc], time_transform_signature(transform))
-  match self.reuse_doc(id, inputs=[doc]) {
-    Some(doc) => doc
-    None =>
-      doc.jux(id~, transform~) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+) -> @pattern.PatternDoc[A] raise SourceProblem {
+  let id = self.node_id(
+    "jux",
+    [doc.root()],
+    time_transform_signature(transform),
+  )
+  doc.jux(id~, transform~) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
@@ -709,32 +631,28 @@ fn time_transform_signature(transform : @pattern.TimeTransform) -> String {
 }
 
 ///|
-fn MiniDocBuilder::scalar_control_doc(
+fn[A] MiniDocBuilder::scalar_control_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   key : @control.Control,
   value : Double,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let control_id = self.id("mini:control:\{doc.root().value()}:\{key}:\{value}")
   let control_doc = self.control_doc(control_id, key, value)
-  let id = self.node_id("merge_control", [doc], "\{key}:\{value}")
-  match self.reuse_doc(id, inputs=[doc, control_doc]) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let id = self.node_id("merge_control", [doc.root()], "\{key}:\{value}")
+  @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
 ///|
 /// Merge the control `value` gives `key` into `doc`.
-fn MiniDocBuilder::control_value_doc(
+fn[A] MiniDocBuilder::control_value_doc(
   self : MiniDocBuilder,
-  doc : @pattern.PatternDoc,
+  doc : @pattern.PatternDoc[A],
   key : @control.Control,
   value : ControlValue,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let control_doc = match value {
     Number(value) => return self.scalar_control_doc(doc, key, value)
     Steps(notation) =>
@@ -747,10 +665,11 @@ fn MiniDocBuilder::control_value_doc(
       )
       let id = self.atom_id("signal", "\{key}:\{signature}")
       self.contents[id.value()] = "signal:\{key}:\{signature}"
-      let shaped = match self.reuse_doc(id) {
-        Some(doc) => doc
-        None => @pattern.PatternDoc::continuous(id~, key~, f=signal.function())
-      }
+      let shaped = @pattern.PatternDoc::continuous(
+        id~,
+        key~,
+        f=signal.function(),
+      )
       if signal.rate == @pattern.Rational::from_int(1) {
         shaped
       } else {
@@ -759,13 +678,13 @@ fn MiniDocBuilder::control_value_doc(
     }
   }
   // The provider's node and content, not its spelling, identify the merge.
-  let id = self.node_id("merge_control", [doc, control_doc], key.name())
-  match self.reuse_doc(id, inputs=[doc, control_doc]) {
-    Some(doc) => doc
-    None =>
-      @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
-        _ => raise Internal("internal mini PatternDoc construction failed")
-      }
+  let id = self.node_id(
+    "merge_control",
+    [doc.root(), control_doc.root()],
+    key.name(),
+  )
+  @pattern.PatternDoc::merge_control(id~, left=doc, right=control_doc) catch {
+    _ => raise Internal("internal mini PatternDoc construction failed")
   }
 }
 
@@ -779,13 +698,10 @@ fn stable_seed(value : String) -> Int32 {
 }
 
 ///|
-fn parse_doc_internal(
-  input : String,
-  previous : @pattern.PatternDoc?,
-) -> Result[@pattern.PatternDoc, String] {
+fn parse_doc_internal(input : String) -> Result[ScoreDoc, String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
-  let builder = MiniDocBuilder(previous~)
+  let builder = MiniDocBuilder()
   try parse_doc_body(input, p, builder) catch {
     problem => Err(problem.to_string())
   } noraise {
@@ -798,7 +714,7 @@ fn parse_doc_body(
   input : String,
   p : Parser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   p.parse_bindings(builder)
   if mini_collect_dollar_stack_lines(input, start=p.pos) is Some(lines) {
     return parse_doc_dollar_stack_program(input, p, builder, lines)
@@ -820,8 +736,8 @@ fn parse_doc_dollar_stack_program(
   parser : Parser,
   builder : MiniDocBuilder,
   lines : Array[MiniDollarStackLine],
-) -> @pattern.PatternDoc raise SourceProblem {
-  let args : Array[@pattern.PatternDoc] = []
+) -> ScoreDoc raise SourceProblem {
+  let args : Array[ScoreDoc] = []
   for line in lines {
     parser.pos = line.start
     let doc = parser.parse_doc_expr(builder)
@@ -841,26 +757,17 @@ fn parse_doc_dollar_stack_program(
 /// Parse a mini-notation string into an identity-bearing pattern document.
 ///
 /// IDs are deterministic from the parsed structure and ignore whitespace-only
-/// edits. Pass `previous=Some(prior)` to reuse unchanged subtrees from a prior
-/// parsed document when their deterministic `PatternNodeId`s still appear —
-/// this preserves subtree generations for lowering-cache reuse.
-pub fn parse_doc(
-  input : String,
-  previous~ : @pattern.PatternDoc? = None,
-) -> Result[@pattern.PatternDoc, String] {
-  parse_doc_internal(input, previous)
+/// edits.
+pub fn parse_doc(input : String) -> Result[ScoreDoc, String] {
+  parse_doc_internal(input)
 }
 
 ///|
 /// Parse a mini-notation string into a lowered pattern snapshot.
-///
-/// Pass `previous=Some(prior)` to reuse subtree IDs from a prior parsed
-/// document, mirroring `parse_doc`'s reuse semantics.
 pub fn parse_snapshot(
   input : String,
-  previous~ : @pattern.PatternDoc? = None,
-) -> Result[@pattern.PatternSnapshot, String] {
-  match parse_doc(input, previous~) {
+) -> Result[@pattern.PatternSnapshot[@score.ScoreEvent], String] {
+  match parse_doc(input) {
     Err(msg) => Err(msg)
     Ok(doc) => {
       let snapshot = doc.lower() catch {
@@ -875,7 +782,7 @@ pub fn parse_snapshot(
 fn Parser::parse_doc_expr(
   self : Parser,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   let resolved = resolve_mini_expr(self.parse_syntax_expr(), self.bindings)
   if self.admission is Some(admission) {
     admission.roots.push(admission.expression(resolved))
@@ -900,34 +807,34 @@ fn Parser::read_quoted_string_with_start(
 
 ///|
 /// Builds the document of one notation; `word_doc` builds each word's.
-priv struct NotationDocReader[W] {
+priv struct NotationDocReader[W, A] {
   builder : MiniDocBuilder
-  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc[A] raise SourceProblem
 }
 
 ///|
 /// The document this notation plays, building each word's with `word_doc`.
-fn[W] MiniDocBuilder::notation_doc(
+fn[W, A] MiniDocBuilder::notation_doc(
   self : MiniDocBuilder,
   syntax : NotationSyntax[W],
-  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem,
-) -> @pattern.PatternDoc raise SourceProblem {
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc[A] raise SourceProblem,
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   NotationDocReader::{ builder: self, word_doc, }.layers(syntax.layers)
 }
 
 ///|
-fn[W] NotationDocReader::layers(
-  self : NotationDocReader[W],
+fn[W, A] NotationDocReader::layers(
+  self : NotationDocReader[W, A],
   layers : Array[NotationLayer[W]],
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   self.builder.stack_doc(layers.map(layer => self.layer(layer)))
 }
 
 ///|
-fn[W] NotationDocReader::layer(
-  self : NotationDocReader[W],
+fn[W, A] NotationDocReader::layer(
+  self : NotationDocReader[W, A],
   layer : NotationLayer[W],
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let steps = layer.steps.map(step => self.step(step))
   match layer.timing {
     EqualSlots => self.builder.sequence_doc(steps)
@@ -940,10 +847,10 @@ fn[W] NotationDocReader::layer(
 }
 
 ///|
-fn[W] NotationDocReader::step(
-  self : NotationDocReader[W],
+fn[W, A] NotationDocReader::step(
+  self : NotationDocReader[W, A],
   step : NotationStep[W],
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let builder = self.builder
   let mut doc = match step.body {
     Rest(span) =>
@@ -974,11 +881,11 @@ fn[W] NotationDocReader::step(
 
 ///|
 /// The document of a quoted pattern literal, framed by its source literal.
-fn[W] MiniDocBuilder::literal_doc(
+fn[W, A] MiniDocBuilder::literal_doc(
   self : MiniDocBuilder,
   notation : NotationSyntax[W],
-  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem,
-) -> @pattern.PatternDoc raise SourceProblem {
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc[A] raise SourceProblem,
+) -> @pattern.PatternDoc[A] raise SourceProblem {
   let doc = self.notation_doc(notation, word_doc)
   let { start, end, } = notation.content
   match self.source_frame_at(start, end) {
@@ -998,11 +905,11 @@ fn[W] MiniDocBuilder::literal_doc(
 ///|
 fn MiniDocBuilder::drum_doc(
   self : MiniDocBuilder,
-  drum : DrumName,
+  drum : @score.Drum,
   span : MiniSpan,
-) -> @pattern.PatternDoc raise SourceProblem {
-  let id = self.atom_id_at("sound", drum.name, span.start, span.end)
-  self.control_doc(id, Sound, drum.midi.to_double())
+) -> ScoreDoc raise SourceProblem {
+  let id = self.atom_id_at("sound", drum.name(), span.start, span.end)
+  self.sound_doc(id, Hit(drum))
 }
 
 ///|
@@ -1010,9 +917,9 @@ fn MiniDocBuilder::pitch_doc(
   self : MiniDocBuilder,
   pitch : Pitch,
   span : MiniSpan,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   let id = self.atom_id_at("note", pitch.text, span.start, span.end)
-  self.control_doc(id, Note, pitch.midi)
+  self.sound_doc(id, Note(@score.Instrument::default(), pitch=pitch.midi))
 }
 
 ///|
@@ -1020,7 +927,7 @@ fn MiniDocBuilder::chord_name_doc(
   self : MiniDocBuilder,
   chord : ChordName,
   span : MiniSpan,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   let id = self.atom_id_at("chord", chord.name, span.start, span.end)
   self.chord_doc_from_notes(id, chord.notes)
 }
@@ -1031,7 +938,7 @@ fn MiniDocBuilder::control_number_doc(
   key : @control.Control,
   number : ControlNumber,
   span : MiniSpan,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> @pattern.PatternDoc[@pattern.ControlMap] raise SourceProblem {
   let id = self.atom_id_at(
     "control",
     "\{key}:\{number.text}",
@@ -1040,3 +947,7 @@ fn MiniDocBuilder::control_number_doc(
   )
   self.control_doc(id, key, number.value)
 }
+
+///|
+/// A document of score events, as Mini builds from a score expression.
+type ScoreDoc = @pattern.PatternDoc[@score.ScoreEvent]

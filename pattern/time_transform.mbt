@@ -35,9 +35,9 @@ pub fn[A] TimeTransform::every(
 }
 
 ///|
-pub fn TimeTransform::jux(
+pub fn[A : WithControls] TimeTransform::jux(
   self : TimeTransform,
-  pat : Pat[ControlMap],
-) -> Pat[ControlMap] {
+  pat : Pat[A],
+) -> Pat[A] {
   pat.jux_known(p => self.apply(p), self.signature())
 }

@@ -22,8 +22,6 @@
 ///   `.room(send)` (merge per-event controls),
 ///   `.every(n, fast(k)|slow(k)|rev)` (apply f every n cycles),
 ///   `.jux(fast(k)|slow(k)|rev)` — split stereo, apply f to right channel
-pub fn parse(
-  input : String,
-) -> Result[@pattern.Pat[@pattern.ControlMap], String] {
+pub fn parse(input : String) -> Result[@pattern.Pat[@score.ScoreEvent], String] {
   parse_snapshot(input).map(snapshot => snapshot.pat())
 }

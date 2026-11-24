@@ -5,6 +5,7 @@ import {
   "dowdiness/moondsp/control",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
@@ -13,17 +14,15 @@ import {
 // Values
 pub const DEFAULT_BPM : Double = 120.0
 
-pub fn drum_midi(String) -> Int32?
+pub fn parse(String) -> Result[@pattern.Pat[@score.ScoreEvent], String]
 
-pub fn parse(String) -> Result[@pattern.Pat[@pattern.ControlMap], String]
+pub fn parse_doc(String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
 
-pub fn parse_doc(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternDoc, String]
+pub fn parse_play_source(String, query_window? : @pattern.QueryWindow) -> Result[PlaySource, SourceProblem]
 
-pub fn parse_play_source(String, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PlaySource, SourceProblem]
+pub fn parse_snapshot(String) -> Result[@pattern.PatternSnapshot[@score.ScoreEvent], String]
 
-pub fn parse_snapshot(String, previous? : @pattern.PatternDoc?) -> Result[@pattern.PatternSnapshot, String]
-
-pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@pattern.ControlMap]], String]
+pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String]
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
@@ -111,20 +110,20 @@ pub fn EditTransaction::EditTransaction(base~ : DraftVersion, edits~ : Array[Tex
 pub struct MiniDocBuilder {
   // private fields
 }
-pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::control(Self, @pattern.PatternDoc, @control.Control, Double) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::degrade(Self, @pattern.PatternDoc, Double, step? : Int32) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::euclid(Self, @pattern.PatternDoc, Int32, Int32, Int32) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::every(Self, @pattern.PatternDoc, Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::fast(Self, @pattern.PatternDoc, @pattern.Rational) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::jux(Self, @pattern.PatternDoc, @pattern.TimeTransform) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::rev(Self, @pattern.PatternDoc) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc]) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::slow(Self, @pattern.PatternDoc, @pattern.Rational) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc]) -> Result[@pattern.PatternDoc, String]
-pub fn MiniDocBuilder::with_previous(@pattern.PatternDoc?) -> Self
+pub fn MiniDocBuilder::chord_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
+pub fn[A] MiniDocBuilder::control(Self, @pattern.PatternDoc[A], @control.Control, Double) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::degrade(Self, @pattern.PatternDoc[A], Double, step? : Int32) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::euclid(Self, @pattern.PatternDoc[A], Int32, Int32, Int32) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::every(Self, @pattern.PatternDoc[A], Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::fast(Self, @pattern.PatternDoc[A], @pattern.Rational) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::jux(Self, @pattern.PatternDoc[A], @pattern.TimeTransform) -> Result[@pattern.PatternDoc[A], String]
+pub fn MiniDocBuilder::new() -> Self
+pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
+pub fn[A] MiniDocBuilder::rev(Self, @pattern.PatternDoc[A]) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::sequence(Self, Array[@pattern.PatternDoc[A]]) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A] MiniDocBuilder::slow(Self, @pattern.PatternDoc[A], @pattern.Rational) -> Result[@pattern.PatternDoc[A], String]
+pub fn MiniDocBuilder::sound_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
+pub fn[A] MiniDocBuilder::stack(Self, Array[@pattern.PatternDoc[A]]) -> Result[@pattern.PatternDoc[A], String]
 
 #derive(Eq, @debug.Debug)
 pub(all) enum OriginLocation {
@@ -153,9 +152,9 @@ pub fn[C] ParsedSong::bpm(Self[C]) -> Double?
 pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
 
 pub enum PlayBody {
-  Pattern(@pattern.PatternDoc)
-  Arrangement(@song.Song[@pattern.Pat[@pattern.ControlMap]], Bool)
-  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins], Bool)
+  Pattern(@pattern.PatternDoc[@score.ScoreEvent])
+  Arrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]], Bool)
 }
 
 pub struct PlaySource {
@@ -167,7 +166,7 @@ pub fn PlaySource::bpm(Self) -> Double
 pub struct PlaybackInput {
   // private fields
 }
-pub fn PlaybackInput::compile(Self, previous? : @pattern.PatternDoc?, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::compile(Self, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
 pub fn PlaybackInput::decode_wire(String) -> Result[Self, String]
 pub fn PlaybackInput::encode_wire(Self) -> String
 pub fn PlaybackInput::source(Self) -> String
@@ -175,7 +174,7 @@ pub fn PlaybackInput::text(String) -> Self
 pub fn PlaybackInput::version(Self) -> DraftVersion?
 
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins, Double)
+  Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
   Runtime(PlaySource)
 }
 

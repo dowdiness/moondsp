@@ -3,8 +3,7 @@
 The scheduler bridges identity-bearing pattern/song snapshots to a set of
 instruments, each a bound voice pool. One scheduler owns the clock, the
 accepted score, and the active notes for every instrument; it routes each event
-to the first instrument whose `InstrumentSelector` matches the event's controls
-and mixes all instruments into the caller's buffers. Edit orchestration helpers let UI or authoring code stage a replacement
+to the pool its `@score.Sound` names and mixes all instruments into the caller's buffers. Edit orchestration helpers let UI or authoring code stage a replacement
 snapshot, choose how already-sounding voices should be reconciled, and
 optionally apply live graph-control changes to matching active voices before the
 replacement is accepted at the next block boundary. Normal browser edits keep
@@ -31,7 +30,7 @@ sample-accurate audio voice triggers across block boundaries:
 ```
 
 - **Upstream consumers**: `browser/internal/playback_host` drives live browser
-  playback through staged snapshots; custom hosts feed `Pat[ControlMap]` or
+  playback through staged snapshots; custom hosts feed `Pat[ScoreEvent]` or
   `Song` instances into the scheduler.
 - **Downstream dependencies**: [`voice/`](../voice/) receives dispatched note
   events, gates, and controls; [`pattern/`](../pattern/) and [`song/`](../song/)
@@ -68,9 +67,10 @@ Migrate `process_playback_snapshot_block_with_send` calls to
 
 ## Transport
 
-The `PatternScheduler(bpm~, ctx~, instruments~)` constructor takes the instruments as
-`(InstrumentSelector, BoundVoicePool)` pairs in routing order. An event no
-instrument selects stays silent. It validates the tempo and DSP context and raises
+The `PatternScheduler(bpm~, ctx~, pools~, route~)` constructor takes every voice
+pool and `route`, which gives the index in `pools` of the pool that plays a
+sound. At note-on the voice reads the event's controls, and a note's pitch as
+`Note`. It validates the tempo and DSP context and raises
 `TransportError` on rejection. Use `current_block()` to read the next block's sample range and
 rational musical span. Use `sample_at(position)` for conversion against the
 current clock; an absolute sample count and a BPM alone cannot describe an
@@ -291,22 +291,22 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     ),
     max_voices=4,
   )
-  let sched = try! @scheduler.PatternScheduler(bpm=120.0, ctx~, instruments=[
-    (@scheduler.AllEvents, pool),
-  ])
+  let sched = try! @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => {
+    0
+  })
   let edited = try! @identity.PatternNodeId::from_string("docs:lead")
   let replacement_root = try! @identity.PatternNodeId::from_string(
     "docs:replacement",
   )
   let active_doc = @pattern.PatternDoc::from_pattern(
     id=edited,
-    pat=@pattern.note(60.0),
+    pat=@score.note(60.0),
   )
   let active_snapshot = try! active_doc.lower()
 
   let replacement_doc = @pattern.PatternDoc::from_pattern(
     id=replacement_root,
-    pat=@pattern.note(67.0),
+    pat=@score.note(67.0),
   )
   let replacement = try! replacement_doc.lower()
   let left = @moondsp.AudioBuffer::filled(128)

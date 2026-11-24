@@ -11,7 +11,7 @@ control side.
 
 ```text
 Mini PatternDoc / PatternSnapshot
-  -> scheduler events + ControlMap
+  -> scheduler events: ScoreEvent (Sound + ControlMap)
   -> template registry
   -> ControlBindingMap for the selected AnalyzedGraph (targets and units)
   -> GraphControl batch / BoundVoicePool note-on at block boundary
@@ -33,19 +33,25 @@ selected template.
 
 | Layer | Owns | Must not own |
 | --- | --- | --- |
-| Mini DSL | Text pattern syntax, rhythmic structure, event timing, `ControlMap`, pattern snapshots, and block-boundary scheduler delivery. | DSP topology, graph node identity, graph source diagnostics, or graph recompilation policy. |
+| Mini DSL | Text pattern syntax, rhythmic structure, event timing, each event's `Sound` and `ControlMap`, pattern snapshots, and block-boundary scheduler delivery. | DSP topology, graph node identity, graph source diagnostics, or graph recompilation policy. |
 | Graph DSL authoring | Template names, topology, stable graph node IDs, declared controls, defaults/requiredness, source diagnostics, and lowering to `Array[DspNode]` plus binding declarations. | Pattern syntax, event-time scheduling, Mini drum/note semantics, or sample-accurate automation. |
 | MoonDsp graph runtime | `DspNode`, `AnalyzedGraph`, compile diagnostics, validated `ControlBindingMap`, runtime `GraphControl` validation, hotswap, and audio-safe processing. | Source parsing/projection, external name resolution, or deciding which template a Mini event meant. |
 
 ## Canonical control bridge
 
-Mini events carry numeric `ControlMap` entries. The integration bridge applies
-these rules before calling `ControlBindingMap::resolve_controls`:
+Each Mini event is a `ScoreEvent` (package `score`). Its `sound` selects the
+template: `Hit(drum)` from `s("bd")`, or `Note(instrument, pitch~)` from
+`note("C4")`, which plays the default instrument. Selection is a match on `Sound`, done on the control
+side; a missing template is a control-side diagnostic, and nothing is parsed,
+lowered, or compiled on the audio callback. A note's `pitch` is a MIDI note
+number; the browser host binds it as the `note` key with `unit=MidiToHz` to
+the template's oscillator frequency.
+
+The event's `controls` are numeric `ControlMap` entries. The integration
+bridge applies these rules before calling `ControlBindingMap::resolve_controls`:
 
 | Mini key | Mini meaning | Bridge behavior | Graph-control result |
 | --- | --- | --- | --- |
-| `sound` | Drum/sound selector from `s("...")`; current Mini atoms use GM MIDI drum numbers such as `bd = 36`. | Consumed as a template/route selector. A registry may expose graph templates by name (`bd`) while normalizing to the same sound code. | No `GraphControl` by default. Missing selected template is a control-side diagnostic; do not parse/lower/compile on the audio callback. |
-| `note` | MIDI note number from `note("...")`. | Bind with `unit=MidiToHz` to the selected template's pitch/frequency control. The canonical graph-facing key is `note`; a host may explicitly alias it to another declared key such as `freq`. | `GraphControl::set_param` for the bound oscillator/frequency slot. |
 | `lpf` | Low-pass cutoff in Hz from `.lpf(hz, resonance?)`. | Pass through only if the selected graph template declares/binds it to a low-pass filter. | Usually `GraphParamSlot::Value0` on a `Biquad` / `StereoBiquad` whose mode is `LowPass`; runtime validation still checks sample-rate-dependent domains. |
 | `lpf_resonance` | Optional low-pass resonance/Q from the second `.lpf(...)` argument. | Pass through only if the selected graph template declares/binds it to the same low-pass filter as `lpf`. Omitted arguments emit no key, preserving the template default. | Usually `GraphParamSlot::Value1` on the low-pass `Biquad` / `StereoBiquad`; Q must be finite and positive. |
 | `hpf` | High-pass cutoff in Hz from `.hpf(hz, resonance?)`. | Pass through only if the selected graph template declares/binds it to a high-pass filter. | Usually `GraphParamSlot::Value0` on a `Biquad` / `StereoBiquad` whose mode is `HighPass`; runtime validation still checks sample-rate-dependent domains. |
@@ -64,17 +70,18 @@ resolution and surface those diagnostics in the authoring UI.
 A bridge maintains a prepared registry entry per playable graph template:
 
 - template name or route key used by the editor;
-- optional Mini `sound` code or track/default selector;
+- the `Drum` or `Instrument` it plays;
 - analyzed `AnalyzedGraph`;
 - `ControlBindingMap` built against that exact template;
 - compiled runtime, hot-swap target, or `BoundVoicePool` prepared from the same
   template and bindings.
 
-For `s("bd")`, Mini emits `sound = 36`. The bridge maps that code to the
-registry entry for the `bd` graph template. For note-only patterns, a host may
-use the currently selected track/template as the selector. If selection fails,
-report a missing-template diagnostic and skip the event or keep the last-good
-runtime alive; do not fall back to graph recompilation inside the scheduler or
+For `s("bd")`, Mini emits `Hit(Bd)`, and the bridge matches it to the
+registry entry for the `bd` graph template; `note("C4")` emits a note on the
+default instrument. A host that registers every `Drum` and `Instrument` (as
+the browser host does) selects with one total match and has no failure case.
+A partial registry reports a missing-template diagnostic and skips the event
+or keeps the last-good runtime alive; do not fall back to graph recompilation inside the scheduler or
 audio callback.
 
 ## Required, optional, and defaulted controls
@@ -99,7 +106,7 @@ Do not recompile graph templates for Mini-only changes. Use pattern snapshot
 updates for timing changes and runtime controls for parameter values:
 
 - Mini pattern edits that change timing, density, or event ordering;
-- `ControlMap` value changes for note, cutoff, gain, pan, and future numeric
+- pitch, sound, and `ControlMap` value changes for cutoff, gain, pan, and future numeric
   automation;
 - bridge-level defaults that are applied as event controls.
 

@@ -16,9 +16,7 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
     let syntax = resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings)
     let admission = PlaybackAdmission(0.125)
     let work = admission.expression(syntax)
-    let pat = compile_mini_doc(syntax, MiniDocBuilder(previous=None))
-      .lower()
-      .pat()
+    let pat = compile_mini_doc(syntax, MiniDocBuilder()).lower().pat()
     for start in starts {
       for width in widths {
         let events = pat.query(@pattern.TimeSpan(start, start + width))
@@ -87,9 +85,14 @@ test "bounded recursive descent rejects depth without relying on the pre-scan" {
 ///|
 /// An event with its controls in key order: which merge set a key first
 /// does not change the event.
-fn admission_event_text(event : @pattern.Event[@pattern.ControlMap]) -> String {
-  let controls = []
-  event.value.each((key, value) => controls.push("\{key}=\{value}"))
+fn admission_event_text(event : @pattern.Event[@score.ScoreEvent]) -> String {
+  let controls = [
+    match event.value.sound {
+      Hit(drum) => "hit=\{drum.name()}"
+      Note(instrument, pitch~) => "\{instrument.name()}=\{pitch}"
+    },
+  ]
+  event.value.controls.each((key, value) => controls.push("\{key}=\{value}"))
   controls.sort()
   let whole = match event.whole {
     Some(span) => span.to_string()

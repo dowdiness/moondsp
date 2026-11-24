@@ -10,7 +10,6 @@ struct MiniGraphPreparedTemplate {
 ///|
 #derive(Debug, Eq)
 enum MiniGraphBridgeError {
-  MissingSoundKey
   MissingTemplate(String)
 }
 
@@ -51,20 +50,6 @@ fn prepared_bd_graph_template(
 }
 
 ///|
-fn mini_template_name_for_sound(sound : Double) -> String? {
-  let code = sound.to_int()
-  guard sound == code.to_double() else { return None }
-  match code {
-    36 => Some("bd")
-    38 => Some("sd")
-    39 => Some("cp")
-    42 => Some("hh")
-    46 => Some("oh")
-    _ => None
-  }
-}
-
-///|
 fn find_prepared_template(
   registry : Array[MiniGraphPreparedTemplate],
   name : String,
@@ -79,7 +64,7 @@ fn find_prepared_template(
 }
 
 ///|
-fn first_mini_control_map(input : String) -> @pattern.ControlMap {
+fn first_mini_event(input : String) -> @score.ScoreEvent {
   let pat = @mini.parse(input).unwrap()
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
@@ -90,39 +75,21 @@ fn first_mini_control_map(input : String) -> @pattern.ControlMap {
 }
 
 ///|
-fn mini_sound_selector_label(sound : Double) -> String {
-  let code = sound.to_int()
-  if sound == code.to_double() {
-    "\{code}"
-  } else {
-    "\{sound}"
-  }
-}
-
-///|
 fn resolve_mini_graph_controls(
-  controls : @pattern.ControlMap,
+  event : @score.ScoreEvent,
   registry : Array[MiniGraphPreparedTemplate],
 ) -> Result[Array[@moondsp.GraphControl], MiniGraphBridgeError] {
-  let sound = match controls.get(Sound) {
-    Some(value) => value
-    None => return Err(MiniGraphBridgeError::MissingSoundKey)
-  }
-  let template_name = match mini_template_name_for_sound(sound) {
-    Some(name) => name
-    None =>
-      return Err(
-        MiniGraphBridgeError::MissingTemplate(mini_sound_selector_label(sound)),
-      )
+  let template_name = match event.sound {
+    Hit(drum) => drum.name()
+    Note(instrument, ..) => instrument.name()
   }
   let prepared = match find_prepared_template(registry, template_name) {
     Some(entry) => entry
     None => return Err(MiniGraphBridgeError::MissingTemplate(template_name))
   }
   let graph_controls : Map[@moondsp.Control, Double] = Map([])
-  controls.each(fn(key, value) {
+  event.controls.each(fn(key, value) {
     match key {
-      Sound => () // selector, not a graph parameter
       Pan => () // default scheduler side-effect, not a graph parameter
       _ => graph_controls[key] = value
     }
@@ -134,10 +101,10 @@ fn resolve_mini_graph_controls(
 test "Mini graph boundary: sound selects template and controls resolve" {
   let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
-  let controls = first_mini_control_map(
+  let event = first_mini_event(
     "s(\"bd\").lpf(1200).hpf(80).gain(0.5).pan(-0.25)",
   )
-  let resolved = resolve_mini_graph_controls(controls, [bd]).unwrap()
+  let resolved = resolve_mini_graph_controls(event, [bd]).unwrap()
 
   @debug.assert_eq(resolved.length(), 3)
   @debug.assert_eq(resolved[0].node_index(), 1)
@@ -160,20 +127,10 @@ test "Mini graph boundary: sound selects template and controls resolve" {
 test "Mini graph boundary: missing selected template is diagnostic" {
   let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=16)
   let bd = prepared_bd_graph_template(ctx)
-  let controls = first_mini_control_map("s(\"sd\").gain(0.5)")
-  match resolve_mini_graph_controls(controls, [bd]) {
+  let event = first_mini_event("s(\"sd\").gain(0.5)")
+  match resolve_mini_graph_controls(event, [bd]) {
     Err(MiniGraphBridgeError::MissingTemplate(name)) =>
       @debug.assert_eq(name, "sd")
     _ => fail("expected Mini sound selector to report missing graph template")
-  }
-}
-
-///|
-test "Mini graph boundary: unknown sound selector is diagnostic" {
-  match
-    resolve_mini_graph_controls(@pattern.ControlMap::single(Sound, 999.0), []) {
-    Err(MiniGraphBridgeError::MissingTemplate(name)) =>
-      @debug.assert_eq(name, "999")
-    _ => fail("expected unknown Mini sound selector to be reported")
   }
 }

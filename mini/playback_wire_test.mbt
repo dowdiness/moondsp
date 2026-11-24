@@ -10,7 +10,7 @@ fn wire_test_input(text : String) -> @mini.PlaybackInput raise {
 ///|
 fn wire_test_snapshot(
   input : @mini.PlaybackInput,
-) -> @pattern.PatternSnapshotWithOrigins raise {
+) -> @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent] raise {
   match input.compile() {
     Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) => snapshot
     _ => fail("expected exact pattern")
@@ -51,7 +51,7 @@ test "wire roundtrip preserves named routes and frozen source identity" {
     right.origin().bindings()[0].reference(),
   )
   assert_true(draft.locate_origin(left.origin()) is Located(_, _))
-  assert_eq(left.event().value.get(Note), Some(60.0))
+  assert_eq(pitch_of(left.event().value), Some(60.0))
 }
 
 ///|

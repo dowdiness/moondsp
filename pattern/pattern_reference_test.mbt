@@ -45,7 +45,7 @@ test "references to divergent definition revisions never share stale values" {
 ///|
 test "rebuilding references to an edited definition invalidates a persistent cache" {
   let original = @pattern.PatternDoc::pure(id=pid("note"), value=n(60))
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let before = @pattern.PatternDoc::reference(
     id=pid("use"),
     definition=original,

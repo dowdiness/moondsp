@@ -591,8 +591,8 @@ fn unshift_span(
 pub fn[C : SongContent] Song::query(
   self : Song[C],
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
-  let result : Array[@pattern.Event[@pattern.ControlMap]] = []
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
+  let result : Array[@pattern.Event[@score.ScoreEvent]] = []
   let indexes = self.occurrence_indexes_intersecting(arc)
   for index in indexes {
     let occurrence = self.occurrences[index]

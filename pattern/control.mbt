@@ -83,75 +83,6 @@ pub fn continuous(
 }
 
 ///|
-pub fn note(n : Double) -> Pat[ControlMap] {
-  control(Note, n)
-}
-
-///|
-/// Create a sound control pattern from a MIDI drum number.
-pub fn sound(midi : Double) -> Pat[ControlMap] {
-  control(Sound, midi)
-}
-
-///|
-pub fn note_name(name : String) -> Pat[ControlMap] {
-  note(parse_note_name(name))
-}
-
-///|
-fn parse_note_name(name : String) -> Double {
-  let len = name.length()
-  if len < 2 {
-    return 0.0
-  }
-  let letter = name[0]
-  let base_semitone = match letter {
-    'c' | 'C' => 0
-    'd' | 'D' => 2
-    'e' | 'E' => 4
-    'f' | 'F' => 5
-    'g' | 'G' => 7
-    'a' | 'A' => 9
-    'b' | 'B' => 11
-    _ => 0
-  }
-  let mut offset = 1
-  let mut modifier = 0
-  if offset < len {
-    match name[offset] {
-      's' | '#' => {
-        modifier = 1
-        offset = offset + 1
-      }
-      'f' =>
-        if offset + 1 < len {
-          modifier = -1
-          offset = offset + 1
-        }
-      _ => ()
-    }
-  }
-  let mut octave = 0
-  let mut negative = false
-  if offset < len && name[offset] == '-' {
-    negative = true
-    offset = offset + 1
-  }
-  while offset < len {
-    let c = name[offset]
-    if c >= '0' && c <= '9' {
-      octave = octave * 10 + (c.to_int() - '0'.to_int())
-    }
-    offset = offset + 1
-  }
-  if negative {
-    octave = -octave
-  }
-  let midi = (octave + 1) * 12 + base_semitone + modifier
-  midi.to_double()
-}
-
-///|
 pub fn s_lpf(frequency_hz : Double, resonance? : Double) -> Pat[ControlMap] {
   let cutoff = ControlMap::single(Lpf, frequency_hz)
   controls(
@@ -196,20 +127,20 @@ pub fn s_pan(p : Double) -> Pat[ControlMap] {
 /// patterns like `s("bd sd hh sd").jux(rev)` the per-pool pressure
 /// stays at 1.
 /// Arbitrary callback content is unknown. Use TimeTransform for known operations.
-pub fn Pat::jux(
-  self : Pat[ControlMap],
-  f : (Pat[ControlMap]) -> Pat[ControlMap],
-) -> Pat[ControlMap] {
+pub fn[A : WithControls] Pat::jux(
+  self : Pat[A],
+  f : (Pat[A]) -> Pat[A],
+) -> Pat[A] {
   self.jux_known(f, "")
 }
 
 ///|
-fn Pat::jux_known(
-  self : Pat[ControlMap],
-  f : (Pat[ControlMap]) -> Pat[ControlMap],
+fn[A : WithControls] Pat::jux_known(
+  self : Pat[A],
+  f : (Pat[A]) -> Pat[A],
   signature : String,
-) -> Pat[ControlMap] {
-  jux_kernel(self, f, (value, pan) => merge_maps(value, pan), signature)
+) -> Pat[A] {
+  jux_kernel(self, f, A::with_controls, signature)
 }
 
 ///|
@@ -239,11 +170,6 @@ fn[A] jux_kernel(
       },
     ),
   )
-}
-
-///|
-fn merge_maps(a : ControlMap, b : ControlMap) -> ControlMap {
-  a.merge(b)
 }
 
 ///|
@@ -346,12 +272,12 @@ pub fn controls(values : ControlMap) -> Pat[ControlMap] {
 
 ///|
 /// Select events carrying a control; optionally require an exact value.
-pub fn Pat::select_control(
-  self : Pat[ControlMap],
+pub fn[A : WithControls] Pat::select_control(
+  self : Pat[A],
   key : @control.Control,
   value? : Double,
-) -> Pat[ControlMap] {
-  select_control_kernel(self, cm => cm, key, value)
+) -> Pat[A] {
+  select_control_kernel(self, A::controls, key, value)
 }
 
 ///|
@@ -379,6 +305,25 @@ fn[A] select_control_kernel(
     },
     "select:\{key.name().length()}:\{key.name()}:" + condition,
   )
+}
+
+///|
+/// A payload that carries controls. The document layer reads and writes an
+/// event's controls through this trait (ADR-0022).
+pub(open) trait WithControls {
+  fn controls(Self) -> ControlMap
+  /// The payload with `controls` set over its own.
+  fn with_controls(Self, ControlMap) -> Self
+}
+
+///|
+pub impl WithControls for ControlMap with fn controls(self) {
+  self
+}
+
+///|
+pub impl WithControls for ControlMap with fn with_controls(self, controls) {
+  self.merge(controls)
 }
 
 ///|

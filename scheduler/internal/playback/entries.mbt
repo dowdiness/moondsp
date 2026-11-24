@@ -1,16 +1,21 @@
 ///|
 priv enum EntrySource {
-  Pattern(@pattern.PatternSnapshot, Int32)
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins, Int32)
+  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent], Int32)
+  PatternWithOrigins(
+    @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
+    Int32,
+  )
   RuntimeSong(@song.SongEventOrigin)
-  ExactSong(@song.SongEntry[@pattern.PatternSnapshotWithOrigins])
+  ExactSong(
+    @song.SongEntry[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  )
 }
 
 ///|
 /// The source is bound when preparing the material, never paired during playback.
 priv struct EntrySpec {
   id : String
-  body : @pattern.Pat[@pattern.ControlMap]
+  body : @pattern.Pat[@score.ScoreEvent]
   start : @pattern.Rational
   end_ : @pattern.Rational?
   source : EntrySource
@@ -19,7 +24,7 @@ priv struct EntrySpec {
 ///|
 fn EntrySpec::EntrySpec(
   id~ : String,
-  body~ : @pattern.Pat[@pattern.ControlMap],
+  body~ : @pattern.Pat[@score.ScoreEvent],
   start~ : @pattern.Rational,
   end_~ : @pattern.Rational?,
   source~ : EntrySource,
@@ -188,7 +193,7 @@ fn idle_entry(material : EntrySpec, spec : EntrySpec) -> Bool {
   guard material.start == spec.start && material.end_ == spec.end_ else {
     return false
   }
-  let idle : @pattern.Pat[@pattern.ControlMap] = @pattern.Pat::silence().slow(
+  let idle : @pattern.Pat[@score.ScoreEvent] = @pattern.Pat::silence().slow(
     material.body.entry_period(),
   )
   idle.same_content(spec.body)
@@ -446,7 +451,7 @@ fn query_entry(
   spec : EntrySpec,
   origin : @pattern.Rational,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   spec.body.query(arc).map(event => event.shift(origin))
 }
 
@@ -479,7 +484,7 @@ fn EntrySpec::query_sourced(
         source_origin: Some(event.origin()),
         source_frame: event.source_frame(),
         source_start: event.source_start(),
-        source_pitch: event.source_pitch(),
+        source_pitch: authored_pitch(event.event().value),
         controls: event.controls().placed(placement),
       })
     RuntimeSong(song_origin) =>
@@ -490,7 +495,7 @@ fn EntrySpec::query_sourced(
         source_frame: None,
         source_start: -1.0,
         source_pitch: -1.0,
-        controls: @pattern.Controls::fixed(event.value),
+        controls: @pattern.Controls::fixed(event.value.controls),
       })
     ExactSong(entry) => {
       let source_arc = @pattern.TimeSpan(
@@ -508,7 +513,7 @@ fn EntrySpec::query_sourced(
         source_origin: Some(event.origin()),
         source_frame: event.source_frame(),
         source_start: event.source_start(),
-        source_pitch: event.source_pitch(),
+        source_pitch: authored_pitch(event.event().value),
         controls: event.controls().placed(slice.placement()).placed(placement),
       })
     }
@@ -519,7 +524,7 @@ fn EntrySpec::query_sourced(
 fn query_entries(
   entries : Array[EntryState],
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   query_entry_segments(entries, arc, query_entry)
 }
 
@@ -656,4 +661,13 @@ fn[A] query_entry_segments(
     }
   }
   result
+}
+
+///|
+/// The pitch an exact event's atom wrote, or NaN for a drum hit.
+fn authored_pitch(event : @score.ScoreEvent) -> Double {
+  match event.sound {
+    Note(_, pitch~) => pitch
+    Hit(_) => @double.not_a_number
+  }
 }

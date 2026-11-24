@@ -4,13 +4,14 @@ package "dowdiness/moondsp/scheduler/internal/voice_runtime"
 import {
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler/internal/model",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/voice",
 }
 
 // Values
-pub fn compare_event_onset(@pattern.Event[@pattern.ControlMap], @pattern.Event[@pattern.ControlMap]) -> Int32
+pub fn compare_event_onset(@pattern.Event[@score.ScoreEvent], @pattern.Event[@score.ScoreEvent]) -> Int32
 
-pub fn copy_control_events(Array[@pattern.Event[@pattern.ControlMap]]) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn copy_control_events(Array[@pattern.Event[@score.ScoreEvent]]) -> Array[@pattern.Event[@score.ScoreEvent]]
 
 // Errors
 

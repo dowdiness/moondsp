@@ -5,7 +5,12 @@ fn bench_one_cycle() -> TimeSpan {
 
 ///|
 fn bench_jux_base_pattern() -> Pat[ControlMap] {
-  sequence([note(60.0), note(64.0), note(67.0), note(72.0)])
+  sequence([
+    control(Note, 60.0),
+    control(Note, 64.0),
+    control(Note, 67.0),
+    control(Note, 72.0),
+  ])
 }
 
 ///|

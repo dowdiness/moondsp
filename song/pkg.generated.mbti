@@ -4,6 +4,7 @@ package "dowdiness/moondsp/song"
 import {
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/score",
   "moonbitlang/core/debug",
 }
 
@@ -94,13 +95,13 @@ pub struct Section[C] {
 }
 pub fn[C] Section::Section(name~ : String, length_cycles~ : @pattern.Rational, scope~ : TimeScope, body~ : SectionBody[C]) -> Self[C] raise SectionBuildError
 pub fn[C] Section::apply_patch(Self[C], SectionPatch[C]) -> Self[C] raise SectionPatchError
-pub fn[C : SongContent] Section::body(Self[C]) -> @pattern.Pat[@pattern.ControlMap]
+pub fn[C : SongContent] Section::body(Self[C]) -> @pattern.Pat[@score.ScoreEvent]
 pub fn[C] Section::get_layer(Self[C], String) -> C?
 pub fn[C] Section::layer(Self[C], name~ : String, body~ : C) -> Self[C]
 pub fn[C] Section::layer_count(Self[C]) -> Int32
 pub fn[C] Section::length_cycles(Self[C]) -> @pattern.Rational
 pub fn[C] Section::name(Self[C]) -> String
-pub fn[C : SongContent] Section::query(Self[C], @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn[C : SongContent] Section::query(Self[C], @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn[C] Section::scope(Self[C]) -> TimeScope
 pub fn[C] Section::section_body(Self[C]) -> SectionBody[C]
 pub fn[C] Section::single(name~ : String, body~ : C) -> Self[C]
@@ -113,7 +114,7 @@ pub fn[C] SectionBody::get_layer(Self[C], String) -> C?
 pub fn[C] SectionBody::layer_count(Self[C]) -> Int32
 pub fn[C] SectionBody::layers(Array[SectionLayer[C]]) -> Self[C]
 pub fn[C] SectionBody::single(C) -> Self[C]
-pub fn[C : SongContent] SectionBody::to_pattern(Self[C]) -> @pattern.Pat[@pattern.ControlMap]
+pub fn[C : SongContent] SectionBody::to_pattern(Self[C]) -> @pattern.Pat[@score.ScoreEvent]
 
 pub struct SectionDoc[C] {
   // private fields
@@ -196,7 +197,7 @@ pub fn[C] Song::occurrence_count(Self[C]) -> Int32
 pub fn[C] Song::occurrences(Self[C]) -> Array[SectionOccurrence[C]]
 pub fn[C] Song::occurrences_at(Self[C], @pattern.Rational) -> Array[SectionOccurrence[C]]
 pub fn[C] Song::occurrences_intersecting(Self[C], @pattern.TimeSpan) -> Array[SectionOccurrence[C]]
-pub fn[C : SongContent] Song::query(Self[C], @pattern.TimeSpan) -> Array[@pattern.Event[@pattern.ControlMap]]
+pub fn[C : SongContent] Song::query(Self[C], @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 
 pub struct SongDoc[C] {
   // private fields
@@ -221,7 +222,7 @@ pub fn[C] SongDoc::to_song(Self[C]) -> Song[C] raise SongBuildError
 pub struct SongEntry[C] {
   // private fields
 }
-pub fn[C] SongEntry::body(Self[C]) -> @pattern.Pat[@pattern.ControlMap]
+pub fn[C] SongEntry::body(Self[C]) -> @pattern.Pat[@score.ScoreEvent]
 pub fn[C] SongEntry::end_(Self[C]) -> @pattern.Rational
 pub fn[C] SongEntry::origin(Self[C]) -> SongEventOrigin
 pub fn[C] SongEntry::slice(Self[C], @pattern.TimeSpan) -> SongSlice[C]?
@@ -299,7 +300,7 @@ pub fn TimeScope::slow(factor~ : @pattern.Rational) -> Self raise TimeScopeBuild
 
 // Traits
 pub trait SongContent {
-  fn pat(Self) -> @pattern.Pat[@pattern.ControlMap]
+  fn pat(Self) -> @pattern.Pat[@score.ScoreEvent]
 }
-pub impl SongContent for @pattern.Pat[@pattern.ControlMap]
-pub impl SongContent for @pattern.PatternSnapshotWithOrigins
+pub impl SongContent for @pattern.Pat[@score.ScoreEvent]
+pub impl SongContent for @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]

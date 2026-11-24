@@ -303,69 +303,6 @@ test "chord returns None for unknown quality" {
 }
 
 ///|
-test "chord pattern C major produces 3 note events" {
-  let pat = @pattern.chord("C")
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let events = pat.query(arc)
-  @debug.assert_eq(events.length(), 3)
-}
-
-///|
-test "chord pattern C major has correct note values" {
-  let pat = @pattern.chord("C")
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let events = pat.query(arc)
-  let notes = events.map(ev => ev.value.get(Note))
-  // Stack order: the order from chord intervals [0, 4, 7]
-  assert_true(notes.contains(Some(60.0)))
-  assert_true(notes.contains(Some(64.0)))
-  assert_true(notes.contains(Some(67.0)))
-}
-
-///|
-test "chord pattern Dm produces 3 note events" {
-  let pat = @pattern.chord("Dm")
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let events = pat.query(arc)
-  @debug.assert_eq(events.length(), 3)
-  let notes = events.map(ev => ev.value.get(Note))
-  assert_true(notes.contains(Some(62.0)))
-  assert_true(notes.contains(Some(65.0)))
-  assert_true(notes.contains(Some(69.0)))
-}
-
-///|
-test "chord pattern G7 produces 4 note events" {
-  let pat = @pattern.chord("G7")
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let events = pat.query(arc)
-  @debug.assert_eq(events.length(), 4)
-}
-
-///|
-test "chord pattern silence for unknown chord" {
-  let pat = @pattern.chord("X")
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  let events = pat.query(arc)
-  @debug.assert_eq(events.length(), 0)
-}
-
-///|
 test "chord parse E natural (no accidental confusion from f)" {
   // "ef" inside a chord name should be parsed as:
   // root=E, then 'f' after the root: check it's not parsed as E-flat

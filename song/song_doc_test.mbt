@@ -25,14 +25,14 @@ fn song_doc_test_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.SectionDoc[@pattern.Pat[@pattern.ControlMap]] {
+) -> @song.SectionDoc[@pattern.Pat[@score.ScoreEvent]] {
   @song.SectionDoc::single(
     id=song_doc_test_section_id(id),
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
     layer_id=song_doc_test_layer_id("\{id}:main"),
-    body=@pattern.note(midi),
+    body=@score.note(midi),
   ) catch {
     _ => abort("section doc creation failed")
   }
@@ -56,8 +56,8 @@ fn[C] song_doc_test_song(doc : @song.SongDoc[C]) -> @song.Song[C] {
 
 ///|
 fn song_doc_test_snapshot(
-  doc : @song.SongDoc[@pattern.PatternSnapshotWithOrigins],
-) -> @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins] {
+  doc : @song.SongDoc[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+) -> @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]] {
   doc.lower() catch {
     _ => abort("song snapshot lowering failed")
   }
@@ -67,12 +67,12 @@ fn song_doc_test_snapshot(
 fn song_doc_test_content(
   name : String,
   midi : Double,
-) -> @pattern.PatternSnapshotWithOrigins {
-  @pattern.PatternDoc::control_atom(
+) -> @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent] {
+  @pattern.PatternDoc::atom(
     id=@identity.PatternNodeId::from_string(name),
     source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7000L), 1L),
-    key=Note,
-    value=midi,
+    value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=midi)),
+    content="note:\{midi}",
   ).lower_with_origins() catch {
     _ => abort("pattern lowering failed")
   }
@@ -84,13 +84,15 @@ fn song_doc_test_content(
 priv struct SongDocTestEvent {
   origin : @song.SongEventOrigin
   source : @pattern.EventOrigin
-  event : @pattern.Event[@pattern.ControlMap]
+  event : @pattern.Event[@score.ScoreEvent]
   controls : @pattern.Controls
 }
 
 ///|
 fn song_doc_test_query(
-  slices : Array[@song.SongSlice[@pattern.PatternSnapshotWithOrigins]],
+  slices : Array[
+    @song.SongSlice[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  ],
 ) -> Array[SongDocTestEvent] {
   let result : Array[SongDocTestEvent] = []
   for slice in slices {
@@ -148,11 +150,11 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   assert_true(events[0].origin.occurrence() == occurrence_id)
   assert_true(events[0].origin.section() == section_id)
   assert_true(events[0].origin.layer() == lead_id)
-  assert_true(events[0].event.value.get(Note) == Some(60.0))
+  assert_true(events[0].event.value.sound is Note(_, pitch~) && pitch == 60.0)
   assert_true(events[1].origin.occurrence() == occurrence_id)
   assert_true(events[1].origin.section() == section_id)
   assert_true(events[1].origin.layer() == pad_id)
-  assert_true(events[1].event.value.get(Note) == Some(67.0))
+  assert_true(events[1].event.value.sound is Note(_, pitch~) && pitch == 67.0)
 }
 
 ///|
@@ -367,10 +369,7 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     @pattern.Rational::from_int(1),
     60.0,
   )
-  let edited_verse = verse.replace_layer_body(
-    layer_id,
-    body=@pattern.note(61.0),
-  ) catch {
+  let edited_verse = verse.replace_layer_body(layer_id, body=@score.note(61.0)) catch {
     _ => abort("body edit failed")
   }
   let chorus = song_doc_test_section(
@@ -411,7 +410,7 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     ),
   )
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(61.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 61.0)
 }
 
 ///|
@@ -451,17 +450,15 @@ test "exact Song entry origins survive scoped placement" {
   let exact = @pattern.PatternDoc::stack(
     id=@identity.PatternNodeId::from_string("source:stack"),
     docs=[
-      @pattern.PatternDoc::control_atom(
+      @pattern.PatternDoc::atom(
         id=@identity.PatternNodeId::from_string("source:c"),
         source_atom=c,
-        key=Note,
-        value=60.0,
+        value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
       ),
-      @pattern.PatternDoc::control_atom(
+      @pattern.PatternDoc::atom(
         id=@identity.PatternNodeId::from_string("source:g"),
         source_atom=g,
-        key=Note,
-        value=67.0,
+        value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=67.0)),
       ),
     ],
   ).lower_with_origins()
@@ -494,8 +491,8 @@ test "exact Song entry origins survive scoped placement" {
     for event in events {
       assert_true(event.source.atom() == atom)
       assert_true(
-        event.event.value.get(Note) ==
-        Some(if index == 0 { 60.0 } else { 67.0 }),
+        event.event.value.sound is Note(_, pitch~) &&
+        pitch == (if index == 0 { 60.0 } else { 67.0 }),
       )
     }
     @debug.assert_eq(
@@ -530,11 +527,10 @@ test "song events read their buses on the song clock" {
   }
   let pattern = @pattern.PatternDoc::merge_control(
     id=id("merge"),
-    left=@pattern.PatternDoc::control_atom(
+    left=@pattern.PatternDoc::atom(
       id=id("note"),
       source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7002L), 1L),
-      key=Note,
-      value=60.0,
+      value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
     ),
     right=@pattern.PatternDoc::continuous(id=id("ramp"), key=Lpf, f=t => {
       100.0 * t

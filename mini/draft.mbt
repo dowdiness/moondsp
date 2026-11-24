@@ -552,8 +552,8 @@ fn SourceMap::resolve_reference(
   start : Int32,
   end : Int32,
   definition_span : MiniSpan,
-  definition : @pattern.PatternDoc,
-) -> @pattern.ResolvedReference raise SourceProblem {
+  definition : ScoreDoc,
+) -> @pattern.ResolvedReference[@score.ScoreEvent] raise SourceProblem {
   for reference in self.references {
     if reference.span.start == start && reference.span.end == end {
       let (binding, target) = match reference.binding {
@@ -630,7 +630,7 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 ///|
 /// Exact patterns and explicitly untracked runtime sources are distinct capabilities.
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins, Double)
+  Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
   Runtime(PlaySource)
 }
 
@@ -639,18 +639,16 @@ pub(all) enum PreparedPlayback {
 /// A failed exact compilation never falls back to runtime-only playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
-  previous~ : @pattern.PatternDoc? = None,
   query_window? : @pattern.QueryWindow,
 ) -> Result[PreparedPlayback, String] {
   match self.payload {
     Text =>
-      parse_play_source(self.input, previous~, query_window?)
+      parse_play_source(self.input, query_window?)
       .map(source => Runtime(source))
       .map_err(SourceProblem::to_string)
     Song(_, origins) => {
       let source = parse_play_source_with_origins(
         self.input,
-        previous,
         query_window,
         origins=Some(origins),
         syntax_depth_limit=Some(32),
@@ -665,7 +663,6 @@ pub fn PlaybackInput::compile(
     Pattern(_, origins) => {
       let source = parse_play_source_with_origins(
         self.input,
-        None,
         query_window,
         origins=Some(origins),
         syntax_depth_limit=Some(32),
@@ -711,7 +708,6 @@ pub struct Draft {
   priv mut sources : SourceMap
   /// What the current text means for playback, or why it cannot be played.
   priv mut analysis : DraftAnalysis
-  priv mut last_valid_doc : @pattern.PatternDoc?
   /// The window of the player the text is checked for, once that is known.
   priv mut query_window : @pattern.QueryWindow?
 }
@@ -728,18 +724,6 @@ fn DraftAnalysis::diagnostic(self : DraftAnalysis) -> DraftDiagnostic? {
   match self {
     Playable(_, _) => None
     Rejected(diagnostic) => Some(diagnostic)
-  }
-}
-
-///|
-fn DraftAnalysis::pattern_doc(self : DraftAnalysis) -> @pattern.PatternDoc? {
-  match self {
-    Playable(source, _) =>
-      match source.body() {
-        Pattern(doc) => Some(doc)
-        Arrangement(_, _) | ExactArrangement(_, _) => None
-      }
-    Rejected(_) => None
   }
 }
 
@@ -775,7 +759,6 @@ fn draft_analysis(
   at : DraftVersion,
   mode : DraftTracking,
   sources : SourceMap,
-  previous : @pattern.PatternDoc?,
   query_window : @pattern.QueryWindow?,
 ) -> DraftAnalysis {
   let payload = match mode {
@@ -786,7 +769,6 @@ fn draft_analysis(
   }
   let source = parse_play_source_with_origins(
     input,
-    previous,
     query_window,
     origins=Some(sources),
     syntax_depth_limit=Some(32),
@@ -817,16 +799,8 @@ fn Draft::starting_with(
     _ => empty
   }
   let at = DraftVersion(epoch, 0L)
-  let analysis = draft_analysis(input, at, mode, sources, None, query_window)
-  {
-    input,
-    at,
-    mode,
-    sources,
-    analysis,
-    last_valid_doc: analysis.pattern_doc(),
-    query_window,
-  }
+  let analysis = draft_analysis(input, at, mode, sources, query_window)
+  { input, at, mode, sources, analysis, query_window, }
 }
 
 ///|
@@ -847,12 +821,8 @@ pub fn Draft::check_playback_within(
     self.at,
     self.mode,
     self.sources,
-    self.last_valid_doc,
     self.query_window,
   )
-  if self.analysis.pattern_doc() is Some(doc) {
-    self.last_valid_doc = Some(doc)
-  }
   self.state()
 }
 
@@ -934,23 +904,13 @@ fn Draft::edit_checked(
     _ => baseline
   }
   let at = DraftVersion(self.at.epoch, self.at.revision + 1L)
-  let analysis = draft_analysis(
-    input,
-    at,
-    mode,
-    sources,
-    self.last_valid_doc,
-    self.query_window,
-  )
+  let analysis = draft_analysis(input, at, mode, sources, self.query_window)
   // Commit only after all validation and checked identity allocation succeeded.
   self.input = input
   self.at = at
   self.mode = mode
   self.sources = sources
   self.analysis = analysis
-  if analysis.pattern_doc() is Some(doc) {
-    self.last_valid_doc = Some(doc)
-  }
   self.state()
 }
 
@@ -981,7 +941,6 @@ pub fn Draft::reset(
       self.mode = fresh.mode
       self.sources = fresh.sources
       self.analysis = fresh.analysis
-      self.last_valid_doc = fresh.last_valid_doc
       Ok(self.state())
     }
   }

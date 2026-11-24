@@ -101,11 +101,11 @@ test "fractional tempo remains queryable after eight hours" {
     clock.position(clock.sample() + 128L).unwrap(),
   )
   assert_true(arc.duration() == @pattern.Rational(120123L, 90000000L))
-  let events = @pattern.sequence([@pattern.note(60.0), @pattern.note(64.0)])
+  let events = @pattern.sequence([@score.note(60.0), @score.note(64.0)])
     .slow(@pattern.Rational::from_int(3))
     .query(arc)
   assert_eq(events.length(), 1)
-  assert_eq(events[0].value.get(Note), Some(64.0))
+  assert_eq(pitch_of(events[0].value), Some(64.0))
   assert_true(events[0].part == arc)
 }
 
@@ -118,4 +118,12 @@ test "one cycle is a four-beat bar at the authored BPM" {
   // 120 BPM: four beats last two seconds.
   assert_true(clock.position(96000L).unwrap() == @pattern.Rational::from_int(1))
   assert_eq(clock.sample_at(@pattern.Rational(1L, 4L)).unwrap(), 24000L)
+}
+
+///|
+fn pitch_of(event : @score.ScoreEvent) -> Double? {
+  match event.sound {
+    Note(_, pitch~) => Some(pitch)
+    Hit(_) => None
+  }
 }

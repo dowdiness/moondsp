@@ -3,10 +3,10 @@
 /// closed: text names a control only where it enters, in Mini's method names.
 #derive(Eq, Debug)
 pub(all) enum Control {
-  /// MIDI note number.
+  /// MIDI note number. The scheduler sets it from a note's pitch at note-on;
+  /// scores choose what to play with `@score.Sound`, never with a control
+  /// (ADR-0022).
   Note
-  /// MIDI drum number.
-  Sound
   Gain
   Pan
   /// Send level to the shared reverb.
@@ -32,7 +32,6 @@ pub(all) enum Control {
 pub fn Control::name(self : Control) -> String {
   match self {
     Note => "note"
-    Sound => "sound"
     Gain => "gain"
     Pan => "pan"
     Room => "room"
@@ -60,19 +59,18 @@ pub impl Show for Control with fn output(self, logger) {
 pub impl Hash for Control with fn hash(self) {
   match self {
     Note => 0
-    Sound => 1
-    Gain => 2
-    Pan => 3
-    Room => 4
-    Lpf => 5
-    LpfResonance => 6
-    Hpf => 7
-    HpfResonance => 8
-    Attack => 9
-    Decay => 10
-    Sustain => 11
-    Hold => 12
-    Release => 13
+    Gain => 1
+    Pan => 2
+    Room => 3
+    Lpf => 4
+    LpfResonance => 5
+    Hpf => 6
+    HpfResonance => 7
+    Attack => 8
+    Decay => 9
+    Sustain => 10
+    Hold => 11
+    Release => 12
   }
 }
 
@@ -87,7 +85,6 @@ pub impl Hash for Control with fn hash_combine(self, hasher) {
 pub fn Control::all() -> FixedArray[Control] {
   [
     Note,
-    Sound,
     Gain,
     Pan,
     Room,
@@ -127,7 +124,6 @@ pub fn Control::nesting(self : Control) -> Nesting {
   match self {
     Gain => Multiply
     Note
-    | Sound
     | Pan
     | Room
     | Lpf
@@ -155,6 +151,6 @@ pub fn Control::admits(self : Control, value : Double) -> Bool {
     Attack | Hold | Release => value >= 0.0 && value <= MAX_SECONDS
     Room => value >= 0.0 && value <= 1.0
     LpfResonance | HpfResonance => value > 0.0 && !value.is_inf()
-    Note | Sound | Gain | Pan | Lpf | Hpf | Decay | Sustain => !value.is_nan()
+    Note | Gain | Pan | Lpf | Hpf | Decay | Sustain => !value.is_nan()
   }
 }

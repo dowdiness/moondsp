@@ -40,14 +40,14 @@ fn section_test_section_doc(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> SectionDoc[@pattern.Pat[@pattern.ControlMap]] {
+) -> SectionDoc[@pattern.Pat[@score.ScoreEvent]] {
   SectionDoc::single(
     id=section_id,
     name~,
     length_cycles=length,
     scope=TimeScope::identity(),
     layer_id~,
-    body=@pattern.note(midi),
+    body=@score.note(midi),
   ) catch {
     _ => abort("section doc creation failed")
   }
@@ -55,7 +55,7 @@ fn section_test_section_doc(
 
 ///|
 test "Section::single wraps a pattern with identity scope" {
-  let pat = @pattern.note(60.0)
+  let pat = @score.note(60.0)
   let section = Section::single(name="main", body=pat)
   @debug.assert_eq(section.name(), "main")
   assert_true(section.length_cycles() == @pattern.Rational::from_int(1))
@@ -66,12 +66,12 @@ test "Section::single wraps a pattern with identity scope" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
 }
 
 ///|
 test "Section constructor rejects non-positive lengths" {
-  let pat = @pattern.note(60.0)
+  let pat = @score.note(60.0)
   try
     Section(
       name="bad",
@@ -123,7 +123,7 @@ test "Section::query applies non-identity TimeScope" {
     name="fast",
     length_cycles=@pattern.Rational::from_int(1),
     scope~,
-    body=SectionBody::single(@pattern.note(60.0)),
+    body=SectionBody::single(@score.note(60.0)),
   ) catch {
     _ => abort("section creation failed")
   }
@@ -153,8 +153,8 @@ test "SectionDoc display renames preserve section and layer IDs and revisions" {
     length_cycles=@pattern.Rational::from_int(1),
     scope=TimeScope::identity(),
     body=SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
-      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@score.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@score.note(67.0)),
     ]),
   ) catch {
     _ => abort("section doc creation failed")
@@ -194,8 +194,8 @@ test "SectionDoc rejects duplicate renamed layer display names" {
     length_cycles=@pattern.Rational::from_int(1),
     scope=TimeScope::identity(),
     body=SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
-      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@pattern.note(67.0)),
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@score.note(60.0)),
+      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@score.note(67.0)),
     ]),
   ) catch {
     _ => abort("section doc creation failed")
@@ -218,7 +218,7 @@ test "SectionDoc rename reports missing layer before duplicate display name" {
     length_cycles=@pattern.Rational::from_int(1),
     scope=TimeScope::identity(),
     body=SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@pattern.note(60.0)),
+      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@score.note(60.0)),
     ]),
   ) catch {
     _ => abort("section doc creation failed")
@@ -243,7 +243,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     @pattern.Rational::from_int(2),
     60.0,
   )
-  let edited = doc.replace_layer_body(layer_id, body=@pattern.note(64.0)) catch {
+  let edited = doc.replace_layer_body(layer_id, body=@score.note(64.0)) catch {
     _ => abort("replace layer body failed")
   }
   @debug.assert_eq(edited.id().value(), doc.id().value())
@@ -298,7 +298,7 @@ test "SectionDoc layer body edits advance layer and section revisions without la
     ),
   )
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(64.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 64.0)
 }
 
 ///|
@@ -317,7 +317,7 @@ test "SectionDoc length edits advance section revision and shift layout while pr
   }
   @debug.assert_eq(longer.id().value(), doc.id().value())
   assert_true(longer.revision().value() > doc.revision().value())
-  let chorus = Section::single(name="chorus", body=@pattern.note(67.0))
+  let chorus = Section::single(name="chorus", body=@score.note(67.0))
   let before = @song.Song(parts=[
     @song.SongPart::with_id(id=verse_id, name="Verse", section=doc.to_section()),
     @song.SongPart::with_id(id=chorus_id, name="Chorus", section=chorus),
@@ -355,8 +355,8 @@ test "SectionBody::layers stacks ordered named layers" {
     length_cycles=@pattern.Rational::from_int(1),
     scope=TimeScope::identity(),
     body=SectionBody::layers([
-      @song.SectionLayer(name="bass", body=@pattern.note(36.0)),
-      @song.SectionLayer(name="lead", body=@pattern.note(64.0)),
+      @song.SectionLayer(name="bass", body=@score.note(36.0)),
+      @song.SectionLayer(name="lead", body=@score.note(64.0)),
     ]),
   ) catch {
     _ => abort("section creation failed")
@@ -370,13 +370,13 @@ test "SectionBody::layers stacks ordered named layers" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(36.0))
-  assert_true(events[1].value.get(Note) == Some(64.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 36.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 64.0)
 }
 
 ///|
 test "Section constructor accepts pattern body wrapper" {
-  let pat = @pattern.note(60.0)
+  let pat = @score.note(60.0)
   let section = Section(
     name="main",
     length_cycles=@pattern.Rational::from_int(1),
@@ -391,13 +391,13 @@ test "Section constructor accepts pattern body wrapper" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
 }
 
 ///|
 test "Section::layer converts single body to named layers" {
-  let base = Section::single(name="verse", body=@pattern.note(48.0))
-  let section = base.layer(name="counter", body=@pattern.note(55.0))
+  let base = Section::single(name="verse", body=@score.note(48.0))
+  let section = base.layer(name="counter", body=@score.note(55.0))
   @debug.assert_eq(section.layer_count(), 2)
   assert_true(section.get_layer("main") is Some(_))
   assert_true(section.get_layer("counter") is Some(_))
@@ -407,14 +407,14 @@ test "Section::layer converts single body to named layers" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(48.0))
-  assert_true(events[1].value.get(Note) == Some(55.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 48.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 55.0)
 }
 
 ///|
 test "Section::layer replaces existing layer by name" {
-  let base = Section::single(name="verse", body=@pattern.note(48.0))
-  let section = base.layer(name="main", body=@pattern.note(60.0))
+  let base = Section::single(name="verse", body=@score.note(48.0))
+  let section = base.layer(name="main", body=@score.note(60.0))
   @debug.assert_eq(section.layer_count(), 1)
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
@@ -422,14 +422,14 @@ test "Section::layer replaces existing layer by name" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 1)
-  assert_true(events[0].value.get(Note) == Some(60.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
 }
 
 ///|
 test "Section::apply_patch add layer appends named layer" {
-  let base = Section::single(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@score.note(48.0))
   let section = base.apply_patch(
-    SectionPatch::add_layer("counter", @pattern.note(55.0)),
+    SectionPatch::add_layer("counter", @score.note(55.0)),
   ) catch {
     _ => abort("patch failed")
   }
@@ -439,10 +439,10 @@ test "Section::apply_patch add layer appends named layer" {
 
 ///|
 test "Section::apply_patch set layer replaces existing layer" {
-  let single = Section::single(name="verse", body=@pattern.note(48.0))
-  let base = single.layer(name="counter", body=@pattern.note(55.0))
+  let single = Section::single(name="verse", body=@score.note(48.0))
+  let base = single.layer(name="counter", body=@score.note(55.0))
   let section = base.apply_patch(
-    SectionPatch::set_layer("counter", @pattern.note(67.0)),
+    SectionPatch::set_layer("counter", @score.note(67.0)),
   ) catch {
     _ => abort("patch failed")
   }
@@ -452,15 +452,15 @@ test "Section::apply_patch set layer replaces existing layer" {
   )
   let events = section.body().query(arc)
   @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.get(Note) == Some(48.0))
-  assert_true(events[1].value.get(Note) == Some(67.0))
+  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 48.0)
+  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 67.0)
 }
 
 ///|
 test "Section::apply_patch add layer rejects duplicate layer" {
-  let base = Section::single(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@score.note(48.0))
   try
-    base.apply_patch(SectionPatch::add_layer("main", @pattern.note(55.0)))
+    base.apply_patch(SectionPatch::add_layer("main", @score.note(55.0)))
   catch {
     SectionPatchError::DuplicateLayer("main") => ()
     _ => assert_true(false)
@@ -471,9 +471,9 @@ test "Section::apply_patch add layer rejects duplicate layer" {
 
 ///|
 test "Section::apply_patch set layer rejects missing layer" {
-  let base = Section::single(name="verse", body=@pattern.note(48.0))
+  let base = Section::single(name="verse", body=@score.note(48.0))
   try
-    base.apply_patch(SectionPatch::set_layer("counter", @pattern.note(55.0)))
+    base.apply_patch(SectionPatch::set_layer("counter", @score.note(55.0)))
   catch {
     SectionPatchError::MissingLayer("counter") => ()
     _ => assert_true(false)

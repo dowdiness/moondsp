@@ -101,23 +101,26 @@ check_manifest() {
 # architecture plus the facade exceptions documented in ADR-0001 and ADR-0015.
 # `control` is the closed control vocabulary (ADR-0020): a leaf that pattern,
 # Mini, voice, and scheduler share; graph stays generic over its keys.
+# `score` holds the closed set of sounds a score event plays (ADR-0022): above
+# pattern, below its users (song, Mini, scheduler, the browser host).
 check_manifest \
   "moon.pkg" \
   '^(dowdiness/moondsp/(control|dsp|graph|identity|voice|engine))$' \
-  '^(dowdiness/moondsp/(mini|pattern))$'
+  '^(dowdiness/moondsp/(mini|pattern|score))$'
 check_manifest "dsp/moon.pkg" '^$'
 check_manifest "identity/moon.pkg" '^$'
 check_manifest "control/moon.pkg" '^$'
 check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/(control|identity))$'
-check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern))$'
-check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(control|identity|pattern|song))$'
+check_manifest "score/moon.pkg" '^(dowdiness/moondsp/pattern)$'
+check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|score))$'
+check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(control|identity|pattern|score|song))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(control|dsp|graph))$'
 # Shared lifecycle and primitive browser adapter; see docs/engine-architecture.md.
 check_manifest "engine/moon.pkg" '^(dowdiness/moondsp/(dsp|graph|engine/lifecycle))$'
 check_manifest "engine/lifecycle/moon.pkg" '^(dowdiness/moondsp/dsp)$'
 check_manifest "graph/browser/moon.pkg" '^(dowdiness/moondsp/(dsp|engine/lifecycle|graph/internal/(model|template|runtime)))$'
-check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(control|identity|pattern|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
+check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(control|identity|pattern|score|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(graph/browser|scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "cmd/main/moon.pkg" '^$'
@@ -136,13 +139,16 @@ check_manifest "graph/internal/authoring/moon.pkg" '^(dowdiness/moondsp/(identit
 # graph rules. They document the facade-plus-internals direction without
 # blocking current production code paths.
 check_manifest "scheduler/internal/model/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song))$'
-check_manifest "scheduler/internal/transport/moon.pkg" '^(dowdiness/moondsp/(dsp|pattern))$'
-check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|song|scheduler/internal/model))$'
-check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|scheduler/internal/model|voice))$'
+check_manifest \
+  "scheduler/internal/transport/moon.pkg" \
+  '^(dowdiness/moondsp/(dsp|pattern))$' \
+  '^(dowdiness/moondsp/(dsp|pattern|score))$'
+check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|score|song|scheduler/internal/model))$'
+check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|score|scheduler/internal/model|voice))$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
 # Playback preparation assigns IDs to routed snapshots (technical reference: Browser live updates).
-check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|song|identity))$'
+check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|score|song|identity))$'
 
 # Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
 # mention @dsp types, but it must not publicly re-export DSP package types,

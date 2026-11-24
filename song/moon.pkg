@@ -1,6 +1,7 @@
 import {
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/score",
 }
 
 import {

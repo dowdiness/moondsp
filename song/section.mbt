@@ -182,7 +182,7 @@ pub fn[C] SectionBody::layers(
 /// The section's layers stacked into one pattern.
 pub fn[C : SongContent] SectionBody::to_pattern(
   self : SectionBody[C],
-) -> @pattern.Pat[@pattern.ControlMap] {
+) -> @pattern.Pat[@score.ScoreEvent] {
   match self {
     Single(body) => body.pat()
     Layers(layers) => @pattern.stack(layers.map(layer => layer.body().pat()))
@@ -701,7 +701,7 @@ pub fn[C] Section::scope(self : Section[C]) -> TimeScope {
 /// The section's layers stacked into one pattern, without its scope.
 pub fn[C : SongContent] Section::body(
   self : Section[C],
-) -> @pattern.Pat[@pattern.ControlMap] {
+) -> @pattern.Pat[@score.ScoreEvent] {
   self.body.to_pattern()
 }
 
@@ -715,7 +715,7 @@ pub fn[C : SongContent] Section::body(
 pub fn[C : SongContent] Section::query(
   self : Section[C],
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   let body = self.body.to_pattern()
   if self.scope.is_identity() {
     body.query(arc)

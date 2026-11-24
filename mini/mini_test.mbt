@@ -1,19 +1,12 @@
 ///|
-test "drum_midi returns correct GM numbers" {
-  debug_inspect(@mini.drum_midi("bd"), content="Some(36)")
-  debug_inspect(@mini.drum_midi("sd"), content="Some(38)")
-  debug_inspect(@mini.drum_midi("cp"), content="Some(39)")
-  debug_inspect(@mini.drum_midi("hh"), content="Some(42)")
-  debug_inspect(@mini.drum_midi("oh"), content="Some(46)")
-}
-
-///|
 test "parse s(\"cp oh\") cross-pool drum sequence" {
   let pat = unwrap_ok(@mini.parse("s(\"cp oh\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="2")
-  assert_eq(events[0].value.entries(), Map([(Sound, 39)]))
-  assert_eq(events[1].value.entries(), Map([(Sound, 46)]))
+  assert_eq(drum_of(events[0].value), Some("cp"))
+  assert_eq(events[0].value.controls.entries(), Map([]))
+  assert_eq(drum_of(events[1].value), Some("oh"))
+  assert_eq(events[1].value.controls.entries(), Map([]))
 }
 
 ///|
@@ -158,17 +151,10 @@ test "gate rejects fractions outside zero through one" {
 }
 
 ///|
-test "drum_midi returns None for unknown names" {
-  debug_inspect(@mini.drum_midi("snare"), content="None")
-  debug_inspect(@mini.drum_midi(""), content="None")
-  debug_inspect(@mini.drum_midi("123"), content="None")
-}
-
-///|
 /// Query a pattern over one cycle [0, 1) and return events.
 fn query_one_cycle(
-  pat : @pattern.Pat[@pattern.ControlMap],
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+  pat : @pattern.Pat[@score.ScoreEvent],
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
@@ -179,8 +165,8 @@ fn query_one_cycle(
 ///|
 /// Unwrap an Ok result or fail the test.
 fn unwrap_ok(
-  result : Result[@pattern.Pat[@pattern.ControlMap], String],
-) -> @pattern.Pat[@pattern.ControlMap] {
+  result : Result[@pattern.Pat[@score.ScoreEvent], String],
+) -> @pattern.Pat[@score.ScoreEvent] {
   match result {
     Ok(pat) => pat
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -189,8 +175,8 @@ fn unwrap_ok(
 
 ///|
 fn unwrap_doc(
-  result : Result[@pattern.PatternDoc, String],
-) -> @pattern.PatternDoc {
+  result : Result[@pattern.PatternDoc[@score.ScoreEvent], String],
+) -> @pattern.PatternDoc[@score.ScoreEvent] {
   match result {
     Ok(doc) => doc
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -199,8 +185,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_mini_snapshot(
-  result : Result[@pattern.PatternSnapshot, String],
-) -> @pattern.PatternSnapshot {
+  result : Result[@pattern.PatternSnapshot[@score.ScoreEvent], String],
+) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
   match result {
     Ok(snapshot) => snapshot
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -216,7 +202,7 @@ fn pid(value : String) -> @identity.PatternNodeId {
 
 ///|
 fn assert_builder_result_error(
-  result : Result[@pattern.PatternDoc, String],
+  result : Result[@pattern.PatternDoc[@score.ScoreEvent], String],
   expected : String,
 ) -> Unit {
   match result {
@@ -233,7 +219,8 @@ test "parse single drum sound" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  assert_eq(events[0].value.entries(), Map([(Sound, 36)]))
+  assert_eq(drum_of(events[0].value), Some("bd"))
+  assert_eq(events[0].value.controls.entries(), Map([]))
 }
 
 ///|
@@ -241,15 +228,10 @@ test "parse lpf and hpf methods merges cutoff and optional resonance controls" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\").lpf(200, 2).hpf(40, 0.5)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
+  assert_eq(drum_of(events[0].value), Some("bd"))
   assert_eq(
-    events[0].value.entries(),
-    Map([
-      (Sound, 36),
-      (Lpf, 200),
-      (LpfResonance, 2),
-      (Hpf, 40),
-      (HpfResonance, 0.5),
-    ]),
+    events[0].value.controls.entries(),
+    Map([(Lpf, 200), (LpfResonance, 2), (Hpf, 40), (HpfResonance, 0.5)]),
   )
 }
 
@@ -258,8 +240,8 @@ test "filter resonance accepts any finite positive value" {
   let high_q = query_one_cycle(
     unwrap_ok(@mini.parse("note(\"C4\").lpf(800, 64).hpf(80, 128)")),
   )
-  assert_eq(high_q[0].value.get(LpfResonance), Some(64.0))
-  assert_eq(high_q[0].value.get(HpfResonance), Some(128.0))
+  assert_eq(high_q[0].value.controls.get(LpfResonance), Some(64.0))
+  assert_eq(high_q[0].value.controls.get(HpfResonance), Some(128.0))
   for source in ["note(\"C4\").lpf(800, 0)", "note(\"C4\").hpf(80, -1)"] {
     match @mini.parse(source) {
       Ok(_) => abort("expected invalid filter resonance to fail")
@@ -274,9 +256,9 @@ test "parse gain and pan methods merge sound controls" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\").gain(0.5).pan(-0.25)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Gain) == Some(0.5))
-  assert_true(events[0].value.get(Pan) == Some(-0.25))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Gain) == Some(0.5))
+  assert_true(events[0].value.controls.get(Pan) == Some(-0.25))
 }
 
 ///|
@@ -284,8 +266,8 @@ test "parse room method adds a shared reverb send" {
   let pat = unwrap_ok(@mini.parse("s(\"bd\").room(0.625)"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  guard events[0].value.get(Room) is Some(send) else {
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  guard events[0].value.controls.get(Room) is Some(send) else {
     abort("expected room send")
   }
   assert_true((send - 0.625).abs() < 0.000001)
@@ -334,15 +316,10 @@ test "parse_snapshot lowers filter resonance through PatternDoc" {
     ),
   )
   inspect(events.length(), content="1")
+  assert_eq(drum_of(events[0].value), Some("bd"))
   assert_eq(
-    events[0].value.entries(),
-    Map([
-      (Sound, 36),
-      (Lpf, 200),
-      (LpfResonance, 2),
-      (Hpf, 40),
-      (HpfResonance, 0.5),
-    ]),
+    events[0].value.controls.entries(),
+    Map([(Lpf, 200), (LpfResonance, 2), (Hpf, 40), (HpfResonance, 0.5)]),
   )
 }
 
@@ -362,9 +339,9 @@ test "parse_snapshot lowers gain and pan methods through PatternDoc" {
     ),
   )
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Gain) == Some(0.5))
-  assert_true(events[0].value.get(Pan) == Some(-0.25))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Gain) == Some(0.5))
+  assert_true(events[0].value.controls.get(Pan) == Some(-0.25))
 }
 
 ///|
@@ -379,8 +356,8 @@ test "parse_snapshot supports repeated lpf values in PatternDoc" {
     ),
   )
   inspect(events.length(), content="2")
-  assert_true(events[0].value.get(Lpf) == Some(200.0))
-  assert_true(events[1].value.get(Lpf) == Some(200.0))
+  assert_true(events[0].value.controls.get(Lpf) == Some(200.0))
+  assert_true(events[1].value.controls.get(Lpf) == Some(200.0))
 }
 
 ///|
@@ -395,8 +372,8 @@ test "parse_snapshot supports repeated hpf chain in PatternDoc" {
     ),
   )
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Hpf) == Some(200.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Hpf) == Some(200.0))
 }
 
 ///|
@@ -414,8 +391,8 @@ test "parse_snapshot supports repeated gain and pan values in PatternDoc" {
   )
   inspect(events.length(), content="2")
   for event in events {
-    assert_true(event.value.get(Gain) == Some(0.5))
-    assert_true(event.value.get(Pan) == Some(-0.25))
+    assert_true(event.value.controls.get(Gain) == Some(0.5))
+    assert_true(event.value.controls.get(Pan) == Some(-0.25))
   }
 }
 
@@ -425,7 +402,7 @@ test "parse pan method is overridden by jux outer pan" {
   let events = query_one_cycle(pat)
   inspect(events.length(), content="2")
   let (pan_neg1, pan_pos1) = for event in events; neg = 0, pos = 0 {
-    match event.value.get(Pan) {
+    match event.value.controls.get(Pan) {
       Some(-1.0) => continue neg + 1, pos
       Some(1.0) => continue neg, pos + 1
       _ => continue neg, pos
@@ -439,7 +416,7 @@ test "parse pan method is overridden by jux outer pan" {
 
 ///|
 test "MiniDocBuilder::note_atom rejects invalid note text" {
-  let builder = @mini.MiniDocBuilder::with_previous(None)
+  let builder = @mini.MiniDocBuilder::new()
   assert_builder_result_error(
     builder.note_atom(pid("mini:note:bad:0"), ""),
     "invalid note: '' is not a number or note name",
@@ -456,7 +433,7 @@ test "MiniDocBuilder::note_atom rejects invalid note text" {
 
 ///|
 test "MiniDocBuilder transforms documents it did not build" {
-  let builder = @mini.MiniDocBuilder::with_previous(None)
+  let builder = @mini.MiniDocBuilder::new()
   let parsed = unwrap_doc(@mini.parse_doc("note(\"60 62\")"))
   let own = builder.note_atom(pid("mini:note:64:0"), "64").unwrap()
   let fast = builder.fast(parsed, @pattern.Rational::from_int(2)).unwrap()
@@ -466,28 +443,17 @@ test "MiniDocBuilder transforms documents it did not build" {
 }
 
 ///|
-test "parse_doc_reusing preserves ids across whitespace edits" {
+test "reparsing preserves ids across whitespace edits" {
   let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
-  let edited = unwrap_doc(
-    @mini.parse_doc("s(\"  bd   sd  \")", previous=Some(doc)),
-  )
+  let edited = unwrap_doc(@mini.parse_doc("s(\"  bd   sd  \")"))
   @debug.assert_eq(doc.root().value(), edited.root().value())
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(edited.contains_node(pid("mini:sound:sd:0")))
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
-  ignore(doc.lower_with_cache(cache))
-  cache.reset_stats()
-  ignore(edited.lower_with_cache(cache))
-  inspect(cache.hit_count(), content="1")
-  inspect(cache.miss_count(), content="0")
 }
 
 ///|
-test "parse_doc_reusing lpf edit preserves sound atom id" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").lpf(200)"))
-  let edited = unwrap_doc(
-    @mini.parse_doc("s(\"bd\").lpf(300)", previous=Some(doc)),
-  )
+test "reparsing lpf edit preserves sound atom id" {
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").lpf(300)"))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:300")),
@@ -495,11 +461,7 @@ test "parse_doc_reusing lpf edit preserves sound atom id" {
   assert_true(
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:200")),
   )
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
-  ignore(doc.lower_with_cache(cache))
-  cache.reset_stats()
-  let snapshot = edited.lower_with_cache(cache)
-  assert_true(cache.hit_count() >= 1)
+  let snapshot = edited.lower()
   let events = snapshot.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -507,16 +469,13 @@ test "parse_doc_reusing lpf edit preserves sound atom id" {
     ),
   )
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Lpf) == Some(300.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Lpf) == Some(300.0))
 }
 
 ///|
-test "parse_doc_reusing gain edit preserves sound atom id" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").gain(1)"))
-  let edited = unwrap_doc(
-    @mini.parse_doc("s(\"bd\").gain(2)", previous=Some(doc)),
-  )
+test "reparsing gain edit preserves sound atom id" {
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").gain(2)"))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:2")),
@@ -533,16 +492,13 @@ test "parse_doc_reusing gain edit preserves sound atom id" {
       ),
     )
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Gain) == Some(2.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Gain) == Some(2.0))
 }
 
 ///|
-test "parse_doc_reusing pan edit preserves sound atom id" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd\").pan(-1)"))
-  let edited = unwrap_doc(
-    @mini.parse_doc("s(\"bd\").pan(0)", previous=Some(doc)),
-  )
+test "reparsing pan edit preserves sound atom id" {
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd\").pan(0)"))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(
     edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:0")),
@@ -559,26 +515,18 @@ test "parse_doc_reusing pan edit preserves sound atom id" {
       ),
     )
   inspect(events.length(), content="1")
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[0].value.get(Pan) == Some(0.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(events[0].value.controls.get(Pan) == Some(0.0))
 }
 
 ///|
-test "parse_doc_reusing token replacement preserves unaffected token ids" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd hh\")"))
-  let edited = unwrap_doc(
-    @mini.parse_doc("s(\"bd cp hh\")", previous=Some(doc)),
-  )
+test "reparsing token replacement preserves unaffected token ids" {
+  let edited = unwrap_doc(@mini.parse_doc("s(\"bd cp hh\")"))
   assert_true(edited.contains_node(pid("mini:sound:bd:0")))
   assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
   assert_true(edited.contains_node(pid("mini:sound:cp:0")))
   assert_true(edited.contains_node(pid("mini:sound:hh:0")))
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
-  ignore(doc.lower_with_cache(cache))
-  cache.reset_stats()
-  let snapshot = edited.lower_with_cache(cache)
-  assert_true(cache.hit_count() >= 2)
-  assert_true(cache.miss_count() >= 1)
+  let snapshot = edited.lower()
   let events = snapshot.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -586,9 +534,8 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
     ),
   )
   let saw_cp = for event in events {
-    match event.value.get(Sound) {
-      Some(39.0) => break true
-      _ => ()
+    if drum_of(event.value) == Some("cp") {
+      break true
     }
   } nobreak {
     false
@@ -597,17 +544,12 @@ test "parse_doc_reusing token replacement preserves unaffected token ids" {
 }
 
 ///|
-test "parse_doc_reusing insertion and removal keep surviving token ids" {
-  let doc = unwrap_doc(@mini.parse_doc("s(\"bd sd\")"))
-  let inserted = unwrap_doc(
-    @mini.parse_doc("s(\"hh bd sd\")", previous=Some(doc)),
-  )
+test "reparsing insertion and removal keep surviving token ids" {
+  let inserted = unwrap_doc(@mini.parse_doc("s(\"hh bd sd\")"))
   assert_true(inserted.contains_node(pid("mini:sound:hh:0")))
   assert_true(inserted.contains_node(pid("mini:sound:bd:0")))
   assert_true(inserted.contains_node(pid("mini:sound:sd:0")))
-  let removed = unwrap_doc(
-    @mini.parse_doc("s(\"bd\")", previous=Some(inserted)),
-  )
+  let removed = unwrap_doc(@mini.parse_doc("s(\"bd\")"))
   assert_true(removed.contains_node(pid("mini:sound:bd:0")))
   assert_true(!removed.contains_node(pid("mini:sound:hh:0")))
   assert_true(!removed.contains_node(pid("mini:sound:sd:0")))
@@ -616,7 +558,7 @@ test "parse_doc_reusing insertion and removal keep surviving token ids" {
 ///|
 fn draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshotWithOrigins raise {
+) -> @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent] raise {
   let input = match draft.prepare_playback() {
     Ok(input) => input
     Err(diagnostic) => fail(diagnostic.problem().to_string())
@@ -1029,7 +971,7 @@ test "Draft control changes preserve live source paths including zero gain" {
   edit_draft(draft, prefix.length(), prefix.length() + 1, "0")
   let event = draft_snapshot(draft).query(draft_arc())[0]
   assert_eq(event.origin(), old)
-  assert_eq(event.event().value.get(Gain), Some(0.0))
+  assert_eq(event.event().value.controls.get(Gain), Some(0.0))
 }
 
 ///|
@@ -1170,7 +1112,7 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
     fail("expected exact arrangement")
   }
   assert_true(repeating)
-  assert_eq(song.query(draft_arc())[0].value.get(Sound), Some(36.0))
+  assert_eq(drum_of(song.query(draft_arc())[0].value), Some("bd"))
   assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
   edit_draft(draft, 0, text.length(), "/*")
   assert_true(draft.state().tracking() is Song)
@@ -1186,7 +1128,7 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
     fail("text input must be explicitly untracked")
   }
   guard raw.body() is Pattern(doc) else { fail("expected runtime pattern") }
-  assert_eq(doc.lower().query(draft_arc())[0].value.get(Note), Some(62.0))
+  assert_eq(pitch_of(doc.lower().query(draft_arc())[0].value), Some(62.0))
 }
 
 ///|
@@ -1266,9 +1208,9 @@ test "parse note sequence" {
   let pat = unwrap_ok(@mini.parse("note(\"60 64 67\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  assert_eq(events[0].value.entries(), Map([(Note, 60)]))
-  assert_eq(events[1].value.entries(), Map([(Note, 64)]))
-  assert_eq(events[2].value.entries(), Map([(Note, 67)]))
+  assert_eq(pitch_of(events[0].value), Some(60.0))
+  assert_eq(pitch_of(events[1].value), Some(64.0))
+  assert_eq(pitch_of(events[2].value), Some(67.0))
 }
 
 ///|
@@ -1348,7 +1290,8 @@ test "parse euclid bd(3,8) tresillo" {
   let pat = unwrap_ok(@mini.parse("s(\"bd(3,8)\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  assert_eq(events[0].value.entries(), Map([(Sound, 36)]))
+  assert_eq(drum_of(events[0].value), Some("bd"))
+  assert_eq(events[0].value.controls.entries(), Map([]))
 }
 
 ///|
@@ -1381,7 +1324,8 @@ test "parse euclid k=0 produces silence for that element" {
   let events = query_one_cycle(pat)
   // bd(0,8) is silent, only sd plays in second half
   inspect(events.length(), content="1")
-  assert_eq(events[0].value.entries(), Map([(Sound, 38)]))
+  assert_eq(drum_of(events[0].value), Some("sd"))
+  assert_eq(events[0].value.controls.entries(), Map([]))
 }
 
 ///|
@@ -1509,7 +1453,7 @@ test "degradeBy drops the same events wherever the same expression is written" {
         @pattern.Rational::from_int(4),
       ),
     )
-    .filter(event => event.value.get(Gain) is None)
+    .filter(event => event.value.controls.get(Gain) is None)
     .map(event => event.part.begin)
   }
 
@@ -1684,9 +1628,12 @@ test "parse with rev method" {
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
   // Reversed: hh, sd, bd
-  assert_eq(events[0].value.entries(), Map([(Sound, 36)]))
-  assert_eq(events[1].value.entries(), Map([(Sound, 38)]))
-  assert_eq(events[2].value.entries(), Map([(Sound, 42)]))
+  assert_eq(drum_of(events[0].value), Some("bd"))
+  assert_eq(events[0].value.controls.entries(), Map([]))
+  assert_eq(drum_of(events[1].value), Some("sd"))
+  assert_eq(events[1].value.controls.entries(), Map([]))
+  assert_eq(drum_of(events[2].value), Some("hh"))
+  assert_eq(events[2].value.controls.entries(), Map([]))
 }
 
 ///|
@@ -1871,7 +1818,7 @@ test "chord(C) parses C major as 3 stacked notes" {
   let pat = unwrap_ok(@mini.parse("chord(\"C\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  let notes = events.map(ev => ev.value.get(Note))
+  let notes = events.map(ev => pitch_of(ev.value))
   assert_true(notes.contains(Some(60.0)))
   assert_true(notes.contains(Some(64.0)))
   assert_true(notes.contains(Some(67.0)))
@@ -1923,9 +1870,9 @@ test "note(C4 E4 G4) parses note names into MIDI numbers" {
   let pat = unwrap_ok(@mini.parse("note(\"C4 E4 G4\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  assert_eq(events[0].value.entries(), Map([(Note, 60)]))
-  assert_eq(events[1].value.entries(), Map([(Note, 64)]))
-  assert_eq(events[2].value.entries(), Map([(Note, 67)]))
+  assert_eq(pitch_of(events[0].value), Some(60.0))
+  assert_eq(pitch_of(events[1].value), Some(64.0))
+  assert_eq(pitch_of(events[2].value), Some(67.0))
 }
 
 ///|
@@ -1933,11 +1880,11 @@ test "note(C D E F G) defaults octave to 4" {
   let pat = unwrap_ok(@mini.parse("note(\"C D E F G\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="5")
-  @debug.assert_eq(events[0].value.get(Note), Some(60.0))
-  @debug.assert_eq(events[1].value.get(Note), Some(62.0))
-  @debug.assert_eq(events[2].value.get(Note), Some(64.0))
-  @debug.assert_eq(events[3].value.get(Note), Some(65.0))
-  @debug.assert_eq(events[4].value.get(Note), Some(67.0))
+  @debug.assert_eq(pitch_of(events[0].value), Some(60.0))
+  @debug.assert_eq(pitch_of(events[1].value), Some(62.0))
+  @debug.assert_eq(pitch_of(events[2].value), Some(64.0))
+  @debug.assert_eq(pitch_of(events[3].value), Some(65.0))
+  @debug.assert_eq(pitch_of(events[4].value), Some(67.0))
 }
 
 ///|
@@ -1945,7 +1892,7 @@ test "note(C-1) parses negative octave note name" {
   let pat = unwrap_ok(@mini.parse("note(\"C-1\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  @debug.assert_eq(events[0].value.get(Note), Some(0.0))
+  @debug.assert_eq(pitch_of(events[0].value), Some(0.0))
 }
 
 ///|
@@ -1976,8 +1923,8 @@ test "chord method chain .gain(0.5).pan(-0.5)" {
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
   for event in events {
-    assert_true(event.value.get(Gain) == Some(0.5))
-    assert_true(event.value.get(Pan) == Some(-0.5))
+    assert_true(event.value.controls.get(Gain) == Some(0.5))
+    assert_true(event.value.controls.get(Pan) == Some(-0.5))
   }
 }
 
@@ -1986,7 +1933,7 @@ test "note(F#3) parses single note with sharp" {
   let pat = unwrap_ok(@mini.parse("note(\"F#3\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  @debug.assert_eq(events[0].value.get(Note), Some(54.0))
+  @debug.assert_eq(pitch_of(events[0].value), Some(54.0))
 }
 
 ///|
@@ -1994,7 +1941,7 @@ test "note(C#4 Bb3 D#5) parses various accidentals" {
   let pat = unwrap_ok(@mini.parse("note(\"C#4 Bb3 D#5\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  let notes = events.map(ev => ev.value.get(Note))
+  let notes = events.map(ev => pitch_of(ev.value))
   assert_true(notes.contains(Some(61.0))) // C#4
   assert_true(notes.contains(Some(58.0))) // Bb3
   assert_true(notes.contains(Some(75.0))) // D#5
@@ -2021,7 +1968,7 @@ test "note(C#4) parses note with sharp and octave" {
   let pat = unwrap_ok(@mini.parse("note(\"C#4\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="1")
-  @debug.assert_eq(events[0].value.get(Note), Some(61.0))
+  @debug.assert_eq(pitch_of(events[0].value), Some(61.0))
 }
 
 ///|
@@ -2029,7 +1976,7 @@ test "chord(C#) parses C-sharp major" {
   let pat = unwrap_ok(@mini.parse("chord(\"C#\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  let notes = events.map(ev => ev.value.get(Note))
+  let notes = events.map(ev => pitch_of(ev.value))
   assert_true(notes.contains(Some(61.0))) // C#4
   assert_true(notes.contains(Some(65.0))) // F4
   assert_true(notes.contains(Some(68.0))) // G#4
@@ -2040,7 +1987,7 @@ test "chord(F#m7) parses F-sharp minor 7" {
   let pat = unwrap_ok(@mini.parse("chord(\"F#m7\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="4")
-  let notes = events.map(ev => ev.value.get(Note))
+  let notes = events.map(ev => pitch_of(ev.value))
   assert_true(notes.contains(Some(66.0))) // F#4
   assert_true(notes.contains(Some(69.0))) // A4
   assert_true(notes.contains(Some(73.0))) // C#5
@@ -2052,7 +1999,7 @@ test "chord(Bb) parses B-flat major" {
   let pat = unwrap_ok(@mini.parse("chord(\"Bb\")"))
   let events = query_one_cycle(pat)
   inspect(events.length(), content="3")
-  let notes = events.map(ev => ev.value.get(Note))
+  let notes = events.map(ev => pitch_of(ev.value))
   assert_true(notes.contains(Some(70.0))) // Bb4
   assert_true(notes.contains(Some(74.0))) // D5
   assert_true(notes.contains(Some(77.0))) // F5
@@ -2075,11 +2022,11 @@ test "chord(C) produces same events each cycle" {
   inspect(events2.length(), content="3")
   // Verify events in both cycles have the same note values
   for ev in events1 {
-    let note = ev.value.get(Note)
+    let note = pitch_of(ev.value)
     assert_true(note == Some(60.0) || note == Some(64.0) || note == Some(67.0))
   }
   for ev in events2 {
-    let note = ev.value.get(Note)
+    let note = pitch_of(ev.value)
     assert_true(note == Some(60.0) || note == Some(64.0) || note == Some(67.0))
   }
 }
@@ -2097,8 +2044,8 @@ test "chord(C) and note(60 64 67) produce identical events" {
   inspect(events1.length(), content="3")
   inspect(events2.length(), content="3")
   // Same notes (order may differ since chord uses stack and note uses sequence)
-  let notes1 = events1.map(ev => ev.value.get(Note))
-  let notes2 = events2.map(ev => ev.value.get(Note))
+  let notes1 = events1.map(ev => pitch_of(ev.value))
+  let notes2 = events2.map(ev => pitch_of(ev.value))
   for n in [Some(60.0), Some(64.0), Some(67.0)] {
     assert_true(notes1.contains(n))
     assert_true(notes2.contains(n))
@@ -2110,10 +2057,10 @@ test "explicit chord notation compiles with named chords weights repeats and res
   let events = query_one_cycle(
     unwrap_ok(@mini.parse("chord(\"[C {60,63,68}@2]*2 ~\")")),
   )
-  assert_true(events.map(event => event.value.get(Note)).contains(Some(60.0)))
-  assert_true(events.map(event => event.value.get(Note)).contains(Some(63.0)))
-  assert_true(events.map(event => event.value.get(Note)).contains(Some(68.0)))
-  assert_true(events.map(event => event.value.get(Note)).contains(Some(64.0)))
+  assert_true(events.map(event => pitch_of(event.value)).contains(Some(60.0)))
+  assert_true(events.map(event => pitch_of(event.value)).contains(Some(63.0)))
+  assert_true(events.map(event => pitch_of(event.value)).contains(Some(68.0)))
+  assert_true(events.map(event => pitch_of(event.value)).contains(Some(64.0)))
 }
 
 ///|

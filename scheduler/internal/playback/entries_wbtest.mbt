@@ -1,9 +1,9 @@
 ///|
 /// `pat` as one entry addressed by the document node `name`.
 fn addressed(
-  pat : @pattern.Pat[@pattern.ControlMap],
+  pat : @pattern.Pat[@score.ScoreEvent],
   name : String,
-) -> @pattern.Pat[@pattern.ControlMap] raise {
+) -> @pattern.Pat[@score.ScoreEvent] raise {
   @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string(name),
     pat=pat.material(),
@@ -17,11 +17,11 @@ fn material(
   name : String,
   note : Int32,
   period : Int32,
-) -> @pattern.Pat[@pattern.ControlMap] raise {
+) -> @pattern.Pat[@score.ScoreEvent] raise {
   addressed(
     @pattern.sequence([
-      @pattern.note(note.to_double()),
-      @pattern.note((note + 1).to_double()),
+      @score.note(note.to_double()),
+      @score.note((note + 1).to_double()),
     ]).slow(@pattern.Rational::from_int(period)),
     name,
   )
@@ -29,7 +29,7 @@ fn material(
 
 ///|
 fn score(
-  parts : Array[@pattern.Pat[@pattern.ControlMap]],
+  parts : Array[@pattern.Pat[@score.ScoreEvent]],
 ) -> PlaybackSnapshot raise {
   PlaybackSnapshot::pattern(
     @pattern.PatternDoc::from_pattern(
@@ -42,7 +42,7 @@ fn score(
 ///|
 fn accept(
   state : PlaybackState,
-  parts : Array[@pattern.Pat[@pattern.ControlMap]],
+  parts : Array[@pattern.Pat[@score.ScoreEvent]],
   at : Int32,
 ) -> Unit raise {
   state.queue(score(parts))
@@ -66,13 +66,15 @@ fn notes(
     let actual = sourced[i].event()
     assert_true(event.whole == actual.whole)
     assert_true(event.part == actual.part)
-    assert_true(event.value.entries() == actual.value.entries())
+    assert_true(
+      event.value.controls.entries() == actual.value.controls.entries(),
+    )
   }
   let events = raw.filter(e => e.whole is Some(w) && arc.contains(w.begin))
   events.sort_by((a, b) => {
     a.whole.unwrap().begin.compare(b.whole.unwrap().begin)
   })
-  events.map(e => e.value.get(Note).unwrap().to_int())
+  events.map(e => pitch_of(e.value).unwrap().to_int())
 }
 
 ///|
@@ -205,7 +207,7 @@ test "reverting cancels a reservation while a new material waits for its entry" 
 
 ///|
 test "content edits preserve the cycle count used by variation" {
-  fn varying(note : Int32) -> @pattern.Pat[@pattern.ControlMap] raise {
+  fn varying(note : Int32) -> @pattern.Pat[@score.ScoreEvent] raise {
     @pattern.every(2, p => p.rev(), material("a", note, 3))
   }
   let state = PlaybackState()
@@ -222,11 +224,11 @@ test "content edits preserve the cycle count used by variation" {
 
 ///|
 test "combined custom content without signatures is conservatively replaced" {
-  fn combined(note : Int32) -> @pattern.Pat[@pattern.ControlMap] raise {
+  fn combined(note : Int32) -> @pattern.Pat[@score.ScoreEvent] raise {
     addressed(
       @pattern.stack([
-        @pattern.note(note.to_double()),
-        @pattern.note((note + 1).to_double()),
+        @score.note(note.to_double()),
+        @score.note((note + 1).to_double()),
       ]).jux(p => p.rev()),
       "a",
     )
@@ -484,11 +486,10 @@ test "retained entry budget preserves music and recovers at removal boundaries" 
 ///|
 test "exact pattern origins survive admission and active queries" {
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
-  let doc = @pattern.PatternDoc::control_atom(
+  let doc = @pattern.PatternDoc::atom(
     id=@identity.PatternNodeId::from_string("exact-origin"),
     source_atom=@identity.SourceAtomId::SourceAtomId(epoch, 1L),
-    key=Note,
-    value=60.0,
+    value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
   )
   let snapshot = PlaybackSnapshot::pattern_with_origins(
     doc.lower_with_origins(),
@@ -512,11 +513,10 @@ test "exact pattern origins survive admission and active queries" {
 test "origin-only edits update retained material provenance" {
   fn exact(serial : Int64) -> PlaybackSnapshot raise {
     let epoch = @identity.SourceEpoch::SourceEpoch(1L)
-    let doc = @pattern.PatternDoc::control_atom(
+    let doc = @pattern.PatternDoc::atom(
       id=@identity.PatternNodeId::from_string("same-material"),
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
-      key=Note,
-      value=60.0,
+      value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
     )
     PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
   }
@@ -542,11 +542,10 @@ test "origin-only edits update retained material provenance" {
 test "pending material retains old exact origins until its musical boundary" {
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
   fn exact(serial : Int64, note : Double) -> PlaybackSnapshot raise {
-    let doc = @pattern.PatternDoc::control_atom(
+    let doc = @pattern.PatternDoc::atom(
       id=@identity.PatternNodeId::from_string("tone"),
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
-      key=Note,
-      value=note,
+      value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=note)),
     ).slow(
       id=@identity.PatternNodeId::from_string("phrase"),
       factor=@pattern.Rational::from_int(3),
@@ -570,8 +569,8 @@ test "pending material retains old exact origins until its musical boundary" {
     next.source_origin() is Some(next_origin) else {
     fail("expected old and pending exact material")
   }
-  assert_eq(old.event().value.get(Note), Some(60.0))
-  assert_eq(next.event().value.get(Note), Some(72.0))
+  assert_eq(pitch_of(old.event().value), Some(60.0))
+  assert_eq(pitch_of(next.event().value), Some(72.0))
   assert_eq(old_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 1L))
   assert_eq(next_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 2L))
   assert_eq(next.event().whole.unwrap().begin, @pattern.Rational::from_int(3))

@@ -50,10 +50,10 @@ pub fn[C] ParsedSong::bpm(self : ParsedSong[C]) -> Double? {
 /// anonymous runtime patterns, without source origins.
 pub fn parse_song(
   input : String,
-) -> Result[ParsedSong[@pattern.Pat[@pattern.ControlMap]], String] {
+) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
-  let builder = MiniDocBuilder(previous=None, origins=None)
+  let builder = MiniDocBuilder()
   p.parse_bindings(builder) catch {
     problem => return Err(problem.to_string())
   }
@@ -74,7 +74,7 @@ pub fn parse_song(
 fn[C] Parser::parse_song_expr(
   self : Parser,
   builder : MiniDocBuilder,
-  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+  lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> ParsedSong[C] raise SourceProblem {
   self.skip_whitespace()
   let song_start = self.pos
@@ -142,7 +142,7 @@ fn[C] Parser::parse_song_item(
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
   builder~ : MiniDocBuilder,
-  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+  lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> Unit raise SourceProblem {
   self.skip_whitespace()
   let item_start = self.pos
@@ -193,7 +193,7 @@ fn[C] Parser::parse_song_section(
   self : Parser,
   item_start : Int32,
   builder~ : MiniDocBuilder,
-  lower~ : (@pattern.PatternDoc) -> C raise @pattern.PatternDocError,
+  lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
 ) -> @song.Section[C] raise SourceProblem {
   self.skip_whitespace()
   let name = self.read_quoted_string()

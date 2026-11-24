@@ -4,6 +4,7 @@ import {
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/scheduler",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",

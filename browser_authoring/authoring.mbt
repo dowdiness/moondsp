@@ -213,7 +213,6 @@ fn notation_projection_events(
   content_start : Int32,
   content_length : Int32,
   nodes : Array[Json],
-  kind : String,
   rests_only : Bool,
 ) -> Array[Json] raise EditWireError {
   match compiled {
@@ -257,13 +256,9 @@ fn notation_projection_events(
               raise InvalidEdit("compiled event does not map to a source atom")
           }
           if !rests_only || notation_projection_is_rest(nodes, node) {
-            let pitch : Json = if rests_only || kind == "drum" {
-              Json::null()
-            } else {
-              match event.value.get(Note) {
-                Some(value) => Json(value)
-                None => raise InvalidEdit("compiled note event has no pitch")
-              }
+            let pitch : Json = match event.value.sound {
+              Note(_, pitch~) if !rests_only => Json(pitch)
+              Note(_, ..) | Hit(_) => Json::null()
             }
             projected.push({
               "node": Json(node),
@@ -288,7 +283,6 @@ fn notation_projection_compile_events(
   content_start : Int32,
   content_length : Int32,
   nodes : Array[Json],
-  kind : String,
   rests_only : Bool,
 ) -> Array[Json] raise EditWireError {
   let input = match draft.prepare_playback() {
@@ -300,7 +294,7 @@ fn notation_projection_compile_events(
     Err(message) => raise InvalidEdit(message)
   }
   notation_projection_events(
-    draft, compiled, span, content_start, content_length, nodes, kind, rests_only,
+    draft, compiled, span, content_start, content_length, nodes, rests_only,
   )
 }
 
@@ -350,7 +344,6 @@ fn notation_projection_json(
     content_start,
     content.length(),
     nodes,
-    kind,
     false,
   )
   let mut has_rests = false
@@ -377,7 +370,6 @@ fn notation_projection_json(
       content_start,
       content.length(),
       nodes,
-      kind,
       true,
     )
     guard events.length() + rest_result.length() <= 256 else {

@@ -20,8 +20,8 @@ fn doc_span(
 
 ///|
 fn unwrap_doc(
-  build : () -> @pattern.PatternDoc raise @pattern.PatternDocError,
-) -> @pattern.PatternDoc {
+  build : () -> @pattern.PatternDoc[@pattern.ControlMap] raise @pattern.PatternDocError,
+) -> @pattern.PatternDoc[@pattern.ControlMap] {
   build() catch {
     _ => abort("expected pattern doc")
   }
@@ -29,8 +29,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_snapshot(
-  build : () -> @pattern.PatternSnapshot raise @pattern.PatternDocError,
-) -> @pattern.PatternSnapshot {
+  build : () -> @pattern.PatternSnapshot[@pattern.ControlMap] raise @pattern.PatternDocError,
+) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
   build() catch {
     _ => abort("expected pattern snapshot")
   }
@@ -38,7 +38,7 @@ fn unwrap_snapshot(
 
 ///|
 fn assert_pattern_event_path(
-  event : @pattern.PatternSnapshotEvent,
+  event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
   expected : Array[String],
 ) -> Unit {
   let nodes = event.pattern_nodes()
@@ -62,7 +62,10 @@ fn unwrap_revision(
 }
 
 ///|
-fn edited_leaf_doc(edit_count : Int32, value : Int32) -> @pattern.PatternDoc {
+fn edited_leaf_doc(
+  edit_count : Int32,
+  value : Int32,
+) -> @pattern.PatternDoc[@pattern.ControlMap] {
   let count = edit_count.abs() % 8 + 1
   let mut doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(value))
   for i in 0..<count {
@@ -78,7 +81,7 @@ fn revisioned_leaf_doc(
   id_value : String,
   revision : Int32,
   value : Int32,
-) -> @pattern.PatternDoc {
+) -> @pattern.PatternDoc[@pattern.ControlMap] {
   let mut doc = @pattern.PatternDoc::pure(id=pid(id_value), value=n(value))
   for i in 0..<revision {
     doc = unwrap_doc(() => {
@@ -194,11 +197,11 @@ test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
     @pattern.PatternDoc::stack(id=pid("jux-stack"), docs=[
       @pattern.PatternDoc::from_pattern(
         id=pid("jux-left"),
-        pat=@pattern.note(60.0),
+        pat=@pattern.control(Note, 60.0),
       ),
       @pattern.PatternDoc::from_pattern(
         id=pid("jux-right"),
-        pat=@pattern.note(67.0),
+        pat=@pattern.control(Note, 67.0),
       ),
     ])
   })
@@ -221,7 +224,7 @@ test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
 test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   let left = @pattern.PatternDoc::from_pattern(
     id=pid("merge-left"),
-    pat=@pattern.note(60.0),
+    pat=@pattern.control(Note, 60.0),
   )
   let right = @pattern.PatternDoc::control_atom(
     id=pid("merge-right"),
@@ -303,7 +306,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
   let base = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   ignore(unwrap_snapshot(() => base.lower_with_cache(cache)))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="3")
@@ -333,7 +336,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
 test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
   let first = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   let second = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(2))
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
   @debug.assert_eq(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, n(1))
   cache.reset_stats()
@@ -357,7 +360,7 @@ test "PatternLoweringCache does not reuse divergent replacements" {
   let second = unwrap_doc(() => {
     base.replace_with_pure(id=pid("left"), value=n(4))
   })
-  let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
+  let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
   let first_events = first_snapshot.query(doc_span(0, 1, 1, 1))
   @debug.assert_eq(first_events[0].value, n(3))
@@ -643,7 +646,10 @@ test "PatternDoc::every lowers through runtime combinator" {
 test "PatternDoc::jux lowers through control-map runtime combinator" {
   let doc = @pattern.PatternDoc::from_pattern(
     id=pid("sound"),
-    pat=@pattern.sequence([@pattern.sound(36.0), @pattern.sound(38.0)]),
+    pat=@pattern.sequence([
+      @pattern.control(Note, 36.0),
+      @pattern.control(Note, 38.0),
+    ]),
   )
   let juxed = unwrap_doc(() => {
     doc.jux(id=pid("jux"), transform=@pattern.TimeTransform::Reverse)
@@ -668,7 +674,7 @@ test "PatternDoc::jux lowers through control-map runtime combinator" {
 test "PatternDoc::merge_control lowers through control-map runtime combinator" {
   let note_doc = @pattern.PatternDoc::from_pattern(
     id=pid("note"),
-    pat=@pattern.note(60.0),
+    pat=@pattern.control(Note, 60.0),
   )
   let gain_doc = @pattern.PatternDoc::control_atom(
     id=pid("gain"),
@@ -693,16 +699,25 @@ test "PatternDoc::merge_control lowers through control-map runtime combinator" {
 test "PatternDoc::merge_control revision changes when lower-revision input changes" {
   let note_doc = @pattern.PatternDoc::from_pattern(
     id=pid("note"),
-    pat=@pattern.note(60.0),
+    pat=@pattern.control(Note, 60.0),
   )
   let note_doc = unwrap_doc(() => {
-    note_doc.replace_with_pattern(id=pid("note"), pat=@pattern.note(61.0))
+    note_doc.replace_with_pattern(
+      id=pid("note"),
+      pat=@pattern.control(Note, 61.0),
+    )
   })
   let note_doc = unwrap_doc(() => {
-    note_doc.replace_with_pattern(id=pid("note"), pat=@pattern.note(62.0))
+    note_doc.replace_with_pattern(
+      id=pid("note"),
+      pat=@pattern.control(Note, 62.0),
+    )
   })
   let note_doc = unwrap_doc(() => {
-    note_doc.replace_with_pattern(id=pid("note"), pat=@pattern.note(63.0))
+    note_doc.replace_with_pattern(
+      id=pid("note"),
+      pat=@pattern.control(Note, 63.0),
+    )
   })
   let gain_doc = @pattern.PatternDoc::pure(
     id=pid("gain"),
@@ -769,7 +784,7 @@ test "PatternDoc rejects missing edit target" {
 
 ///|
 test "PatternDoc rejects empty sequence documents" {
-  let docs : Array[@pattern.PatternDoc] = []
+  let docs : Array[@pattern.PatternDoc[@pattern.ControlMap]] = []
   try @pattern.PatternDoc::sequence(id=pid("seq"), docs~) catch {
     @pattern.PatternDocError::EmptyPatternDocs => ()
     _ => abort("expected empty pattern docs")

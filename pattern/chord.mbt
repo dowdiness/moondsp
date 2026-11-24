@@ -5,7 +5,7 @@
 ///   C, Dm, G7, F#m7, Bb, Cmaj7, Am, Esus4, Cdim, Caug, Dm7b5, etc.
 ///
 /// Each chord name is parsed into a root MIDI note + quality intervals,
-/// producing an array of MIDI note numbers for use with `note()`.
+/// producing an array of MIDI note numbers for note events.
 
 ///|
 /// Chord quality intervals in semitones from root.
@@ -325,32 +325,6 @@ fn parse_chord_with_default_octave(
     }
     None => None
   }
-}
-
-///|
-/// Create a pattern from a chord name. The chord is expanded into a stack
-/// of note events, one per chord tone, all at the same time position.
-///
-/// Octave defaults to 4 (middle C octave).
-///
-/// Examples:
-///   chord("C")    → C major: [C4, E4, G4]  = [60, 64, 67]
-///   chord("Dm")   → D minor: [D4, F4, A4]  = [62, 65, 69]
-///   chord("G7")   → G dominant 7th: [G4, B4, D5, F5] = [67, 71, 74, 77]
-///   chord("F#m7") → F# minor 7th: [F#4, A4, C#5, E5] = [66, 69, 73, 76]
-///
-/// Returns silence pattern for unrecognized chord names.
-pub fn chord(name : String, octave~ : Int32 = 4) -> Pat[ControlMap] {
-  match parse_chord_with_default_octave(name, octave) {
-    Some(notes) => chord_pat_from_notes(notes)
-    None => Pat::silence()
-  }
-}
-
-///|
-/// Internal: create a stacked pattern from MIDI note numbers.
-fn chord_pat_from_notes(notes : Array[Int32]) -> Pat[ControlMap] {
-  stack(notes.map(fn(midi) { note(midi.to_double()) }))
 }
 
 ///|

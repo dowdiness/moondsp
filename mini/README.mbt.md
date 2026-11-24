@@ -34,8 +34,8 @@ surface:
 
 - **Upstream consumers**: Web editors (e.g. `web/live/`), REPLs, and live-coding
   interfaces pass text code directly to `mini`.
-- **Downstream dependencies**: [`pattern/`](../pattern/) provides `Pat[ControlMap]`,
-  `Rational`, and `PatternDoc`; [`song/`](../song/) provides `Song`
+- **Downstream dependencies**: [`pattern/`](../pattern/) provides `Pat`,
+  `Rational`, and `PatternDoc`; [`score/`](../score/) provides `ScoreEvent`; [`song/`](../song/) provides `Song`
   layouts; [`identity/`](../identity/) supplies node IDs for live-editing trees.
   `mini` has zero dependencies on audio buffers, DSP, or voice pools.
 
@@ -43,12 +43,12 @@ surface:
 
 | Category | Types / Functions | Key operations |
 |---|---|---|
-| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ControlMap]` or `ParsedSong[Pat[ControlMap]]` |
+| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ScoreEvent]` or `ParsedSong[Pat[ScoreEvent]]` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
-| **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::with_previous`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
-| **Song & Utilities** | `ParsedSong[C]`, `drum_midi` | `ParsedSong::song`, `ParsedSong::bpm`, `drum_midi` |
+| **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::new`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
+| **Song & Utilities** | `ParsedSong[C]` | `ParsedSong::song`, `ParsedSong::bpm` |
 
 ## Choose an entry point
 
@@ -59,9 +59,9 @@ origins; `Draft` adds them.
 
 | Function | Use it when you need |
 |---|---|
-| `parse` | The lowered `Pat[ControlMap]` of `parse_snapshot` |
+| `parse` | The lowered `Pat[ScoreEvent]` of `parse_snapshot` |
 | `parse_song` | A `Song` layout plus its authored BPM metadata |
-| `parse_doc` | A general graph document, optionally reusing previous subtrees |
+| `parse_doc` | A general graph document |
 | `parse_snapshot` | A parsed and lowered document snapshot |
 | `Draft` | Causal atom/reference identities across valid and invalid edits, frozen playback input, and current source locations |
 
@@ -83,10 +83,10 @@ test "parse a layered mini pattern" {
   let events = pat.query(cycle)
 
   assert_eq(events.length(), 4)
-  assert_true(events[0].value.get(Sound) == Some(36.0))
-  assert_true(events[1].value.get(Sound) == Some(38.0))
-  assert_true(events[2].value.get(Note) == Some(60.0))
-  assert_true(events[3].value.get(Note) == Some(64.0))
+  assert_true(drum_of(events[0].value) == Some("bd"))
+  assert_true(drum_of(events[1].value) == Some("sd"))
+  assert_true(pitch_of(events[2].value) == Some(60.0))
+  assert_true(pitch_of(events[3].value) == Some(64.0))
 }
 ```
 
@@ -146,9 +146,8 @@ An exact compilation failure never falls back to untracked playback.
 `encode_wire()` serializes a frozen input as schema-1 JSON. `decode_wire(wire)`
 returns a `Result`, validating bounded source/wire sizes, safe integer identities,
 and complete source witnesses without inferring identity continuity. It does
-not replace `compile()` or host workload admission. `compile` accepts optional
-`previous` and `query_window` arguments; only explicit text input reuses the
-previous general document. A transported Song input must still parse as a song.
+not replace `compile()` or host workload admission. `compile` accepts an
+optional `query_window`. A transported Song input must still parse as a song.
 
 `locate_origin(origin)` returns `Located(atom_range, reference_ranges)` with
 outer-to-inner reference ranges, or `Unavailable(SourceReset | AtomRetired |
@@ -211,25 +210,12 @@ Select Song mode in the browser editor before playing one.
 
 ## Live-editing documents
 
-`parse_doc` creates a `PatternDoc` with deterministic graph IDs, not
-causal source identities. Pass the previous successful document back through
-`previous` to reuse unchanged subtrees:
+`parse_doc` creates a `PatternDoc[ScoreEvent]` from the text alone, with
+deterministic graph IDs, not causal source identities: reparsing an edit gives
+unchanged subtrees the same IDs.
 
-```mbt nocheck
-///|
-let first = @mini.parse_doc("let beat = s(\"bd sd\"); beat")
-
-///|
-let edited = match first {
-  Ok(doc) =>
-    @mini.parse_doc("let beat = s(\"bd hh\"); beat", previous=Some(doc))
-  Err(message) => Err(message)
-}
-```
-
-Use `Draft` rather than this stateless loop when editing needs exact source
-continuity. Its last-valid document is internal parse state, not a playback
-acceptance channel. Parsing remains whole-source; this is not token-level
+Use `Draft` rather than reparsing when editing needs exact source continuity.
+Parsing remains whole-source; this is not token-level
 incremental parsing. A Draft needs no disposal: dropping it releases it, and
 `PlaybackInput` values prepared from it own their own source witnesses.
 

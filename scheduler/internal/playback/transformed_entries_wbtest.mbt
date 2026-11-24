@@ -1,6 +1,6 @@
 ///|
 test "public transformations of identified material reach playback" {
-  let source = @pattern.sequence([@pattern.note(60.0), @pattern.note(72.0)]).material()
+  let source = @pattern.sequence([@score.note(60.0), @score.note(72.0)]).material()
   let cases = [
     (source.filter_map(_ => None), []),
     (source.rev(), [72, 60]),
@@ -24,8 +24,8 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
   let pair = @identity.PatternNodeId::from_string("pair")
   let euclid = @identity.PatternNodeId::from_string("euclid")
   let snapshot = @pattern.PatternDoc::stack(id=pair, docs=[
-      @pattern.PatternDoc::from_pattern(id=left, pat=@pattern.note(60.0)),
-      @pattern.PatternDoc::from_pattern(id=right, pat=@pattern.note(67.0)),
+      @pattern.PatternDoc::from_pattern(id=left, pat=@score.note(60.0)),
+      @pattern.PatternDoc::from_pattern(id=right, pat=@score.note(67.0)),
     ])
     .euclid(id=euclid, k=1, n=2)
     .lower()
@@ -42,7 +42,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
   )
   let events = state.query_active_sourced_events(arc)
   assert_eq(
-    events.map(event => event.event().value.get(Note).unwrap().to_int()),
+    events.map(event => pitch_of(event.event().value).unwrap().to_int()),
     [60, 67],
   )
   let children = [left, right]
@@ -59,7 +59,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     @pattern.TimeSpan(@pattern.Rational(1L, 4L), @pattern.Rational(3L, 4L)),
   )
   assert_eq(
-    clipped.map(event => event.event().value.get(Note).unwrap().to_int()),
+    clipped.map(event => pitch_of(event.event().value).unwrap().to_int()),
     [60, 67],
   )
   for sourced in clipped {

@@ -1,5 +1,5 @@
 ///|
-fn bench_origin_draft_doc(text : String) -> @pattern.PatternDoc {
+fn bench_origin_draft_doc(text : String) -> ScoreDoc {
   let draft = try! Draft(text)
   match draft.analysis {
     Playable(source, _) =>
@@ -22,19 +22,29 @@ fn bench_origin_arc(index : Int32) -> @pattern.TimeSpan {
 
 ///|
 fn bench_origin_rows(
-  events : Array[@pattern.Event[@pattern.ControlMap]],
+  events : Array[@pattern.Event[@score.ScoreEvent]],
 ) -> Array[
-  (@pattern.TimeSpan?, @pattern.TimeSpan, Map[@control.Control, Double]),
+  (
+    @pattern.TimeSpan?,
+    @pattern.TimeSpan,
+    @score.Sound,
+    Map[@control.Control, Double],
+  ),
 ] {
-  events.map(event => (event.whole, event.part, event.value.entries()))
+  events.map(event => {
+    (event.whole, event.part, event.value.sound, event.value.controls.entries())
+  })
 }
 
 ///|
 fn bench_origin_check_parity(
-  doc : @pattern.PatternDoc,
+  doc : ScoreDoc,
   arcs : Array[@pattern.TimeSpan],
   require_bindings : Bool,
-) -> (@pattern.PatternSnapshot, @pattern.PatternSnapshotWithOrigins) raise {
+) -> (
+  @pattern.PatternSnapshot[@score.ScoreEvent],
+  @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
+) raise {
   let ordinary = try! doc.lower()
   let exact = try! doc.lower_with_origins()
   for arc in arcs {

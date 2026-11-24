@@ -74,6 +74,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking MoonBit API:** score events carry the sound they play
+  (ADR-0022). A new `score` package defines `Drum`, `Instrument`,
+  `Sound = Hit(Drum) | Note(Instrument, pitch~)`, and
+  `ScoreEvent { sound, controls }`; Mini, `song`, and the scheduler carry
+  `ScoreEvent` instead of `ControlMap`. `Control::Sound` is gone, and Mini no
+  longer writes `Note`: the scheduler gives a note's pitch to its voice as
+  `Note` at note-on. `PatternDoc` and its snapshots, origins, and lowering
+  cache take their payload type again; `merge_control` merges a
+  `PatternDoc[ControlMap]` into any `A : WithControls`. `PatternScheduler`
+  takes `pools~` and `route~ : (Sound) -> Int` instead of
+  `InstrumentSelector` pairs. `@pattern.note`, `sound`, `note_name`, and
+  `chord`, and `@mini.drum_midi`, are removed; use `@score.note` and
+  `@score.hit`. Mini parses from the text alone: `previous` is gone from
+  `parse_doc`, `parse_snapshot`, `parse_play_source`, and
+  `PlaybackInput::compile`, and `MiniDocBuilder::new()` replaces
+  `with_previous`. Content signatures now name the sound, so `degradeBy`
+  over drums may drop different events.
 - **Breaking MoonBit and browser API:** `Draft` has no disposal. `dispose`,
   `DraftTracking::Disposed`, `DraftDiagnosticKind::Disposed`,
   `DraftEditError::Disposed`, and `browser_authoring.dispose_draft` are gone,

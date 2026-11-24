@@ -203,7 +203,7 @@ pub fn project_notation_nodes(
 fn[W] project_notation(
   content : String,
   vocabulary : NotationVocabulary[W],
-  word_doc : (MiniDocBuilder, W, MiniSpan) -> @pattern.PatternDoc raise SourceProblem,
+  word_doc : (MiniDocBuilder, W, MiniSpan) -> ScoreDoc raise SourceProblem,
   word_work : (W) -> MiniQueryWork,
 ) -> Result[Json, String] {
   let syntax = NotationSyntax::parse(content, vocabulary, at=0) catch {
@@ -215,10 +215,7 @@ fn[W] project_notation(
   }
   // A reduced p/q period repeats on the integer-cycle grid after p cycles.
   // Ceil(p/q) is not a repeat span (e.g. 3/2 needs 3 cycles, not 2).
-  let pattern = MiniDocBuilder(previous=None)
-    .notation_doc(syntax, word_doc)
-    .lower()
-    .pat() catch {
+  let pattern = MiniDocBuilder().notation_doc(syntax, word_doc).lower().pat() catch {
       _ => return Err("internal mini PatternDoc lowering failed")
     }
   let span = pattern.entry_period().num.to_double().max(1.0)

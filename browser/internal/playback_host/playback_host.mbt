@@ -141,29 +141,37 @@ pub fn init_scheduler_graph_with_templates(
   // The scheduler and its voice pools refuse any format they cannot run.
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   let candidates = [
-    (@scheduler.ControlEquals(Sound, 36.0), make_drum_pool(bd_template, ctx)),
-    (@scheduler.ControlEquals(Sound, 38.0), make_drum_pool(sd_template, ctx)),
-    (@scheduler.ControlEquals(Sound, 42.0), make_drum_pool(hh_template, ctx)),
-    (@scheduler.ControlEquals(Sound, 39.0), make_drum_pool(cp_template, ctx)),
-    (@scheduler.ControlEquals(Sound, 46.0), make_drum_pool(oh_template, ctx)),
-    (@scheduler.HasControl(Note), make_synth_pool(synth_template, ctx)),
+    make_drum_pool(bd_template, ctx),
+    make_drum_pool(sd_template, ctx),
+    make_drum_pool(hh_template, ctx),
+    make_drum_pool(cp_template, ctx),
+    make_drum_pool(oh_template, ctx),
+    make_synth_pool(synth_template, ctx),
   ]
-  let instruments : Array[
-    (@scheduler.InstrumentSelector, @moondsp.BoundVoicePool),
-  ] = []
+  let pools : Array[@moondsp.BoundVoicePool] = []
   for candidate in candidates {
-    match candidate {
-      (selector, Some(pool)) => instruments.push((selector, pool))
-      (_, None) => {
-        reset_scheduler_graph()
-        return false
-      }
+    guard candidate is Some(pool) else {
+      reset_scheduler_graph()
+      return false
+    }
+    pools.push(pool)
+  }
+  // The index in `pools` of each sound's pool.
+  let route = (sound : @score.Sound) => {
+    match sound {
+      Hit(Bd) => 0
+      Hit(Sd) => 1
+      Hit(Hh) => 2
+      Hit(Cp) => 3
+      Hit(Oh) => 4
+      Note(Triangle, ..) => 5
     }
   }
   let scheduler = @scheduler.PatternScheduler(
     bpm=@mini.DEFAULT_BPM,
     ctx~,
-    instruments~,
+    pools~,
+    route~,
   ) catch {
     _ => {
       reset_scheduler_graph()

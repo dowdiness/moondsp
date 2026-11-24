@@ -1,7 +1,7 @@
 ///|
 /// A playback event paired with the material version that produced it.
 pub struct PlaybackSourcedEvent {
-  priv event : @pattern.Event[@pattern.ControlMap]
+  priv event : @pattern.Event[@score.ScoreEvent]
   priv origin : @model.VoiceOrigin
   priv source_origin : @pattern.EventOrigin?
   priv source_frame : @identity.SourceFrameId?
@@ -12,7 +12,7 @@ pub struct PlaybackSourcedEvent {
 
 ///|
 pub fn PlaybackSourcedEvent::anonymous(
-  event : @pattern.Event[@pattern.ControlMap],
+  event : @pattern.Event[@score.ScoreEvent],
 ) -> PlaybackSourcedEvent {
   {
     event,
@@ -21,7 +21,7 @@ pub fn PlaybackSourcedEvent::anonymous(
     source_frame: None,
     source_start: -1.0,
     source_pitch: -1.0,
-    controls: @pattern.Controls::fixed(event.value),
+    controls: @pattern.Controls::fixed(event.value.controls),
   }
 }
 
@@ -64,7 +64,7 @@ pub fn PlaybackSourcedEvent::source_pitch(
 ///|
 pub fn PlaybackSourcedEvent::event(
   self : PlaybackSourcedEvent,
-) -> @pattern.Event[@pattern.ControlMap] {
+) -> @pattern.Event[@score.ScoreEvent] {
   self.event
 }
 
@@ -77,8 +77,8 @@ pub fn PlaybackSourcedEvent::origin(
 
 ///|
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot)
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
@@ -87,8 +87,10 @@ pub enum PlaybackSnapshot {
 /// A lowered song the scheduler can play. Its sections hold either anonymous
 /// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
-  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Exact(
+    @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  )
 }
 
 ///|
@@ -127,7 +129,7 @@ fn SongMaterial::entry_count(self : SongMaterial) -> Int32 {
 fn SongMaterial::query(
   self : SongMaterial,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   match self {
     Runtime(snapshot) => snapshot.song().query(arc)
     Exact(snapshot) => snapshot.song().query(arc)
@@ -136,14 +138,14 @@ fn SongMaterial::query(
 
 ///|
 pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins,
+  snapshot : @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
   PatternWithOrigins(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
   Pattern(snapshot)
 }
@@ -402,7 +404,7 @@ fn[A] PlaybackRun::query(
 pub fn PlaybackState::query_active_events(
   self : PlaybackState,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   match self.running {
     None => []
     Some(run) =>
@@ -437,7 +439,7 @@ pub fn PlaybackState::query_active_sourced_events(
 pub fn PlaybackSnapshot::query_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   match self {
     Pattern(snapshot) => snapshot.query(arc)
     PatternWithOrigins(snapshot) =>

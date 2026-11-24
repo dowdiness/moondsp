@@ -2,8 +2,10 @@
 /// A lowered song the scheduler can play. Its sections hold either anonymous
 /// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@pattern.ControlMap]])
-  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins])
+  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Exact(
+    @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  )
 }
 
 ///|
@@ -29,22 +31,22 @@ fn SongMaterial::from_raw(material : @playback.SongMaterial) -> SongMaterial {
 /// coherent staging boundary when higher-level live orchestration prepares the
 /// next playback state.
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot)
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins)
+  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
+  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
   Pattern(snapshot)
 }
 
 ///|
 pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins,
+  snapshot : @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
   PatternWithOrigins(snapshot)
 }
@@ -111,6 +113,6 @@ pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
 pub fn PlaybackSnapshot::query(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@pattern.ControlMap]] {
+) -> Array[@pattern.Event[@score.ScoreEvent]] {
   self.raw().query_events(arc)
 }

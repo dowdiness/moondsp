@@ -11,7 +11,7 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 priv struct MiniDefinition {
   /// The resolved body, which playback admission assesses.
   syntax : ResolvedMiniExpr
-  body : @pattern.PatternDoc
+  body : ScoreDoc
   name_span : MiniSpan
 }
 
@@ -23,7 +23,7 @@ priv struct ResolvedMiniExpr {
 
 ///|
 priv enum ResolvedMiniExprNode {
-  Sounds(NotationSyntax[DrumName])
+  Sounds(NotationSyntax[@score.Drum])
   Notes(NotationSyntax[Pitch])
   Chords(NotationSyntax[ChordName])
   Silence
@@ -46,7 +46,7 @@ fn control_domain_message(key : @control.Control) -> String {
     Room => "room() expects a send between 0 and 1"
     LpfResonance => "lpf() expects finite resonance above 0"
     HpfResonance => "hpf() expects finite resonance above 0"
-    Note | Sound | Gain | Pan | Lpf | Hpf | Decay | Sustain =>
+    Note | Gain | Pan | Lpf | Hpf | Decay | Sustain =>
       "\{key}() expects a number"
   }
 }
@@ -152,7 +152,7 @@ fn ResolvedMiniExpr::ResolvedMiniExpr(
 fn compile_mini_doc(
   expr : ResolvedMiniExpr,
   builder : MiniDocBuilder,
-) -> @pattern.PatternDoc raise SourceProblem {
+) -> ScoreDoc raise SourceProblem {
   match expr.node {
     Sounds(notation) => builder.literal_doc(notation, MiniDocBuilder::drum_doc)
     Notes(notation) => builder.literal_doc(notation, MiniDocBuilder::pitch_doc)

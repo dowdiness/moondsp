@@ -3,7 +3,7 @@
 /// edited material keeps its current interval until its next source entry.
 pub fn PatternScheduler::queue_pattern_snapshot(
   self : PatternScheduler,
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
 ) -> Unit {
   self.queue_playback_snapshot(PlaybackSnapshot::pattern(snapshot))
 }

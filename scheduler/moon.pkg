@@ -3,6 +3,7 @@ import {
   "dowdiness/moondsp/control",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/scheduler/internal/playback",

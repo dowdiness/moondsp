@@ -6,6 +6,11 @@ import {
   "moonbitlang/core/json",
 }
 
+import {
+  "dowdiness/moondsp/score",
+  "moonbitlang/core/double",
+} for "wbtest"
+
 pkgtype(kind: "executable")
 
 options(
