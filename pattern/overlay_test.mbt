@@ -81,13 +81,14 @@ test "overlays keep independent clocks while material explicitly groups them" {
     @pattern.control(Note, 72.0).slow(four)
   assert_eq(named.entries().map(p => p.entry_period()), [three, four])
   assert_eq(named.material().entries().length(), 1)
-  let two = @pattern.Rational::from_int(2)
-  let grouped = named.material().slow(two).entries()[0]
+  // The group repeats once both layers do: lcm(3, 4) = 12 cycles, then
+  // slow(2) makes it 24.
+  let grouped = named.material().slow(@pattern.Rational::from_int(2)).entries()[0]
   assert_eq(
     (grouped + @pattern.control(Note, 84.0).slow(three))
     .entries()
     .map(p => p.entry_period()),
-    [two, three],
+    [@pattern.Rational::from_int(24), three],
   )
   let rest : @pattern.Pat[Int32] = @pattern.Pat::silence()
     .slow(three)

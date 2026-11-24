@@ -96,7 +96,7 @@ in the browser bundle.
   <dt>a@2</dt><dd>relative duration weight; omitted weights are 1</dd>
   <dt>a, b</dt><dd>play together</dd>
   <dt>{60,63,68}</dt><dd>one explicit chord atom with absolute MIDI pitches, ascending and comma-separated without spaces</dd>
-  <dt>a/2</dt><dd>stretch 2× slower</dd>
+  <dt>a/2</dt><dd>stretch 2× slower; in a sequence, the step plays its next part each cycle</dd>
   <dt>a?</dt><dd>50% chance to drop</dd>
   <dt>a(3,8)</dt><dd>3 hits across 8 steps; a(3,8,1) adds rotation</dd>
 </dl>

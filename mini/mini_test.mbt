@@ -1432,6 +1432,29 @@ test "parse degrade step bd? drops some events deterministically" {
 }
 
 ///|
+test "a slowed step inside a sequence keeps playing its later cycles" {
+  // [64 67]/2 spans two cycles of its slot: 64 in even cycles, 67 in odd.
+  let pat = unwrap_ok(@mini.parse("note(\"60 [64 67]/2\")"))
+  let notes = (cycle : Int32) => {
+    pat
+    .query(
+      @pattern.TimeSpan(
+        @pattern.Rational::from_int(cycle),
+        @pattern.Rational::from_int(cycle + 1),
+      ),
+    )
+    .map(event => pitch_of(event.value))
+  }
+  @debug.assert_eq([notes(0), notes(1), notes(2)], [
+    [Some(60.0), Some(64.0)],
+    [Some(60.0), Some(67.0)],
+    [Some(60.0), Some(64.0)],
+  ])
+  // Live edits switch at the period, which now covers both cycles.
+  @debug.assert_eq(pat.entry_period(), @pattern.Rational::from_int(2))
+}
+
+///|
 test "parse degradeBy method chain" {
   let pat = unwrap_ok(
     @mini.parse(

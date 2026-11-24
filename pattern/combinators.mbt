@@ -8,7 +8,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
   let map = TimeMap::sequence(n)
   make_pat(
     arc => map.query(pats, arc),
-    map.period(Rational::from_int(1)),
+    map.period(periods_lcm(pats)),
     Opaque([]),
     Anonymous,
     combine_signature("sequence", pats),
@@ -17,7 +17,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
 
 ///|
 /// Sequence patterns whose positive integer weights determine their cycle shares.
-/// Each child sees its complete [0, 1) pattern cycle over its entire slot.
+/// In cycle c each child plays its own cycle c over its entire slot.
 /// Weights must be 1–16 and their sum at most 256; invalid inputs yield silence.
 pub fn[A] sequence_weighted(
   pats : Array[Pat[A]],
@@ -39,7 +39,7 @@ pub fn[A] sequence_weighted(
   )
   make_pat(
     arc => map.query(pats, arc),
-    map.period(Rational::from_int(1)),
+    map.period(periods_lcm(pats)),
     Opaque([]),
     Anonymous,
     signature,
@@ -82,7 +82,7 @@ pub fn[A] stack(pats : Array[Pat[A]]) -> Pat[A] {
     fn(arc) {
       normalized.iter().flat_map(pat => pat.query(arc).iter()).collect()
     },
-    Rational::from_int(1),
+    periods_lcm(normalized),
     Overlay(normalized),
     Anonymous,
     overlay_signature(normalized),

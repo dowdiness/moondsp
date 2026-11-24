@@ -247,10 +247,10 @@ test "continuous bus signal is exact under rev and inside sequence" {
   @debug.assert_eq(times.map(t => read(t.num, t.den).get().unwrap()), [
     0.875, 0.625, 1.9375,
   ])
-  // Slot 0 of 2 maps [c, c + 1/2) onto the child's [0, 1).
+  // Slot 0 of 2 maps [c, c + 1/2) onto the child's own cycle [c, c + 1).
   let read = gain_reader(in_slot)
   @debug.assert_eq(times.map(t => read(t.num, t.den).get().unwrap()), [
-    0.25, 0.75, 0.125,
+    0.25, 0.75, 1.125,
   ])
 }
 

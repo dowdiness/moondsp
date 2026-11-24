@@ -10,8 +10,9 @@ priv enum TimeMap {
   Affine(Rational, Rational)
   /// One piece per cycle c: child time = `2c + 1 − t` (`rev`).
   MirrorCycles
-  /// One piece per slot k of each cycle, for child k. `bounds` holds the
-  /// n + 1 cumulative slot weights; slot k shows its child `[0, 1)`.
+  /// One piece per slot k of each cycle c, for child k. `bounds` holds the
+  /// n + 1 cumulative slot weights; slot k of cycle c shows its child's
+  /// cycle c, `[c, c + 1)`.
   Slots(Array[Int64])
 }
 
@@ -160,7 +161,9 @@ fn TimeMap::offset_num(self : TimeMap, cycle : Int64, slot : Int32) -> Int64 {
   match self {
     Affine(_, offset) => offset.num
     MirrorCycles => 2L * cycle + 1L
-    Slots(bounds) => -slot_bound(bounds, cycle, slot)
+    Slots(bounds) =>
+      cycle * (bounds[slot + 1] - bounds[slot]) -
+      slot_bound(bounds, cycle, slot)
   }
 }
 
@@ -192,13 +195,30 @@ fn TimeMap::coefficients(
 }
 
 ///|
-/// The length after which the mapped pattern repeats, given its child's.
-fn TimeMap::period(self : TimeMap, child : Rational) -> Rational {
+/// The length after which the mapped pattern repeats, given the common
+/// period of its children (`period_lcm`). Cycle maps repeat every cycle, so
+/// they also need a whole number of cycles.
+fn TimeMap::period(self : TimeMap, children : Rational) -> Rational {
   match self {
-    Affine(scale, _) => child / scale
-    MirrorCycles => child
-    Slots(_) => Rational::from_int(1)
+    Affine(scale, _) => children / scale
+    MirrorCycles | Slots(_) => period_lcm(children, Rational::from_int(1))
   }
+}
+
+///|
+/// The shortest length that is a whole multiple of both positive periods:
+/// `lcm(a, c) / gcd(b, d)` for `a / b` and `c / d` in lowest terms.
+fn period_lcm(left : Rational, right : Rational) -> Rational {
+  let numerator = left.num / gcd(left.num, right.num) * right.num
+  Rational(numerator, gcd(left.den, right.den))
+}
+
+///|
+/// `period_lcm` of every pattern's period; 1 for none.
+fn[A] periods_lcm(pats : Array[Pat[A]]) -> Rational {
+  pats.fold(init=Rational::from_int(1), (period, pat) => {
+    period_lcm(period, pat.metadata.period)
+  })
 }
 
 ///|

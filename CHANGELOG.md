@@ -49,6 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a control under `rev` read its signal from the first cycle, so
   `.fadeOut(4).rev()` and `saw.slow(4)` under `every(n, rev)` or `jux(rev)`
   stopped moving after it.
+- A step inside a sequence keeps playing its later cycles. In
+  `note("60 [64 67]/2")`, the slowed step plays 64 and then 67 in turn,
+  as `/2` documents; it used to restart at 64 in every cycle and never
+  play 67. The same holds for weighted steps, Euclidean hits, and signals
+  inside them. A live edit now waits until such a pattern repeats: a
+  sequence, `rev`, or grouped stack repeats after the least common multiple
+  of its parts' lengths, such as 15 cycles for `note("60/3 64/5")`. The
+  editor's inline step controls are not shown for patterns that repeat over
+  more than 16 cycles.
 - Notation that is valid but over a playback limit, such as
   `note("c4(3,200) e4")`, no longer reports "Couldn't prepare this code"
   before the player's format is known. Quoted notation is now parsed once into

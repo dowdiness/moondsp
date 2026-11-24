@@ -207,6 +207,21 @@ test "rev of a pattern longer than one cycle reverses each of its cycles" {
 }
 
 ///|
+test "rev and sequences repeat after a whole number of cycles" {
+  // A 3/2-cycle pattern under rev or in a slot repeats only after 3 cycles.
+  let p = @pattern.Pat::pure(1).slow(r(3, 2))
+  @debug.assert_eq(
+    [
+      p.rev().entry_period(),
+      @pattern.sequence([p, @pattern.Pat::pure(2)]).entry_period(),
+      @pattern.sequence_weighted([p], [2]).entry_period(),
+      p.fast(r(3, 1)).entry_period(),
+    ],
+    [r(3, 1), r(3, 1), r(3, 1), r(1, 2)],
+  )
+}
+
+///|
 test "fast(0) returns silence (no events)" {
   let p = @pattern.Pat::pure(42).fast(r(0, 1))
   let events = p.query(span(0, 1, 1, 1))

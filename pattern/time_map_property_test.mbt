@@ -32,12 +32,11 @@ fn tm_floor(t : @pattern.Rational, left : Bool) -> Int64 {
 
 ///|
 /// The child time of outer time `t` through `ops` (innermost first), and
-/// whether it is a limit from below; `None` where a slot is silent.
-/// `keep_cycle` is ADR-0024 Decision 2: a slot shows its child's cycle c.
+/// whether it is a limit from below; `None` where a slot is silent. A slot
+/// in cycle c shows its child's cycle c (ADR-0024 Decision 2).
 fn tm_reference(
   ops : Array[TimeOp],
   outer : @pattern.Rational,
-  keep_cycle~ : Bool,
 ) -> (@pattern.Rational, Bool)? {
   let mut t = outer
   let mut left = false
@@ -53,8 +52,7 @@ fn tm_reference(
         let c = tm_floor(t, left)
         let pos = (t - tm_r(c, 1L)) * tm_r(n.to_int64(), 1L)
         guard tm_floor(pos, left) == i.to_int64() else { return None }
-        let cycle = if keep_cycle { c } else { 0L }
-        t = pos - tm_r(i.to_int64(), 1L) + tm_r(cycle, 1L)
+        t = pos - tm_r(i.to_int64(), 1L) + tm_r(c, 1L)
       }
     }
   }
@@ -138,8 +136,7 @@ fn tm_expected_event(
   ops : Array[TimeOp],
   t : @pattern.Rational,
 ) -> Array[Int32] {
-  // TODO(ADR-0024 step 6): keep_cycle=true once sequence slots keep it.
-  match tm_reference(ops, t, keep_cycle=false) {
+  match tm_reference(ops, t) {
     None => []
     Some((child, left)) => {
       let c = tm_floor(child, left)
@@ -244,9 +241,8 @@ test "time transforms move bus signals where the reference map does" {
       @pattern.TimeSpan(tm_r(-2L, 1L), tm_r(4L, 1L)),
     )
     let times = random.times()
-    // TODO(ADR-0024 step 6): keep_cycle=true once sequence slots keep it.
     let expected = times.map(t => {
-      tm_reference(ops, t, keep_cycle=false).map(child => child.0.to_double())
+      tm_reference(ops, t).map(child => child.0.to_double())
     })
     // A chain can leave the note silent everywhere; then so is the reference.
     guard events.get(0) is Some(onset) else {
