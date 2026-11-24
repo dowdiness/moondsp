@@ -82,7 +82,7 @@ fn Score::stack(
 fn NoteDoc::on(
   self : NoteDoc,
   builder : MiniDocBuilder,
-  instruments : @pattern.PatternDoc[@score.Instrument],
+  instruments : @pattern.PatternDoc[VoiceName],
 ) -> NoteDoc raise SourceProblem {
   let NoteDoc(doc) = self
   let id = builder.node_id("instruments", [doc.root(), instruments.root()], "")
@@ -99,13 +99,14 @@ fn NoteDoc::on(
 }
 
 ///|
-/// `event` played on `instrument`.
-fn played_on(
-  event : @score.ScoreEvent,
-  instrument : @score.Instrument,
-) -> @score.ScoreEvent {
+/// `event` played on `voice`: an instrument, or a sample at the note's pitch.
+fn played_on(event : @score.ScoreEvent, voice : VoiceName) -> @score.ScoreEvent {
   match event.sound {
-    Note(_, pitch~) => { ..event, sound: Note(instrument, pitch~), }
+    Note(_, pitch~) | Play(_, pitch~) =>
+      match voice {
+        Instrument(instrument) => { ..event, sound: Note(instrument, pitch~), }
+        Sample(sample) => { ..event, sound: Play(sample, pitch~), }
+      }
     // Unreachable: a `NoteDoc` holds no hits. Pattern queries run on the
     // audio thread, so the event stays as it is instead of aborting. A
     // payload that rules out hits is rejected in ADR-0022.

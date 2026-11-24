@@ -12,4 +12,5 @@ import {
 
 import {
   "moonbitlang/core/json",
+  "moonbitlang/core/math",
 } for "wbtest"

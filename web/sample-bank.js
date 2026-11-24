@@ -1,8 +1,9 @@
 // The built-in sample bank's material, generated in code at the context's
 // sample rate. It stands in for recordings until ones with an approved
 // licence replace it (ADR-0026). Each entry is what a decoded, resampled,
-// mono file would be: a name from `@score.Sample`, the MIDI pitch it was
-// recorded at, and its samples.
+// mono file would be: a name from `@score.Sample` and its samples. The engine
+// knows each bank sample's root pitch (`@score.Sample::root_pitch`): ping is
+// A4 (69), so its tone is 440 Hz; burst is unpitched and sits at C4 (60).
 
 /** A decaying 440 Hz sine with a little second harmonic, 1.5 s long. */
 function ping(sampleRate) {
@@ -33,7 +34,7 @@ function burst(sampleRate) {
  */
 export function sampleBank(sampleRate) {
   return [
-    { type: "sample-load", name: "ping", rootPitch: 69, data: ping(sampleRate) },
-    { type: "sample-load", name: "burst", rootPitch: 60, data: burst(sampleRate) },
+    { type: "sample-load", name: "ping", data: ping(sampleRate) },
+    { type: "sample-load", name: "burst", data: burst(sampleRate) },
   ];
 }

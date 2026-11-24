@@ -36,13 +36,60 @@ priv struct NotationVocabulary[W] {
 }
 
 ///|
-fn drum_names() -> NotationVocabulary[@score.Drum] {
-  { read_word: NotationCursor::read_drum_name, random_drop: Allowed, }
+/// A name `s("…")` accepts: a drum or a sample (ADR-0026 Decision 3).
+priv enum SoundName {
+  Drum(@score.Drum)
+  Sample(@score.Sample)
 }
 
 ///|
-fn instrument_names() -> NotationVocabulary[@score.Instrument] {
-  { read_word: NotationCursor::read_instrument_name, random_drop: Allowed, }
+fn SoundName::name(self : SoundName) -> String {
+  match self {
+    Drum(drum) => drum.name()
+    Sample(sample) => sample.name()
+  }
+}
+
+///|
+/// What the name plays: a drum hit, or the sample at its root pitch.
+fn SoundName::sound(self : SoundName) -> @score.Sound {
+  match self {
+    Drum(drum) => Hit(drum)
+    Sample(sample) => Play(sample, pitch=sample.root_pitch())
+  }
+}
+
+///|
+fn SoundName::parse(name : String) -> SoundName? {
+  match @score.Drum::parse(name) {
+    Some(drum) => Some(Drum(drum))
+    None => @score.Sample::parse(name).map(sample => Sample(sample))
+  }
+}
+
+///|
+/// A name `.s("…")` accepts: an instrument or a sample.
+priv enum VoiceName {
+  Instrument(@score.Instrument)
+  Sample(@score.Sample)
+}
+
+///|
+fn VoiceName::name(self : VoiceName) -> String {
+  match self {
+    Instrument(instrument) => instrument.name()
+    Sample(sample) => sample.name()
+  }
+}
+
+///|
+fn sound_names() -> NotationVocabulary[SoundName] {
+  { read_word: NotationCursor::read_sound_name, random_drop: Allowed, }
+}
+
+///|
+fn voice_names() -> NotationVocabulary[VoiceName] {
+  { read_word: NotationCursor::read_voice_name, random_drop: Allowed, }
 }
 
 ///|
@@ -503,32 +550,40 @@ fn NotationCursor::read_euclid_arguments(
 }
 
 ///|
-fn NotationCursor::read_drum_name(
+fn NotationCursor::read_sound_name(
   self : NotationCursor,
-) -> @score.Drum raise SourceProblem {
+) -> SoundName raise SourceProblem {
   let start = self.pos
   let name = self.read_ident()
   guard !name.is_empty() else {
     raise self.mistake(start, "expected sound name")
   }
-  match @score.Drum::parse(name) {
-    Some(drum) => drum
-    None => raise self.mistake(start, "unknown drum name '\{name}'")
+  match SoundName::parse(name) {
+    Some(sound) => sound
+    None => raise self.mistake(start, "unknown drum or sample name '\{name}'")
   }
 }
 
 ///|
-fn NotationCursor::read_instrument_name(
+fn NotationCursor::read_voice_name(
   self : NotationCursor,
-) -> @score.Instrument raise SourceProblem {
+) -> VoiceName raise SourceProblem {
   let start = self.pos
   let name = self.read_ident()
   guard !name.is_empty() else {
     raise self.mistake(start, "expected instrument name")
   }
   match @score.Instrument::parse(name) {
-    Some(instrument) => instrument
-    None => raise self.mistake(start, "unknown instrument name '\{name}'")
+    Some(instrument) => Instrument(instrument)
+    None =>
+      match @score.Sample::parse(name) {
+        Some(sample) => Sample(sample)
+        None =>
+          raise self.mistake(
+            start,
+            "unknown instrument or sample name '\{name}'",
+          )
+      }
   }
 }
 

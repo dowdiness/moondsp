@@ -78,3 +78,50 @@ test "sample loads report the limit they exceed" {
   assert_eq(sample_bank_name(0), "ping")
   assert_eq(sample_bank_name(sample_bank_count()), "")
 }
+
+///|
+/// Load a one-second 440 Hz sine, the bank's `ping` at its root of A4, into
+/// sample number `entry`.
+fn load_sine_for_test(entry : Int32) -> Unit raise {
+  assert_eq(sample_load_begin(entry, 48000, 0.0), 0)
+  for i in 0..<48000 {
+    sample_load_write(
+      i,
+      Float::from_double(
+        @math.sin(2.0 * @math.PI * 440.0 * i.to_double() / 48000.0),
+      ),
+    )
+  }
+  assert_true(sample_load_commit())
+}
+
+///|
+/// Energy of the score `text` over 48 blocks, on a player whose pools read
+/// the browser's sample store.
+fn sample_score_energy(text : String) -> Double raise {
+  ignore(init_sample_store())
+  rendered_synth_energy(text)
+}
+
+///|
+test "scores play bank samples through s and .s, shaped by lpf and gain" {
+  ignore(init_sample_store())
+  // Nothing has loaded `burst` yet: its notes start and play silence.
+  assert_true(!sample_loaded(@score.Sample::parse("burst").unwrap().number()))
+  assert_eq(sample_score_energy("s(\"burst\").slow(40)"), 0.0)
+  load_sine_for_test(@score.Sample::parse("ping").unwrap().number())
+  let one_shot = sample_score_energy("s(\"ping\").slow(40)")
+  let pitched = sample_score_energy("note(\"69\").slow(40).s(\"ping\")")
+  let quieter = sample_score_energy("s(\"ping\").slow(40).gain(0.25)")
+  let low_passed = sample_score_energy("s(\"ping\").slow(40).lpf(100)")
+  assert_true(one_shot > 10.0)
+  // `s("ping")` plays at the root, 69, so the two scores render alike.
+  assert_true((pitched / one_shot - 1.0).abs() < 0.01)
+  assert_true((quieter / one_shot - 0.25).abs() < 0.01)
+  assert_true(low_passed < one_shot * 0.1)
+  // An octave below the root reads the waveform at half speed: 220 Hz,
+  // which a 300 Hz low-pass keeps and which passes it less than 440 Hz.
+  let low = sample_score_energy("note(\"57\").slow(40).s(\"ping\").lpf(300)")
+  let root = sample_score_energy("note(\"69\").slow(40).s(\"ping\").lpf(300)")
+  assert_true(low > root * 2.0)
+}

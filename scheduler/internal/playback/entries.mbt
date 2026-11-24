@@ -709,10 +709,11 @@ fn[A] query_entry_segments(
 }
 
 ///|
-/// The pitch an exact event's atom wrote, or NaN for a drum hit.
+/// The pitch an exact event plays, or NaN for a drum hit. A sample played
+/// with `s("…")` plays its root pitch.
 fn authored_pitch(event : @score.ScoreEvent) -> Double {
   match event.sound {
-    Note(_, pitch~) => pitch
+    Note(_, pitch~) | Play(_, pitch~) => pitch
     Hit(_) => @double.not_a_number
   }
 }

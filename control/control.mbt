@@ -23,6 +23,10 @@ pub(all) enum Control {
   Sustain
   /// Seconds.
   Hold
+  /// The number of the sample a sampler voice plays. Like `Note`, the
+  /// scheduler sets it from the event's sound at note-on and no score method
+  /// names it (ADR-0026 Decision 1).
+  SampleNumber
   /// Seconds.
   Release
 }
@@ -43,6 +47,7 @@ pub fn Control::name(self : Control) -> String {
     Decay => "decay"
     Sustain => "sustain"
     Hold => "hold"
+    SampleNumber => "sample_number"
     Release => "release"
   }
 }
@@ -70,7 +75,8 @@ pub impl Hash for Control with fn hash(self) {
     Decay => 9
     Sustain => 10
     Hold => 11
-    Release => 12
+    SampleNumber => 12
+    Release => 13
   }
 }
 
@@ -96,6 +102,7 @@ pub fn Control::all() -> FixedArray[Control] {
     Decay,
     Sustain,
     Hold,
+    SampleNumber,
     Release,
   ]
 }
@@ -134,6 +141,7 @@ pub fn Control::nesting(self : Control) -> Nesting {
     | Decay
     | Sustain
     | Hold
+    | SampleNumber
     | Release => Override
   }
 }
@@ -152,5 +160,6 @@ pub fn Control::admits(self : Control, value : Double) -> Bool {
     Room => value >= 0.0 && value <= 1.0
     LpfResonance | HpfResonance => value > 0.0 && !value.is_inf()
     Note | Gain | Pan | Lpf | Hpf | Decay | Sustain => !value.is_nan()
+    SampleNumber => value >= 0.0 && value == value.floor() && !value.is_inf()
   }
 }

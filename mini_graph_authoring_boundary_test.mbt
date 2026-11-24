@@ -82,6 +82,7 @@ fn resolve_mini_graph_controls(
   let template_name = match event.sound {
     Hit(drum) => drum.name()
     Note(instrument, ..) => instrument.name()
+    Play(sample, ..) => sample.name()
   }
   let prepared = match find_prepared_template(registry, template_name) {
     Some(entry) => entry

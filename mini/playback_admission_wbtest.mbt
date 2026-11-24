@@ -90,6 +90,7 @@ fn admission_event_text(event : @pattern.Event[@score.ScoreEvent]) -> String {
     match event.value.sound {
       Hit(drum) => "hit=\{drum.name()}"
       Note(instrument, pitch~) => "\{instrument.name()}=\{pitch}"
+      Play(sample, pitch~) => "\{sample.name()}=\{pitch}"
     },
   ]
   event.value.controls.each((key, value) => controls.push("\{key}=\{value}"))

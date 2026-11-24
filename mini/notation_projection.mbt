@@ -183,7 +183,7 @@ pub fn project_notation_nodes(
   }
   match kind {
     "drum" =>
-      project_notation(content, drum_names(), MiniDocBuilder::drum_doc, _ => {
+      project_notation(content, sound_names(), MiniDocBuilder::sound_name_doc, _ => {
         Atom
       })
     "note" =>

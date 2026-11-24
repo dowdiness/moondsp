@@ -154,17 +154,39 @@ pub fn Sample::description(self : Sample) -> String {
 }
 
 ///|
+/// The sample's number in a host's sample store: its position in `all`.
+/// A match, so the audio thread reads it without building `all`.
+pub fn Sample::number(self : Sample) -> Int32 {
+  match self {
+    Ping => 0
+    Burst => 1
+  }
+}
+
+///|
+/// The MIDI pitch the sample was recorded at, which `s("name")` plays it at.
+/// A host registers the sample's waveform with this root.
+pub fn Sample::root_pitch(self : Sample) -> Double {
+  match self {
+    Ping => 69.0
+    Burst => 60.0
+  }
+}
+
+///|
 pub fn Sample::parse(name : String) -> Sample? {
   Sample::all().iter().find_first(sample => sample.name() == name)
 }
 
 ///|
-/// What a score event plays: a drum hit, or an instrument note at a pitch
-/// (a MIDI note number).
+/// What a score event plays: a drum hit, an instrument note at a pitch (a
+/// MIDI note number), or a recorded sample at a pitch; a sample plays as
+/// recorded at its `root_pitch` (ADR-0026 Decision 3).
 #derive(Eq, Debug)
 pub(all) enum Sound {
   Hit(Drum)
   Note(Instrument, pitch~ : Double)
+  Play(Sample, pitch~ : Double)
 }
 
 ///|
@@ -179,5 +201,6 @@ pub fn Sound::content(self : Sound) -> String {
   match self {
     Hit(drum) => "hit:\{drum.name()}"
     Note(instrument, pitch~) => "note:\{instrument.name()}:\{pitch}"
+    Play(sample, pitch~) => "play:\{sample.name()}:\{pitch}"
   }
 }

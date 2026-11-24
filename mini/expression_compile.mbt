@@ -23,7 +23,7 @@ priv struct ResolvedMiniExpr {
 
 ///|
 priv enum ResolvedMiniExprNode {
-  Sounds(NotationSyntax[@score.Drum])
+  Sounds(NotationSyntax[SoundName])
   Notes(NotationSyntax[Pitch])
   Chords(NotationSyntax[ChordName])
   Silence
@@ -31,7 +31,7 @@ priv enum ResolvedMiniExprNode {
   Reference(String, MiniDefinition)
   Apply(ResolvedMiniExpr, MiniTransform[ControlValue])
   /// The instruments of `.s`, and where its argument is written.
-  Instruments(ResolvedMiniExpr, NotationSyntax[@score.Instrument], Int32)
+  Instruments(ResolvedMiniExpr, NotationSyntax[VoiceName], Int32)
 }
 
 ///|
@@ -48,7 +48,7 @@ fn control_domain_message(key : @control.Control) -> String {
     Room => "room() expects a send between 0 and 1"
     LpfResonance => "lpf() expects finite resonance above 0"
     HpfResonance => "hpf() expects finite resonance above 0"
-    Note | Gain | Pan | Lpf | Hpf | Decay | Sustain =>
+    Note | Gain | Pan | Lpf | Hpf | Decay | Sustain | SampleNumber =>
       "\{key}() expects a number"
   }
 }
@@ -119,7 +119,7 @@ fn resolve_mini_expr(
   definitions : Map[String, MiniDefinition],
 ) -> ResolvedMiniExpr raise SourceProblem {
   let node : ResolvedMiniExprNode = match expr.node {
-    Literal(Sound, quoted) => Sounds(quoted.parse(drum_names()))
+    Literal(Sound, quoted) => Sounds(quoted.parse(sound_names()))
     Literal(Note, quoted) => Notes(quoted.parse(pitches()))
     Literal(Chord, quoted) => Chords(quoted.parse(chord_names()))
     Silence => Silence
@@ -131,7 +131,7 @@ fn resolve_mini_expr(
     }
     Instruments(child, quoted) => {
       let child = resolve_mini_expr(child, definitions)
-      Instruments(child, quoted.parse(instrument_names()), quoted.at)
+      Instruments(child, quoted.parse(voice_names()), quoted.at)
     }
     Reference(name) =>
       match unique_definition(definitions.get(name).iter(), false) {
@@ -161,7 +161,7 @@ fn compile_score(
 ) -> Score raise SourceProblem {
   match expr.node {
     Sounds(notation) =>
-      Hits(builder.literal_doc(notation, MiniDocBuilder::drum_doc))
+      Hits(builder.literal_doc(notation, MiniDocBuilder::sound_name_doc))
     Notes(notation) =>
       Notes(NoteDoc(builder.literal_doc(notation, MiniDocBuilder::pitch_doc)))
     Chords(notation) =>

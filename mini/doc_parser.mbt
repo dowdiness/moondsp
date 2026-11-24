@@ -70,9 +70,9 @@ pub fn MiniDocBuilder::sound_atom(
   id : @identity.PatternNodeId,
   name : String,
 ) -> Result[ScoreDoc, String] {
-  match @score.Drum::parse(name) {
-    Some(drum) => Ok(self.sound_doc(id, Hit(drum)))
-    None => Err("unknown drum name '\{name}'")
+  match SoundName::parse(name) {
+    Some(sound) => Ok(self.sound_doc(id, sound.sound()))
+    None => Err("unknown drum or sample name '\{name}'")
   }
 }
 
@@ -441,13 +441,13 @@ fn MiniDocBuilder::sound_doc(
 /// the notes it plays.
 fn MiniDocBuilder::instrument_doc(
   self : MiniDocBuilder,
-  instrument : @score.Instrument,
+  voice : VoiceName,
   _span : MiniSpan,
-) -> @pattern.PatternDoc[@score.Instrument] raise SourceProblem {
-  let id = self.atom_id("instrument", instrument.name())
-  let content = "instrument:\{instrument.name()}"
+) -> @pattern.PatternDoc[VoiceName] raise SourceProblem {
+  let id = self.atom_id("instrument", voice.name())
+  let content = "instrument:\{voice.name()}"
   self.contents[id.value()] = content
-  @pattern.PatternDoc::atom(id~, value=instrument, content~)
+  @pattern.PatternDoc::atom(id~, value=voice, content~)
 }
 
 ///|
@@ -924,13 +924,13 @@ fn[W, A] MiniDocBuilder::literal_doc(
 }
 
 ///|
-fn MiniDocBuilder::drum_doc(
+fn MiniDocBuilder::sound_name_doc(
   self : MiniDocBuilder,
-  drum : @score.Drum,
+  sound : SoundName,
   span : MiniSpan,
 ) -> ScoreDoc raise SourceProblem {
-  let id = self.atom_id_at("sound", drum.name(), span.start, span.end)
-  self.sound_doc(id, Hit(drum))
+  let id = self.atom_id_at("sound", sound.name(), span.start, span.end)
+  self.sound_doc(id, sound.sound())
 }
 
 ///|

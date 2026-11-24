@@ -6,8 +6,9 @@ fn copy_control_events(
 }
 
 ///|
-/// What a voice reads at note-on: the event's controls, and the pitch of a
-/// note as `Note` (ADR-0022).
+/// What a voice reads at note-on: the event's controls, the pitch of a note
+/// or sample as `Note` (ADR-0022), and a sample's number as `SampleNumber`
+/// (ADR-0026 Decision 1).
 priv struct NoteOnControls {
   sound : @score.Sound
   controls : @pattern.Controls
@@ -16,7 +17,10 @@ priv struct NoteOnControls {
 ///|
 impl @control.ControlSource for NoteOnControls with fn value(self, key) {
   match (key, self.sound) {
-    (Note, Note(_, pitch~)) => @control.ControlValue::of(pitch)
+    (Note, Note(_, pitch~) | Play(_, pitch~)) =>
+      @control.ControlValue::of(pitch)
+    (SampleNumber, Play(sample, ..)) =>
+      @control.ControlValue::of(sample.number().to_double())
     _ => @control.ControlSource::value(self.controls, key)
   }
 }

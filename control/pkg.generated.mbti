@@ -25,6 +25,7 @@ pub(all) enum Control {
   Decay
   Sustain
   Hold
+  SampleNumber
   Release
 }
 pub fn Control::admits(Self, Double) -> Bool

@@ -324,7 +324,7 @@ test "negative pitch is distinct from an unpitched drum onset" {
       fail("expected source frame")
     }
     let wire_pitch = match event.event().value.sound {
-      Note(_, pitch~) => Json(pitch)
+      Note(_, pitch~) | Play(_, pitch~) => Json(pitch)
       Hit(_) => Json::null()
     }
     assert_true(wire_pitch == pitch)
@@ -353,7 +353,7 @@ test "control nesting names every control's rule" {
   guard @json.parse(control_nesting()) is Object(rules) else {
     fail("expected a JSON object")
   }
-  assert_eq(rules.length(), 13)
+  assert_eq(rules.length(), 14)
   assert_eq(rules.get("gain"), Some(Json::string("multiply")))
   assert_eq(rules.get("lpf"), Some(Json::string("override")))
   assert_eq(rules.get("lpf_resonance"), Some(Json::string("override")))
@@ -363,7 +363,7 @@ test "control nesting names every control's rule" {
 /// The pitch an exact event's atom wrote, or NaN for a drum hit.
 fn authored_pitch(event : @score.ScoreEvent) -> Double {
   match event.sound {
-    Note(_, pitch~) => pitch
+    Note(_, pitch~) | Play(_, pitch~) => pitch
     Hit(_) => @double.not_a_number
   }
 }

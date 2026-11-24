@@ -257,8 +257,8 @@ fn notation_projection_events(
           }
           if !rests_only || notation_projection_is_rest(nodes, node) {
             let pitch : Json = match event.value.sound {
-              Note(_, pitch~) if !rests_only => Json(pitch)
-              Note(_, ..) | Hit(_) => Json::null()
+              Note(_, pitch~) | Play(_, pitch~) if !rests_only => Json(pitch)
+              Note(_, ..) | Play(_, ..) | Hit(_) => Json::null()
             }
             projected.push({
               "node": Json(node),

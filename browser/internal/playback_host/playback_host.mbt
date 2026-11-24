@@ -187,8 +187,7 @@ pub fn init_scheduler_graph_with_sounds(
   let ctx = sample_context(sample_rate, block_size)
   let drums = @score.Drum::all()
   let instruments = @score.Instrument::all()
-  // No sound routes to the sampler pool, the last, until scores play
-  // samples (ADR-0026 stage 4, after ADR-0023).
+  // Every sample plays on the sampler pool, the last.
   let candidates = [
     ..drums.map(d => make_drum_pool(drum(d), ctx)),
     ..instruments.map(i => make_note_pool(instrument(i), ctx)),
@@ -208,6 +207,7 @@ pub fn init_scheduler_graph_with_sounds(
     match sound {
       Hit(d) => drums.search(d).unwrap()
       Note(i, ..) => drums.length() + instruments.search(i).unwrap()
+      Play(_, ..) => drums.length() + instruments.length()
     }
   }
   let scheduler = @scheduler.PatternScheduler(

@@ -27,9 +27,13 @@ export class SampleLoader {
     this.unknown = new Set();
   }
 
-  /** Queue a `{ type: "sample-load", name, rootPitch, data: Float32Array }` message. */
+  /**
+   * Queue a `{ type: "sample-load", name, data: Float32Array }` message. A
+   * bank sample's root pitch comes from the engine; `rootPitch` is for others.
+   */
   enqueue(message) {
-    const { name, rootPitch, data } = message;
+    const { name, data } = message;
+    const rootPitch = message.rootPitch ?? 60;
     if (typeof name !== "string" || !(data instanceof Float32Array) ||
         typeof rootPitch !== "number" || !Number.isFinite(rootPitch)) {
       this.post({ type: "error", message: "invalid sample-load message" });

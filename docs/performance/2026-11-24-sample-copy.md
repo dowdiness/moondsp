@@ -222,3 +222,43 @@ Limits:
   be one late block or clock granularity. Safari still needs its own check
   on a Mac before the browser path is called done.
 - **Device:** the runs used a headless device in a shared orb.
+
+## Stage 4: scores play bank samples
+
+Measured 2026-11-24 after `Sound::Play` and routing landed. Same orb and
+toolchain.
+
+[`scripts/bench-sample-copy/play-check.cjs`](../../scripts/bench-sample-copy/play-check.cjs)
+runs the production `scheduler-processor.js` in a realtime `AudioContext` at
+48 kHz. It sends the bank as the editor does (`web/sample-bank.js`) and waits
+until the status channel reports nothing loading. Then it plays each score and
+sums the squared output of the left channel over 1.5 s (562 blocks). Each
+score is slowed by 4 so one onset falls in the window.
+
+| Score | Energy | Ratio to `s("ping")` |
+|---|---:|---:|
+| `silence()` | 0 | 0 |
+| `s("ping")` | 32.84 | 1 |
+| `note("69").s("ping")` (root pitch) | 32.84 | 1.000 |
+| `note("57").s("ping")` (an octave down) | 65.67 | 2.000 |
+| `s("ping").gain(0.25)` | 2.052 | 0.0625 |
+| `s("ping").lpf(200)` | 1.294 | 0.039 |
+| `note("69").s("ping").lpf(200)` | 1.294 | 0.039 |
+| `s("burst")` | 2.964 | — |
+| `s("bd")` | 43.51 | — |
+
+- `s("ping")` and `.s("ping")` at the root pitch produce the same output.
+- An octave down plays the waveform at half speed, so it lasts twice as long
+  and carries twice the energy.
+- `.gain(0.25)` scales energy by 0.25² = 0.0625, as amplitude gain should.
+- `.lpf(200)` removes most of the 440 Hz ping through both `s` and `.s`.
+- The status channel reported `loading: ["ping"]`, then `["ping", "burst"]`,
+  then `["burst"]`, then `[]`.
+
+```sh
+npm --prefix web/live run sync:assets
+NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/play-check.cjs chromium
+```
+
+Chromium only. Firefox and Safari remain required before the browser path is
+called done.

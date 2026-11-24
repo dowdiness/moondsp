@@ -46,16 +46,20 @@ fn sample_context(
 }
 
 ///|
+/// The built-in bank by sample number, built once so loading on the audio
+/// thread reads it without allocating.
+let bank : Array[@score.Sample] = @score.Sample::all()
+
+///|
 /// The number of samples in the built-in bank; sample number `n` is
 /// `@score.Sample::all()[n]`.
 pub fn sample_bank_count() -> Int32 {
-  @score.Sample::all().length()
+  bank.length()
 }
 
 ///|
 /// The name of bank sample `entry`, or "" outside the bank.
 pub fn sample_bank_name(entry : Int32) -> String {
-  let bank = @score.Sample::all()
   if entry >= 0 && entry < bank.length() {
     bank[entry].name()
   } else {
@@ -65,6 +69,8 @@ pub fn sample_bank_name(entry : Int32) -> String {
 
 ///|
 /// Begin loading a waveform of `length` samples into sample number `entry`.
+/// A bank sample's root is its `@score.Sample::root_pitch`, which `s("…")`
+/// plays it at; `root_pitch` is the root of any other sample number.
 /// Returns 0, or what refused it: 1 the sample number, 2 the length, 3 the
 /// store's memory (ADR-0026 Decision 6), 4 no store yet.
 pub fn sample_load_begin(
@@ -73,6 +79,11 @@ pub fn sample_load_begin(
   root_pitch : Double,
 ) -> Int32 {
   guard sample_store.val is Some(store) else { return 4 }
+  let root_pitch = if entry >= 0 && entry < bank.length() {
+    bank[entry].root_pitch()
+  } else {
+    root_pitch
+  }
   match store.begin(entry, length, root_pitch~) {
     None => 0
     Some(Entries) => 1
@@ -156,9 +167,9 @@ fn SamplerVoice::graph(self : SamplerVoice) -> Array[@moondsp.DspNode] {
 }
 
 ///|
-/// The one pool every sample plays on (ADR-0026). A note's pitch is the
-/// player's MIDI pitch. Its sample number reaches the player once scores
-/// play samples (ADR-0026 stage 4, after ADR-0023).
+/// The one pool every sample plays on (ADR-0026). A note's sample number
+/// and MIDI pitch, which the scheduler sets from its `Play` sound, are the
+/// player's sample and pitch.
 fn make_sample_pool(
   voice : SamplerVoice,
   ctx : @moondsp.DspContext,
@@ -167,11 +178,13 @@ fn make_sample_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(voice.graph()),
       ctx,
-      instrument_bindings().bind(
-        key=Note,
+      instrument_bindings()
+      .bind(
+        key=SampleNumber,
         node_index=0,
-        slot=@moondsp.GraphParamSlot::Value1,
-      ),
+        slot=@moondsp.GraphParamSlot::Value0,
+      )
+      .bind(key=Note, node_index=0, slot=@moondsp.GraphParamSlot::Value1),
       max_voices=voice.voices,
     ),
   ) catch {

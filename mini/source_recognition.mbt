@@ -117,7 +117,7 @@ fn Parser::record_literal_facts(
   notation : QuotedNotation,
 ) -> Unit {
   let (literal_kind, atom_kind, complete_words) = match kind {
-    Sound => ("drum", "sound", notation.complete_words(drum_names()))
+    Sound => ("drum", "sound", notation.complete_words(sound_names()))
     Note => ("note", "note", notation.complete_words(pitches()))
     Chord => ("chord", "chord", notation.complete_words(chord_names()))
   }

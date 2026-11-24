@@ -2103,6 +2103,7 @@ fn sound_names(events : Array[@pattern.Event[@score.ScoreEvent]]) -> String {
   .map(event => {
     match event.value.sound {
       Note(instrument, pitch~) => "\{instrument.name()}:\{pitch}"
+      Play(sample, pitch~) => "\{sample.name()}:\{pitch}"
       Hit(drum) => drum.name()
     }
   })
@@ -2137,11 +2138,45 @@ test ".s chooses each note's instrument at its onset" {
 }
 
 ///|
+test "s plays drums and samples at the sample's root; .s plays notes on samples" {
+  inspect(
+    sound_names(query_one_cycle(unwrap_ok(@mini.parse("s(\"bd ping burst\")")))),
+    content="bd ping:69 burst:60",
+  )
+  // A sample plays each note's pitch; the outer `.s` still wins.
+  inspect(
+    sound_names(
+      query_one_cycle(
+        unwrap_ok(@mini.parse("note(\"60 72\").s(\"ping bass\")")),
+      ),
+    ),
+    content="ping:60 bass:72",
+  )
+  inspect(
+    sound_names(
+      query_one_cycle(
+        unwrap_ok(@mini.parse("note(\"48\").s(\"pad\").s(\"ping\")")),
+      ),
+    ),
+    content="ping:48",
+  )
+}
+
+///|
 test ".s names instruments of notes only" {
   for
     case in [
-      ("s(\"bass\")", "position 3: unknown drum name 'bass'"),
-      ("note(\"60\").s(\"bd\")", "position 14: unknown instrument name 'bd'"),
+      ("s(\"bass\")", "position 3: unknown drum or sample name 'bass'"),
+      (
+        "note(\"60\").s(\"bd\")", "position 14: unknown instrument or sample name 'bd'",
+      ),
+      (
+        "s(\"ping\").s(\"bass\")", "position 13: .s(\"...\") chooses the instrument of notes, and drums have none",
+      ),
+      // The sample number is set from the sound; no method names it.
+      (
+        "note(\"60\").sample_number(1)", "position 11: unknown method 'sample_number'",
+      ),
       (
         "s(\"bd\").s(\"bass\")", "position 11: .s(\"...\") chooses the instrument of notes, and drums have none",
       ),
