@@ -70,25 +70,30 @@ piece, maps outer time `t` to child time `a·t + b` with `a ≠ 0`:
 `TimeMap` (`Affine`, `MirrorCycles`, `Slots`). It is the only place the
 formulas are written. It answers both questions from them:
 
-- `pieces(arc)` splits a query arc into pieces with their child index, `a`,
-  `b`, and outer span. `Pat::mapped(map, children)` queries each child over
-  its mapped span and maps events back, swapping span ends when `a < 0`.
-- `slot_at(num, den, left)`, `scale(slot)`, and `offset(cycle, slot)` locate
-  one instant. `BusSignal::Mapped(map, children)` evaluates the child at the
-  mapped instant, flipping `left` when `a < 0` (the half-open boundary rule
-  that `Rev` uses today).
+- `each_piece(arc, f)` visits the pieces of a query arc with their slot,
+  outer span, and cycle. `TimeMap::query(children, arc)` queries each
+  child over its mapped span and maps events back; only `rev` has `a < 0`,
+  and its span map swaps the ends.
+- `cycle_at(num, den, left)`, `slot_at(num, den, left, cycle)`,
+  `scale_num()`, `scale_den(slot)`, `offset_num(cycle, slot)`, and
+  `offset_den(slot)` locate one instant. `BusSignal::Mapped(map, children)`
+  evaluates the child at the mapped instant, flipping `left` when `a < 0`
+  (the half-open boundary rule that `Rev` used).
 
 They return scalars, not a pair or a struct. A probe with moon
 0.1.20261117 found that a `#valtype` two-field struct returns by value on
 native but allocates on wasm-gc (`struct.new`) and JS (`new`), like a plain
 struct; ADR-0020 found the same for `Option`.
 
-`Pat::fast`, `slow`, `rev`, `sequence`, `sequence_weighted`, `euclid`,
-`Event::placed`, and `Controls::place` construct a `TimeMap` and delegate.
-Document lowering builds one `TimeMap` per node and gives the same value to
-the pattern and to its buses. `TimeTransform` names a map;
-`TimeTransform::apply` and `BusSignal::transformed` both use it. The public
-signatures of these functions do not change.
+`Pat::fast`, `slow`, `rev`, `sequence`, `sequence_weighted`, `euclid`, and
+`Controls::place` construct a `TimeMap` and delegate. `Event::placed` maps
+its spans through `Placement::span`, which inverts the placement's
+coefficients (`inverse_affine`) and applies them with the same span map
+(`map_span`). Document lowering builds the pattern's map and its buses'
+maps from the same constructors, so they share the formula, not one value.
+`TimeTransform` names a map: `TimeTransform::time_map` serves
+`TimeTransform::apply` and `BusSignal::through`. The public signatures of
+these functions do not change.
 
 ### 2. A sequence slot keeps the cycle number
 
@@ -114,7 +119,7 @@ material repeats. `TimeMap::period(child_periods)` states it once:
 - `MirrorCycles`: `lcm(p, 1)`.
 - `Slots`: `lcm(1, p₀, p₁, …)`, now that slots keep their child's cycle.
 
-`stack` uses the same `lcm` of its members instead of its fixed 1, which
+`stack` uses the `lcm` of its members, without 1, instead of its fixed 1, which
 matters where a stack sits inside a material (`.material()`, or under a
 transform). Raw top-level stacks still split into one entry per member.
 `lcm` of reduced rationals is `lcm(numerators) / gcd(denominators)`. `every`
@@ -155,9 +160,15 @@ and keep their own code: `gate` (shortens events), `degradeBy` (drops them),
   construction, and one property test covers both.
 - Behavior changes: sequences, weighted sequences, and Euclid hits keep the
   cycle number (Decision 2); periods of sequences and stacks become `lcm`s
-  (Decision 3). One-cycle patterns sound the same.
-- `BusSignal` loses `Fast`, `Shift`, `Rev`, `Sequence`, and `Weighted`, and
-  lowering loses its paired `.transform`/`.map_buses` code.
+  (Decision 3). A pattern whose steps all last one cycle sounds the same,
+  except that `degradeBy` and `?` inside a sequence step now roll per cycle:
+  they hash the event's onset, which now differs per cycle. A decimal factor
+  can make a period long, such as 100 cycles for `fast(1.01).rev()`, which
+  a live edit then waits for.
+- `BusSignal` loses `Fast`, `Shift`, `Rev`, `Sequence`, and `Weighted`.
+  Lowering keeps its paired `.transform`/`.map_buses` code per node, but
+  both sides now take their map from the same `TimeTransform::time_map` or
+  `TimeMap` constructor.
 - `rev`'s `b = 2c + 1` and a slot's `b = c − n·c − i` grow with the cycle
   number; long sessions must stay within `Int64` like other exact times.
 

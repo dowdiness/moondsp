@@ -202,16 +202,20 @@ score ranged 1.21–1.63 ms. Read differences under about 10% as no change;
 the first and fourth scores are consistently faster.
 
 Allocation: `BusSignal::eval` and every function it calls (`TimeMap`
-`cycle_at`, `slot_at`, `scale_*`, `offset_*`, `time_floor`, `bus_gcd`) contain
-no `struct.new`/`array.new` in release wasm-gc WAT and no `new` in release
-JS, inspected statically, not counted at run time. The CLAP audit
+`cycle_at`, `slot_at`, `scale_*`, `offset_*`, `time_floor`, `gcd`) contain
+no `struct.new`/`array.new` in release wasm-gc WAT and construct no object
+(`new`) in release JS, inspected statically, not counted at run time. On JS
+`Int64` is a `BigInt`, so its arithmetic may still allocate on the heap; the
+code before the refactor had the same property. The CLAP audit
 (`scripts/audit-clap-audio-allocations.sh --expect-zero`) stayed at zero.
 
 Output: FNV-1a hashes of 400 rendered browser-host blocks (exact editor
 input) for nine scores were identical at `690d93c` and the refactor before
-the fixes, and the fixes changed none of them. Step 6 (`fd7109e`, sequence
-slots keep the cycle) changed only the two scores with a slowed step in a
-sequence, `note("60 [64 67]/2").fast(4)` and `s("bd [sd cp]/2").fast(4)`.
+the fixes, and the fixes changed none of them. Of these nine scores, step 6
+(`fd7109e`, sequence slots keep the cycle) changed only the two with a
+slowed step in a sequence, `note("60 [64 67]/2").fast(4)` and
+`s("bd [sd cp]/2").fast(4)`. Scores outside this set can change too: `?`
+inside a sequence now rolls per cycle (see the CHANGELOG).
 
 ## Provenance and reproduction limits
 

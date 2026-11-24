@@ -55,9 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   play 67. The same holds for weighted steps, Euclidean hits, and signals
   inside them. A live edit now waits until such a pattern repeats: a
   sequence, `rev`, or grouped stack repeats after the least common multiple
-  of its parts' lengths, such as 15 cycles for `note("60/3 64/5")`. The
+  of its parts' lengths, such as 15 cycles for `note("60/3 64/5")`. A decimal
+  factor can make that long, such as 100 cycles for `fast(1.01).rev()`. The
   editor's inline step controls are not shown for patterns that repeat over
   more than 16 cycles.
+- `?` and `degradeBy` inside a sequence step roll again in every cycle. They
+  used to repeat the first cycle's choice, because each step saw only its
+  first cycle.
 - Notation that is valid but over a playback limit, such as
   `note("c4(3,200) e4")`, no longer reports "Couldn't prepare this code"
   before the player's format is known. Quoted notation is now parsed once into
