@@ -56,6 +56,14 @@ pub fn push_playback_char(Int32) -> Unit
 
 pub fn reset_phase() -> Unit
 
+pub fn sample_copy_checksum() -> Double
+
+pub fn sample_copy_reserve(Int32) -> Int32
+
+pub fn sample_copy_sample(Int32) -> Double
+
+pub fn sample_copy_write(Int32, Float) -> Unit
+
 pub fn scheduler_left_sample(Int32) -> Double
 
 pub fn scheduler_right_sample(Int32) -> Double

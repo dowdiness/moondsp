@@ -1,0 +1,14 @@
+<!doctype html><script>
+window.run = async (chunk, realtime) => {
+  const mod = await WebAssembly.compileStreaming(fetch('browser_test.wasm'));
+  const ctx = realtime ? new AudioContext({ sampleRate: 48000 }) : new OfflineAudioContext(1, 48000 * 30, 48000);
+  await ctx.audioWorklet.addModule('processor.js');
+  const node = new AudioWorkletNode(ctx, 'sample-copy', { processorOptions: { wasmModule: mod, chunk } });
+  node.connect(ctx.destination);
+  const done = new Promise(r => node.port.onmessage = e => r(e.data));
+  if (realtime) await ctx.resume(); else ctx.startRendering();
+  const res = await done;
+  if (realtime) await ctx.close();
+  return res;
+};
+</script>

@@ -43,3 +43,4 @@ shipped plan or spec.
 - [ADR-0023 — The parser owns the score vocabulary](0023-the-parser-owns-the-score-vocabulary.md) (Accepted)
 - [ADR-0024 — Each time transform is defined once, for events and signals](0024-time-maps-defined-once.md)
 - [ADR-0025 — One-shot signals start where their material enters](0025-one-shot-signals-start-at-entry.md)
+- [ADR-0026 — Scores play recorded samples](0026-sample-playback.md)
