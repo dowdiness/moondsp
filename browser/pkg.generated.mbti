@@ -90,6 +90,8 @@ pub fn init_compiled_topology_edit_graph(Double, Int32) -> Bool
 
 pub fn init_exit_deliverable_graph(Double, Int32) -> Bool
 
+pub fn init_sample_store() -> Int32
+
 pub fn init_scheduler_graph(Double, Int32) -> Bool
 
 pub fn player_mode() -> PlaybackMode
@@ -147,6 +149,20 @@ pub fn queue_compiled_topology_delete_edit() -> Bool
 pub fn queue_compiled_topology_edit() -> Bool
 
 pub fn reset_phase() -> Unit
+
+pub fn sample_bank_count() -> Int32
+
+pub fn sample_bank_name_char(Int32, Int32) -> Int32
+
+pub fn sample_bank_name_length(Int32) -> Int32
+
+pub fn sample_load_begin(Int32, Int32, Double) -> Int32
+
+pub fn sample_load_commit() -> Bool
+
+pub fn sample_load_write(Int32, Float) -> Unit
+
+pub fn sample_loaded(Int32) -> Bool
 
 pub fn scheduler_bpm() -> Double
 

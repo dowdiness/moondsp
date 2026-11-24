@@ -113,6 +113,52 @@ pub fn Instrument::parse(name : String) -> Instrument? {
 }
 
 ///|
+/// A recorded sample of the built-in bank (ADR-0026). Constructed only by
+/// `all`, as for `Drum`. The bank's material is generated in code until
+/// recordings with an approved licence replace it.
+#derive(Eq, Debug)
+pub enum Sample {
+  Ping
+  Burst
+}
+
+///|
+pub extend Sample with Eq::{not_equal, equal}
+
+///|
+pub extend Sample with Debug::{to_repr}
+
+///|
+/// Every sample, in sample-number order: a host registers each one's
+/// waveform under its position here. Keep this the only expression in the
+/// package that constructs a `Sample`.
+pub fn Sample::all() -> Array[Sample] {
+  [Ping, Burst]
+}
+
+///|
+pub fn Sample::name(self : Sample) -> String {
+  match self {
+    Ping => "ping"
+    Burst => "burst"
+  }
+}
+
+///|
+/// What the sample sounds like, for people choosing one.
+pub fn Sample::description(self : Sample) -> String {
+  match self {
+    Ping => "decaying sine ping"
+    Burst => "short noise burst"
+  }
+}
+
+///|
+pub fn Sample::parse(name : String) -> Sample? {
+  Sample::all().iter().find_first(sample => sample.name() == name)
+}
+
+///|
 /// What a score event plays: a drum hit, or an instrument note at a pitch
 /// (a MIDI note number).
 #derive(Eq, Debug)

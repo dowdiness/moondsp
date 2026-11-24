@@ -1,5 +1,6 @@
 import { PlaybackController } from "./playback-controller.js";
 import { OnsetRing } from "./playback-onsets.js";
+import { SampleLoader } from "./sample-loader.js";
 
 class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -17,10 +18,16 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     const onsetBuffer = options?.processorOptions?.onsetBuffer;
     this.onsets = onsetBuffer ? new OnsetRing(onsetBuffer) : null;
     this.onsetGeneration = 0;
+    this.samples = null;
 
     this.port.onmessage = (event) => {
       const data = event.data;
       if (!data || typeof data !== "object") return;
+      // The store exists from construction, so samples queue at once.
+      if (data.type === "sample-load" && this.samples) {
+        this.samples.enqueue(data);
+        return;
+      }
       if (!this.wasm || !this.graphInitialized) {
         this.pendingCommands.push(data);
         return;
@@ -41,6 +48,10 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       this.wasm.player_onset_clear();
     }
     if (data.type === "observe-onsets") return;
+    if (data.type === "sample-load") {
+      this.samples.enqueue(data);
+      return;
+    }
     if (data.type === "player-update" || data.type === "player-restart" ||
         data.type === "player-play" || data.type === "player-pause" ||
         data.type === "set-scheduler-bpm") {
@@ -51,9 +62,12 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
     }
   }
 
-  async initWasm(wasmModule) {
+  // Synchronous, so the sample store exists before the first process() call:
+  // making it takes 15-20 ms (ADR-0026 Decision 6). A render quantum waits
+  // for this constructor, while the page's gain is still 0.
+  initWasm(wasmModule) {
     try {
-      const instance = await WebAssembly.instantiate(wasmModule, {
+      const instance = new WebAssembly.Instance(wasmModule, {
         spectest: { print_char() {} },
         "moonbit:ffi": {
           make_closure(funcref, closure) {
@@ -74,12 +88,17 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
         "scheduler_sample_position", "get_playback_error_length", "get_playback_error_char",
         "player_onset_enable", "player_onset_count", "player_onset_field",
         "player_onset_clear", "player_onset_dropped",
+        "init_sample_store", "sample_bank_count", "sample_bank_name_length",
+        "sample_bank_name_char", "sample_load_begin", "sample_load_write",
+        "sample_load_commit", "sample_loaded",
       ]);
       if (missingExports.length > 0) {
         throw new Error(`Scheduler browser exports not found: ${missingExports.join(", ")}`);
       }
 
       this.playback = new PlaybackController(this.wasm, reply => this.port.postMessage(reply));
+      if (this.wasm.init_sample_store() <= 0) throw new Error("Sample store initialization failed");
+      this.samples = new SampleLoader(this.wasm, message => this.port.postMessage(message));
       this.ready = true;
     } catch (error) {
       this.ready = false;
@@ -148,6 +167,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       return true;
     }
 
+    // Copy before rendering, so a waveform finished now plays in this block.
+    this.samples.step();
     const engineBlockStart = this.onsets ? this.wasm.scheduler_sample_position() : 0;
     const processed = this.wasm.process_scheduler_block();
     if (!processed) {

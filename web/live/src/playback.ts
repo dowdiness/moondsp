@@ -362,6 +362,9 @@ export class Player {
   private receive(event: AudioEvent): void {
     if (event.kind === "failed") { this.fail(event.message); return; }
     if (event.kind === "status") { this.snapshot = event; this.render(); return; }
+    // No score plays a sample yet (ADR-0026 stage 4 waits for ADR-0023), so
+    // nothing shows which samples are loading.
+    if (event.kind === "samples") return;
     const receipt = event.receipt;
     const pending = this.pending.get(receipt.id.value);
     if (!pending) return;

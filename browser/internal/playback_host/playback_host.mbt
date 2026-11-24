@@ -123,6 +123,32 @@ fn NoteVoice::graph(self : NoteVoice) -> Array[@moondsp.DspNode] {
 }
 
 ///|
+/// The voice-frame keys and the envelope and filters of the `NoteVoice`
+/// layout: [1] adsr, [2] low-pass, [3] high-pass. Every pitched pool binds
+/// them; each binds `Note` to its own source.
+fn instrument_bindings() -> @moondsp.ControlBindingBuilder[@moondsp.Control] {
+  voice_frame_bindings()
+  .bind(
+    key=Attack,
+    node_index=1,
+    slot=@moondsp.GraphParamSlot::Value0,
+    unit=SecondsToMs,
+  )
+  .bind(key=Decay, node_index=1, slot=@moondsp.GraphParamSlot::Value1)
+  .bind(key=Sustain, node_index=1, slot=@moondsp.GraphParamSlot::Value2)
+  .bind(
+    key=Release,
+    node_index=1,
+    slot=@moondsp.GraphParamSlot::Value3,
+    unit=SecondsToMs,
+  )
+  .bind(key=Lpf, node_index=2, slot=@moondsp.GraphParamSlot::Value0)
+  .bind(key=LpfResonance, node_index=2, slot=@moondsp.GraphParamSlot::Value1)
+  .bind(key=Hpf, node_index=3, slot=@moondsp.GraphParamSlot::Value0)
+  .bind(key=HpfResonance, node_index=3, slot=@moondsp.GraphParamSlot::Value1)
+}
+
+///|
 /// Create a note instrument pool (with note->freq binding).
 fn make_note_pool(
   voice : NoteVoice,
@@ -133,38 +159,11 @@ fn make_note_pool(
     @moondsp.BoundVoicePool(
       @moondsp.AnalyzedGraph::analyze(voice.graph()),
       ctx,
-      voice_frame_bindings()
-      .bind(
+      instrument_bindings().bind(
         key=Note,
         node_index=0, // oscillator(Value0) frequency placeholder
         slot=@moondsp.GraphParamSlot::Value0,
         unit=MidiToHz,
-      )
-      .bind(
-        key=Attack,
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value0,
-        unit=SecondsToMs,
-      )
-      .bind(key=Decay, node_index=1, slot=@moondsp.GraphParamSlot::Value1)
-      .bind(key=Sustain, node_index=1, slot=@moondsp.GraphParamSlot::Value2)
-      .bind(
-        key=Release,
-        node_index=1,
-        slot=@moondsp.GraphParamSlot::Value3,
-        unit=SecondsToMs,
-      )
-      .bind(key=Lpf, node_index=2, slot=@moondsp.GraphParamSlot::Value0)
-      .bind(
-        key=LpfResonance,
-        node_index=2,
-        slot=@moondsp.GraphParamSlot::Value1,
-      )
-      .bind(key=Hpf, node_index=3, slot=@moondsp.GraphParamSlot::Value0)
-      .bind(
-        key=HpfResonance,
-        node_index=3,
-        slot=@moondsp.GraphParamSlot::Value1,
       ),
       max_voices=voice.voices,
     ),
@@ -175,20 +174,25 @@ fn make_note_pool(
 
 ///|
 /// Give every drum and instrument a voice pool, built from `drum` and
-/// `instrument`.
+/// `instrument`, and the samples one pool, built from `sampler`. Pools read
+/// samples from the store `init_sample_store` made, if it made one.
 pub fn init_scheduler_graph_with_sounds(
   sample_rate : Double,
   block_size : Int32,
   drum~ : (@score.Drum) -> Array[@moondsp.DspNode],
   instrument~ : (@score.Instrument) -> NoteVoice,
+  sampler~ : SamplerVoice,
 ) -> Bool {
   // The scheduler and its voice pools refuse any format they cannot run.
-  let ctx = @moondsp.DspContext(sample_rate~, block_size~)
+  let ctx = sample_context(sample_rate, block_size)
   let drums = @score.Drum::all()
   let instruments = @score.Instrument::all()
+  // No sound routes to the sampler pool, the last, until scores play
+  // samples (ADR-0026 stage 4, after ADR-0023).
   let candidates = [
     ..drums.map(d => make_drum_pool(drum(d), ctx)),
     ..instruments.map(i => make_note_pool(instrument(i), ctx)),
+    make_sample_pool(sampler, ctx),
   ]
   let pools : Array[@moondsp.BoundVoicePool] = []
   for candidate in candidates {

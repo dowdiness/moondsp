@@ -57,6 +57,6 @@ console.log("[sync-assets] control-nesting.js");
 mkdirSync(publicDir, { recursive: true });
 copy(authoringSource, resolve(generatedDir, "authoring.js"));
 copy(resolve(releaseBuildDir("wasm-gc"), "browser/browser.wasm"), resolve(publicDir, "moonbit_dsp.wasm"));
-for (const worklet of ["playback-controller.js", "playback-onsets.js", "scheduler-processor.js"]) {
+for (const worklet of ["playback-controller.js", "playback-onsets.js", "sample-loader.js", "scheduler-processor.js"]) {
   copy(resolve(webDir, worklet), resolve(publicDir, worklet));
 }

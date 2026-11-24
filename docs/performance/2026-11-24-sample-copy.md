@@ -164,3 +164,61 @@ node --experimental-wasm-custom-descriptors scripts/bench-sample-copy/audit-play
 This counts constructions in the compiled graph's render path only. It does
 not cover the voice pool, the scheduler or MessagePort traffic, which
 stage 4 routes samples through, and it does not measure GC pauses.
+
+## Stage 4: loading while a realtime context plays
+
+Measured 2026-11-24 with the stage 4 loader (ADR-0026 Order of work, step 4,
+the parts that do not depend on the vocabulary). Same orb and toolchain.
+
+[`scripts/bench-sample-copy/loading-check.cjs`](../../scripts/bench-sample-copy/loading-check.cjs)
+runs the production `scheduler-processor.js` and `sample-loader.js` from
+`web/live/public` in a realtime `AudioContext` at 48 kHz. A subclass records
+every rendered block by engine sample position. The score is
+`stack(note("60 64 67 71 72 71 67 64"), s("bd sd hh sd"), s("hh*8"))`, and each
+run renders 3,000 blocks (8 s).
+
+- **Control run:** no sample loads.
+- **Loading run:** two seconds in, a 480,000-sample (10 s) waveform is posted
+  for `ping`. One second later, a 1,440,001-sample waveform, one sample over
+  the length limit, is posted for `burst`.
+
+The scheduler is deterministic, so a load that disturbed rendering would show
+as a difference from the control.
+
+| Browser | Blocks compared / differing | Blocks that copied | Longest `process()` while copying (1 ms clock) |
+|---|---:|---:|---:|
+| Chromium 159 (headless shell), 4 runs | 3,000 / 0 | 30 (31 with the over-limit run) | 1 ms |
+| Firefox 159 (Playwright), 3 runs | 3,000 / 0 | 30 | 1–2 ms |
+| Playwright WebKit 27.2 (Linux, not Safari), 2 runs | 3,000 / 0 | 30 | 3 ms |
+
+- **Output:** every block of every loading run matched the control exactly
+  (largest difference 0). The crackle-probe metrics over the copying blocks
+  (largest step 0.0035, largest boundary step 0.0031 in Chromium) equal the
+  control's over the same blocks.
+- **Status channel:** it reported `loading: ["ping"]` when the load arrived and
+  `loading: []` 77–80 ms later. The oversized `burst` reported
+  `overLimit: [{ name: "burst", limit: "length" }]` in the same block.
+- **Chromium trace:** in the loading run, `AudioWorkletProcessor::Process`
+  callbacks had p50 0.073 ms and p99 0.20 ms. Only two callbacks exceeded the
+  2.67 ms quantum, and neither is the load:
+  - the first render, which builds the voice pools (7.5–8.3 ms);
+  - the harness's own final report, which posts the recorded output (2.7–3.7 ms).
+
+  No callback over the quantum fell in the loading window.
+
+```sh
+npm --prefix web/live run sync:assets
+NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/loading-check.cjs chromium 8
+```
+
+Limits:
+
+- **Underruns:** none of the three browsers exposes an underrun or glitch
+  count here. `AudioContext.playoutStats` is absent in Chromium 158 and 159,
+  even with `--enable-blink-features=AudioContextPlayoutStats`. Late
+  callbacks come from the Chromium trace only.
+- **Firefox:** the 1 ms clock cannot show a callback just over 2.67 ms.
+- **WebKit:** this is Linux WebKit, not Safari on macOS. Its 3 ms reading may
+  be one late block or clock granularity. Safari still needs its own check
+  on a Mac before the browser path is called done.
+- **Device:** the runs used a headless device in a shared orb.

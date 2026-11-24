@@ -2,8 +2,9 @@
 // score/tempo operations do not exist on a stopped engine.
 import { decodeWorkletMessage, type AudioFormat } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
-import type { PlayerReceipt, PlayerSnapshot, RequestId } from "./playback-protocol";
+import type { PlayerReceipt, PlayerSnapshot, RequestId, SampleStatus } from "./playback-protocol";
 import { ONSET_BYTES, OnsetRing, type OnsetStatistics } from "../../playback-onsets.js";
+import { sampleBank } from "../../sample-bank.js";
 
 function abortError(): DOMException {
   return new DOMException("Audio initialization cancelled", "AbortError");
@@ -53,6 +54,7 @@ export type AudioEngineOptions = {
 export type AudioEvent =
   | { kind: "receipt"; receipt: PlayerReceipt }
   | ({ kind: "status" } & PlayerSnapshot)
+  | ({ kind: "samples" } & SampleStatus)
   | { kind: "failed"; message: string };
 export type CloseSessionResult = { kind: "closed" } | { kind: "session-expired" };
 export type SessionCommandResult = "issued" | "session-expired";
@@ -302,6 +304,8 @@ export class AudioEngine {
       const ready = this.waitForReady(node, signal);
       node.connect(gain);
       const format = await ready;
+      // The worklet copies the bank into its store a block's share at a time.
+      for (const load of sampleBank(ctx.sampleRate)) node.port.postMessage(load, [load.data.buffer]);
       await abortable(() => running, signal);
       return { ctx, node, gain, analyser, onsets, format };
     } catch (error) {
@@ -326,7 +330,7 @@ export class AudioEngine {
         switch (message.kind) {
           case "ready": signal.removeEventListener("abort", onAbort); resolve(message.format); break;
           case "runtime-error": case "protocol-error": fail(new Error(message.message)); break;
-          case "status": break;
+          case "status": case "samples": break;
           case "receipt": fail(new Error("Playback receipt arrived before worklet readiness")); break;
         }
       };
@@ -343,7 +347,7 @@ export class AudioEngine {
         if (state.kind !== "active") return "obsolete-session";
         state.deliver(message);
         return "delivered";
-      case "status":
+      case "status": case "samples":
         if (state.kind === "active") state.deliver(message);
         return "delivered";
       case "ready":

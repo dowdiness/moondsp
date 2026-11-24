@@ -12,6 +12,8 @@ pub fn drum_template(@score.Drum) -> Array[@graph.DspNode]
 
 pub fn instrument_voice(@score.Instrument) -> @playback_host.NoteVoice
 
+pub fn sampler_voice() -> @playback_host.SamplerVoice
+
 // Errors
 
 // Types and methods

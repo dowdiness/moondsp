@@ -34,8 +34,16 @@ export type PlayerReceipt = PlayerSnapshot & Readonly<{ id: RequestId; operation
 /** How the player's audio arrives: blocks of `blockSize` frames at `sampleRate`. */
 export type AudioFormat = Readonly<{ sampleRate: number; blockSize: number }>;
 
+/** Bank samples still copying into the worklet, and loads it refused (ADR-0026 Decision 5). */
+export type SampleStatus = Readonly<{
+  loading: readonly string[];
+  overLimit: readonly Readonly<{ name: string; limit: string }>[];
+  unknown: readonly string[];
+}>;
+
 export type WorkletMessage =
   | { kind: "ready"; format: AudioFormat }
+  | ({ kind: "samples" } & SampleStatus)
   | { kind: "receipt"; receipt: PlayerReceipt }
   | ({ kind: "status" } & PlayerSnapshot)
   | { kind: "runtime-error"; message: string }
@@ -62,6 +70,19 @@ function mode(value: unknown): value is PlayerMode {
 function operation(value: unknown): value is PlayerOperation {
   return value === "update" || value === "restart" || value === "play" || value === "pause";
 }
+function names(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(name => typeof name === "string");
+}
+function sampleStatus(value: Record<string, unknown>): SampleStatus | null {
+  const { loading, overLimit, unknown } = value;
+  if (!names(loading) || !names(unknown) || !Array.isArray(overLimit)) return null;
+  const refused: { name: string; limit: string }[] = [];
+  for (const entry of overLimit) {
+    if (!record(entry) || typeof entry.name !== "string" || typeof entry.limit !== "string") return null;
+    refused.push({ name: entry.name, limit: entry.limit });
+  }
+  return { loading: [...loading], overLimit: refused, unknown: [...unknown] };
+}
 function snapshot(value: Record<string, unknown>): PlayerSnapshot | null {
   if (!playState(value.state) || !mode(value.mode) || !cyclePosition(value.cyclePosition) || !count(value.samplePosition) ||
       !tempo(value.tempo) || !count(value.pendingCount) || !count(value.skippedCount)) return null;
@@ -82,6 +103,10 @@ export function decodeWorkletMessage(value: unknown): WorkletMessage {
   if (value.type === "player-status") {
     const view = snapshot(value);
     return view ? { kind: "status", ...view } : { kind: "protocol-error", message: "invalid player status" };
+  }
+  if (value.type === "sample-status") {
+    const status = sampleStatus(value);
+    return status ? { kind: "samples", ...status } : { kind: "protocol-error", message: "invalid sample status" };
   }
   if (value.type === "player-receipt") {
     const id = RequestId.decode(value.id);

@@ -22,6 +22,7 @@ pub fn init_scheduler_graph(sample_rate : Double, block_size : Int32) -> Bool {
     block_size,
     drum=@demo_templates.drum_template,
     instrument=@demo_templates.instrument_voice,
+    sampler=@demo_templates.sampler_voice(),
   )
 }
 
@@ -175,4 +176,65 @@ pub fn player_onset_clear() -> Unit {
 ///|
 pub fn player_onset_dropped() -> Double {
   @playback_host.player_onset_dropped()
+}
+
+///|
+/// Make the sample store, 32 MiB, if there is none yet, and return its
+/// capacity in samples. Call it before the first `process()`: it takes
+/// 15–20 ms (ADR-0026 Decision 6).
+pub fn init_sample_store() -> Int32 {
+  @playback_host.init_sample_store()
+}
+
+///|
+/// The number of samples in the built-in bank.
+pub fn sample_bank_count() -> Int32 {
+  @playback_host.sample_bank_count()
+}
+
+///|
+/// The UTF-16 length of bank sample `entry`'s name, 0 outside the bank.
+pub fn sample_bank_name_length(entry : Int32) -> Int32 {
+  @playback_host.sample_bank_name(entry).length()
+}
+
+///|
+/// UTF-16 code unit `index` of bank sample `entry`'s name.
+pub fn sample_bank_name_char(entry : Int32, index : Int32) -> Int32 {
+  let name = @playback_host.sample_bank_name(entry)
+  if index >= 0 && index < name.length() {
+    name.code_unit_at(index).to_int()
+  } else {
+    0
+  }
+}
+
+///|
+/// Begin loading `length` samples into sample number `entry`, recorded at
+/// MIDI pitch `root_pitch`. Returns 0, or what refused it: 1 the sample
+/// number, 2 the length, 3 the store's memory, 4 no store.
+pub fn sample_load_begin(
+  entry : Int32,
+  length : Int32,
+  root_pitch : Double,
+) -> Int32 {
+  @playback_host.sample_load_begin(entry, length, root_pitch)
+}
+
+///|
+/// Write sample `offset` of the waveform being loaded.
+pub fn sample_load_write(offset : Int32, value : Float) -> Unit {
+  @playback_host.sample_load_write(offset, value)
+}
+
+///|
+/// Finish loading the waveform. Returns false when none was being loaded.
+pub fn sample_load_commit() -> Bool {
+  @playback_host.sample_load_commit()
+}
+
+///|
+/// Whether sample number `entry` has a waveform.
+pub fn sample_loaded(entry : Int32) -> Bool {
+  @playback_host.sample_loaded(entry)
 }

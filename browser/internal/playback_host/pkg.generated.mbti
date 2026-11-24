@@ -10,6 +10,12 @@ import {
 }
 
 // Values
+pub const SAMPLE_CAPACITY : Int32 = 8388608
+
+pub const SAMPLE_ENTRIES : Int32 = 64
+
+pub const SAMPLE_MAX_LENGTH : Int32 = 1440000
+
 pub fn clear_playback_input() -> Unit
 
 pub fn get_playback_error() -> String
@@ -18,7 +24,9 @@ pub fn get_playback_error_char(Int32) -> Int32
 
 pub fn get_playback_error_length() -> Int32
 
-pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> NoteVoice) -> Bool
+pub fn init_sample_store() -> Int32
+
+pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> NoteVoice, sampler~ : SamplerVoice) -> Bool
 
 pub fn player_mode() -> PlaybackMode
 
@@ -51,6 +59,18 @@ pub fn process_scheduler_block() -> Bool
 pub fn push_playback_char(Int32) -> Unit
 
 pub fn reset_scheduler_graph() -> Unit
+
+pub fn sample_bank_count() -> Int32
+
+pub fn sample_bank_name(Int32) -> String
+
+pub fn sample_load_begin(Int32, Int32, Double) -> Int32
+
+pub fn sample_load_commit() -> Bool
+
+pub fn sample_load_write(Int32, Float) -> Unit
+
+pub fn sample_loaded(Int32) -> Bool
 
 pub fn scheduler_bpm() -> Double
 
@@ -132,6 +152,17 @@ pub struct PlayerView {
   sample_position : Double
   pending_materials : Int32
   skipped_materials : Int32
+}
+
+pub(all) struct SamplerVoice {
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  lpf_hz : Double
+  lpf_q : Double
+  amount : Double
+  voices : Int32
 }
 
 // Type aliases

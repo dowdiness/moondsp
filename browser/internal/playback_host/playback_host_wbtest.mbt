@@ -42,6 +42,18 @@ fn test_voice(_ : @score.Instrument) -> NoteVoice {
 }
 
 ///|
+let test_sampler : SamplerVoice = {
+  attack_ms: 0.0,
+  decay_ms: 0.0,
+  sustain: 1.0,
+  release_ms: 10.0,
+  lpf_hz: 8000.0,
+  lpf_q: 0.707,
+  amount: 1.0,
+  voices: 4,
+}
+
+///|
 fn init_scheduler_graph_for_test(
   sample_rate~ : Double = 48000.0,
   block_size~ : Int32 = 128,
@@ -51,6 +63,7 @@ fn init_scheduler_graph_for_test(
     block_size,
     drum=test_drum,
     instrument=test_voice,
+    sampler=test_sampler,
   )
 }
 
@@ -287,10 +300,16 @@ test ".s plays each note on its instrument's pool" {
   // Each instrument's voice is louder by its position in `all()`.
   fn energy(text : String) -> Double raise {
     assert_true(
-      init_scheduler_graph_with_sounds(48000.0, 128, drum=test_drum, instrument=i => {
-        let rank = @score.Instrument::all().search(i).unwrap() + 1
-        { ..test_voice(i), amount: rank.to_double() * 0.1, }
-      }),
+      init_scheduler_graph_with_sounds(
+        48000.0,
+        128,
+        drum=test_drum,
+        instrument=i => {
+          let rank = @score.Instrument::all().search(i).unwrap() + 1
+          { ..test_voice(i), amount: rank.to_double() * 0.1, }
+        },
+        sampler=test_sampler,
+      ),
     )
     assert_eq(submit_for_test(text), 0)
     let mut energy = 0.0

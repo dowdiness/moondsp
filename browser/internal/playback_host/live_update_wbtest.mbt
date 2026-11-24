@@ -287,6 +287,7 @@ test "unrepresentable finite endpoints reject before publication or restart" {
       128,
       drum=test_drum,
       instrument=test_voice,
+      sampler=test_sampler,
     ),
   )
   let invalid = "bpm(0.001); song(section(\"a\",2000000000,silence()),part(\"p\",\"a\"))"

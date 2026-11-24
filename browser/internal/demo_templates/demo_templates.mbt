@@ -151,6 +151,22 @@ pub fn drum_template(drum : @score.Drum) -> Array[@moondsp.DspNode] {
 }
 
 ///|
+/// The sound of the sampler. A sample plays from its onset for as long as
+/// its note lasts, then fades over the release, like an instrument note.
+pub fn sampler_voice() -> @playback_host.SamplerVoice {
+  {
+    attack_ms: 1.0,
+    decay_ms: 0.0,
+    sustain: 1.0,
+    release_ms: 40.0,
+    lpf_hz: 18000.0,
+    lpf_q: 0.707,
+    amount: 0.8,
+    voices: 16,
+  }
+}
+
+///|
 /// The sound of each instrument. The oscillators are not band-limited, so
 /// the brighter waveforms sit behind a low-pass default. Triangle, the
 /// default, has 24 voices for a 5-note chord × 4 layers of jux/stereo, so
