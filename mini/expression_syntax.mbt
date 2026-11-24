@@ -46,8 +46,10 @@ fn MiniFilterKind::resonance_control_key(
 }
 
 ///|
-/// A periodic signal shape with values in [0, 1] and period one cycle.
+/// A signal shape with values in [0, 1]. Every shape but `Ramp` repeats each
+/// cycle; `Ramp` rises once over cycle 0 and holds 0 before it and 1 after it.
 priv enum MiniShape {
+  Ramp
   Sine
   Cosine
   Saw
@@ -59,7 +61,7 @@ priv enum MiniShape {
 ///|
 /// Every signal shape. Keep this the only expression that constructs one.
 fn MiniShape::all() -> Array[MiniShape] {
-  [Sine, Cosine, Saw, Isaw, Tri, Square]
+  [Ramp, Sine, Cosine, Saw, Isaw, Tri, Square]
 }
 
 ///|
@@ -70,6 +72,7 @@ fn MiniShape::parse(name : String) -> MiniShape? {
 ///|
 fn MiniShape::name(self : MiniShape) -> String {
   match self {
+    Ramp => "ramp"
     Sine => "sine"
     Cosine => "cosine"
     Saw => "saw"
@@ -82,6 +85,7 @@ fn MiniShape::name(self : MiniShape) -> String {
 ///|
 fn MiniShape::description(self : MiniShape) -> String {
   match self {
+    Ramp => "rise 0→1 once, then hold 1"
     Sine => "0–1 sine, one period per cycle"
     Cosine => "sine starting at 1"
     Saw => "rise 0→1 each cycle"
@@ -96,6 +100,9 @@ fn MiniShape::description(self : MiniShape) -> String {
 fn MiniShape::at(self : MiniShape, t : Double) -> Double {
   let phase = t - t.floor()
   match self {
+    // Local time starts at a section's start, so a ramp's end value lasts
+    // through the section's remaining cycles and its notes' release.
+    Ramp => if t <= 0.0 { 0.0 } else if t >= 1.0 { 1.0 } else { t }
     Sine => 0.5 + 0.5 * @math.sin(2.0 * @math.PI * phase)
     Cosine => 0.5 + 0.5 * @math.cos(2.0 * @math.PI * phase)
     Saw => phase
@@ -350,6 +357,27 @@ fn Parser::parse_method(
     }
     Fast => Fast(self.read_method_factor(method_start, name))
     Slow => Slow(self.read_method_factor(method_start, name))
+    FadeIn | FadeOut => {
+      // `gain(ramp.slow(n))` or `gain(ramp.range(1, 0).slow(n))`: gain
+      // multiplies, so the fade scales any other gain, and keeps its end value.
+      let cycles = self.read_method_factor(method_start, name)
+      let fade_in = called is FadeIn
+      let fade = {
+        shape: Ramp,
+        low: if fade_in {
+          0.0
+        } else {
+          1.0
+        },
+        high: if fade_in {
+          1.0
+        } else {
+          0.0
+        },
+        rate: @pattern.Rational::from_int(1) / cycles,
+      }
+      Control(Gain, { value: Signal(fade), method_at: method_start, })
+    }
     Gate => {
       self.expect_char('(')
       self.skip_whitespace()

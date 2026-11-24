@@ -384,6 +384,29 @@ test "Mini control arguments accept quoted steps and signals" {
 }
 
 ///|
+test "ramp, fadeIn, and fadeOut run once and then hold their end value" {
+  // Under an 8-cycle note: periodic isaw jumps back to 1 at cycle 4; a
+  // 4-cycle fadeOut stays silent from there on, including the boundary.
+  let gain = (source : String, t : @pattern.Rational) => {
+    mini_control_at("note(\"60\").slow(8)\{source}", Gain, t).1
+  }
+  let times = [bus_r(2L, 1L), bus_r(4L, 1L), bus_r(5L, 1L), bus_r(7L, 1L)]
+  @debug.assert_eq(times.map(t => gain(".gain(isaw.slow(4))", t)), [
+    0.5, 1.0, 0.75, 0.25,
+  ])
+  @debug.assert_eq(times.map(t => gain(".fadeOut(4)", t)), [0.5, 0.0, 0.0, 0.0])
+  @debug.assert_eq(times.map(t => gain(".fadeIn(4)", t)), [0.5, 1.0, 1.0, 1.0])
+  @debug.assert_eq(gain(".fadeIn(4)", bus_r(1L, 1L)), 0.25)
+  // fadeOut multiplies an inner gain; a decimal length stays exact.
+  @debug.assert_eq(gain(".gain(4).fadeOut(2.5)", bus_r(1L, 2L)), 3.2)
+  // ramp keeps its top after range and slow.
+  @debug.assert_eq(times.map(t => gain(".gain(ramp.range(2, 6).slow(2))", t)), [
+    6.0, 6.0, 6.0, 6.0,
+  ])
+  @debug.assert_eq(gain(".gain(ramp.slow(4))", bus_r(1L, 1L)), 0.25)
+}
+
+///|
 test "Mini control arguments are range-checked and syntax-checked" {
   let error = (source : String) => {
     match @mini.parse_snapshot(source) {
@@ -406,7 +429,7 @@ test "Mini control arguments are range-checked and syntax-checked" {
       #|position 11: room() expects a send between 0 and 1
       #|position 11: attack() expects seconds between 0 and 86400
       #|position 11: lpf() expects finite resonance above 0
-      #|position 16: expected a number, a quoted pattern, or a signal (sine, cosine, saw, isaw, tri, square), got 'sin'
+      #|position 16: expected a number, a quoted pattern, or a signal (ramp, sine, cosine, saw, isaw, tri, square), got 'sin'
       #|position 20: unknown signal method 'wobble'; use range, fast, or slow
       #|position 21: expected number
       #|position 24: random drop ? is not supported in gain patterns

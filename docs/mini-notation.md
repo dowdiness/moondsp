@@ -67,11 +67,16 @@ in the browser bundle.
 <dl>
   <dt>.gain("0.3 0.8")</dt><dd>step through values; quoted notation works as in <code>note("...")</code>, except <code>?</code></dd>
   <dt>sine cosine saw isaw tri square</dt><dd>continuous signals from 0 to 1, one period per cycle</dd>
+  <dt>ramp</dt><dd>rise from 0 to 1 once over the first cycle, then hold 1</dd>
+  <dt>.fadeIn(n)</dt><dd>fade up from silence over n cycles</dd>
+  <dt>.fadeOut(n)</dt><dd>fade to silence over n cycles, then stay silent</dd>
   <dt>.range(lo, hi)</dt><dd>map a signal onto lo–hi</dd>
   <dt>.slow(n) .fast(n)</dt><dd>stretch or speed up a signal</dd>
 </dl>
 <p><code>note("C2").slow(4)<br>&nbsp;&nbsp;.lpf(saw.range(200, 4000).slow(4))<br>&nbsp;&nbsp;.pan(sine)</code></p>
 <p class="cheat-note">A note starts from the value at its onset, then follows once per audio block. Limits such as room 0–1 apply to every value a pattern or signal can take.</p>
+<p><code>note("C3").slow(4).release(2).fadeOut(4)<br>&nbsp;&nbsp;.lpf(ramp.range(200, 4000).slow(4))</code></p>
+<p class="cheat-note">The other signals repeat every period. <code>ramp</code> runs once from the start of the section, or of playback outside a song, and then keeps its end value, through the release and the following cycles. <code>.fadeIn(n)</code> is <code>.gain(ramp.slow(n))</code> and <code>.fadeOut(n)</code> is <code>.gain(ramp.range(1, 0).slow(n))</code>; both multiply any other gain.</p>
 
 <h2>Rhythm</h2>
 <p class="cheat-note">One cycle is one bar of four beats. BPM counts beats: at the default 120 BPM, one cycle lasts two seconds, so <code>s("bd hh sd hh")</code> plays quarter notes.</p>

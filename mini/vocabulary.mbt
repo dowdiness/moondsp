@@ -148,6 +148,8 @@ fn ArrangementMethod::parse(name : String) -> ArrangementMethod? {
 priv enum Method {
   Fast
   Slow
+  FadeIn
+  FadeOut
   Gate
   Rev
   DegradeBy
@@ -170,6 +172,8 @@ fn Method::all() -> Array[Method] {
   [
     Fast,
     Slow,
+    FadeIn,
+    FadeOut,
     Gate,
     Rev,
     DegradeBy,
@@ -192,6 +196,8 @@ fn Method::name(self : Method) -> String {
   match self {
     Fast => "fast"
     Slow => "slow"
+    FadeIn => "fadeIn"
+    FadeOut => "fadeOut"
     Gate => "gate"
     Rev => "rev"
     DegradeBy => "degradeBy"
@@ -658,6 +664,14 @@ fn Method::signature(self : Method) -> Signature {
   match self {
     Fast => signature("n× faster", required=[argument("factor", Number)])
     Slow => signature("n× slower", required=[argument("factor", Number)])
+    FadeIn =>
+      signature("fade up from silence over n cycles", required=[
+        argument("cycles", Number),
+      ])
+    FadeOut =>
+      signature("fade to silence over n cycles, then stay silent", required=[
+        argument("cycles", Number),
+      ])
     Gate =>
       signature("audible fraction of each step (0–1)", required=[
         argument("fraction", Number),

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ramp` is a signal that rises from 0 to 1 once and then keeps 1.
+  `.fadeIn(n)` fades a pattern up from silence over n cycles, and
+  `.fadeOut(n)` fades it to silence and keeps it silent. All three start at
+  the section's start, so a fade-out stays silent through the release after
+  the section ends; a periodic signal such as `isaw` jumps back to its start
+  value there.
 - `.s("bass pad")` chooses the instrument of notes and chords per step
   (ADR-0022): `triangle` (the default), `bass`, `pad`, `pluck`, and
   `sawtooth`, each with its own voice pool in the browser. A note takes the

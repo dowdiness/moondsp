@@ -2153,8 +2153,8 @@ test ".s keeps exact origins; default instruments keep chord tone paths" {
 ///|
 test "methods_after names the methods the compiler accepts after a receiver" {
   let pattern = [
-    "fast", "slow", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release",
-    "gain", "pan", "room", "every", "jux",
+    "fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf",
+    "attack", "hold", "release", "gain", "pan", "room", "every", "jux",
   ]
   let notes = [..pattern, "s"]
   let song = "song(section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\"))"
@@ -2218,7 +2218,7 @@ fn sample(argument : @mini.Argument) -> String raise {
     SongItem => "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
     Number =>
       match argument.name {
-        "tempo" | "factor" | "k" | "n" | "length" | "high" => "2"
+        "tempo" | "factor" | "cycles" | "k" | "n" | "length" | "high" => "2"
         "fraction" | "p" | "low" => "0.5"
         "start" => "8"
         name => fail("no sample for number '\{name}'")

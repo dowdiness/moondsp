@@ -161,6 +161,8 @@ fn Method::follows(self : Method, score : Score) -> Bool {
     Instrument => score.notes() is Some(_)
     Fast
     | Slow
+    | FadeIn
+    | FadeOut
     | Gate
     | Rev
     | DegradeBy
