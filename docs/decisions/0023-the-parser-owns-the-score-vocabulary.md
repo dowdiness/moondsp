@@ -103,13 +103,18 @@ editor parses it once, when the score tools load.
 ### 4. `mini` decides which methods may follow a receiver
 
 `@mini.methods_after(receiver)` compiles the receiver, after the `let`
-bindings before it, and returns the names of the methods that may follow
-it: for a pattern, every `Method`, without those that take instruments
-unless it is a score of only notes or silence (the rule `.s` applies); for a
-signal, every `SignalMethod`; for an arrangement, every `ArrangementMethod`.
-Code that does not compile has none. The receiver before a `.` is finished
-syntax even while the rest of the score is not, so the editor cuts it, and
-the bindings, out of the Lezer tree and asks.
+bindings before it, and returns the calls of the methods that may follow
+it: for a pattern, every `Method` the compiler accepts after it, so `.s`
+only when it is a score of only notes or silence; for an arrangement
+(`song(…)`), every `ArrangementMethod`, and none once it repeats. Code that
+does not compile has none. The receiver before a `.` is finished syntax even
+while the rest of the score is not, so the editor cuts it, and the
+bindings, out of the Lezer tree and asks.
+
+A signal is not a receiver here. It is written only in a control argument,
+where the parser reads it whatever the bindings are, and its methods do not
+depend on it, so they are the calls of their position. The receiver's text
+alone could not say which one it is: a binding may be named `sine`.
 
 The compiler is the only place that knows what a receiver is, through
 references, `stack`, `+`, and groups, so neither the vocabulary nor the
@@ -125,7 +130,8 @@ never names a call itself:
   calls of that position;
 - in an argument of any call: the options of the argument's kind, such as
   drum names inside `s("…")` and song items inside `song(…)`;
-- after `.`: the calls `methods_after` names.
+- after `.` on a signal in a control argument: the calls after a signal;
+- after any other `.`: the calls `methods_after` returns.
 
 Snippets fill in the required arguments only.
 
@@ -184,9 +190,10 @@ Snippets fill in the required arguments only.
 2. Parse every position through its enum and derive the reserved names. No
    other behaviour changes, except the two new reserved names. Done.
 3. Publish `@mini.vocabulary()` and `@mini.methods_after`, replacing
-   `sound_vocabulary()` and `takes_instruments`.
-4. Complete every position from the vocabulary in the editor and remove its
-   hand-written lists.
+   `sound_vocabulary()` and `takes_instruments`; the editor completes every
+   method after `.` from them. Done.
+4. Complete the other positions from the vocabulary in the editor and
+   remove its remaining hand-written lists.
 
 ## Not covered
 
@@ -201,8 +208,8 @@ such as `Am` and `G7`, and operators such as `*`, `?`, and `@`.
 - Every reserved name is rejected after `let`.
 - `methods_after` names every method the parser accepts after a pattern of
   notes, the same without `.s` after one with drums, through bindings,
-  `stack`, `+`, and groups, the signal methods after a signal,
-  `.repeat()` after `song(…)`, and nothing after code that does not compile.
+  `stack`, `+`, and groups, `.repeat()` after `song(…)` until it repeats,
+  and nothing after a signal or code that does not compile.
 - The editor offers each position's calls, drum names inside `s("…")`, song
   items inside `song(…)`, and the methods `methods_after` names.
 - The editor starts and edits without the score tools.

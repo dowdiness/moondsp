@@ -3,11 +3,11 @@ import {
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler",
-  "dowdiness/moondsp/score",
   "moonbitlang/core/json",
 }
 
 import {
+  "dowdiness/moondsp/score",
   "moonbitlang/core/double",
 } for "wbtest"
 
@@ -27,8 +27,8 @@ options(
         "locate_onsets",
         "project_notation",
         "control_nesting",
-        "sound_vocabulary",
-        "takes_instruments",
+        "vocabulary",
+        "methods_after",
       ],
     },
   },

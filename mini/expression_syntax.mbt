@@ -80,6 +80,18 @@ fn MiniShape::name(self : MiniShape) -> String {
 }
 
 ///|
+fn MiniShape::description(self : MiniShape) -> String {
+  match self {
+    Sine => "0–1 sine, one period per cycle"
+    Cosine => "sine starting at 1"
+    Saw => "rise 0→1 each cycle"
+    Isaw => "fall 1→0 each cycle"
+    Tri => "0→1→0 each cycle"
+    Square => "0, then 1 for the second half"
+  }
+}
+
+///|
 /// The shape at cycle position `t`. Allocates nothing.
 fn MiniShape::at(self : MiniShape, t : Double) -> Double {
   let phase = t - t.floor()

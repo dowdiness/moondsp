@@ -323,7 +323,7 @@ async function prepareAuthoring(): Promise<void> {
       effects: [
         view.scrollSnapshot(),
         patternCompartment.reconfigure(controls.patternControls(sources)),
-        scoreNamesCompartment.reconfigure(scoreNames({ sounds: authoring.soundVocabulary(), takesInstruments: authoring.takesInstruments })),
+        scoreNamesCompartment.reconfigure(scoreNames({ vocabulary: authoring.vocabulary(), methodsAfter: authoring.methodsAfter })),
         controlsCompartment.reconfigure(controls.patternControlsVisible.of(dom.transport.sourceToggle.getAttribute("aria-pressed") === "true")),
       ],
     });

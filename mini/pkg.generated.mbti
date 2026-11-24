@@ -14,6 +14,8 @@ import {
 // Values
 pub const DEFAULT_BPM : Double = 120.0
 
+pub fn methods_after(String) -> Array[Call]
+
 pub fn parse(String) -> Result[@pattern.Pat[@score.ScoreEvent], String]
 
 pub fn parse_doc(String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
@@ -26,7 +28,7 @@ pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]],
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
-pub fn takes_instruments(String) -> Bool
+pub fn vocabulary() -> Vocabulary
 
 // Errors
 #derive(Eq, @debug.Debug)
@@ -53,6 +55,33 @@ pub fn SourceProblem::to_string(Self) -> String
 pub impl Show for SourceProblem
 
 // Types and methods
+pub struct Argument {
+  name : String
+  kind : ArgumentKind
+}
+pub impl @json.ToJson for Argument
+
+pub enum ArgumentKind {
+  Drums
+  Instruments
+  Callback
+  Control
+  Pattern
+  SongItem
+  Plain
+}
+pub impl @json.ToJson for ArgumentKind
+
+pub struct Call {
+  name : String
+  position : Position
+  description : String
+  required : Array[Argument]
+  optional : Array[Argument]
+  repeated : Argument?
+}
+pub impl @json.ToJson for Call
+
 pub struct Draft {
   // private fields
 }
@@ -108,6 +137,12 @@ pub struct EditTransaction {
   // private fields
 }
 pub fn EditTransaction::EditTransaction(base~ : DraftVersion, edits~ : Array[TextEdit]) -> Self
+
+pub struct Instruments {
+  default : Term
+  others : Array[Term]
+}
+pub impl @json.ToJson for Instruments
 
 pub struct MiniDocBuilder {
   // private fields
@@ -175,6 +210,17 @@ pub fn PlaybackInput::source(Self) -> String
 pub fn PlaybackInput::text(String) -> Self
 pub fn PlaybackInput::version(Self) -> DraftVersion?
 
+pub enum Position {
+  Statement
+  Pattern
+  SongItem
+  AfterSong
+  AfterPattern
+  Callback
+  AfterSignal
+}
+pub impl @json.ToJson for Position
+
 pub(all) enum PreparedPlayback {
   Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
   Runtime(PlaySource)
@@ -205,10 +251,24 @@ pub fn SourceRange::not_equal(Self, Self) -> Bool
 pub fn SourceRange::start(Self) -> Int32
 pub fn SourceRange::to_repr(Self) -> @debug.Repr
 
+pub struct Term {
+  name : String
+  description : String
+}
+pub impl @json.ToJson for Term
+
 pub struct TextEdit {
   // private fields
 }
 pub fn TextEdit::TextEdit(from~ : Int32, to~ : Int32, inserted~ : String) -> Self
+
+pub struct Vocabulary {
+  drums : Array[Term]
+  instruments : Instruments
+  signals : Array[Term]
+  calls : Array[Call]
+}
+pub impl @json.ToJson for Vocabulary
 
 // Type aliases
 

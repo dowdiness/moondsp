@@ -200,14 +200,10 @@ fn compile_score(
       })
     }
     Instruments(child, notation, at) => {
-      let notes = match compile_score(child, builder) {
-        Notes(notes) => notes
-        // Silence plays no drums, so its document plays only notes.
-        Silent(doc) => NoteDoc(doc)
-        Hits(_) | Mixed(_) =>
-          raise Mistake(
-            at, ".s(\"...\") chooses the instrument of notes, and drums have none",
-          )
+      guard compile_score(child, builder).notes() is Some(notes) else {
+        raise Mistake(
+          at, ".s(\"...\") chooses the instrument of notes, and drums have none",
+        )
       }
       let instruments = builder.notation_doc(
         notation,

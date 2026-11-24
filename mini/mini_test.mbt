@@ -2151,27 +2151,111 @@ test ".s keeps exact origins; default instruments keep chord tone paths" {
 }
 
 ///|
-test "takes_instruments follows the rule that rejects .s" {
+test "methods_after names the methods the compiler accepts after a receiver" {
+  let pattern = [
+    "fast", "slow", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release",
+    "gain", "pan", "room", "every", "jux",
+  ]
+  let notes = [..pattern, "s"]
+  let song = "song(section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\"))"
   for
     case in [
-      ("note(\"C4\")", true),
-      ("chord(\"C\").fast(2)", true),
-      ("silence()", true),
-      ("let lead = note(\"C4\"); lead.fast(2)", true),
-      ("note(\"C4\").s(\"bass\")", true),
-      ("s(\"bd\")", false),
-      ("stack(s(\"bd\"), note(\"C4\"))", false),
-      ("let beat = s(\"bd\"); beat", false),
+      ("note(\"C4\")", notes),
+      ("chord(\"C\").fast(2)", notes),
+      ("silence()", notes),
+      ("let lead = note(\"C4\"); lead.fast(2)", notes),
+      ("note(\"C4\").s(\"bass\")", notes),
+      ("(note(\"C4\"))", notes),
+      ("s(\"bd\")", pattern),
+      ("stack(s(\"bd\"), note(\"C4\"))", pattern),
+      ("note(\"C4\") + s(\"bd\")", pattern),
+      ("let beat = s(\"bd\"); beat", pattern),
       (
-        "let beat = s(\"bd\"); let both = stack(beat, note(\"C4\")); both", false,
+        "let beat = s(\"bd\"); let both = stack(beat, note(\"C4\")); both", pattern,
       ),
-      // Not a score: a signal, an unknown name, unfinished code.
-      ("saw", false),
-      ("lead", false),
-      ("note(\"C4\"", false),
+      // A binding may take a signal's name; at a pattern it is a reference.
+      ("let sine = s(\"bd\"); sine", pattern),
+      (song, ["repeat"]),
+      ("\{song}.repeat()", []),
+      // Not a receiver: a signal, an unknown name, unfinished code, a statement.
+      ("saw", []),
+      ("lead", []),
+      ("note(\"C4\"", []),
+      ("bpm(120)", []),
     ] {
     let (receiver, expected) = case
-    assert_eq(@mini.takes_instruments(receiver), expected, msg=receiver)
+    let names = @mini.methods_after(receiver).map(call => call.name)
+    assert_eq(names, expected, msg=receiver)
+  }
+}
+
+///|
+/// A score that writes `call` with `arguments` in the call's position.
+fn written_in_position(call : @mini.Call, arguments : Array[String]) -> String {
+  let written = "\{call.name}(\{arguments.join(", ")})"
+  let song = "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
+  match call.position {
+    Statement =>
+      if call.name == "bpm" {
+        "\{written}; s(\"bd\")"
+      } else {
+        written
+      }
+    Pattern => written
+    SongItem => "song(\{song}, \{written})"
+    AfterSong => "song(\{song}).\{written}"
+    AfterPattern => "note(\"C4\").\{written}"
+    Callback => "note(\"C4\").jux(\{written})"
+    AfterSignal => "note(\"C4\").gain(sine.\{written})"
+  }
+}
+
+///|
+/// A value for `argument` that its call accepts.
+fn sample(argument : @mini.Argument) -> String raise {
+  match argument.kind {
+    Drums => "\"bd\""
+    Instruments => "\"bass\""
+    Callback => "rev"
+    Control => "sine.range(0.2, 0.8)"
+    Pattern => "s(\"bd\")"
+    SongItem => "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
+    Plain =>
+      match argument.name {
+        "tempo" | "factor" | "k" | "n" | "length" | "high" => "2"
+        "fraction" | "p" | "low" => "0.5"
+        "start" => "8"
+        "notes" => "\"C4 E4\""
+        "chords" => "\"C Am\""
+        "name" => "\"x\""
+        "section" => "\"a\""
+        "prefix" => "\"f\""
+        "id" => "\"occ_0123456789abcdef0123456789abcdef\""
+        name => fail("no sample for argument '\{name}'")
+      }
+  }
+}
+
+///|
+test "every vocabulary call parses as it describes its arguments" {
+  for call in @mini.vocabulary().calls {
+    let required = call.required.map(argument => sample(argument))
+    let optional = call.optional.map(argument => sample(argument))
+    // A second song item, so that the song names its parts once.
+    let repeated = match call.repeated {
+      Some({ kind: SongItem, .. }) => ["part(\"q\", \"a\")"]
+      Some(argument) => [sample(argument)]
+      None => []
+    }
+    for
+      arguments in [
+        required,
+        [..required, ..optional],
+        [..required, ..optional, ..repeated],
+      ] {
+      let source = written_in_position(call, arguments)
+      assert_true(@mini.parse_play_source(source) is Ok(_), msg=source)
+    }
   }
 }
 

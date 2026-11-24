@@ -31,6 +31,17 @@ fn Score::of(doc : ScoreDoc, hits~ : Bool, notes~ : Bool) -> Score {
 }
 
 ///|
+/// The score as notes, unless it plays drums. Silence plays no drums, so its
+/// document plays only notes.
+fn Score::notes(self : Score) -> NoteDoc? {
+  match self {
+    Notes(notes) => Some(notes)
+    Silent(doc) => Some(NoteDoc(doc))
+    Hits(_) | Mixed(_) => None
+  }
+}
+
+///|
 fn Score::plays_hits(self : Score) -> Bool {
   self is (Hits(_) | Mixed(_))
 }
@@ -102,23 +113,67 @@ fn played_on(
 }
 
 ///|
-/// Whether `.s` may follow `receiver`: one expression, after the `let`
-/// bindings it uses, that compiles to a score of only notes or silence.
-/// Drums have no instrument, and code that is not a score takes none.
-pub fn takes_instruments(receiver : String) -> Bool {
+/// The methods that may follow `receiver`, a pattern or `song(…)` after the
+/// `let` bindings it uses. Code that does not compile takes none. A signal's
+/// methods do not depend on the signal, so they are its position's calls.
+pub fn methods_after(receiver : String) -> Array[Call] {
   let parser = Parser(receiver)
   let builder = MiniDocBuilder()
-  let score = (fn() raise SourceProblem {
+  (fn() raise SourceProblem {
     parser.parse_bindings(builder)
-    let score = compile_score(
-      resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings),
-      builder,
-    )
     parser.skip_whitespace()
-    guard parser.at_end() else { raise Mistake(parser.pos, "trailing input") }
-    score
+    let at = parser.pos
+    match parser.read_call(StatementCall::parse) {
+      Some(Song) => {
+        let (_, repeating, _) = parser.parse_play_song(
+          at,
+          builder,
+          None,
+          None,
+          lower=doc => doc.lower().pat(),
+        )
+        if repeating {
+          []
+        } else {
+          ArrangementMethod::all().map(ArrangementMethod::call)
+        }
+      }
+      Some(Bpm) => []
+      None => {
+        let score = compile_score(
+          resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings),
+          builder,
+        )
+        parser.expect_end()
+        Method::all()
+        .filter(candidate => candidate.follows(score))
+        .map(Method::call)
+      }
+    }
   })() catch {
-    _ => return false
+    _ => []
   }
-  score is (Silent(_) | Notes(_))
+}
+
+///|
+/// Whether the method may follow `score`, by the rules the compiler applies.
+fn Method::follows(self : Method, score : Score) -> Bool {
+  match self {
+    Instruments => score.notes() is Some(_)
+    Fast
+    | Slow
+    | Gate
+    | Rev
+    | DegradeBy
+    | Lpf
+    | Hpf
+    | Attack
+    | Hold
+    | Release
+    | Gain
+    | Pan
+    | Room
+    | Every
+    | Jux => true
+  }
 }

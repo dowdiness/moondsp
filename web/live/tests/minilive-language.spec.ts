@@ -124,8 +124,10 @@ test("MiniLive keeps number highlighting while the sign is edited", async ({ pag
   await expect.poll(numberTokens).toEqual(initialTokens);
 });
 
-test("MiniLive completes filters with cutoff and resonance arguments", async ({ page }) => {
+test("MiniLive completes filters with their required cutoff argument", async ({ page }) => {
   await page.goto("/");
+  // Methods come from the score language, which loads with the score tools.
+  await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
   const editor = page.locator(".cm-content");
   await replaceCode(page, 'note("C4").');
   await editor.press("Control+Space");
@@ -135,11 +137,13 @@ test("MiniLive completes filters with cutoff and resonance arguments", async ({ 
   await expect(labels.filter({ hasText: /^lpf$/ })).toBeVisible();
   await expect(labels.filter({ hasText: /^hpf$/ })).toBeVisible();
   await labels.filter({ hasText: /^lpf$/ }).click();
-  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(hz, resonance)');
+  await expect.poll(() => readCode(page)).toBe('note("C4").lpf(cutoff)');
 });
 
 test("MiniLive completes signals inside control arguments and their methods", async ({ page }) => {
   await page.goto("/");
+  // Methods come from the score language, which loads with the score tools.
+  await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
   const editor = page.locator(".cm-content");
   const labels = page.locator(".cm-completionLabel");
   await replaceCode(page, 'note("C4").lpf(sa');
@@ -157,6 +161,15 @@ test("MiniLive completes signals inside control arguments and their methods", as
 
   // A pattern's own chain still offers pattern methods.
   await replaceCode(page, 'note("C4").');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^gain$/ })).toBeVisible();
+  await expect(labels.filter({ hasText: /^range$/ })).toHaveCount(0);
+
+  // A binding named like a signal is a pattern outside control arguments.
+  await replaceCode(page, 'let sine = s("bd");\nnote("C4").lpf(sine.');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^range$/ })).toBeVisible();
+  await replaceCode(page, 'let sine = s("bd");\nsine.');
   await editor.press("Control+Space");
   await expect(labels.filter({ hasText: /^gain$/ })).toBeVisible();
   await expect(labels.filter({ hasText: /^range$/ })).toHaveCount(0);
@@ -178,14 +191,27 @@ test("MiniLive completes instrument names in .s and offers .s only on receivers 
     ['(s("bd") + note("C4")).fast(2)', false],
     ['let beat = s("bd"); beat', false],
     ['let beat = s("bd"); let both = stack(beat, note("C4")); both', false],
-    ['saw', false],
   ] as const) {
     await replaceCode(page, `${receiver}.`);
     await editor.press("Control+Space");
-    await expect(labels.filter({ hasText: receiver === "saw" ? /^range$/ : /^gain$/ }), receiver).toBeVisible();
+    await expect(labels.filter({ hasText: /^gain$/ }), receiver).toBeVisible();
     await expect(labels.filter({ hasText: /^s$/ }), receiver).toHaveCount(offered ? 1 : 0);
     await editor.press("Escape");
   }
+  // After a song, its own methods until it repeats; inside a section, the pattern's.
+  const song = 'song(section("a", 4, s("bd")), part("p", "a"))';
+  await replaceCode(page, `${song}.`);
+  await editor.press("Control+Space");
+  await expect(labels).toHaveText(["repeat"]);
+  await editor.press("Escape");
+  await replaceCode(page, `${song}.repeat().`);
+  await editor.press("Control+Space");
+  await expect(labels).toHaveCount(0);
+  await replaceCode(page, 'song(section("a", 4, note("C4").');
+  await editor.press("Control+Space");
+  await expect(labels.filter({ hasText: /^s$/ })).toHaveCount(1);
+  await expect(labels.filter({ hasText: /^repeat$/ })).toHaveCount(0);
+  await editor.press("Escape");
   await replaceCode(page, 'note("C4").s("');
   await editor.press("Control+Space");
   await expect(labels).toHaveText(["bass", "pad", "pluck", "sawtooth", "triangle"]);

@@ -291,3 +291,398 @@ fn[C] Parser::read_call(self : Parser, parse : (String) -> C?) -> C? {
     None
   }
 }
+
+///|
+/// Where a call is written.
+pub enum Position {
+  Statement
+  Pattern
+  SongItem
+  AfterSong
+  AfterPattern
+  Callback
+  AfterSignal
+}
+
+///|
+pub impl ToJson for Position with fn to_json(self) {
+  let name = match self {
+    Statement => "statement"
+    Pattern => "pattern"
+    SongItem => "song-item"
+    AfterSong => "after-song"
+    AfterPattern => "after-pattern"
+    Callback => "callback"
+    AfterSignal => "after-signal"
+  }
+  Json(name)
+}
+
+///|
+/// What completion offers in an argument. `Plain` offers nothing: numbers,
+/// lengths, quoted names, and note notation.
+pub enum ArgumentKind {
+  Drums
+  Instruments
+  Callback
+  Control
+  Pattern
+  SongItem
+  Plain
+}
+
+///|
+pub impl ToJson for ArgumentKind with fn to_json(self) {
+  let name = match self {
+    Drums => "drums"
+    Instruments => "instruments"
+    Callback => "callback"
+    Control => "control"
+    Pattern => "pattern"
+    SongItem => "song-item"
+    Plain => "plain"
+  }
+  Json(name)
+}
+
+///|
+pub struct Argument {
+  name : String
+  kind : ArgumentKind
+}
+
+///|
+pub impl ToJson for Argument with fn to_json(self) {
+  { "name": Json(self.name), "kind": ToJson::to_json(self.kind) }
+}
+
+///|
+/// A name written with arguments: its required arguments, then its optional
+/// ones, then any number of `repeated` ones.
+pub struct Call {
+  name : String
+  position : Position
+  description : String
+  required : Array[Argument]
+  optional : Array[Argument]
+  repeated : Argument?
+}
+
+///|
+pub impl ToJson for Call with fn to_json(self) {
+  {
+    "name": Json(self.name),
+    "position": ToJson::to_json(self.position),
+    "description": Json(self.description),
+    "required": ToJson::to_json(self.required),
+    "optional": ToJson::to_json(self.optional),
+    "repeated": match self.repeated {
+      Some(argument) => ToJson::to_json(argument)
+      None => Json::null()
+    },
+  }
+}
+
+///|
+/// A name written on its own.
+pub struct Term {
+  name : String
+  description : String
+}
+
+///|
+pub impl ToJson for Term with fn to_json(self) {
+  { "name": Json(self.name), "description": Json(self.description) }
+}
+
+///|
+/// The instruments; `default` is what a note plays without `.s`.
+pub struct Instruments {
+  default : Term
+  others : Array[Term]
+}
+
+///|
+pub impl ToJson for Instruments with fn to_json(self) {
+  {
+    "default": ToJson::to_json(self.default),
+    "others": ToJson::to_json(self.others),
+  }
+}
+
+///|
+/// Every name a score writes outside the notation in strings (ADR-0023).
+pub struct Vocabulary {
+  drums : Array[Term]
+  instruments : Instruments
+  signals : Array[Term]
+  calls : Array[Call]
+}
+
+///|
+pub impl ToJson for Vocabulary with fn to_json(self) {
+  {
+    "drums": ToJson::to_json(self.drums),
+    "instruments": ToJson::to_json(self.instruments),
+    "signals": ToJson::to_json(self.signals),
+    "calls": ToJson::to_json(self.calls),
+  }
+}
+
+///|
+pub fn vocabulary() -> Vocabulary {
+  let default = @score.Instrument::default()
+  let instrument = (instrument : @score.Instrument) => {
+    name: instrument.name(),
+    description: instrument.description(),
+  }
+  {
+    drums: @score.Drum::all().map(drum => {
+      name: drum.name(),
+      description: drum.description(),
+    }),
+    instruments: {
+      default: instrument(default),
+      others: @score.Instrument::all()
+      .filter(other => other != default)
+      .map(instrument),
+    },
+    signals: MiniShape::all().map(shape => {
+      name: shape.name(),
+      description: shape.description(),
+    }),
+    calls: [
+      ..StatementCall::all().map(StatementCall::call),
+      ..PatternCall::all().map(PatternCall::call),
+      ..SongItem::all().map(SongItem::call),
+      ..ArrangementMethod::all().map(ArrangementMethod::call),
+      ..Method::all().map(Method::call),
+      ..Callback::all().map(Callback::call),
+      ..SignalMethod::all().map(SignalMethod::call),
+    ],
+  }
+}
+
+///|
+fn argument(name : String, kind : ArgumentKind) -> Argument {
+  { name, kind, }
+}
+
+///|
+/// What a call does and the arguments it takes.
+priv struct Signature {
+  description : String
+  required : Array[Argument]
+  optional : Array[Argument]
+  repeated : Argument?
+}
+
+///|
+fn signature(
+  description : String,
+  required~ : Array[Argument] = [],
+  optional~ : Array[Argument] = [],
+  repeated? : Argument,
+) -> Signature {
+  { description, required, optional, repeated, }
+}
+
+///|
+fn Signature::call(
+  self : Signature,
+  name : String,
+  position : Position,
+) -> Call {
+  {
+    name,
+    position,
+    description: self.description,
+    required: self.required,
+    optional: self.optional,
+    repeated: self.repeated,
+  }
+}
+
+///|
+fn StatementCall::call(self : StatementCall) -> Call {
+  self.signature().call(self.name(), Statement)
+}
+
+///|
+fn StatementCall::signature(self : StatementCall) -> Signature {
+  match self {
+    Bpm =>
+      signature("beats per minute, 4 beats per cycle; default 120", required=[
+        argument("tempo", Plain),
+      ])
+    Song =>
+      signature(
+        "finite arrangement",
+        required=[argument("item", SongItem)],
+        repeated=argument("item", SongItem),
+      )
+  }
+}
+
+///|
+fn PatternCall::call(self : PatternCall) -> Call {
+  self.signature().call(self.name(), Pattern)
+}
+
+///|
+fn PatternCall::signature(self : PatternCall) -> Signature {
+  match self {
+    Literal(Sound) =>
+      signature("drum sounds", required=[argument("drums", Drums)])
+    Literal(Note) =>
+      signature("MIDI numbers or note names", required=[
+        argument("notes", Plain),
+      ])
+    Literal(Chord) =>
+      signature("chord names", required=[argument("chords", Plain)])
+    Silence => signature("silent pattern")
+    Stack =>
+      signature(
+        "combine layers",
+        required=[argument("pattern", Pattern)],
+        repeated=argument("pattern", Pattern),
+      )
+  }
+}
+
+///|
+fn SongItem::call(self : SongItem) -> Call {
+  self.signature().call(self.name(), SongItem)
+}
+
+///|
+fn SongItem::signature(self : SongItem) -> Signature {
+  match self {
+    Bpm =>
+      signature("the song's beats per minute", required=[
+        argument("tempo", Plain),
+      ])
+    Section =>
+      signature("a named pattern that plays for a length in cycles", required=[
+        argument("name", Plain),
+        argument("length", Plain),
+        argument("pattern", Pattern),
+      ])
+    Part =>
+      signature(
+        "play a section, after the previous part or from a start",
+        required=[argument("name", Plain), argument("section", Plain)],
+        optional=[argument("start", Plain)],
+      )
+    PartId =>
+      signature(
+        "a part with a stable occurrence id",
+        required=[
+          argument("id", Plain),
+          argument("name", Plain),
+          argument("section", Plain),
+        ],
+        optional=[argument("start", Plain)],
+      )
+    Fill =>
+      signature("play a section in the gaps between parts", required=[
+        argument("prefix", Plain),
+        argument("section", Plain),
+      ])
+  }
+}
+
+///|
+fn ArrangementMethod::call(self : ArrangementMethod) -> Call {
+  self.signature().call(self.name(), AfterSong)
+}
+
+///|
+fn ArrangementMethod::signature(self : ArrangementMethod) -> Signature {
+  match self {
+    Repeat => signature("repeat an arranged song")
+  }
+}
+
+///|
+fn Method::call(self : Method) -> Call {
+  self.signature().call(self.name(), AfterPattern)
+}
+
+///|
+fn Method::signature(self : Method) -> Signature {
+  let control = (description : String) => {
+    signature(description, required=[argument("value", Control)])
+  }
+  let filter = (description : String) => {
+    signature(description, required=[argument("cutoff", Control)], optional=[
+      argument("resonance", Control),
+    ])
+  }
+  match self {
+    Fast => signature("n× faster", required=[argument("factor", Plain)])
+    Slow => signature("n× slower", required=[argument("factor", Plain)])
+    Gate =>
+      signature("audible fraction of each step (0–1)", required=[
+        argument("fraction", Plain),
+      ])
+    Rev => signature("reverse")
+    DegradeBy =>
+      signature("drop with probability p (0–1)", required=[
+        argument("p", Plain),
+      ])
+    Lpf => filter("low-pass cutoff and optional resonance (Q)")
+    Hpf => filter("high-pass cutoff and optional resonance (Q)")
+    Attack => control("note fade-in, seconds")
+    Hold => control("hold after attack, seconds")
+    Release => control("note fade-out, seconds")
+    Gain => control("voice level")
+    Pan => control("stereo position (0 left, 1 right)")
+    Room => control("send to shared room (0–1)")
+    Every =>
+      signature("apply f every nth cycle", required=[
+        argument("n", Plain),
+        argument("f", Callback),
+      ])
+    Jux =>
+      signature("split stereo, apply f to right", required=[
+        argument("f", Callback),
+      ])
+    Instruments =>
+      signature("play notes on an instrument", required=[
+        argument("instruments", Instruments),
+      ])
+  }
+}
+
+///|
+fn Callback::call(self : Callback) -> Call {
+  self.signature().call(self.name(), Callback)
+}
+
+///|
+fn Callback::signature(self : Callback) -> Signature {
+  match self {
+    Fast => signature("k× faster", required=[argument("k", Plain)])
+    Slow => signature("k× slower", required=[argument("k", Plain)])
+    Rev => signature("reverse")
+  }
+}
+
+///|
+fn SignalMethod::call(self : SignalMethod) -> Call {
+  self.signature().call(self.name(), AfterSignal)
+}
+
+///|
+fn SignalMethod::signature(self : SignalMethod) -> Signature {
+  match self {
+    Range =>
+      signature("map 0–1 onto low–high", required=[
+        argument("low", Plain),
+        argument("high", Plain),
+      ])
+    Fast => signature("n× faster", required=[argument("factor", Plain)])
+    Slow => signature("n× slower", required=[argument("factor", Plain)])
+  }
+}

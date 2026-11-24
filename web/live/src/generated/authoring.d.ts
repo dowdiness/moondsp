@@ -9,5 +9,5 @@ export function prepare_playback(handle: DraftHandle): string;
 export function locate_onsets(handle: DraftHandle, wire: string): string;
 export function project_notation(kind: string, content: string): string;
 export function control_nesting(): string;
-export function sound_vocabulary(): string;
-export function takes_instruments(receiver: string): boolean;
+export function vocabulary(): string;
+export function methods_after(receiver: string): string;

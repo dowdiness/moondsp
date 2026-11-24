@@ -519,3 +519,10 @@ fn Parser::read_positive_factor(
   }
   parse_decimal_rational(self.input, value_start, value_end, method_start)
 }
+
+///|
+/// Raise unless only whitespace is left.
+fn Parser::expect_end(self : Parser) -> Unit raise SourceProblem {
+  self.skip_whitespace()
+  guard self.at_end() else { raise Mistake(self.pos, "trailing input") }
+}

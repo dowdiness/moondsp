@@ -7,8 +7,8 @@ import {
   edit_draft as editDraft,
   prepare_playback as preparePlayback,
   locate_onsets as locateOnsets,
-  sound_vocabulary as soundVocabularyWire,
-  takes_instruments as takesInstruments,
+  vocabulary as vocabularyWire,
+  methods_after as methodsAfterWire,
   type DraftHandle,
 } from "./generated/authoring.js";
 
@@ -32,34 +32,80 @@ export type LocatedOnset = Readonly<{
   notation: Readonly<{ from: number; to: number; start: number; pitch: number | null }> | null;
 }>;
 
-/** A drum or instrument, as people choose it. */
-export type SoundEntry = Readonly<{ name: string; description: string }>;
-/** The score's sounds. `instruments.default` is what a note plays without `.s`. */
-export type SoundVocabulary = Readonly<{
-  drums: readonly SoundEntry[];
-  instruments: Readonly<{ default: SoundEntry; others: readonly SoundEntry[] }>;
+/** A name written on its own: a drum, an instrument, or a signal. */
+export type Term = Readonly<{ name: string; description: string }>;
+/** Where a call is written. */
+export type Position = "statement" | "pattern" | "song-item" | "after-song" | "after-pattern" | "callback" | "after-signal";
+/** What completion offers in an argument; `plain` offers nothing. */
+export type ArgumentKind = "drums" | "instruments" | "callback" | "control" | "pattern" | "song-item" | "plain";
+export type Argument = Readonly<{ name: string; kind: ArgumentKind }>;
+/** A name written with arguments: required, then optional, then any number of `repeated`. */
+export type Call = Readonly<{
+  name: string;
+  position: Position;
+  description: string;
+  required: readonly Argument[];
+  optional: readonly Argument[];
+  repeated: Argument | null;
+}>;
+/** Every name a score writes (ADR-0023). `instruments.default` is what a note plays without `.s`. */
+export type Vocabulary = Readonly<{
+  drums: readonly Term[];
+  instruments: Readonly<{ default: Term; others: readonly Term[] }>;
+  signals: readonly Term[];
+  calls: readonly Call[];
 }>;
 
-export function soundVocabulary(): SoundVocabulary {
-  const invalid = (): never => { throw new Error("invalid sound vocabulary"); };
-  const record = (value: unknown): Record<string, unknown> =>
-    typeof value === "object" && value !== null ? value as Record<string, unknown> : invalid();
-  const entry = (value: unknown): SoundEntry => {
-    const { name, description } = record(value);
-    return typeof name === "string" && typeof description === "string" ? Object.freeze({ name, description }) : invalid();
-  };
-  const entries = (value: unknown): readonly SoundEntry[] =>
-    Array.isArray(value) ? Object.freeze(value.map(entry)) : invalid();
-  const wire = record(JSON.parse(soundVocabularyWire()));
-  const instruments = record(wire.instruments);
+const POSITIONS: readonly Position[] = ["statement", "pattern", "song-item", "after-song", "after-pattern", "callback", "after-signal"];
+const ARGUMENT_KINDS: readonly ArgumentKind[] = ["drums", "instruments", "callback", "control", "pattern", "song-item", "plain"];
+
+const invalidVocabulary = (): never => { throw new Error("invalid vocabulary"); };
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? value as Record<string, unknown> : invalidVocabulary();
+const list = <T>(value: unknown, item: (value: unknown) => T): readonly T[] =>
+  Array.isArray(value) ? Object.freeze(value.map(item)) : invalidVocabulary();
+const text = (value: unknown): string => typeof value === "string" ? value : invalidVocabulary();
+const oneOf = <T extends string>(options: readonly T[]) => (value: unknown): T =>
+  options.find(option => option === value) ?? invalidVocabulary();
+
+function decodeTerm(value: unknown): Term {
+  const { name, description } = record(value);
+  return Object.freeze({ name: text(name), description: text(description) });
+}
+
+function decodeArgument(value: unknown): Argument {
+  const { name, kind } = record(value);
+  return Object.freeze({ name: text(name), kind: oneOf(ARGUMENT_KINDS)(kind) });
+}
+
+function decodeCall(value: unknown): Call {
+  const { name, position, description, required, optional, repeated } = record(value);
   return Object.freeze({
-    drums: entries(wire.drums),
-    instruments: Object.freeze({ default: entry(instruments.default), others: entries(instruments.others) }),
+    name: text(name),
+    position: oneOf(POSITIONS)(position),
+    description: text(description),
+    required: list(required, decodeArgument),
+    optional: list(optional, decodeArgument),
+    repeated: repeated === null ? null : decodeArgument(repeated),
   });
 }
 
-/** Whether `.s` may follow `receiver`, its `let` bindings and one expression. */
-export { takesInstruments };
+/** The score's vocabulary, read once when the score tools load. */
+export function vocabulary(): Vocabulary {
+  const wire = record(JSON.parse(vocabularyWire()));
+  const instruments = record(wire.instruments);
+  return Object.freeze({
+    drums: list(wire.drums, decodeTerm),
+    instruments: Object.freeze({ default: decodeTerm(instruments.default), others: list(instruments.others, decodeTerm) }),
+    signals: list(wire.signals, decodeTerm),
+    calls: list(wire.calls, decodeCall),
+  });
+}
+
+/** The methods that may follow `receiver`, its `let` bindings and one expression. */
+export function methodsAfter(receiver: string): readonly Call[] {
+  return list(JSON.parse(methodsAfterWire(receiver)), decodeCall);
+}
 
 function decodeProblem(raw: unknown, text: string): SourceProblem | null | undefined {
   if (raw === null) return null;
