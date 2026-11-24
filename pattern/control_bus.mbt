@@ -316,6 +316,9 @@ priv enum BusSignal {
   Const(Double)
   /// A function of time; a `NaN` result counts as absent.
   Continuous((Double) -> Double)
+  /// `(f, delay)`: a one-shot function of the time since its material
+  /// entered, `f(t − delay)` (ADR-0025).
+  Once((Double) -> Double, Double)
   /// Each piece of the map reads its child (one per slot) at the mapped
   /// time; a silent slot's child is `Absent`.
   Mapped(TimeMap, Array[BusSignal])
@@ -344,6 +347,8 @@ fn BusSignal::eval(
     Const(value) => @control.ControlValue::of(value)
     Continuous(f) =>
       @control.ControlValue::of(f(num.to_double() / den.to_double()))
+    Once(f, delay) =>
+      @control.ControlValue::of(f(num.to_double() / den.to_double() - delay))
     Mapped(map, children) => {
       let cycle = map.cycle_at(num, den, left)
       let slot = map.slot_at(num, den, left, cycle)
@@ -406,6 +411,47 @@ fn BusSignal::is_constant(self : BusSignal) -> Bool {
     Mapped(Slots(_), _) => false
     Mapped(_, children) => children[0].is_constant()
     _ => false
+  }
+}
+
+///|
+/// Whether a one-shot signal is inside.
+fn BusSignal::has_once(self : BusSignal) -> Bool {
+  match self {
+    Once(_, _) => true
+    Absent | Const(_) | Continuous(_) => false
+    Mapped(_, children) | Stack(children) =>
+      children.iter().any(c => c.has_once())
+    Every(_, plain, transformed) => plain.has_once() || transformed.has_once()
+    Product(inner, outer) => inner.has_once() || outer.has_once()
+    Merge(presence, left, right) =>
+      presence.has_once() || left.has_once() || right.has_once()
+  }
+}
+
+///|
+/// This signal for a material that entered `delay` after its origin: its
+/// one-shot signals start `delay` later (ADR-0025). A rate scales the delay
+/// for its children. A cycle map keeps it, because the delay is a whole
+/// number of the material's periods, so a whole number of cycles there, and
+/// shifting a cycle map's input by whole cycles shifts its output the same.
+fn BusSignal::delayed(self : BusSignal, delay : Rational) -> BusSignal {
+  match self {
+    Once(f, before) => Once(f, before + delay.to_double())
+    Absent | Const(_) | Continuous(_) => self
+    Mapped(map, children) => {
+      let inner = match map {
+        Affine(scale, _) => delay * scale
+        MirrorCycles | Slots(_) => delay
+      }
+      Mapped(map, children.map(child => child.delayed(inner)))
+    }
+    Stack(children) => Stack(children.map(child => child.delayed(delay)))
+    Every(n, plain, transformed) =>
+      Every(n, plain.delayed(delay), transformed.delayed(delay))
+    Product(inner, outer) => Product(inner.delayed(delay), outer.delayed(delay))
+    Merge(presence, left, right) =>
+      Merge(presence, left.delayed(delay), right.delayed(delay))
   }
 }
 
@@ -517,10 +563,10 @@ fn[A : WithControls] compile_signal(
   match entry.node {
     Reference(definition, _) =>
       compile_signal(definition.nodes, definition.root, key)
-    Continuous(_, k, f) =>
+    Continuous(_, k, signal) =>
       match key {
         None => Const(0.0)
-        Some(key) => if k == key { Continuous(f) } else { Absent }
+        Some(key) => if k == key { signal } else { Absent }
       }
     Pure(value) | Atom(_, value, _) =>
       match key {

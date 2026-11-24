@@ -13,7 +13,12 @@ fn bus_r(num : Int64, den : Int64) -> @pattern.Rational {
 ///|
 /// Continuous control whose value is the absolute time it is sampled at.
 fn bus_ramp(name : String) -> @pattern.PatternDoc[@pattern.ControlMap] {
-  @pattern.PatternDoc::continuous(id=bus_id(name), key=Gain, f=t => t)
+  @pattern.PatternDoc::continuous(
+    id=bus_id(name),
+    key=Gain,
+    f=t => t,
+    signature="time",
+  )
 }
 
 ///|

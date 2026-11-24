@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ramp` is a signal that rises from 0 to 1 once and then keeps 1.
   `.fadeIn(n)` fades a pattern up from silence over n cycles, and
-  `.fadeOut(n)` fades it to silence and keeps it silent. All three start at
-  the section's start, so a fade-out stays silent through the release after
-  the section ends; a periodic signal such as `isaw` jumps back to its start
-  value there.
+  `.fadeOut(n)` fades it to silence and keeps it silent. In a song all three
+  start at the section's start, so a fade-out stays silent through the
+  release after the section ends; a periodic signal such as `isaw` jumps back
+  to its start value there. Outside a song they start where the pattern
+  enters: adding `.fadeOut(4)` by a live edit fades over the four cycles
+  after the edit takes effect, while the rhythm and the cycle count go on.
+  Resubmitting the same text keeps a running fade where it is.
 - `.s("bass pad")` chooses the instrument of notes and chords per step
   (ADR-0022): `triangle` (the default), `bass`, `pad`, `pluck`, and
   `sawtooth`, each with its own voice pool in the browser. A note takes the
@@ -26,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `PatternDoc::continuous` takes a required `signature` that names its
+  function, and `PatternDoc::once` builds a one-shot signal (ADR-0025). A live
+  edit keeps a material with a signal only when its signatures are unchanged;
+  before, such a material was replaced at every edit.
 - Every Mini parser reads call, method, callback, and signal names through
   one closed set of names per position (ADR-0023), and the names a `let`
   binding may not take derive from them: `let silence = …` and

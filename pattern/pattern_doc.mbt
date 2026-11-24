@@ -16,8 +16,8 @@ pub(all) suberror PatternDocError {
 priv enum PatternDocNode[A] {
   Runtime(Pat[A])
   /// A continuous control as both its query form and its allocation-free
-  /// time function `(cycles) -> value` for one key.
-  Continuous(Pat[A], @control.Control, (Double) -> Double)
+  /// bus signal for one key.
+  Continuous(Pat[A], @control.Control, BusSignal)
   Reference(PatternDoc[A], ReferenceBinding?)
   Silence
   Pure(A)
@@ -79,7 +79,7 @@ fn next_pattern_node_generation() -> Int64 {
 fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
   match self {
     Runtime(pat) => Runtime(pat)
-    Continuous(pat, key, f) => Continuous(pat, key, f)
+    Continuous(pat, key, signal) => Continuous(pat, key, signal)
     Reference(definition, binding) => Reference(definition, binding)
     Silence => Silence
     Pure(value) => Pure(value)
@@ -1869,6 +1869,38 @@ pub fn[A : WithControls] PatternSnapshot::query_sourced_events_for_entry(
 }
 
 ///|
+/// This snapshot for material that entered `delay` after its origin: its
+/// one-shot signals start `delay` later (ADR-0025), on the payloads and the
+/// buses alike. `delay` must be a whole number of the pattern's periods.
+pub fn[A : WithControls] PatternSnapshot::entered(
+  self : PatternSnapshot[A],
+  delay : Rational,
+) -> PatternSnapshot[A] {
+  guard delayed_buses(self.buses, delay) is Some(buses) else { return self }
+  {
+    ..self,
+    pat: self.sourced
+    .project_controls(buses)
+    .address_entries(self.entry_sourced.map(entry => entry.key)),
+    buses,
+    table: buses.map(bus => bus.signal),
+  }
+}
+
+///|
+/// `buses` with their one-shot signals `delay` later; `None` when that
+/// changes nothing.
+fn delayed_buses(
+  buses : Array[ControlBus],
+  delay : Rational,
+) -> Array[ControlBus]? {
+  guard delay.num != 0L && buses.iter().any(bus => bus.signal.has_once()) else {
+    return None
+  }
+  Some(buses.map(bus => bus.map_signal(signal => signal.delayed(delay))))
+}
+
+///|
 /// A compiled pattern whose every emitted event carries an exact source origin.
 pub struct PatternSnapshotWithOrigins[A] {
   priv root : @identity.PatternNodeId
@@ -1925,6 +1957,23 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::query_for_entry(
       entry.source
       .query(arc)
       .map(event => EventWithOrigin(event, self.buses, self.table))
+  }
+}
+
+///|
+/// `PatternSnapshot::entered` with origins.
+pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(
+  self : PatternSnapshotWithOrigins[A],
+  delay : Rational,
+) -> PatternSnapshotWithOrigins[A] {
+  guard delayed_buses(self.buses, delay) is Some(buses) else { return self }
+  {
+    ..self,
+    pat: self.sourced
+    .project_controls(buses)
+    .address_entries(self.entry_sourced.map(entry => entry.key)),
+    buses,
+    table: buses.map(bus => bus.signal),
   }
 }
 
@@ -2084,15 +2133,67 @@ pub fn[A] PatternDoc::from_pattern(
 ///|
 /// A continuous control `key = f(cycles)`, sampled at each query arc's start
 /// when queried as a pattern; its bus evaluates `f` at exact time.
+/// `signature` names `f`: two signals with the same key and signature must
+/// compute the same function. A live edit keeps a material whose content,
+/// signatures included, is unchanged.
 pub fn PatternDoc::continuous(
   id~ : @identity.PatternNodeId,
   key~ : @control.Control,
   f~ : (Double) -> Double,
+  signature~ : String,
 ) -> PatternDoc[ControlMap] {
   PatternDoc(
     root=id,
     revision=@identity.Revision::zero(),
-    nodes=singleton_pattern_nodes(id, Continuous(continuous(key, f), key, f)),
+    nodes=singleton_pattern_nodes(
+      id,
+      Continuous(
+        signal_pattern(key, f, "continuous", signature),
+        key,
+        Continuous(f),
+      ),
+    ),
+  )
+}
+
+///|
+/// `continuous(key, f)` with content `kind` and `signature`.
+fn signal_pattern(
+  key : @control.Control,
+  f : (Double) -> Double,
+  kind : String,
+  signature : String,
+) -> Pat[ControlMap] {
+  let pat = continuous(key, f)
+  let name = key.name()
+  make_pat(
+    pat.query,
+    pat.metadata.period,
+    pat.body,
+    pat.metadata.scope,
+    transformed_signature("\{kind}:\{name.length()}:\{name}", signature),
+  )
+}
+
+///|
+/// A one-shot control `key = f(cycles since its material entered)`. A live
+/// edit's replacement and a newly added material start it at their entry
+/// (ADR-0025); a song section starts it at the section's start. Queried as
+/// a pattern, it samples `f` at each query arc's start.
+/// `signature` names `f` as for `PatternDoc::continuous`.
+pub fn PatternDoc::once(
+  id~ : @identity.PatternNodeId,
+  key~ : @control.Control,
+  f~ : (Double) -> Double,
+  signature~ : String,
+) -> PatternDoc[ControlMap] {
+  PatternDoc(
+    root=id,
+    revision=@identity.Revision::zero(),
+    nodes=singleton_pattern_nodes(
+      id,
+      Continuous(signal_pattern(key, f, "once", signature), key, Once(f, 0.0)),
+    ),
   )
 }
 

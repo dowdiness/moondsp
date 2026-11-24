@@ -19,6 +19,9 @@ priv struct EntrySpec {
   start : @pattern.Rational
   end_ : @pattern.Rational?
   source : EntrySource
+  /// How long after its origin the material entered; its one-shot signals
+  /// start there (ADR-0025).
+  delay : @pattern.Rational
 }
 
 ///|
@@ -29,7 +32,48 @@ fn EntrySpec::EntrySpec(
   end_~ : @pattern.Rational?,
   source~ : EntrySource,
 ) -> EntrySpec {
-  { id, body, start, end_, source, }
+  { id, body, start, end_, source, delay: @pattern.Rational::from_int(0), }
+}
+
+///|
+/// This material entered `delay` after its origin: its one-shot signals
+/// start at its entry (ADR-0025). A song occurrence keeps them on its
+/// section's clock.
+fn EntrySpec::entered(self : EntrySpec, delay : @pattern.Rational) -> EntrySpec {
+  guard delay.num != 0L else { return self }
+  match self.source {
+    Pattern(snapshot, index) => {
+      let snapshot = snapshot.entered(delay)
+      {
+        ..self,
+        body: snapshot.pat().entries()[index],
+        source: Pattern(snapshot, index),
+        delay,
+      }
+    }
+    PatternWithOrigins(snapshot, index) => {
+      let snapshot = snapshot.entered(delay)
+      {
+        ..self,
+        body: snapshot.pat().entries()[index],
+        source: PatternWithOrigins(snapshot, index),
+        delay,
+      }
+    }
+    RuntimeSong(_) | ExactSong(_) => self
+  }
+}
+
+///|
+/// `replacement` placed for its boundary `due`, entering there.
+fn entering(
+  current : EntrySpec,
+  origin : @pattern.Rational,
+  replacement : EntrySpec,
+  due : @pattern.Rational,
+) -> (EntrySpec, @pattern.Rational) {
+  let origin = replacement_origin(current, origin, replacement, due)
+  (replacement.entered(due - origin), origin)
 }
 
 ///|
@@ -210,7 +254,7 @@ fn EntryState::retain_if_same(
     | Stopping(material, origin, _)
     | Retained(material, origin, _) =>
       if same_entry(material, spec) {
-        Some(Current(spec, origin))
+        Some(Current(spec.entered(material.delay), origin))
       } else {
         None
       }
@@ -218,9 +262,8 @@ fn EntryState::retain_if_same(
       if idle_entry(material, spec) {
         None
       } else if material.start == spec.start && material.end_ == spec.end_ {
-        Some(
-          Entering(spec, replacement_origin(material, origin, spec, due), due),
-        )
+        let (spec, origin) = entering(material, origin, spec, due)
+        Some(Entering(spec, origin, due))
       } else {
         None
       }
@@ -228,7 +271,7 @@ fn EntryState::retain_if_same(
       if same_entry(skipped, spec) {
         Some(Finishing(current, origin, due, spec))
       } else if same_entry(current, spec) {
-        Some(Current(spec, origin))
+        Some(Current(spec.entered(current.delay), origin))
       } else {
         None
       }
@@ -256,7 +299,11 @@ fn plan_change(
       if spec.end_ is Some(_) && spec.start != current.start && spec.start < due {
         Finishing(current, origin, due, spec)
       } else {
-        Switching(current, origin, Replace(spec, due))
+        Switching(
+          current,
+          origin,
+          Replace(entering(current, origin, spec, due).0, due),
+        )
       }
   }
 }
@@ -270,8 +317,10 @@ fn entry_for_update(spec : EntrySpec, now : @pattern.Rational) -> EntryState {
     Some(end_) if now >= end_ => Skipped(spec)
     Some(_) if now > spec.start => Skipped(spec)
     Some(_) => Entering(spec, spec.start, spec.start)
-    None =>
-      Entering(spec, spec.start, next_unbounded_entry(spec, spec.start, now))
+    None => {
+      let due = next_unbounded_entry(spec, spec.start, now)
+      Entering(spec.entered(due - spec.start), spec.start, due)
+    }
   }
 }
 
@@ -322,14 +371,10 @@ fn PlaybackSnapshot::reconcile_entries(
           Some(spec) if spec.start != material.start ||
             spec.end_ != material.end_ =>
             result.push(entry_for_update(spec, now))
-          Some(spec) =>
-            result.push(
-              Entering(
-                spec,
-                replacement_origin(material, origin, spec, due),
-                due,
-              ),
-            )
+          Some(spec) => {
+            let (spec, origin) = entering(material, origin, spec, due)
+            result.push(Entering(spec, origin, due))
+          }
           None => ()
         }
       Switching(material, origin, edit) =>

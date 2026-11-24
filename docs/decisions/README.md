@@ -42,3 +42,4 @@ shipped plan or spec.
 - [ADR-0022 — Score events carry the sound they play](0022-score-events-carry-their-sound.md) (Proposed)
 - [ADR-0023 — The parser owns the score vocabulary](0023-the-parser-owns-the-score-vocabulary.md) (Accepted)
 - [ADR-0024 — Each time transform is defined once, for events and signals](0024-time-maps-defined-once.md)
+- [ADR-0025 — One-shot signals start where their material enters](0025-one-shot-signals-start-at-entry.md)

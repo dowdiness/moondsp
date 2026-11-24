@@ -27,7 +27,12 @@ fn bus_doc(
       id=bus_id("note"),
       value=played(@pattern.ControlMap::single(Note, 60.0)),
     ),
-    right=@pattern.PatternDoc::continuous(id=bus_id("lpf"), key=Lpf, f=cutoff),
+    right=@pattern.PatternDoc::continuous(
+      id=bus_id("lpf"),
+      key=Lpf,
+      f=cutoff,
+      signature="cutoff",
+    ),
   )
   .slow(id=bus_id("slow"), factor=@pattern.Rational::from_int(2))
   .lower()

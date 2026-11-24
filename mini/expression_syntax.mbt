@@ -47,7 +47,8 @@ fn MiniFilterKind::resonance_control_key(
 
 ///|
 /// A signal shape with values in [0, 1]. Every shape but `Ramp` repeats each
-/// cycle; `Ramp` rises once over cycle 0 and holds 0 before it and 1 after it.
+/// cycle; `Ramp` rises once over the first cycle after its material enters
+/// (ADR-0025) and holds 0 before it and 1 after it.
 priv enum MiniShape {
   Ramp
   Sine
@@ -100,8 +101,8 @@ fn MiniShape::description(self : MiniShape) -> String {
 fn MiniShape::at(self : MiniShape, t : Double) -> Double {
   let phase = t - t.floor()
   match self {
-    // Local time starts at a section's start, so a ramp's end value lasts
-    // through the section's remaining cycles and its notes' release.
+    // `t` counts from the material's entry, so a ramp's end value lasts
+    // through the material's remaining cycles and its notes' release.
     Ramp => if t <= 0.0 { 0.0 } else if t >= 1.0 { 1.0 } else { t }
     Sine => 0.5 + 0.5 * @math.sin(2.0 * @math.PI * phase)
     Cosine => 0.5 + 0.5 * @math.cos(2.0 * @math.PI * phase)

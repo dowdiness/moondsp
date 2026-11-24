@@ -532,9 +532,12 @@ test "song events read their buses on the song clock" {
       source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7002L), 1L),
       value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
     ),
-    right=@pattern.PatternDoc::continuous(id=id("ramp"), key=Lpf, f=t => {
-      100.0 * t
-    }),
+    right=@pattern.PatternDoc::continuous(
+      id=id("ramp"),
+      key=Lpf,
+      f=t => 100.0 * t,
+      signature="100t",
+    ),
   ).lower_with_origins()
   // Placed at cycle 3 and played twice as fast: local = (t - 3) × 2.
   let section = @song.SectionDoc::single(

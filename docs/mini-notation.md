@@ -76,7 +76,7 @@ in the browser bundle.
 <p><code>note("C2").slow(4)<br>&nbsp;&nbsp;.lpf(saw.range(200, 4000).slow(4))<br>&nbsp;&nbsp;.pan(sine)</code></p>
 <p class="cheat-note">A note starts from the value at its onset, then follows once per audio block. Limits such as room 0–1 apply to every value a pattern or signal can take.</p>
 <p><code>note("C3").slow(4).release(2).fadeOut(4)<br>&nbsp;&nbsp;.lpf(ramp.range(200, 4000).slow(4))</code></p>
-<p class="cheat-note">The other signals repeat every period. <code>ramp</code> runs once from the start of the section, or of playback outside a song, and then keeps its end value, through the release and the following cycles. <code>.fadeIn(n)</code> is <code>.gain(ramp.slow(n))</code> and <code>.fadeOut(n)</code> is <code>.gain(ramp.range(1, 0).slow(n))</code>; both multiply any other gain.</p>
+<p class="cheat-note">The other signals repeat every period. <code>ramp</code> runs once from the start of the section, or outside a song from where the pattern enters (playback, or the live edit that added or changed it), and then keeps its end value, through the release and the following cycles. <code>.fadeIn(n)</code> is <code>.gain(ramp.slow(n))</code> and <code>.fadeOut(n)</code> is <code>.gain(ramp.range(1, 0).slow(n))</code>; both multiply any other gain.</p>
 
 <h2>Rhythm</h2>
 <p class="cheat-note">One cycle is one bar of four beats. BPM counts beats: at the default 120 BPM, one cycle lasts two seconds, so <code>s("bd hh sd hh")</code> plays quarter notes.</p>

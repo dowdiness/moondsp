@@ -575,3 +575,118 @@ test "pending material retains old exact origins until its musical boundary" {
   assert_eq(next_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 2L))
   assert_eq(next.event().whole.unwrap().begin, @pattern.Rational::from_int(3))
 }
+
+///|
+/// One note per cycle on layer `layer`; with `fade`, its gain falls from 1
+/// to 0 over four cycles after the material enters.
+fn faded_layer(
+  layer : String,
+  note : Int32,
+  fade : Bool,
+) -> @pattern.PatternDoc[@score.ScoreEvent] raise {
+  fn id(name : String) -> @identity.PatternNodeId raise {
+    @identity.PatternNodeId::from_string("\{layer}:\{name}")
+  }
+  let sound = @score.Sound::Note(
+    @score.Instrument::default(),
+    pitch=note.to_double(),
+  )
+  let atom = @pattern.PatternDoc::atom(
+    id=id("note"),
+    value=@score.ScoreEvent(sound),
+    content=sound.content(),
+  )
+  guard fade else { return atom }
+  fn fall(t : Double) -> Double {
+    1.0 - t.max(0.0).min(1.0)
+  }
+  @pattern.PatternDoc::merge_control(
+    id=id("merge"),
+    left=atom,
+    right=@pattern.PatternDoc::once(
+      id=id("ramp"),
+      key=Gain,
+      f=fall,
+      signature="fall",
+    ).slow(id=id("slow"), factor=@pattern.Rational::from_int(4)),
+  )
+}
+
+///|
+fn accept_layers(
+  state : PlaybackState,
+  layers : Array[@pattern.PatternDoc[@score.ScoreEvent]],
+  at : @pattern.Rational,
+) -> Unit raise {
+  let doc = if layers.length() == 1 {
+    layers[0]
+  } else {
+    @pattern.PatternDoc::stack(
+      id=@identity.PatternNodeId::from_string("layers"),
+      docs=layers,
+    )
+  }
+  state.queue(PlaybackSnapshot::pattern(doc.lower()))
+  state.commit_pending(at)
+}
+
+///|
+/// `(note, gain at the onset, gain read half a cycle in)` for each onset in
+/// cycle `cycle`.
+fn gains(
+  state : PlaybackState,
+  cycle : Int32,
+) -> Array[(Int32, Double, Double)] {
+  let arc = @pattern.TimeSpan(
+    @pattern.Rational::from_int(cycle),
+    @pattern.Rational::from_int(cycle + 1),
+  )
+  let events = state.query_active_sourced_events(arc)
+  events.sort_by((a, b) => {
+    pitch_of(a.event().value).compare(pitch_of(b.event().value))
+  })
+  events.map(sourced => {
+    let event = sourced.event()
+    let onset = event.value.controls.get(Gain).unwrap_or(1.0)
+    let half = match sourced.controls().reader(Gain) {
+      Some(read) => read(cycle.to_int64() * 2L + 1L, 2L).get().unwrap_or(1.0)
+      None => onset
+    }
+    (pitch_of(event.value).unwrap().to_int(), onset, half)
+  })
+}
+
+///|
+test "a live edit starts the replacement's fade at its boundary" {
+  let state = PlaybackState()
+  let half = @pattern.Rational(15L, 2L)
+  accept_layers(
+    state,
+    [faded_layer("a", 60, false)],
+    @pattern.Rational::from_int(0),
+  )
+  accept_layers(state, [faded_layer("a", 60, true)], half)
+  // The replacement enters at cycle 8; its four-cycle fade starts there,
+  // not at the material's first cycle, while the cycle count continues.
+  assert_eq(gains(state, 8), [(60, 1.0, 0.875)])
+  assert_eq(gains(state, 10), [(60, 0.5, 0.375)])
+  assert_eq(gains(state, 12), [(60, 0.0, 0.0)])
+}
+
+///|
+test "a layer added while playing starts its fade where it enters" {
+  let state = PlaybackState()
+  accept_layers(
+    state,
+    [faded_layer("a", 60, false)],
+    @pattern.Rational::from_int(0),
+  )
+  accept_layers(
+    state,
+    [faded_layer("a", 60, false), faded_layer("b", 70, true)],
+    @pattern.Rational(11L, 2L),
+  )
+  assert_eq(gains(state, 5), [(60, 1.0, 1.0)])
+  assert_eq(gains(state, 6), [(60, 1.0, 1.0), (70, 1.0, 0.875)])
+  assert_eq(gains(state, 8), [(60, 1.0, 1.0), (70, 0.5, 0.375)])
+}

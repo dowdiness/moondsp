@@ -417,3 +417,41 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   render_for_test(1)
   assert_true(output_energy() > 0.01)
 }
+
+///|
+/// Mean output energy per block over cycle `cycle`'s middle half, at 120 BPM
+/// (750 blocks per cycle), rendering up to there.
+fn cycle_energy(rendered : Ref[Int32], cycle : Int32) -> Double raise {
+  let begin = cycle * 750 + 188
+  render_for_test(begin - rendered.val)
+  let mut energy = 0.0
+  for _ in 0..<375 {
+    render_for_test(1)
+    energy = energy + output_energy()
+  }
+  rendered.val = begin + 375
+  energy / 375.0
+}
+
+///|
+test "a fade added by a live edit starts where the edit enters" {
+  assert_true(init_scheduler_graph_for_test())
+  let plain = "bpm(120); note(\"60 64\")"
+  assert_eq(submit_for_test(plain), 0)
+  assert_eq(player_play(), 0)
+  let rendered = Ref(0)
+  let full = cycle_energy(rendered, 7)
+  assert_true(full > 0.01)
+  // The edit lands during cycle 8 and enters at cycle 9, after the material
+  // has played for longer than the fade.
+  render_for_test(8 * 750 + 100 - rendered.val)
+  rendered.val = 8 * 750 + 100
+  assert_eq(submit_for_test(plain + ".fadeOut(4)", restart=false), 0)
+  let first = cycle_energy(rendered, 9)
+  assert_true(first > full * 0.6)
+  // Resubmitting the same text keeps the running fade.
+  assert_eq(submit_for_test(plain + ".fadeOut(4)", restart=false), 0)
+  let middle = cycle_energy(rendered, 11)
+  assert_true(middle < first * 0.7 && middle > full * 0.1)
+  assert_true(cycle_energy(rendered, 14) < full * 0.001)
+}

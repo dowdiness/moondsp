@@ -335,6 +335,7 @@ test "time transforms move bus signals where the reference map does" {
       id=tm_id(counter),
       key=Gain,
       f=tm_time,
+      signature="time",
     )
     let note = @pattern.PatternDoc::pure(
       id=tm_id(counter),

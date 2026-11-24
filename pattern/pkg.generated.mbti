@@ -145,7 +145,7 @@ pub fn[A] PatternDoc::atom(id~ : @identity.PatternNodeId, source_atom? : @identi
 pub fn[A] PatternDoc::backdate_equal(Self[A], Self[A]) -> Bool
 pub fn[A] PatternDoc::changed_at(Self[A]) -> @types.Revision
 pub fn[A] PatternDoc::contains_node(Self[A], @identity.PatternNodeId) -> Bool
-pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double) -> Double) -> Self[ControlMap]
+pub fn PatternDoc::continuous(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double) -> Double, signature~ : String) -> Self[ControlMap]
 pub fn PatternDoc::control_atom(id~ : @identity.PatternNodeId, source_atom? : @identity.SourceAtomId, key~ : @control.Control, value~ : Double) -> Self[ControlMap]
 pub fn[A] PatternDoc::degrade_by(Self[A], id~ : @identity.PatternNodeId, p~ : Double, seed? : Int32) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::euclid(Self[A], id~ : @identity.PatternNodeId, k~ : Int32, n~ : Int32, rotation? : Int32) -> Self[A] raise PatternDocError
@@ -162,6 +162,7 @@ pub fn[A] PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[
 pub fn[A, B] PatternDoc::merge_values(id~ : @identity.PatternNodeId, left~ : Self[A], right~ : Self[B], apply~ : (A, B) -> A) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::node_count(Self[A]) -> Int32
 pub fn[A] PatternDoc::node_revision(Self[A], @identity.PatternNodeId) -> @identity.Revision raise PatternDocError
+pub fn PatternDoc::once(id~ : @identity.PatternNodeId, key~ : @control.Control, f~ : (Double) -> Double, signature~ : String) -> Self[ControlMap]
 pub fn[A] PatternDoc::pure(id~ : @identity.PatternNodeId, value~ : A) -> Self[A]
 pub fn[A] PatternDoc::reference(id~ : @identity.PatternNodeId, definition~ : Self[A]) -> Self[A]
 pub fn[A] PatternDoc::reference_with_binding(id~ : @identity.PatternNodeId, resolved_reference~ : ResolvedReference[A]) -> Self[A]
@@ -206,6 +207,7 @@ pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 pub struct PatternSnapshot[A] {
   // private fields
 }
+pub fn[A : WithControls] PatternSnapshot::entered(Self[A], Rational) -> Self[A]
 pub fn[A] PatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] PatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A : WithControls] PatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
@@ -225,6 +227,7 @@ pub struct PatternSnapshotWithOrigins[A] {
   // private fields
 }
 pub fn[A] PatternSnapshotWithOrigins::as_snapshot(Self[A]) -> PatternSnapshot[A]
+pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(Self[A], Rational) -> Self[A]
 pub fn[A] PatternSnapshotWithOrigins::pat(Self[A]) -> Pat[A]
 pub fn[A : WithControls] PatternSnapshotWithOrigins::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A : WithControls] PatternSnapshotWithOrigins::query_for_entry(Self[A], Int32, TimeSpan) -> Array[EventWithOrigin[A]]
