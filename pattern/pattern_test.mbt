@@ -219,6 +219,11 @@ test "rev and sequences repeat after a whole number of cycles" {
     ],
     [r(3, 1), r(3, 1), r(3, 1), r(1, 2)],
   )
+  // A stack repeats with its members, which need not fill whole cycles.
+  @debug.assert_eq(
+    @pattern.stack([p, @pattern.Pat::pure(2).slow(r(3, 4))]).entry_period(),
+    r(3, 2),
+  )
 }
 
 ///|

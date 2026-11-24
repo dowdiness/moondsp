@@ -333,18 +333,6 @@ priv enum BusSignal {
 }
 
 ///|
-fn bus_gcd(a : Int64, b : Int64) -> Int64 {
-  let mut x = a.abs()
-  let mut y = b.abs()
-  while y != 0L {
-    let t = y
-    y = x % y
-    x = t
-  }
-  x
-}
-
-///|
 fn BusSignal::eval(
   self : BusSignal,
   num : Int64,
@@ -371,7 +359,7 @@ fn BusSignal::eval(
       } else if bd == ad {
         (num * an + bn * den, den * ad)
       } else {
-        let common = bus_gcd(ad, bd)
+        let common = gcd(ad, bd)
         (
           num * an * (bd / common) + bn * den * (ad / common),
           den * ad * (bd / common),
@@ -379,7 +367,7 @@ fn BusSignal::eval(
       }
       // Reduce only when the denominator grew, so nested maps stay in range;
       // equal slots and integer factors keep it.
-      let g = if d == den { 1L } else { bus_gcd(n, d) }
+      let g = if d == den { 1L } else { gcd(n, d) }
       // A decreasing map turns a limit from below into one from above.
       children[slot].eval(n / g, d / g, if an < 0L { !left } else { left })
     }

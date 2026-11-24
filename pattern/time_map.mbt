@@ -214,11 +214,13 @@ fn period_lcm(left : Rational, right : Rational) -> Rational {
 }
 
 ///|
-/// `period_lcm` of every pattern's period; 1 for none.
+/// `period_lcm` of every pattern's period; `pats` is not empty.
 fn[A] periods_lcm(pats : Array[Pat[A]]) -> Rational {
-  pats.fold(init=Rational::from_int(1), (period, pat) => {
-    period_lcm(period, pat.metadata.period)
-  })
+  let mut period = pats[0].metadata.period
+  for pat in pats[1:] {
+    period = period_lcm(period, pat.metadata.period)
+  }
+  period
 }
 
 ///|
@@ -258,19 +260,13 @@ fn TimeMap::each_piece(
 }
 
 ///|
-/// `span` under the map `t -> a·t + b`; a negative `a` swaps its ends.
-/// `rev` maps by `b − t`, which skips the multiplication.
+/// `span` under the map `t -> a·t + b`. Only `rev` decreases, with
+/// `a = −1`, which swaps the ends and skips the multiplication.
 fn map_span(span : TimeSpan, a : Rational, b : Rational) -> TimeSpan {
   if a.den == 1L && a.num == -1L {
     return TimeSpan(b - span.end_, b - span.begin)
   }
-  let begin = a * span.begin + b
-  let end_ = a * span.end_ + b
-  if a.num < 0L {
-    TimeSpan(end_, begin)
-  } else {
-    TimeSpan(begin, end_)
-  }
+  TimeSpan(a * span.begin + b, a * span.end_ + b)
 }
 
 ///|
@@ -280,12 +276,9 @@ fn inverse_affine(a : Rational, b : Rational) -> (Rational, Rational) {
   if a.den == 1L && a.num == -1L {
     return (a, b)
   }
-  // `a` is reduced, so its reciprocal and a negation need no gcd.
-  let inverse : Rational = if a.num < 0L {
-    { num: -a.den, den: -a.num, }
-  } else {
-    { num: a.den, den: a.num, }
-  }
+  // `a` is reduced and otherwise positive, so its reciprocal and a
+  // negation need no gcd.
+  let inverse : Rational = { num: a.den, den: a.num, }
   let back = b * inverse
   (inverse, { num: -back.num, den: back.den, })
 }
