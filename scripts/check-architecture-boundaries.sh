@@ -103,17 +103,20 @@ check_manifest() {
 # Mini, voice, and scheduler share; graph stays generic over its keys.
 # `score` holds the closed set of sounds a score event plays (ADR-0022): above
 # pattern, below its users (song, Mini, scheduler, the browser host).
+# `trig` is allocation-free scalar trigonometry (ADR-0027): a leaf below both
+# dsp and Mini, so Mini's signals share the kernel without the DSP layers.
 check_manifest \
   "moon.pkg" \
   '^(dowdiness/moondsp/(control|dsp|graph|identity|voice|engine))$' \
   '^(dowdiness/moondsp/(mini|pattern|score))$'
-check_manifest "dsp/moon.pkg" '^$'
+check_manifest "trig/moon.pkg" '^$'
+check_manifest "dsp/moon.pkg" '^(dowdiness/moondsp/trig)$'
 check_manifest "identity/moon.pkg" '^$'
 check_manifest "control/moon.pkg" '^$'
 check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/(control|identity))$'
 check_manifest "score/moon.pkg" '^(dowdiness/moondsp/pattern)$'
 check_manifest "song/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|score))$'
-check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(control|identity|pattern|score|song))$'
+check_manifest "mini/moon.pkg" '^(dowdiness/moondsp/(control|identity|pattern|score|song|trig))$'
 check_manifest "graph/moon.pkg" '^(dowdiness/moondsp/(dsp|identity|graph/internal/(model|template|binding|runtime|staging|authoring)))$'
 check_manifest "voice/moon.pkg" '^(dowdiness/moondsp/(control|dsp|graph))$'
 # Shared lifecycle and primitive browser adapter; see docs/engine-architecture.md.

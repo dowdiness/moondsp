@@ -1,7 +1,7 @@
 # Signal observation: render-path allocation audit
 
 Measured 2026-11-24 in the Linux x64 orb with Node v26.13.1 and Moon
-0.1.20261117 (eb64713), release wasm-gc browser build (`a599cd3d…` SHA-256
+0.1.20261117 (eb64713), release wasm-gc browser build (`99c46a7e…` SHA-256
 prefix), this branch rebased onto `origin/main` 6851a04.
 
 ## Method
@@ -32,6 +32,7 @@ node --experimental-wasm-custom-descriptors scripts/audit-player-signal-allocati
 | Pattern: `saw` filter, `isaw` gain, `tri` pan | 9,000 | 774,702 | 774,702 | 0 |
 | Song: `saw.range(4000, 200)` in the second section | 1,508 | 338,768 | 338,768 | 0 |
 | Pattern: `pan(sine)` | 3,000 | 397,479 | 397,479 | 0 |
+| Pattern: `pan(cosine)` | 3,000 | 397,415 | 397,415 | 0 |
 
 The first run found observation-specific constructions, now removed: a closure
 from `Option::bind` in the bus's `signal_source` per followed bus, and two
@@ -41,7 +42,7 @@ building them again, and asks the pool each block whether the voice still
 follows them, so observation keeps no copy of voice lifetime. Mini's `sine` and `cosine` called core `@math.sin`/`cos`, which construct on
 wasm-gc each call, so observation added 5,984 constructions for `pan(sine)`
 (385,991 off, 391,975 on), and each voice's bus follow paid the same. They now
-use `@dsp.sine_of_turns`/`cosine_of_turns`, the oscillator's scalar kernel,
+use `@trig.sine_of_turns`/`cosine_of_turns`, the oscillator's scalar kernel,
 which matches core bit for bit over one turn: the `pan(sine)` PCM hash is
 unchanged, and its baseline fell by 12,576.
 

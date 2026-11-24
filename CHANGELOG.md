@@ -365,8 +365,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sine` and `cosine` control signals no longer allocate on the audio thread
   in the browser: core `@math.sin`/`cos` construct on wasm-gc on every call,
   so each block of every voice following one did. They now use
-  `@dsp.sine_of_turns` / `cosine_of_turns`, the oscillator's scalar kernel,
-  which gives bit-identical values.
+  `@trig.sine_of_turns` / `cosine_of_turns`, the oscillator's scalar kernel,
+  which gives bit-identical values. The kernel moved from `dsp` to a new leaf
+  package, `trig`, that both `dsp` and Mini import, so Mini still depends on
+  no DSP layer (ADR-0027); `dsp` no longer exports `sine_of_turns` or
+  `cosine_of_turns`.
 
 - A merged control's value no longer depends on the query length: an onset
   reads the value at its own start instead of the last value overlapping the

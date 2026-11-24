@@ -1,0 +1,12 @@
+// Allocation-free scalar trigonometry for the audio thread and for signals
+// sampled there (ADR-0027). A leaf: it imports no moondsp package.
+import {
+  "moonbitlang/core/math",
+}
+
+options(
+  targets: {
+    "trig_wasm_gc.mbt": [ "wasm-gc" ],
+    "trig_other.mbt": [ "not", "wasm-gc" ],
+  },
+)

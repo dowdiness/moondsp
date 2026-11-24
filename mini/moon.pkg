@@ -1,10 +1,10 @@
 import {
   "dowdiness/moondsp/control",
-  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
+  "dowdiness/moondsp/trig",
   "moonbitlang/core/bench",
   "moonbitlang/core/json",
 }

@@ -132,22 +132,9 @@ pub fn Oscillator::process(
 }
 
 ///|
-/// `sin(2π · turns)` for `turns` in `[0, 1]`, as the sine oscillator computes
-/// it. Allocates nothing on every target, unlike core `@math.sin` on wasm-gc.
-pub fn sine_of_turns(turns : Double) -> Double {
-  sine_for_phase(turns)
-}
-
-///|
-/// `cos(2π · turns)` for `turns` in `[0, 1]`. Allocates nothing on every target.
-pub fn cosine_of_turns(turns : Double) -> Double {
-  cos(turns * 2.0 * @math.PI)
-}
-
-///|
 fn sample_for_phase(waveform : Waveform, phase : Double) -> Double {
   match waveform {
-    Sine => sine_for_phase(phase)
+    Sine => @trig.sine_of_turns(phase)
     Saw => 2.0 * phase - 1.0
     Square => if phase < 0.5 { 1.0 } else { -1.0 }
     Triangle => if phase < 0.5 { 4.0 * phase - 1.0 } else { 3.0 - 4.0 * phase }

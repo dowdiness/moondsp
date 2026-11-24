@@ -107,8 +107,8 @@ fn MiniShape::at(self : MiniShape, t : Double, before : Bool) -> Double {
     // `t` counts from the material's entry, so a ramp's end value lasts
     // through the material's remaining cycles and its notes' release.
     Ramp => if t <= 0.0 { 0.0 } else if t >= 1.0 { 1.0 } else { t }
-    Sine => 0.5 + 0.5 * @dsp.sine_of_turns(phase)
-    Cosine => 0.5 + 0.5 * @dsp.cosine_of_turns(phase)
+    Sine => 0.5 + 0.5 * @trig.sine_of_turns(phase)
+    Cosine => 0.5 + 0.5 * @trig.cosine_of_turns(phase)
     Saw => phase
     Isaw => 1.0 - phase
     Tri => if phase < 0.5 { 2.0 * phase } else { 2.0 - 2.0 * phase }

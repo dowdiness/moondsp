@@ -38,22 +38,25 @@ const SINE_PIO2_3 : Double = 2.0222662487111665e-21
 const SINE_PIO2_3T : Double = 8.4784276603688996e-32
 
 ///|
-// Oscillator state is in [0, 1], or NaN after a scalar step overflows.
-// Rounding while wrapping a tiny negative phase can produce exactly 1.
-fn sine_for_phase(phase : Double) -> Double {
-  let x = phase * 2.0 * @math.PI
+/// `sin(2π · turns)` for `turns` in `[0, 1]`, as the sine oscillator computes
+/// it. Oscillator state is in [0, 1], or NaN after a scalar step overflows.
+/// Rounding while wrapping a tiny negative phase can produce exactly 1.
+pub fn sine_of_turns(turns : Double) -> Double {
+  let x = turns * 2.0 * @math.PI
   sin(x)
 }
 
 ///|
-// Nonnegative angles up to one turn; shared by oscillators and biquads.
-fn sin(x : Double) -> Double {
+/// `sin(x)` for nonnegative angles up to one turn; shared by oscillators and
+/// biquads. Not general-purpose trigonometry.
+pub fn sin(x : Double) -> Double {
   trig_kernel(x, cosine=false)
 }
 
 ///|
-// Nonnegative angles up to one turn; shared by oscillators and biquads.
-fn cos(x : Double) -> Double {
+/// `cos(x)` for nonnegative angles up to one turn; shared by oscillators and
+/// biquads. Not general-purpose trigonometry.
+pub fn cos(x : Double) -> Double {
   trig_kernel(x, cosine=true)
 }
 

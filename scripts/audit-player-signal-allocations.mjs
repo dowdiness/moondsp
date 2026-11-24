@@ -67,6 +67,7 @@ const drafts = {
   pattern: { text: 'bpm(240); $: note("C2*8").lpf(saw.range(200, 4000).slow(4))\n$: note("G3*4").gain(isaw.range(0, 0.8)).pan(tri)' },
   song: { text: 'bpm(240); song(section("a", 2, note("C2*4")),\n  section("b", 4, note("C2*4").lpf(saw.range(4000, 200).slow(4))),\n  part("p1", "a"), part("p2", "b"))' },
   sine: { text: 'bpm(240); note("G3*4").pan(sine)' },
+  cosine: { text: 'bpm(240); note("G3*4").pan(cosine)' },
 };
 for (const [name, { text }] of Object.entries(drafts)) {
   const wire = prepare(text);

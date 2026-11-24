@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/trig"
+
+// Values
+pub fn cos(Double) -> Double
+
+pub fn cosine_of_turns(Double) -> Double
+
+pub fn sin(Double) -> Double
+
+pub fn sine_of_turns(Double) -> Double
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

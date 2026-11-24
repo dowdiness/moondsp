@@ -75,8 +75,8 @@ pub fn Biquad::update(
     self.invalidate()
     return false
   }
-  let cos_w0 = cos(w0)
-  let alpha = sin(w0) / (2.0 * q)
+  let cos_w0 = @trig.cos(w0)
+  let alpha = @trig.sin(w0) / (2.0 * q)
   let a0 = 1.0 + alpha
   if !is_finite(a0) || a0 <= 0.0 {
     self.invalidate()
