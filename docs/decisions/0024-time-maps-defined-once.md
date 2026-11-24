@@ -1,6 +1,7 @@
 # ADR-0024: Each time transform is defined once, for events and signals
 
-- **Status:** Proposed 2026-11-24.
+- **Status:** Accepted 2026-11-24. All seven migration steps are implemented;
+  see the [performance record](../performance/2026-10-02-pattern-allocation-summary.md#2026-11-24-one-timemap-for-queries-and-bus-signals-adr-0024).
 - **Date:** 2026-11-24
 - **Source:** [Amp thread T-01a20b2e](https://ampcode.com/threads/T-01a20b2e-880d-7665-89be-6641f7c6a852)
   and its plan "計画：時間変換を1か所で定義する".

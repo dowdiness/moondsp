@@ -168,6 +168,51 @@ CLAP allocation audit stayed at zero, with followers now returning
 `ControlValue`. One shared orb; allocation counts on the browser note-on path
 were not measured.
 
+## 2026-11-24: one TimeMap for queries and bus signals (ADR-0024)
+
+`fast`, `slow`, `rev`, sequences, weighted sequences, Euclid, and placement
+now share one piecewise affine `TimeMap` for event queries and bus reads.
+Baseline `690d93c` (after the `rev` fix, before `TimeMap`) in a separate
+worktree against `fd7109e`; three alternating rounds, wasm-gc release,
+moon 0.1.20261117, one shared orb. The middle column is the refactor before
+the three query fixes below, an intermediate state later folded into
+`3536579`. Medians:
+
+| Benchmark | `690d93c` | Refactor before the fixes | `fd7109e` |
+|---|---:|---:|---:|
+| `note("C4 E4 G4 B4").gain(0.5).lpf(1200).pan(-0.3).room(0.2)`, 750 block queries | 1.21 ms | 1.19 ms | 1.07 ms |
+| `chord("Dm9 Bbmaj7").slow(2).lpf(saw.range(200, 4000).slow(4)).gain("1 0.6").pan(sine)` | 3.56 ms | 4.06 ms | 3.76 ms |
+| `s("hh*16").gain("1 0.4 0.7 0.4")` | 552 µs | 640 µs | 565 µs |
+| `s("bd(3,8) [hh hh]*2 [sd cp]/2").rev().fast(1.5)` | 2.91 ms | 2.70 ms | 2.34 ms |
+| `jux_benchmark` `rev_4step` | 4.22 µs | 5.28 µs | 4.44 µs |
+| `jux_benchmark` `fast_4step` | 7.04 µs | 7.42 µs | 7.23 µs |
+| `control_bus_benchmark` block query with bus bindings | 2.08 ms | 2.20 ms | 2.23 ms |
+| `control_bus_benchmark` one compiled bus signal per block | 21.6 µs | 20.7 µs | 20.0 µs |
+
+The refactor alone cost up to 22% on queries. Three changes recovered it:
+a reduced `a/b` inverts to `b/a` and a mirror to itself, without division;
+slots start at the arc's first slot (`slot_at`) instead of building every
+slot's arc; and a bus read reduces by a gcd only when its denominator grew.
+Two candidates did not help and were not kept: a `−1` fast path in the
+span map alone, and a closed-form `slot_at` for equal slots.
+
+Noise on this orb is large: `path_allocation_benchmark` `depth_12`, which
+does not touch `TimeMap`, moved 17% between rounds, and the baseline's first
+score ranged 1.21–1.63 ms. Read differences under about 10% as no change;
+the first and fourth scores are consistently faster.
+
+Allocation: `BusSignal::eval` and every function it calls (`TimeMap`
+`cycle_at`, `slot_at`, `scale_*`, `offset_*`, `time_floor`, `bus_gcd`) contain
+no `struct.new`/`array.new` in release wasm-gc WAT and no `new` in release
+JS, inspected statically, not counted at run time. The CLAP audit
+(`scripts/audit-clap-audio-allocations.sh --expect-zero`) stayed at zero.
+
+Output: FNV-1a hashes of 400 rendered browser-host blocks (exact editor
+input) for nine scores were identical at `690d93c` and the refactor before
+the fixes, and the fixes changed none of them. Step 6 (`fd7109e`, sequence
+slots keep the cycle) changed only the two scores with a slowed step in a
+sequence, `note("60 [64 67]/2").fast(4)` and `s("bd [sd cp]/2").fast(4)`.
+
 ## Provenance and reproduction limits
 
 Optimization toolchain: Moon 0.1.20260920 (`914d7da`), Node 24.14.1, Python 3.14.2, Binaryen 125, WSL2 x64. Direct Moon commands used `NEW_MOON_MOD=0`.
