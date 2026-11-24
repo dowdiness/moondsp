@@ -12,7 +12,8 @@ each name is valid in one position:
 
 | Position | Names |
 |---|---|
-| Statement | `bpm(n);`, `song(…)` |
+| Declaration | `bpm(n);` |
+| Arrangement | `song(…)`, the score's body in place of a pattern |
 | Pattern | `s(…)`, `note(…)`, `chord(…)`, `stack(…)`, `silence()` |
 | Song item | `section(…)`, `part(…)`, `part_id(…)`, `fill(…)`, `bpm(…)` |
 | After `song(…)` | `.repeat()` |
@@ -56,7 +57,7 @@ the vocabulary.
 
 ### 2. One closed enum per position, which every parser parses into
 
-`StatementCall`, `PatternCall`, `SongItem`, `ArrangementMethod`, `Method`,
+`Declaration`, `Arrangement`, `PatternCall`, `SongItem`, `ArrangementMethod`, `Method`,
 `Callback`, and `SignalMethod` are enums in `mini`; signals are the existing
 `MiniShape`, and sounds are `@score.Drum` and `@score.Instrument`. Each enum
 has `all()`, the only expression that constructs its cases, so a case missing
@@ -72,10 +73,16 @@ such as `.gain` or `.pan` is the `Method` case that names its
 `@control.Control`.
 
 The names a binding may not take are `let` and the names of the calls that
-can stand where a reference is read, the `StatementCall` and `PatternCall`
-cases, derived from their `all()`. Song items and methods follow `song(` or
-`.`, so a reference never stands where they are read. `bpm` is a case of both `StatementCall` and `SongItem`:
-one name in two positions, ending in `;` only as a statement.
+can stand where a reference is read, the `Declaration`, `Arrangement`, and
+`PatternCall` cases, derived from their `all()`. Song items and methods
+follow `song(` or `.`, so a reference never stands where they are read.
+`bpm` is a case of both `Declaration` and `SongItem`: one name in two
+positions, ending in `;` only as a declaration.
+
+A declaration and an arrangement both stand at the top of a score, but they
+are different things: a declaration such as `bpm(n);` may come before the
+body and ends with `;`, while `song(…)` is the body itself, like a
+pattern, and takes `.repeat()`.
 
 ### 3. `mini` publishes the vocabulary as data
 
@@ -126,8 +133,8 @@ The Lezer grammar, highlighting, and the analysis of where the cursor is stay
 in TypeScript. Completion maps the cursor's place to the vocabulary and
 never names a call itself:
 
-- at the top of the score: earlier bindings, `let`, `$:`, and the statement
-  and pattern calls;
+- at the top of the score: earlier bindings, `let`, `$:`, and the
+  declaration, arrangement, and pattern calls;
 - at a pattern elsewhere, such as in a binding, a group, or an argument of
   the pattern kind: earlier bindings and the pattern calls;
 - in an argument of any call: the options of the argument's kind, such as
@@ -138,7 +145,8 @@ never names a call itself:
 - after any other `.`: the calls `methods_after` returns.
 
 Snippets fill in the required arguments only, in quotes when they are
-written as strings.
+written as strings, and a declaration's snippet ends with the `;` the
+grammar writes after it.
 
 ## Alternatives considered
 
@@ -150,7 +158,7 @@ written as strings.
   rules for references, `stack`, `+`, groups, and drums, needs a guess for
   syntax it does not know, and can disagree with the compiler. Rejected.
 - **One enum for every name.** Positions differ: `section` is not a pattern,
-  and `bpm` ends with `;` only as a statement. Rejected.
+  and `bpm` ends with `;` only as a declaration. Rejected.
 - **Put `let` and `$:` in the vocabulary.** Both grammars must know them to
   parse, so data would only repeat the grammars. Rejected.
 - **Parse each call's arguments generically from its argument list.** One
@@ -179,8 +187,6 @@ written as strings.
 - `let silence = …` and `let bpm = …` become errors.
 - Before the score tools load, or if they fail, completion offers only
   earlier bindings, `let`, and `$:`, at the top of the score.
-- A snippet leaves out what the grammar adds around a call, such as the `;`
-  after a `bpm(…)` statement.
 - Each `.` completion compiles the receiver and the bindings before it; they
   are a small part of a score.
 - While an earlier binding does not compile, no method is offered after any

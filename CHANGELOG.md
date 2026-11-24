@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.`, the calls at the top, in patterns, in `song(…)`, and in callbacks,
   signals in control arguments, and sounds in `s("…")` and `.s("…")`.
   Snippets fill in only the required arguments, so `.lpf` completes to
-  `lpf(cutoff)` and `bpm` to `bpm(tempo)` without its `;`. Before the score
+  `lpf(cutoff)` and `bpm` to `bpm(tempo);`. Before the score
   tools load, completion offers only bindings, `let`, and `$:`.
 
 ### Fixed

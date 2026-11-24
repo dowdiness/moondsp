@@ -103,15 +103,18 @@ fn parse_play_source_with_origins(
     parser.parse_bindings(builder)
     parser.skip_whitespace()
     let at = parser.pos
-    match parser.read_call(StatementCall::parse) {
+    match parser.read_call(Declaration::parse) {
       Some(Bpm) => {
         guard authored_bpm is None else {
           raise Mistake(at, "duplicate bpm(...)")
         }
         authored_bpm = Some((at, parser.parse_bpm_statement(at)))
       }
-      Some(Song) => break Some(at)
-      None => break None
+      None =>
+        break match parser.read_call(Arrangement::parse) {
+          Some(Song) => Some(at)
+          None => None
+        }
     }
   } nobreak {
     None

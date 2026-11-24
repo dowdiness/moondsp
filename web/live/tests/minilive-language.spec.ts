@@ -279,7 +279,7 @@ test("before the score tools load, completion offers only bindings, let, and $:"
   }
 });
 
-test("a call snippet fills in its required arguments, quoting strings", async ({ page }) => {
+test("a call snippet fills in its required arguments, quoting strings, and a declaration ends with ;", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
   const editor = page.locator(".cm-content");
@@ -292,4 +292,8 @@ test("a call snippet fills in its required arguments, quoting strings", async ({
   await editor.press("Control+Space");
   await labels.filter({ hasText: /^every$/ }).click();
   await expect.poll(() => readCode(page)).toBe('note("C4").every(n, f)');
+  await replaceCode(page, "bp");
+  await editor.press("Control+Space");
+  await labels.filter({ hasText: /^bpm$/ }).click();
+  await expect.poll(() => readCode(page)).toBe("bpm(tempo);");
 });

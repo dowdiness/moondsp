@@ -4,28 +4,49 @@
 // `parse` reads a name only through `all()`.
 
 ///|
-/// A call at the start of a statement.
-priv enum StatementCall {
+/// A declaration before the score's body, ending in `;`.
+priv enum Declaration {
   Bpm
+}
+
+///|
+fn Declaration::all() -> Array[Declaration] {
+  [Bpm]
+}
+
+///|
+fn Declaration::name(self : Declaration) -> String {
+  match self {
+    Bpm => "bpm"
+  }
+}
+
+///|
+fn Declaration::parse(name : String) -> Declaration? {
+  Declaration::all().iter().find_first(call => call.name() == name)
+}
+
+///|
+/// A score's body that arranges sections, in place of a pattern.
+priv enum Arrangement {
   Song
 }
 
 ///|
-fn StatementCall::all() -> Array[StatementCall] {
-  [Bpm, Song]
+fn Arrangement::all() -> Array[Arrangement] {
+  [Song]
 }
 
 ///|
-fn StatementCall::name(self : StatementCall) -> String {
+fn Arrangement::name(self : Arrangement) -> String {
   match self {
-    Bpm => "bpm"
     Song => "song"
   }
 }
 
 ///|
-fn StatementCall::parse(name : String) -> StatementCall? {
-  StatementCall::all().iter().find_first(call => call.name() == name)
+fn Arrangement::parse(name : String) -> Arrangement? {
+  Arrangement::all().iter().find_first(call => call.name() == name)
 }
 
 ///|
@@ -261,7 +282,8 @@ fn SignalMethod::parse(name : String) -> SignalMethod? {
 /// stand where a binding's name is read.
 fn is_reserved_name(name : String) -> Bool {
   name == "let" ||
-  StatementCall::parse(name) is Some(_) ||
+  Declaration::parse(name) is Some(_) ||
+  Arrangement::parse(name) is Some(_) ||
   PatternCall::parse(name) is Some(_)
 }
 
@@ -295,7 +317,8 @@ fn[C] Parser::read_call(self : Parser, parse : (String) -> C?) -> C? {
 ///|
 /// Where a call is written.
 pub enum Position {
-  Statement
+  Declaration
+  Arrangement
   Pattern
   SongItem
   AfterSong
@@ -307,7 +330,8 @@ pub enum Position {
 ///|
 pub impl ToJson for Position with fn to_json(self) {
   let name = match self {
-    Statement => "statement"
+    Declaration => "declaration"
+    Arrangement => "arrangement"
     Pattern => "pattern"
     SongItem => "song-item"
     AfterSong => "after-song"
@@ -454,7 +478,8 @@ pub fn vocabulary() -> Vocabulary {
       description: shape.description(),
     }),
     calls: [
-      ..StatementCall::all().map(StatementCall::call),
+      ..Declaration::all().map(Declaration::call),
+      ..Arrangement::all().map(Arrangement::call),
       ..PatternCall::all().map(PatternCall::call),
       ..SongItem::all().map(SongItem::call),
       ..ArrangementMethod::all().map(ArrangementMethod::call),
@@ -506,17 +531,28 @@ fn Signature::call(
 }
 
 ///|
-fn StatementCall::call(self : StatementCall) -> Call {
-  self.signature().call(self.name(), Statement)
+fn Declaration::call(self : Declaration) -> Call {
+  self.signature().call(self.name(), Declaration)
 }
 
 ///|
-fn StatementCall::signature(self : StatementCall) -> Signature {
+fn Declaration::signature(self : Declaration) -> Signature {
   match self {
     Bpm =>
       signature("beats per minute, 4 beats per cycle; default 120", required=[
         argument("tempo", Number),
       ])
+  }
+}
+
+///|
+fn Arrangement::call(self : Arrangement) -> Call {
+  self.signature().call(self.name(), Arrangement)
+}
+
+///|
+fn Arrangement::signature(self : Arrangement) -> Signature {
+  match self {
     Song =>
       signature(
         "finite arrangement",

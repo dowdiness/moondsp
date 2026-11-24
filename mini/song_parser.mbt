@@ -59,7 +59,7 @@ pub fn parse_song(
   }
   p.skip_whitespace()
   let song_at = p.pos
-  guard p.read_call(StatementCall::parse) is Some(Song) else {
+  guard p.read_call(Arrangement::parse) is Some(Song) else {
     return Err("position \{song_at}: expected 'song('")
   }
   let result = p.parse_song_body(song_at, builder, lower=doc => {

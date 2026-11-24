@@ -348,9 +348,8 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
       }
       Ok(None) => {
         parser.pos = start
-        let statement = parser.read_call(StatementCall::parse)
         // Tempo is a declaration, not an expression reference.
-        if statement is Some(Bpm) {
+        if parser.read_call(Declaration::parse) is Some(Bpm) {
           try parser.parse_bpm_statement(start) catch {
             _ => ()
           } noraise {
@@ -361,7 +360,7 @@ fn recognize_mini_source(input : String) -> SourceRecognition {
           parser.pos = boundary + 1
           continue
         }
-        if statement is Some(Song) {
+        if parser.read_call(Arrangement::parse) is Some(Song) {
           mode = Some(Song)
           parser.recognize_song_sections(scope_opaque, references)
           break

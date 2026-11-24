@@ -17,6 +17,28 @@ export type ScoreLanguage = Readonly<{
   methodsAfter(receiver: string): readonly Call[];
 }>;
 
+/** What completion knows of the language: the score language once it loads, before that no names. */
+type Names = Readonly<{
+  calls: readonly Call[];
+  signals: readonly Term[];
+  drums: readonly Term[];
+  instruments: readonly Completion[];
+  methodsAfter(receiver: string): readonly Call[];
+}>;
+
+const NO_NAMES: Names = { calls: [], signals: [], drums: [], instruments: [], methodsAfter: () => [] };
+
+function namesOf({ vocabulary, methodsAfter }: ScoreLanguage): Names {
+  const { default: preferred, others } = vocabulary.instruments;
+  return {
+    calls: vocabulary.calls,
+    signals: vocabulary.signals,
+    drums: vocabulary.drums,
+    instruments: [termCompletion(preferred, `${preferred.description} (default)`), ...others.map(term => termCompletion(term))],
+    methodsAfter,
+  };
+}
+
 // The syntax that is not a name, which the grammar owns.
 const KEYWORDS: readonly Completion[] = [
   snippetCompletion("let ${name} = ${pattern};", { label: "let", type: "keyword", detail: "define a reusable pattern" }),
@@ -62,13 +84,16 @@ function notationAt(state: EditorState, pos: number): SyntaxNode | null {
   return inside ? string : null;
 }
 
+const QUOTED: ReadonlySet<ArgumentKind> = new Set(["drums", "instruments", "text"]);
+const METHOD_POSITIONS: ReadonlySet<Position> = new Set(["after-song", "after-pattern", "after-signal"]);
+
 // A call as a snippet that fills in its required arguments, quoting those
-// written as strings.
+// written as strings. A declaration ends with `;`, as the grammar writes it.
 function callCompletion(call: Call): Completion {
-  const quoted = new Set<ArgumentKind>(["drums", "instruments", "text"]);
-  const slot = (argument: Argument) => quoted.has(argument.kind) ? `"\${${argument.name}}"` : `\${${argument.name}}`;
-  const type = call.position.startsWith("after-") ? "method" : "function";
-  return snippetCompletion(`${call.name}(${call.required.map(slot).join(", ")})`, { label: call.name, type, detail: call.description });
+  const slot = (argument: Argument) => QUOTED.has(argument.kind) ? `"\${${argument.name}}"` : `\${${argument.name}}`;
+  const end = call.position === "declaration" ? ";" : "";
+  const type = METHOD_POSITIONS.has(call.position) ? "method" : "function";
+  return snippetCompletion(`${call.name}(${call.required.map(slot).join(", ")})${end}`, { label: call.name, type, detail: call.description });
 }
 
 function termCompletion(term: Term, detail = term.description): Completion {
@@ -76,23 +101,19 @@ function termCompletion(term: Term, detail = term.description): Completion {
 }
 
 export function scoreCompletion(language: ScoreLanguage | null) {
-  const vocabulary = language?.vocabulary;
-  const calls = vocabulary?.calls ?? [];
-  const callsAt = (position: Position) => calls.filter(call => call.position === position);
+  const { calls, methodsAfter, ...names } = language ? namesOf(language) : NO_NAMES;
+  const callsAt = (...positions: Position[]) => calls.filter(call => positions.includes(call.position)).map(callCompletion);
   const options = {
-    top: [...callsAt("statement"), ...callsAt("pattern")].map(callCompletion),
-    pattern: callsAt("pattern").map(callCompletion),
-    songItem: callsAt("song-item").map(callCompletion),
-    callback: callsAt("callback").map(callCompletion),
-    signalMethods: callsAt("after-signal").map(callCompletion),
-    signals: (vocabulary?.signals ?? []).map(term => termCompletion(term)),
-    drums: (vocabulary?.drums ?? []).map(term => termCompletion(term)),
-    instruments: vocabulary ? [
-      termCompletion(vocabulary.instruments.default, `${vocabulary.instruments.default.description} (default)`),
-      ...vocabulary.instruments.others.map(term => termCompletion(term)),
-    ] : [],
+    top: callsAt("declaration", "arrangement", "pattern"),
+    pattern: callsAt("pattern"),
+    songItem: callsAt("song-item"),
+    callback: callsAt("callback"),
+    signalMethods: callsAt("after-signal"),
+    signals: names.signals.map(term => termCompletion(term)),
+    drums: names.drums.map(term => termCompletion(term)),
+    instruments: names.instruments,
   };
-  const signals = new Set((vocabulary?.signals ?? []).map(term => term.name));
+  const signals = new Set(names.signals.map(term => term.name));
 
   return (context: CompletionContext): CompletionResult | null => {
     const { state, pos } = context;
@@ -101,10 +122,10 @@ export function scoreCompletion(language: ScoreLanguage | null) {
 
     // The calls a `Call` node can be, by where it stands.
     const callPositions = (call: SyntaxNode): readonly Position[] => {
-      if (call.parent?.name === "Declaration") return ["statement"];
+      if (call.parent?.name === "Declaration") return ["declaration"];
       const place = call.parent?.name === "Chain" && call.parent.parent ? placeOf(call.parent.parent) : null;
       switch (place) {
-        case "top": return ["statement", "pattern"];
+        case "top": return ["declaration", "arrangement", "pattern"];
         case "pattern": return ["pattern"];
         case "song-item": return ["song-item"];
         case "callback": return ["callback"];
@@ -160,7 +181,7 @@ export function scoreCompletion(language: ScoreLanguage | null) {
     const dot = context.matchBefore(/\.[A-Za-z_]*$/);
     if (dot) {
       const chain = ancestorOfType(tree.resolveInner(dot.from, -1), "Chain");
-      if (!chain || !language) return null;
+      if (!chain) return null;
       if (chain.parent && placeOf(chain.parent) === "control") {
         const head = chain.firstChild?.name === "Call" ? chain.firstChild.getChild("CallName") : null;
         return head && signals.has(text(head)) ? result(dot.from + 1, options.signalMethods) : null;
@@ -168,7 +189,7 @@ export function scoreCompletion(language: ScoreLanguage | null) {
       // The receiver before the `.`, after the `let` bindings before it.
       const bindings = tree.topNode.getChildren("Binding").filter(binding => binding.to <= chain.from);
       const receiver = [...bindings.map(text), state.doc.sliceString(chain.from, dot.from)].join("\n");
-      return result(dot.from + 1, language.methodsAfter(receiver).map(callCompletion));
+      return result(dot.from + 1, methodsAfter(receiver).map(callCompletion));
     }
 
     // A name being written: what its place takes.

@@ -35,7 +35,7 @@ export type LocatedOnset = Readonly<{
 /** A name written on its own: a drum, an instrument, or a signal. */
 export type Term = Readonly<{ name: string; description: string }>;
 /** Where a call is written. */
-export type Position = "statement" | "pattern" | "song-item" | "after-song" | "after-pattern" | "callback" | "after-signal";
+export type Position = "declaration" | "arrangement" | "pattern" | "song-item" | "after-song" | "after-pattern" | "callback" | "after-signal";
 /** What completion offers in an argument; `number` and `text` offer nothing. */
 export type ArgumentKind = "drums" | "instruments" | "callback" | "control" | "pattern" | "song-item" | "number" | "text";
 export type Argument = Readonly<{ name: string; kind: ArgumentKind }>;
@@ -56,7 +56,7 @@ export type Vocabulary = Readonly<{
   calls: readonly Call[];
 }>;
 
-const POSITIONS: readonly Position[] = ["statement", "pattern", "song-item", "after-song", "after-pattern", "callback", "after-signal"];
+const POSITIONS: readonly Position[] = ["declaration", "arrangement", "pattern", "song-item", "after-song", "after-pattern", "callback", "after-signal"];
 const ARGUMENT_KINDS: readonly ArgumentKind[] = ["drums", "instruments", "callback", "control", "pattern", "song-item", "number", "text"];
 
 const invalidVocabulary = (): never => { throw new Error("invalid vocabulary"); };

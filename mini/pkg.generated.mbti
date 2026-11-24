@@ -212,7 +212,8 @@ pub fn PlaybackInput::text(String) -> Self
 pub fn PlaybackInput::version(Self) -> DraftVersion?
 
 pub enum Position {
-  Statement
+  Declaration
+  Arrangement
   Pattern
   SongItem
   AfterSong

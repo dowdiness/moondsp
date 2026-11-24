@@ -2195,12 +2195,8 @@ fn written_in_position(call : @mini.Call, arguments : Array[String]) -> String {
   let written = "\{call.name}(\{arguments.join(", ")})"
   let song = "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
   match call.position {
-    Statement =>
-      if call.name == "bpm" {
-        "\{written}; s(\"bd\")"
-      } else {
-        written
-      }
+    Declaration => "\{written}; s(\"bd\")"
+    Arrangement => written
     Pattern => written
     SongItem => "song(\{song}, \{written})"
     AfterSong => "song(\{song}).\{written}"

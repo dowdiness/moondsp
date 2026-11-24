@@ -123,7 +123,7 @@ pub fn methods_after(receiver : String) -> Array[Call] {
     parser.parse_bindings(builder)
     parser.skip_whitespace()
     let at = parser.pos
-    match parser.read_call(StatementCall::parse) {
+    match parser.read_call(Arrangement::parse) {
       Some(Song) => {
         let (_, repeating, _) = parser.parse_play_song(
           at,
@@ -138,7 +138,6 @@ pub fn methods_after(receiver : String) -> Array[Call] {
           ArrangementMethod::all().map(ArrangementMethod::call)
         }
       }
-      Some(Bpm) => []
       None => {
         let score = compile_score(
           resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings),
