@@ -40,3 +40,4 @@ shipped plan or spec.
 - [ADR-0020 — Controls are typed signals with one representation](0020-controls-as-signals.md)
 - [ADR-0021 — Song structure is generic over its content](0021-song-structure-generic-over-content.md)
 - [ADR-0022 — Score events carry the sound they play](0022-score-events-carry-their-sound.md) (Proposed)
+- [ADR-0023 — The parser owns the score vocabulary](0023-the-parser-owns-the-score-vocabulary.md) (Proposed)
