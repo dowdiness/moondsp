@@ -2072,3 +2072,80 @@ test "malformed explicit chord notation is rejected" {
     assert_true(@mini.parse("chord(\"" + atom + "\")") is Err(_))
   }
 }
+
+///|
+/// Each event's instrument and pitch, or its drum.
+fn sound_names(events : Array[@pattern.Event[@score.ScoreEvent]]) -> String {
+  events
+  .map(event => {
+    match event.value.sound {
+      Note(instrument, pitch~) => "\{instrument.name()}:\{pitch}"
+      Hit(drum) => drum.name()
+    }
+  })
+  .join(" ")
+}
+
+///|
+test ".s chooses each note's instrument at its onset" {
+  inspect(
+    sound_names(
+      query_one_cycle(
+        unwrap_ok(@mini.parse("note(\"60 62 64 65\").s(\"bass pad\")")),
+      ),
+    ),
+    content="bass:60 bass:62 pad:64 pad:65",
+  )
+  inspect(
+    sound_names(query_one_cycle(unwrap_ok(@mini.parse("note(\"60\")")))),
+    content="triangle:60",
+  )
+  // The outer `.s` wins; drums beside chosen notes keep their hits.
+  inspect(
+    sound_names(
+      query_one_cycle(
+        unwrap_ok(
+          @mini.parse("stack(s(\"bd\"), note(\"60\").s(\"bass\").s(\"pad\"))"),
+        ),
+      ),
+    ),
+    content="bd pad:60",
+  )
+}
+
+///|
+test ".s names instruments of notes only" {
+  for
+    case in [
+      ("s(\"bass\")", "position 3: unknown drum name 'bass'"),
+      ("note(\"60\").s(\"bd\")", "position 14: unknown instrument name 'bd'"),
+      (
+        "s(\"bd\").s(\"bass\")", "position 11: .s(\"...\") chooses the instrument of notes, and drums have none",
+      ),
+      (
+        "let beat = stack(s(\"bd\"), note(\"60\")); beat.s(\"bass\")", "position 47: .s(\"...\") chooses the instrument of notes, and drums have none",
+      ),
+    ] {
+    match @mini.parse(case.0) {
+      Err(message) => assert_eq(message, case.1)
+      Ok(_) => fail("expected \{case.0} to be refused")
+    }
+  }
+}
+
+///|
+test ".s keeps exact origins; default instruments keep chord tone paths" {
+  let draft = @mini.Draft("chord(\"C\").s(\"pluck\")")
+  let events = draft_snapshot(draft).query(draft_arc())
+  inspect(
+    sound_names(events.map(event => event.event())),
+    content="pluck:60 pluck:64 pluck:67",
+  )
+  for event in events {
+    assert_true(draft.locate_origin(event.origin()) is Located(_, _))
+  }
+  // The default instrument is set in each atom, not by a merge.
+  let plain = draft_snapshot(@mini.Draft("chord(\"C\")")).query(draft_arc())
+  let paths = plain.map(event => event.pattern_node_path())
+  assert_true(paths[0] != paths[1] && paths[1] != paths[2])
+}

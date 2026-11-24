@@ -524,7 +524,7 @@ fn Parser::parse_bindings(
     self.expect_char(';')
     self.bindings[name] = {
       syntax,
-      body: compile_mini_doc(syntax, builder),
+      body: compile_score(syntax, builder),
       name_span,
     }
   }

@@ -206,7 +206,7 @@ fn[C] Parser::parse_song_section(
   if self.admission is Some(admission) {
     admission.sections[name] = admission.expression(syntax)
   }
-  let doc = compile_mini_doc(syntax, builder)
+  let doc = compile_score(syntax, builder).doc()
   self.skip_whitespace()
   self.expect_char(')')
   let compile_error = Internal("could not compile section '\{name}'")

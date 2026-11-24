@@ -271,7 +271,7 @@ pub fn[A] MiniDocBuilder::every(
 
 ///|
 /// Build a mini jux transform using production root-ID rules.
-pub fn[A] MiniDocBuilder::jux(
+pub fn[A : @pattern.WithControls] MiniDocBuilder::jux(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[A],
   transform : @pattern.TimeTransform,
@@ -437,6 +437,20 @@ fn MiniDocBuilder::sound_doc(
 }
 
 ///|
+/// One instrument `.s` names. It has no source atom: highlighting follows
+/// the notes it plays.
+fn MiniDocBuilder::instrument_doc(
+  self : MiniDocBuilder,
+  instrument : @score.Instrument,
+  _span : MiniSpan,
+) -> @pattern.PatternDoc[@score.Instrument] raise SourceProblem {
+  let id = self.atom_id("instrument", instrument.name())
+  let content = "instrument:\{instrument.name()}"
+  self.contents[id.value()] = content
+  @pattern.PatternDoc::atom(id~, value=instrument, content~)
+}
+
+///|
 fn MiniDocBuilder::reference_doc(
   self : MiniDocBuilder,
   id : @identity.PatternNodeId,
@@ -598,7 +612,7 @@ fn[A] MiniDocBuilder::every_doc(
 }
 
 ///|
-fn[A] MiniDocBuilder::jux_doc(
+fn[A : @pattern.WithControls] MiniDocBuilder::jux_doc(
   self : MiniDocBuilder,
   doc : @pattern.PatternDoc[A],
   transform : @pattern.TimeTransform,
@@ -788,7 +802,7 @@ fn Parser::parse_doc_expr(
     admission.roots.push(admission.expression(resolved))
     Overlay(admission.roots).check(admission.width)
   }
-  compile_mini_doc(resolved, builder)
+  compile_score(resolved, builder).doc()
 }
 
 ///|

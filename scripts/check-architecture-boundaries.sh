@@ -146,7 +146,7 @@ check_manifest \
 check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(identity|pattern|score|song|scheduler/internal/model))$'
 check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|score|scheduler/internal/model|voice))$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
-check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp)$'
+check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(score|browser/internal/playback_host))$'
 # Playback preparation assigns IDs to routed snapshots (technical reference: Browser live updates).
 check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|scheduler|pattern|score|song|identity))$'
 

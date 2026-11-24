@@ -169,6 +169,8 @@ priv enum MiniExprNode {
   Stack(Array[MiniExpr])
   Reference(String)
   Apply(MiniExpr, MiniTransform[ControlArgument])
+  /// `.s("bass pad")`: the instrument each note plays.
+  Instruments(MiniExpr, QuotedNotation)
 }
 
 ///|
@@ -235,8 +237,14 @@ fn Parser::parse_syntax_chain(
     if self.syntax_depth_limit is Some(limit) {
       guard chain_depth < limit else { raise OverLimit(Nesting(limit)) }
     }
-    let transform = self.parse_transform()
-    expr = { span: { start, end: self.pos, }, node: Apply(expr, transform), }
+    let node : MiniExprNode = if self.match_keyword("s(") {
+      let (text, at) = self.read_quoted_string_with_start()
+      self.expect_char(')')
+      Instruments(expr, { text, at, })
+    } else {
+      Apply(expr, self.parse_transform())
+    }
+    expr = { span: { start, end: self.pos, }, node, }
   }
   expr
 }

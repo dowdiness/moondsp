@@ -41,11 +41,15 @@ pub fn Drum::parse(name : String) -> Drum? {
 }
 
 ///|
-/// An instrument that plays pitches. Constructed only by `all`, as for
-/// `Drum`.
+/// An instrument that plays pitches, chosen with `.s("name")`. Constructed
+/// only by `all`, as for `Drum`.
 #derive(Eq, Debug)
 pub enum Instrument {
   Triangle
+  Bass
+  Pad
+  Pluck
+  Sawtooth
 }
 
 ///|
@@ -59,7 +63,7 @@ pub extend Instrument with Debug::{to_repr}
 /// pool. Keep this the only expression in the package that constructs an
 /// `Instrument`.
 pub fn Instrument::all() -> Array[Instrument] {
-  [Triangle]
+  [Triangle, Bass, Pad, Pluck, Sawtooth]
 }
 
 ///|
@@ -72,7 +76,16 @@ pub fn Instrument::default() -> Instrument {
 pub fn Instrument::name(self : Instrument) -> String {
   match self {
     Triangle => "triangle"
+    Bass => "bass"
+    Pad => "pad"
+    Pluck => "pluck"
+    Sawtooth => "sawtooth"
   }
+}
+
+///|
+pub fn Instrument::parse(name : String) -> Instrument? {
+  Instrument::all().iter().find_first(instrument => instrument.name() == name)
 }
 
 ///|

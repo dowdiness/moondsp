@@ -116,7 +116,7 @@ pub fn[A] MiniDocBuilder::degrade(Self, @pattern.PatternDoc[A], Double, step? : 
 pub fn[A] MiniDocBuilder::euclid(Self, @pattern.PatternDoc[A], Int32, Int32, Int32) -> Result[@pattern.PatternDoc[A], String]
 pub fn[A] MiniDocBuilder::every(Self, @pattern.PatternDoc[A], Int32, @pattern.TimeTransform) -> Result[@pattern.PatternDoc[A], String]
 pub fn[A] MiniDocBuilder::fast(Self, @pattern.PatternDoc[A], @pattern.Rational) -> Result[@pattern.PatternDoc[A], String]
-pub fn[A] MiniDocBuilder::jux(Self, @pattern.PatternDoc[A], @pattern.TimeTransform) -> Result[@pattern.PatternDoc[A], String]
+pub fn[A : @pattern.WithControls] MiniDocBuilder::jux(Self, @pattern.PatternDoc[A], @pattern.TimeTransform) -> Result[@pattern.PatternDoc[A], String]
 pub fn MiniDocBuilder::new() -> Self
 pub fn MiniDocBuilder::note_atom(Self, @identity.PatternNodeId, String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
 pub fn[A] MiniDocBuilder::rev(Self, @pattern.PatternDoc[A]) -> Result[@pattern.PatternDoc[A], String]

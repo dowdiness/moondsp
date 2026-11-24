@@ -32,12 +32,17 @@ pub fn Drum::to_repr(Self) -> @debug.Repr
 #derive(Eq, @debug.Debug)
 pub enum Instrument {
   Triangle
+  Bass
+  Pad
+  Pluck
+  Sawtooth
 }
 pub fn Instrument::all() -> Array[Self]
 pub fn Instrument::default() -> Self
 pub fn Instrument::equal(Self, Self) -> Bool
 pub fn Instrument::name(Self) -> String
 pub fn Instrument::not_equal(Self, Self) -> Bool
+pub fn Instrument::parse(String) -> Self?
 pub fn Instrument::to_repr(Self) -> @debug.Repr
 
 #derive(Eq, @debug.Debug)

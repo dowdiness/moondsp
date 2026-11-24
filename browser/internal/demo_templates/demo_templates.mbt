@@ -1,5 +1,5 @@
 ///|
-pub fn bd_template() -> Array[@moondsp.DspNode] {
+fn bd_template() -> Array[@moondsp.DspNode] {
   // Kick drum: pitch sweep 240→60 Hz + amplitude envelope
   // [0] pitch ADSR: fast decay creates frequency sweep
   // [1] scale pitch envelope by 180 Hz range
@@ -32,7 +32,7 @@ pub fn bd_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn sd_template() -> Array[@moondsp.DspNode] {
+fn sd_template() -> Array[@moondsp.DspNode] {
   // Snare: bandpass noise + sine body, amplitude envelope
   // [0] noise source
   // [1] bandpass filter at 1.5 kHz (snare body)
@@ -63,7 +63,7 @@ pub fn sd_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn hh_template() -> Array[@moondsp.DspNode] {
+fn hh_template() -> Array[@moondsp.DspNode] {
   // Hi-hat: high-pass filtered noise, short envelope
   // [0] noise source
   // [1] high-pass filter at 7 kHz
@@ -90,7 +90,7 @@ pub fn hh_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn oh_template() -> Array[@moondsp.DspNode] {
+fn oh_template() -> Array[@moondsp.DspNode] {
   // Open hi-hat: same shape as hh but longer decay + slightly lower
   // cutoff so it reads as "open" against the closed hh in patterns.
   // Different noise seed so layered hh + oh don't beat phase-coherently.
@@ -114,7 +114,7 @@ pub fn oh_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn cp_template() -> Array[@moondsp.DspNode] {
+fn cp_template() -> Array[@moondsp.DspNode] {
   // Clap: bandpass noise around 1.2 kHz with a sharp short envelope.
   // The classic 808 multi-burst texture would need a multi-tap envelope
   // primitive we don't have; a single sharp burst still reads as "clap"
@@ -139,36 +139,90 @@ pub fn cp_template() -> Array[@moondsp.DspNode] {
 }
 
 ///|
-pub fn synth_template() -> Array[@moondsp.DspNode] {
-  // Bind `note` directly to oscillator Value0. Avoid constant ->
-  // oscillator_from for browser synth playback: sustained notes exposed
-  // crackle in that per-sample frequency-buffer path. Browser synth defaults to
-  // Triangle for now: Dsp Sine still crackles in AudioWorklet probes,
-  // while JS sine and direct wasm tick-block are clean. Follow-ups:
-  // https://github.com/dowdiness/moondsp/issues/211
-  // https://github.com/dowdiness/moondsp/issues/212
-  [
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Triangle, 440.0),
-    @moondsp.DspNode::adsr(
-      attack_ms=2.0,
-      decay_ms=800.0,
-      sustain=0.08,
-      release_ms=20.0,
-    ),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::LowPass,
-      cutoff_hz=8000.0,
-      q=0.707,
-    ),
-    @moondsp.DspNode::biquad(
-      input=2,
-      mode=@moondsp.BiquadMode::HighPass,
-      cutoff_hz=20.0,
-      q=0.707,
-    ),
-    @moondsp.DspNode::envelope_gain(input=3, envelope=1, amount=0.5),
-    @moondsp.DspNode::gain(4, 1.0),
-    @moondsp.DspNode::output(5),
-  ]
+/// The sound of each drum.
+pub fn drum_template(drum : @score.Drum) -> Array[@moondsp.DspNode] {
+  match drum {
+    Bd => bd_template()
+    Sd => sd_template()
+    Cp => cp_template()
+    Hh => hh_template()
+    Oh => oh_template()
+  }
+}
+
+///|
+/// The sound of each instrument. The oscillators are not band-limited, so
+/// the brighter waveforms sit behind a low-pass default. Triangle, the
+/// default, has 24 voices for a 5-note chord × 4 layers of jux/stereo, so
+/// fewer steals click; the others have 12, a 5-note chord under `.jux`.
+pub fn instrument_voice(
+  instrument : @score.Instrument,
+) -> @playback_host.NoteVoice {
+  match instrument {
+    // The default instrument is Triangle for now: Dsp Sine still crackles
+    // in AudioWorklet probes, while JS sine and direct wasm tick-block are
+    // clean. Follow-ups:
+    // https://github.com/dowdiness/moondsp/issues/211
+    // https://github.com/dowdiness/moondsp/issues/212
+    Triangle =>
+      {
+        waveform: Triangle,
+        attack_ms: 2.0,
+        decay_ms: 800.0,
+        sustain: 0.08,
+        release_ms: 20.0,
+        lpf_hz: 8000.0,
+        lpf_q: 0.707,
+        amount: 0.5,
+        voices: 24,
+      }
+    Bass =>
+      {
+        waveform: Saw,
+        attack_ms: 3.0,
+        decay_ms: 300.0,
+        sustain: 0.6,
+        release_ms: 80.0,
+        lpf_hz: 700.0,
+        lpf_q: 1.2,
+        amount: 0.45,
+        voices: 12,
+      }
+    Pad =>
+      {
+        waveform: Saw,
+        attack_ms: 400.0,
+        decay_ms: 1200.0,
+        sustain: 0.7,
+        release_ms: 900.0,
+        lpf_hz: 1800.0,
+        lpf_q: 0.707,
+        amount: 0.22,
+        voices: 12,
+      }
+    Pluck =>
+      {
+        waveform: Square,
+        attack_ms: 1.0,
+        decay_ms: 180.0,
+        sustain: 0.0,
+        release_ms: 120.0,
+        lpf_hz: 3000.0,
+        lpf_q: 0.707,
+        amount: 0.3,
+        voices: 12,
+      }
+    Sawtooth =>
+      {
+        waveform: Saw,
+        attack_ms: 5.0,
+        decay_ms: 200.0,
+        sustain: 0.7,
+        release_ms: 120.0,
+        lpf_hz: 6000.0,
+        lpf_q: 0.707,
+        amount: 0.3,
+        voices: 12,
+      }
+  }
 }

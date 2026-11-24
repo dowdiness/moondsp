@@ -17,15 +17,11 @@ pub extend PlaybackMode with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn init_scheduler_graph(sample_rate : Double, block_size : Int32) -> Bool {
-  @playback_host.init_scheduler_graph_with_templates(
+  @playback_host.init_scheduler_graph_with_sounds(
     sample_rate,
     block_size,
-    @demo_templates.bd_template(),
-    @demo_templates.sd_template(),
-    @demo_templates.hh_template(),
-    @demo_templates.cp_template(),
-    @demo_templates.oh_template(),
-    @demo_templates.synth_template(),
+    drum=@demo_templates.drum_template,
+    instrument=@demo_templates.instrument_voice,
   )
 }
 

@@ -33,7 +33,9 @@ in the browser bundle.
   <dt>note("E4 G4")</dt><dd>note names or MIDI numbers</dd>
   <dt>chord("Am G")</dt><dd>chords</dd>
   <dt>s("bd hh sd hh")</dt><dd>drums: bd kick, sd snare, hh closed hat, oh open hat, cp clap</dd>
+  <dt>.s("bass pad")</dt><dd>the instrument of notes and chords, per step: triangle (the default), bass, pad, pluck, sawtooth</dd>
 </dl>
+<p class="cheat-note">Each note takes the instrument at its onset and keeps it while it sounds. Drums have no instrument, so <code>s("bd").s("bass")</code> is a mistake; put <code>.s</code> on the notes inside a <code>stack</code>.</p>
 <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
 <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. Write an exact pitch set as <code>{60,63,68}</code>: braces contain one or more unique MIDI integers from 0 through 127 in strictly ascending order, with no spaces. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 

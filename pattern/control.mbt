@@ -210,6 +210,59 @@ fn[A, B] merge_control_kernel(
 }
 
 ///|
+/// Give each event of `a` the overlapping value of `b` at the event's onset,
+/// however its fragment is cut. An event no value overlaps keeps its own.
+fn[A, B] merge_at_onset_kernel(
+  a : Pat[A],
+  b : Pat[B],
+  merge : (A, B) -> A,
+) -> Pat[A] {
+  if a.body is Silence {
+    return a
+  }
+  let children = a.transform_children(p => merge_at_onset_kernel(p, b, merge))
+  let provider = b.entry_signature()
+  make_pat(
+    fn(arc) {
+      let in_arc = b.query(arc)
+      a
+      .query(arc)
+      .map(ae => {
+        let onset = match ae.whole {
+          Some(whole) => whole.begin
+          None => ae.part.begin
+        }
+        // A fragment that starts after its onset reads the onset's values.
+        let candidates = if onset < arc.begin {
+          b.query(TimeSpan(onset, arc.begin))
+        } else {
+          in_arc
+        }
+        let merged = candidates.fold(init=ae.value, (merged, be) => {
+          if be.part.contains(onset) {
+            merge(merged, be.value)
+          } else {
+            merged
+          }
+        })
+        { whole: ae.whole, part: ae.part, value: merged, }
+      })
+    },
+    a.metadata.period,
+    Opaque(children),
+    a.metadata.scope,
+    transformed_signature(
+      a.entry_signature(),
+      if provider == "" {
+        ""
+      } else {
+        "onset:" + provider
+      },
+    ),
+  )
+}
+
+///|
 /// The content of `a` with controls whose content is `provider` merged in.
 fn[A] merged_signature(a : Pat[A], provider : String) -> String {
   let change = if provider == "" { "" } else { "merge:" + provider }
@@ -314,6 +367,20 @@ pub(open) trait WithControls {
   fn controls(Self) -> ControlMap
   /// The payload with `controls` set over its own.
   fn with_controls(Self, ControlMap) -> Self
+}
+
+///|
+/// A payload's `WithControls`, captured by a document node whose lowering
+/// reads or writes controls. Only payloads with controls can build such a
+/// node, so lowering itself needs no bound.
+priv struct ControlAccess[A] {
+  controls : (A) -> ControlMap
+  with_controls : (A, ControlMap) -> A
+}
+
+///|
+fn[A : WithControls] ControlAccess::of() -> ControlAccess[A] {
+  { controls: A::controls, with_controls: A::with_controls, }
 }
 
 ///|

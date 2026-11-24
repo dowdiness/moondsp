@@ -552,12 +552,14 @@ fn[A : WithControls] control_keys(
     | Every(child, _, _)
     | Gate(child, _)
     | DegradeBy(child, _, _)
-    | FilterMap(child, _)
-    | Jux(child, _) => control_keys(nodes, child, keys)
+    | FilterMap(child, _, _)
+    | Jux(child, _, _) => control_keys(nodes, child, keys)
     MergeControl(left, right) => {
       control_keys(nodes, left, keys)
       control_keys(right.nodes, right.root, keys)
     }
+    // Its values are sampled at onsets, so they cannot follow a bus.
+    MergeValues(_, _) => raise UnsupportedControl(id)
     Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
       for child in children {
         control_keys(nodes, child, keys)
@@ -631,7 +633,10 @@ fn[A : WithControls] compile_signal(
           )
         }
       }
-    Gate(_, _) | DegradeBy(_, _, _) | FilterMap(_, _) | Jux(_, _) =>
-      raise UnsupportedControl(id)
+    Gate(_, _)
+    | DegradeBy(_, _, _)
+    | FilterMap(_, _, _)
+    | Jux(_, _, _)
+    | MergeValues(_, _) => raise UnsupportedControl(id)
   }
 }

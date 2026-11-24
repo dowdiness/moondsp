@@ -810,3 +810,33 @@ test "PatternDoc::from_pattern wraps existing runtime patterns" {
 fn n(value : Int32) -> @pattern.ControlMap {
   @pattern.ControlMap::single(Note, value.to_double())
 }
+
+///|
+test "merge_values gives a fragment the value at its event's onset" {
+  let id = (name : String) => @identity.PatternNodeId::from_string(name)
+  let values : @pattern.PatternDoc[Double] = @pattern.PatternDoc::sequence(
+    id=id("values"),
+    docs=[
+      @pattern.PatternDoc::pure(id=id("first"), value=0.25),
+      @pattern.PatternDoc::pure(id=id("second"), value=0.75),
+    ],
+  )
+  let merged = @pattern.PatternDoc::merge_values(
+    id=id("merged"),
+    left=@pattern.PatternDoc::pure(
+      id=id("note"),
+      value=@pattern.ControlMap::empty(),
+    ),
+    right=values,
+    apply=(controls, gain) => controls.set(Gain, gain),
+  ).lower()
+  // The whole event starts at 0; its second half still reads 0.25.
+  let later = merged.query(
+    @pattern.TimeSpan(@pattern.Rational(1L, 2L), @pattern.Rational::from_int(1)),
+  )
+  @debug.assert_eq(later.map(event => event.value.get(Gain)), [Some(0.25)])
+  let next = merged.query(
+    @pattern.TimeSpan(@pattern.Rational::from_int(1), @pattern.Rational(3L, 2L)),
+  )
+  @debug.assert_eq(next.map(event => event.value.get(Gain)), [Some(0.25)])
+}

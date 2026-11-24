@@ -11,7 +11,7 @@ fn MiniCallback::operation(self : MiniCallback) -> @pattern.TimeTransform {
 priv struct MiniDefinition {
   /// The resolved body, which playback admission assesses.
   syntax : ResolvedMiniExpr
-  body : ScoreDoc
+  body : Score
   name_span : MiniSpan
 }
 
@@ -30,6 +30,8 @@ priv enum ResolvedMiniExprNode {
   Stack(Array[ResolvedMiniExpr])
   Reference(String, MiniDefinition)
   Apply(ResolvedMiniExpr, MiniTransform[ControlValue])
+  /// The instruments of `.s`, and where its argument is written.
+  Instruments(ResolvedMiniExpr, NotationSyntax[@score.Instrument], Int32)
 }
 
 ///|
@@ -127,6 +129,10 @@ fn resolve_mini_expr(
       let child = resolve_mini_expr(child, definitions)
       Apply(child, read_transform_controls(transform))
     }
+    Instruments(child, quoted) => {
+      let child = resolve_mini_expr(child, definitions)
+      Instruments(child, quoted.parse(instrument_names()), quoted.at)
+    }
     Reference(name) =>
       match unique_definition(definitions.get(name).iter(), false) {
         Ok(definition) => Reference(name, definition)
@@ -149,15 +155,19 @@ fn ResolvedMiniExpr::ResolvedMiniExpr(
 }
 
 ///|
-fn compile_mini_doc(
+fn compile_score(
   expr : ResolvedMiniExpr,
   builder : MiniDocBuilder,
-) -> ScoreDoc raise SourceProblem {
+) -> Score raise SourceProblem {
   match expr.node {
-    Sounds(notation) => builder.literal_doc(notation, MiniDocBuilder::drum_doc)
-    Notes(notation) => builder.literal_doc(notation, MiniDocBuilder::pitch_doc)
+    Sounds(notation) =>
+      Hits(builder.literal_doc(notation, MiniDocBuilder::drum_doc))
+    Notes(notation) =>
+      Notes(NoteDoc(builder.literal_doc(notation, MiniDocBuilder::pitch_doc)))
     Chords(notation) =>
-      builder.literal_doc(notation, MiniDocBuilder::chord_name_doc)
+      Notes(
+        NoteDoc(builder.literal_doc(notation, MiniDocBuilder::chord_name_doc)),
+      )
     Silence => {
       let id = builder.atom_id_at(
         "silence",
@@ -165,10 +175,13 @@ fn compile_mini_doc(
         expr.span.start,
         expr.span.end,
       )
-      builder.rest_doc(id)
+      Silent(builder.rest_doc(id))
     }
     Stack(children) =>
-      builder.stack_doc(children.map(child => compile_mini_doc(child, builder)))
+      Score::stack(
+        builder,
+        children.map(child => compile_score(child, builder)),
+      )
     Reference(name, definition) => {
       let id = builder.atom_id_at(
         "binding",
@@ -176,41 +189,63 @@ fn compile_mini_doc(
         expr.span.start,
         expr.span.end,
       )
-      builder.reference_doc(
-        id,
-        expr.span.start,
-        expr.span.end,
-        definition.name_span,
-        definition.body,
+      definition.body.map(body => {
+        builder.reference_doc(
+          id,
+          expr.span.start,
+          expr.span.end,
+          definition.name_span,
+          body,
+        )
+      })
+    }
+    Instruments(child, notation, at) => {
+      let notes = match compile_score(child, builder) {
+        Notes(notes) => notes
+        // Silence plays no drums, so its document plays only notes.
+        Silent(doc) => NoteDoc(doc)
+        Hits(_) | Mixed(_) =>
+          raise Mistake(
+            at, ".s(\"...\") chooses the instrument of notes, and drums have none",
+          )
+      }
+      let instruments = builder.notation_doc(
+        notation,
+        MiniDocBuilder::instrument_doc,
       )
+      Notes(notes.on(builder, instruments))
     }
     Apply(child, transform) => {
-      let doc = compile_mini_doc(child, builder)
+      let score = compile_score(child, builder)
       match transform {
-        Fast(n) => builder.fast_doc(doc, n)
-        Slow(n) => builder.slow_doc(doc, n)
-        Gate(factor) => builder.gate_doc(doc, factor)
-        Rev => builder.rev_doc(doc)
-        Degrade(p) => builder.degrade_doc(doc, p)
-        Control(key, value) => builder.control_value_doc(doc, key, value)
-        Filter(kind, frequency_hz, resonance) => {
-          let filtered = builder.control_value_doc(
-            doc,
-            kind.control_key(),
-            frequency_hz,
-          )
-          match resonance {
-            None => filtered
-            Some(q) =>
-              builder.control_value_doc(
-                filtered,
-                kind.resonance_control_key(),
-                q,
-              )
-          }
-        }
-        Every(n, callback) => builder.every_doc(doc, n, callback.operation())
-        Jux(callback) => builder.jux_doc(doc, callback.operation())
+        Fast(n) => score.map(doc => builder.fast_doc(doc, n))
+        Slow(n) => score.map(doc => builder.slow_doc(doc, n))
+        Gate(factor) => score.map(doc => builder.gate_doc(doc, factor))
+        Rev => score.map(doc => builder.rev_doc(doc))
+        Degrade(p) => score.map(doc => builder.degrade_doc(doc, p))
+        Control(key, value) =>
+          score.map(doc => builder.control_value_doc(doc, key, value))
+        Filter(kind, frequency_hz, resonance) =>
+          score.map(doc => {
+            let filtered = builder.control_value_doc(
+              doc,
+              kind.control_key(),
+              frequency_hz,
+            )
+            match resonance {
+              None => filtered
+              Some(q) =>
+                builder.control_value_doc(
+                  filtered,
+                  kind.resonance_control_key(),
+                  q,
+                )
+            }
+          })
+        Every(n, callback) =>
+          score.map(doc => builder.every_doc(doc, n, callback.operation()))
+        Jux(callback) =>
+          score.map(doc => builder.jux_doc(doc, callback.operation()))
       }
     }
   }

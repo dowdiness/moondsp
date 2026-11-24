@@ -282,15 +282,11 @@ test "playback diagnostics preserve UTF-16 code units" {
 ///|
 test "unrepresentable finite endpoints reject before publication or restart" {
   assert_true(
-    init_scheduler_graph_with_templates(
+    init_scheduler_graph_with_sounds(
       192000.0,
       128,
-      test_drum_template(60.0),
-      test_drum_template(180.0),
-      test_drum_template(8000.0),
-      test_drum_template(1200.0),
-      test_drum_template(6000.0),
-      test_synth_template(),
+      drum=test_drum,
+      instrument=test_voice,
     ),
   )
   let invalid = "bpm(0.001); song(section(\"a\",2000000000,silence()),part(\"p\",\"a\"))"

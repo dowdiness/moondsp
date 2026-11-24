@@ -255,6 +255,8 @@ fn PlaybackAdmission::expression(
     Chords(notation) => notation.query_work(word_work=ChordName::query_work)
     Reference(_, definition) =>
       self.definition(definition.name_span, definition.syntax)
+    Instruments(child, notation, _) =>
+      MergeWith(self.expression(child, depth=depth + 1), notation.query_work())
     Stack(children) =>
       Overlay(children.map(child => self.expression(child, depth=depth + 1)))
     Apply(child, transform) => {

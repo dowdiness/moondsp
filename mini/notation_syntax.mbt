@@ -41,6 +41,11 @@ fn drum_names() -> NotationVocabulary[@score.Drum] {
 }
 
 ///|
+fn instrument_names() -> NotationVocabulary[@score.Instrument] {
+  { read_word: NotationCursor::read_instrument_name, random_drop: Allowed, }
+}
+
+///|
 fn pitches() -> NotationVocabulary[Pitch] {
   { read_word: NotationCursor::read_pitch, random_drop: Allowed, }
 }
@@ -509,6 +514,21 @@ fn NotationCursor::read_drum_name(
   match @score.Drum::parse(name) {
     Some(drum) => drum
     None => raise self.mistake(start, "unknown drum name '\{name}'")
+  }
+}
+
+///|
+fn NotationCursor::read_instrument_name(
+  self : NotationCursor,
+) -> @score.Instrument raise SourceProblem {
+  let start = self.pos
+  let name = self.read_ident()
+  guard !name.is_empty() else {
+    raise self.mistake(start, "expected instrument name")
+  }
+  match @score.Instrument::parse(name) {
+    Some(instrument) => instrument
+    None => raise self.mistake(start, "unknown instrument name '\{name}'")
   }
 }
 

@@ -28,18 +28,34 @@ priv enum PatternDocNode[A] {
   Slow(@identity.PatternNodeId, Rational)
   Gate(@identity.PatternNodeId, Rational)
   Rev(@identity.PatternNodeId)
-  FilterMap(@identity.PatternNodeId, (A) -> A?)
+  /// The map sees each event's controls, read and written through the
+  /// access its constructor captured.
+  FilterMap(@identity.PatternNodeId, (A) -> A?, ControlAccess[A])
   Euclid(@identity.PatternNodeId, Int32, Int32, Int32)
   DegradeBy(@identity.PatternNodeId, Double, Int32)
   Every(@identity.PatternNodeId, Int32, TimeTransform)
-  Jux(@identity.PatternNodeId, TimeTransform)
+  Jux(@identity.PatternNodeId, TimeTransform, ControlAccess[A])
   /// The right-hand controls merge into each left-hand event, as buses.
   /// The provider is a document of its own, as a reference keeps its
   /// definition: it sets controls and sounds nothing (ADR-0022).
   MergeControl(@identity.PatternNodeId, PatternDoc[ControlMap])
+  /// Each left-hand event takes the right-hand value at its onset; the value
+  /// does not change while the event sounds, so it derives no bus.
+  MergeValues(@identity.PatternNodeId, ProvidedValues[A])
   Sequence(Array[@identity.PatternNodeId])
   WeightedSequence(Array[@identity.PatternNodeId], Array[Int32])
   Stack(Array[@identity.PatternNodeId])
+}
+
+///|
+/// The right side of `merge_values`, lowered once: the change each value
+/// makes, and what the merge records of the provider document.
+priv struct ProvidedValues[A] {
+  changes : Pat[(A) -> A]
+  /// Every provider node, for the merged events' paths (ADR-0018).
+  nodes : Array[@identity.PatternNodeId]
+  revision : @identity.Revision
+  cache_token : Array[Int64]
 }
 
 ///|
@@ -72,12 +88,13 @@ fn[A] PatternDocNode::snapshot(self : PatternDocNode[A]) -> PatternDocNode[A] {
     Slow(child, factor) => Slow(child, factor)
     Gate(child, factor) => Gate(child, factor)
     Rev(child) => Rev(child)
-    FilterMap(child, f) => FilterMap(child, f)
+    FilterMap(child, f, access) => FilterMap(child, f, access)
     Euclid(child, k, n, rotation) => Euclid(child, k, n, rotation)
     DegradeBy(child, p, seed) => DegradeBy(child, p, seed)
     Every(child, n, f) => Every(child, n, f)
-    Jux(child, transform) => Jux(child, transform)
+    Jux(child, transform, access) => Jux(child, transform, access)
     MergeControl(left, right) => MergeControl(left, right)
+    MergeValues(left, provided) => MergeValues(left, provided)
     Sequence(children) => Sequence(children.copy())
     WeightedSequence(children, weights) =>
       WeightedSequence(children.copy(), weights.copy())
@@ -235,11 +252,11 @@ fn[A] pattern_node_cache_token_memoized(
             | Slow(child, _)
             | Gate(child, _)
             | Rev(child)
-            | FilterMap(child, _)
+            | FilterMap(child, _, _)
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
-            | Jux(child, _) =>
+            | Jux(child, _, _) =>
               append_pattern_cache_token(
                 token,
                 pattern_node_cache_token_memoized(nodes, child, memo),
@@ -257,6 +274,13 @@ fn[A] pattern_node_cache_token_memoized(
                   Map([]),
                 ),
               )
+            }
+            MergeValues(left, provided) => {
+              append_pattern_cache_token(
+                token,
+                pattern_node_cache_token_memoized(nodes, left, memo),
+              )
+              append_pattern_cache_token(token, provided.cache_token)
             }
             Sequence(children) | Stack(children) =>
               for child in children {
@@ -315,12 +339,13 @@ fn[A] copy_reachable_pattern_nodes(
         | Slow(child, _)
         | Gate(child, _)
         | Rev(child)
-        | FilterMap(child, _)
+        | FilterMap(child, _, _)
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
-        | Jux(child, _) => copy_reachable_pattern_nodes(source, child, target)
-        MergeControl(left, _) =>
+        | Jux(child, _, _) =>
+          copy_reachable_pattern_nodes(source, child, target)
+        MergeControl(left, _) | MergeValues(left, _) =>
           copy_reachable_pattern_nodes(source, left, target)
         Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
           for child in children {
@@ -357,11 +382,11 @@ fn[A] pattern_node_revision_memoized(
             | Slow(child, _)
             | Gate(child, _)
             | Rev(child)
-            | FilterMap(child, _)
+            | FilterMap(child, _, _)
             | Euclid(child, _, _, _)
             | DegradeBy(child, _, _)
             | Every(child, _, _)
-            | Jux(child, _) =>
+            | Jux(child, _, _) =>
               revision = revision.combine(
                 pattern_node_revision_memoized(nodes, child, memo),
               )
@@ -370,6 +395,12 @@ fn[A] pattern_node_revision_memoized(
                 pattern_node_revision_memoized(nodes, left, memo),
               )
               revision = revision.combine(right.revision)
+            }
+            MergeValues(left, provided) => {
+              revision = revision.combine(
+                pattern_node_revision_memoized(nodes, left, memo),
+              )
+              revision = revision.combine(provided.revision)
             }
             Sequence(children)
             | Stack(children)
@@ -790,14 +821,21 @@ fn[A, O] ScopedValue::prepend(
 /// Pair each event's payload with its projection at the start of the event's
 /// fragment (`project_controls`). `buses` must be on this pattern's clock;
 /// child bodies share it.
-fn[A : WithControls, O] Pat::with_projected_controls(
+fn[A, O] Pat::with_projected_controls(
   self : Pat[ScopedValue[A, O]],
   buses : Array[ControlBus],
+  access : ControlAccess[A],
 ) -> Pat[(A, ScopedValue[A, O])] {
   self.map_events((value, time) => {
     (
-      value.value.with_controls(
-        project_controls(value.value.controls(), value.bindings, buses, time),
+      (access.with_controls)(
+        value.value,
+        project_controls(
+          (access.controls)(value.value),
+          value.bindings,
+          buses,
+          time,
+        ),
       ),
       value,
     )
@@ -1023,11 +1061,11 @@ fn[A] append_reachable_pattern_source_ids(
         | Slow(child, _)
         | Gate(child, _)
         | Rev(child)
-        | FilterMap(child, _)
+        | FilterMap(child, _, _)
         | Euclid(child, _, _, _)
         | DegradeBy(child, _, _)
         | Every(child, _, _)
-        | Jux(child, _) =>
+        | Jux(child, _, _) =>
           append_reachable_pattern_source_ids(nodes, child, result, seen)
         MergeControl(left, right) => {
           append_reachable_pattern_source_ids(nodes, left, result, seen)
@@ -1037,6 +1075,15 @@ fn[A] append_reachable_pattern_source_ids(
             result,
             seen,
           )
+        }
+        MergeValues(left, provided) => {
+          append_reachable_pattern_source_ids(nodes, left, result, seen)
+          for provider_node in provided.nodes {
+            if !seen.contains(provider_node.value()) {
+              seen[provider_node.value()] = true
+              result.push(provider_node)
+            }
+          }
         }
         Sequence(children) | Stack(children) | WeightedSequence(children, _) =>
           for child in children {
@@ -1180,7 +1227,7 @@ fn[A, O] opaque_compiled_entries(
 }
 
 ///|
-fn[A : WithControls, O : DocumentOrigin] lower_pattern_node_cached(
+fn[A, O : DocumentOrigin] lower_pattern_node_cached(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   cache : CompiledCache[A, O],
@@ -1202,7 +1249,7 @@ fn[A : WithControls, O : DocumentOrigin] lower_pattern_node_cached(
 }
 
 ///|
-fn[A : WithControls, O : DocumentOrigin] compile_pattern_node(
+fn[A, O : DocumentOrigin] compile_pattern_node(
   nodes : Map[String, PatternDocEntry[A]],
   id : @identity.PatternNodeId,
   cache : CompiledCache[A, O],
@@ -1298,11 +1345,11 @@ fn[A : WithControls, O : DocumentOrigin] compile_pattern_node(
     // child's clock. Returning them unchanged keeps the own values and their
     // buses; a replaced value becomes the event's own values and follows no
     // bus, since a bus would undo the mapping.
-    FilterMap(child, f) => {
+    FilterMap(child, f, access) => {
       let child = lower(child)
       child.transform(pat => {
         pat
-        .with_projected_controls(child.buses)
+        .with_projected_controls(child.buses, access)
         .filter_map_payload(
           pair => {
             let (projected, value) = pair
@@ -1370,7 +1417,7 @@ fn[A : WithControls, O : DocumentOrigin] compile_pattern_node(
     }
     // The transformed branch reads its own copy of each bus. The fixed pan
     // overrides a pan bus.
-    Jux(child_id, transform) => {
+    Jux(child_id, transform, access) => {
       let child = lower(child_id)
       let scope = pattern_source_path_for_opaque_children(nodes, id, [child_id])
       let offset = child.buses.length()
@@ -1381,7 +1428,7 @@ fn[A : WithControls, O : DocumentOrigin] compile_pattern_node(
         },
         (value, pan) => {
           value.remap(
-            value.value.with_controls(pan),
+            (access.with_controls)(value.value, pan),
             value.scope,
             bindings=unbind_keys(value.bindings, pan),
           )
@@ -1458,6 +1505,33 @@ fn[A : WithControls, O : DocumentOrigin] compile_pattern_node(
           CompiledEntry(left.entries[index].key, entries[index])
         }),
         buses~,
+      )
+    }
+    // The left side's buses are unchanged: a value sampled at the onset
+    // does not change while the event sounds.
+    MergeValues(left_id, provided) => {
+      let left = lower(left_id)
+      let descendants : Array[@identity.PatternNodeId] = []
+      let seen : Map[String, Bool] = Map([(id.value(), true)])
+      append_reachable_pattern_source_ids(nodes, left_id, descendants, seen)
+      for provider_node in provided.nodes {
+        if !seen.contains(provider_node.value()) {
+          seen[provider_node.value()] = true
+          descendants.push(provider_node)
+        }
+      }
+      let scope = PatternNodePath(id, descendants~)
+      let pat = merge_at_onset_kernel(left.pat, provided.changes, (
+        value,
+        change,
+      ) => value.remap(change(value.value), scope))
+      let entries = pat.entries()
+      CompiledPattern(
+        pat,
+        Array::makei(entries.length(), index => {
+          CompiledEntry(left.entries[index].key, entries[index])
+        }),
+        buses=left.buses,
       )
     }
     // A child's bus is silent outside that child's slot.
@@ -2110,6 +2184,21 @@ pub fn[A : WithControls] PatternDoc::lower(
 }
 
 ///|
+/// The document's values in time, without origins or controls: lowering
+/// before `lower` projects controls into payloads.
+fn[A] PatternDoc::values(self : PatternDoc[A]) -> Pat[A] raise PatternDocError {
+  let compiled : CompiledPattern[A, Unit] = lower_pattern_node_cached(
+    self.nodes,
+    self.root,
+    CompiledCache::new(),
+    CompiledCache::new(),
+    {},
+    End,
+  )
+  compiled.pat.map_payload(value => value.value)
+}
+
+///|
 pub fn[A : WithControls] PatternDoc::lower_with_cache(
   self : PatternDoc[A],
   cache : PatternLoweringCache[A],
@@ -2261,7 +2350,7 @@ pub fn[A] PatternDoc::rev(
 }
 
 ///|
-pub fn[A] PatternDoc::filter_map(
+pub fn[A : WithControls] PatternDoc::filter_map(
   self : PatternDoc[A],
   id~ : @identity.PatternNodeId,
   f~ : (A) -> A?,
@@ -2270,7 +2359,7 @@ pub fn[A] PatternDoc::filter_map(
   insert_pattern_node(
     nodes,
     id,
-    FilterMap(self.root, f),
+    FilterMap(self.root, f, ControlAccess::of()),
     revision=self.revision.next(),
   )
   PatternDoc(root=id, revision=self.revision.next(), nodes~)
@@ -2329,7 +2418,7 @@ pub fn[A] PatternDoc::every(
 }
 
 ///|
-pub fn[A] PatternDoc::jux(
+pub fn[A : WithControls] PatternDoc::jux(
   self : PatternDoc[A],
   id~ : @identity.PatternNodeId,
   transform~ : TimeTransform,
@@ -2338,7 +2427,7 @@ pub fn[A] PatternDoc::jux(
   insert_pattern_node(
     nodes,
     id,
-    Jux(self.root, transform),
+    Jux(self.root, transform, ControlAccess::of()),
     revision=self.revision.next(),
   )
   PatternDoc(root=id, revision=self.revision.next(), nodes~)
@@ -2355,6 +2444,29 @@ pub fn[A] PatternDoc::merge_control(
   let nodes = copy_pattern_nodes(left.nodes)
   let revision = left.revision.combine(right.revision).next()
   insert_pattern_node(nodes, id, MergeControl(left.root, right), revision~)
+  PatternDoc(root=id, revision~, nodes~)
+}
+
+///|
+/// Give each event of `left` the value `right` has at its onset, through
+/// `apply`. The value holds while the event sounds: it derives no bus.
+pub fn[A, B] PatternDoc::merge_values(
+  id~ : @identity.PatternNodeId,
+  left~ : PatternDoc[A],
+  right~ : PatternDoc[B],
+  apply~ : (A, B) -> A,
+) -> PatternDoc[A] raise PatternDocError {
+  let provider_nodes = []
+  append_reachable_pattern_source_ids(right.nodes, right.root, provider_nodes, {})
+  let provided = {
+    changes: right.values().map_payload(value => (a : A) => apply(a, value)),
+    nodes: provider_nodes,
+    revision: right.revision,
+    cache_token: pattern_node_cache_token_memoized(right.nodes, right.root, {}),
+  }
+  let nodes = copy_pattern_nodes(left.nodes)
+  let revision = left.revision.combine(right.revision).next()
+  insert_pattern_node(nodes, id, MergeValues(left.root, provided), revision~)
   PatternDoc(root=id, revision~, nodes~)
 }
 

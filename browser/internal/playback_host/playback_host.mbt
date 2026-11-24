@@ -75,15 +75,63 @@ fn make_drum_pool(
 }
 
 ///|
-/// Create the synth instrument pool (with note->freq binding).
-fn make_synth_pool(
-  template : Array[@moondsp.DspNode],
+/// The sound of a note instrument. The host builds its graph, so the graph
+/// always has the node layout that `make_note_pool` binds controls to.
+pub(all) struct NoteVoice {
+  waveform : @moondsp.Waveform
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  lpf_hz : Double
+  lpf_q : Double
+  /// Envelope depth, which sets the voice's level.
+  amount : Double
+  /// How many notes the instrument sounds at once.
+  voices : Int32
+}
+
+///|
+/// [0] oscillator, [1] adsr, [2] low-pass, [3] high-pass: the indices
+/// `make_note_pool` binds. `note` binds directly to oscillator Value0: a
+/// constant -> oscillator_from path crackled on sustained browser notes.
+fn NoteVoice::graph(self : NoteVoice) -> Array[@moondsp.DspNode] {
+  [
+    @moondsp.DspNode::oscillator(self.waveform, 440.0),
+    @moondsp.DspNode::adsr(
+      attack_ms=self.attack_ms,
+      decay_ms=self.decay_ms,
+      sustain=self.sustain,
+      release_ms=self.release_ms,
+    ),
+    @moondsp.DspNode::biquad(
+      input=0,
+      mode=@moondsp.BiquadMode::LowPass,
+      cutoff_hz=self.lpf_hz,
+      q=self.lpf_q,
+    ),
+    @moondsp.DspNode::biquad(
+      input=2,
+      mode=@moondsp.BiquadMode::HighPass,
+      cutoff_hz=20.0,
+      q=0.707,
+    ),
+    @moondsp.DspNode::envelope_gain(input=3, envelope=1, amount=self.amount),
+    @moondsp.DspNode::gain(4, 1.0),
+    @moondsp.DspNode::output(5),
+  ]
+}
+
+///|
+/// Create a note instrument pool (with note->freq binding).
+fn make_note_pool(
+  voice : NoteVoice,
   ctx : @moondsp.DspContext,
 ) -> @moondsp.BoundVoicePool? {
   Some(
     // See make_drum_pool for the .jux headroom rationale.
     @moondsp.BoundVoicePool(
-      @moondsp.AnalyzedGraph::analyze(template),
+      @moondsp.AnalyzedGraph::analyze(voice.graph()),
       ctx,
       voice_frame_bindings()
       .bind(
@@ -118,9 +166,7 @@ fn make_synth_pool(
         node_index=3,
         slot=@moondsp.GraphParamSlot::Value1,
       ),
-      // 24 voices for chords: a 5-note chord × 4 layers of jux/stereo
-      // needs up to 20 voices. Fewer steals → fewer clicks.
-      max_voices=24,
+      max_voices=voice.voices,
     ),
   ) catch {
     _ => None
@@ -128,25 +174,21 @@ fn make_synth_pool(
 }
 
 ///|
-pub fn init_scheduler_graph_with_templates(
+/// Give every drum and instrument a voice pool, built from `drum` and
+/// `instrument`.
+pub fn init_scheduler_graph_with_sounds(
   sample_rate : Double,
   block_size : Int32,
-  bd_template : Array[@moondsp.DspNode],
-  sd_template : Array[@moondsp.DspNode],
-  hh_template : Array[@moondsp.DspNode],
-  cp_template : Array[@moondsp.DspNode],
-  oh_template : Array[@moondsp.DspNode],
-  synth_template : Array[@moondsp.DspNode],
+  drum~ : (@score.Drum) -> Array[@moondsp.DspNode],
+  instrument~ : (@score.Instrument) -> NoteVoice,
 ) -> Bool {
   // The scheduler and its voice pools refuse any format they cannot run.
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
+  let drums = @score.Drum::all()
+  let instruments = @score.Instrument::all()
   let candidates = [
-    make_drum_pool(bd_template, ctx),
-    make_drum_pool(sd_template, ctx),
-    make_drum_pool(hh_template, ctx),
-    make_drum_pool(cp_template, ctx),
-    make_drum_pool(oh_template, ctx),
-    make_synth_pool(synth_template, ctx),
+    ..drums.map(d => make_drum_pool(drum(d), ctx)),
+    ..instruments.map(i => make_note_pool(instrument(i), ctx)),
   ]
   let pools : Array[@moondsp.BoundVoicePool] = []
   for candidate in candidates {
@@ -156,15 +198,12 @@ pub fn init_scheduler_graph_with_templates(
     }
     pools.push(pool)
   }
-  // The index in `pools` of each sound's pool.
+  // `pools` holds the drums, then the instruments, each in `all()` order;
+  // `all()` lists every constructor, so each search finds its sound.
   let route = (sound : @score.Sound) => {
     match sound {
-      Hit(Bd) => 0
-      Hit(Sd) => 1
-      Hit(Hh) => 2
-      Hit(Cp) => 3
-      Hit(Oh) => 4
-      Note(Triangle, ..) => 5
+      Hit(d) => drums.search(d).unwrap()
+      Note(i, ..) => drums.length() + instruments.search(i).unwrap()
     }
   }
   let scheduler = @scheduler.PatternScheduler(

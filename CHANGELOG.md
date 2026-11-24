@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `.s("bass pad")` chooses the instrument of notes and chords per step
+  (ADR-0022): `triangle` (the default), `bass`, `pad`, `pluck`, and
+  `sawtooth`, each with its own voice pool in the browser. A note takes the
+  instrument at its onset. `.s` on a pattern that plays drums is a mistake at
+  its argument, and `s("…")` accepts drum names only.
+  `PatternDoc::merge_values` gives each event the value another document has
+  at its onset, and the browser host takes its sounds with
+  `init_scheduler_graph_with_sounds(drum~, instrument~)`.
+
 ### Fixed
 
 - Notation that is valid but over a playback limit, such as

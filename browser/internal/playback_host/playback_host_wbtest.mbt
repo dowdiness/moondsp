@@ -14,31 +14,31 @@ fn test_drum_template(freq : Double) -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn test_synth_template() -> Array[@moondsp.DspNode] {
-  [
-    @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
-    @moondsp.DspNode::adsr(
-      attack_ms=10.0,
-      decay_ms=100.0,
-      sustain=0.7,
-      release_ms=300.0,
-    ),
-    @moondsp.DspNode::biquad(
-      input=0,
-      mode=@moondsp.BiquadMode::LowPass,
-      cutoff_hz=8000.0,
-      q=0.707,
-    ),
-    @moondsp.DspNode::biquad(
-      input=2,
-      mode=@moondsp.BiquadMode::HighPass,
-      cutoff_hz=20.0,
-      q=0.707,
-    ),
-    @moondsp.DspNode::envelope_gain(input=3, envelope=1, amount=1.0),
-    @moondsp.DspNode::gain(4, 1.0),
-    @moondsp.DspNode::output(5),
-  ]
+fn test_drum(drum : @score.Drum) -> Array[@moondsp.DspNode] {
+  test_drum_template(
+    match drum {
+      Bd => 60.0
+      Sd => 180.0
+      Hh => 8000.0
+      Cp => 1200.0
+      Oh => 6000.0
+    },
+  )
+}
+
+///|
+fn test_voice(_ : @score.Instrument) -> NoteVoice {
+  {
+    waveform: Sine,
+    attack_ms: 10.0,
+    decay_ms: 100.0,
+    sustain: 0.7,
+    release_ms: 300.0,
+    lpf_hz: 8000.0,
+    lpf_q: 0.707,
+    amount: 1.0,
+    voices: 12,
+  }
 }
 
 ///|
@@ -46,15 +46,11 @@ fn init_scheduler_graph_for_test(
   sample_rate~ : Double = 48000.0,
   block_size~ : Int32 = 128,
 ) -> Bool {
-  init_scheduler_graph_with_templates(
+  init_scheduler_graph_with_sounds(
     sample_rate,
     block_size,
-    test_drum_template(60.0),
-    test_drum_template(180.0),
-    test_drum_template(8000.0),
-    test_drum_template(1200.0),
-    test_drum_template(6000.0),
-    test_synth_template(),
+    drum=test_drum,
+    instrument=test_voice,
   )
 }
 
@@ -284,4 +280,31 @@ test "room send leaves dry playback dry and adds one wet return" {
   let reverberant_output = output_energy()
   assert_true(wet_energy() > 0.0)
   assert_true((reverberant_output - dry_output).abs() > 0.000001)
+}
+
+///|
+test ".s plays each note on its instrument's pool" {
+  // Each instrument's voice is louder by its position in `all()`.
+  fn energy(text : String) -> Double raise {
+    assert_true(
+      init_scheduler_graph_with_sounds(48000.0, 128, drum=test_drum, instrument=i => {
+        let rank = @score.Instrument::all().search(i).unwrap() + 1
+        { ..test_voice(i), amount: rank.to_double() * 0.1, }
+      }),
+    )
+    assert_eq(submit_for_test(text), 0)
+    let mut energy = 0.0
+    for _ in 0..<48 {
+      render_for_test(1)
+      energy = energy + output_energy()
+    }
+    energy
+  }
+
+  let default = energy("note(\"48\").slow(40)")
+  assert_true(default > 0.0)
+  let bass = energy("note(\"48\").slow(40).s(\"bass\")")
+  let pad = energy("note(\"48\").slow(40).s(\"pad\")")
+  assert_true((bass / default - 2.0).abs() < 1.0e-9)
+  assert_true((pad / default - 3.0).abs() < 1.0e-9)
 }

@@ -2,8 +2,10 @@
 package "dowdiness/moondsp/browser/internal/playback_host"
 
 import {
+  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/score",
   "moonbitlang/core/debug",
 }
 
@@ -16,7 +18,7 @@ pub fn get_playback_error_char(Int32) -> Int32
 
 pub fn get_playback_error_length() -> Int32
 
-pub fn init_scheduler_graph_with_templates(Double, Int32, Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode], Array[@graph.DspNode]) -> Bool
+pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> NoteVoice) -> Bool
 
 pub fn player_mode() -> PlaybackMode
 
@@ -67,6 +69,18 @@ pub fn set_scheduler_gain(Double) -> Unit
 // Errors
 
 // Types and methods
+pub(all) struct NoteVoice {
+  waveform : @dsp.Waveform
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  lpf_hz : Double
+  lpf_q : Double
+  amount : Double
+  voices : Int32
+}
+
 #derive(Eq, @debug.Debug)
 pub(all) enum PlayState {
   Empty
