@@ -159,7 +159,7 @@ pub fn methods_after(receiver : String) -> Array[Call] {
 /// Whether the method may follow `score`, by the rules the compiler applies.
 fn Method::follows(self : Method, score : Score) -> Bool {
   match self {
-    Instruments => score.notes() is Some(_)
+    Instrument => score.notes() is Some(_)
     Fast
     | Slow
     | Gate

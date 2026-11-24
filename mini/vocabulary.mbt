@@ -141,7 +141,7 @@ priv enum Method {
   Every
   Jux
   /// `.s("…")`, which chooses the instrument of notes.
-  Instruments
+  Instrument
 }
 
 ///|
@@ -162,7 +162,7 @@ fn Method::all() -> Array[Method] {
     Room,
     Every,
     Jux,
-    Instruments,
+    Instrument,
   ]
 }
 
@@ -184,7 +184,7 @@ fn Method::name(self : Method) -> String {
     Room => "room"
     Every => "every"
     Jux => "jux"
-    Instruments => "s"
+    Instrument => "s"
   }
 }
 
@@ -319,8 +319,8 @@ pub impl ToJson for Position with fn to_json(self) {
 }
 
 ///|
-/// What completion offers in an argument. `Plain` offers nothing: numbers,
-/// lengths, quoted names, and note notation.
+/// What completion offers in an argument. `Number` and `Text` offer nothing:
+/// a number or length, and a quoted name or notation.
 pub enum ArgumentKind {
   Drums
   Instruments
@@ -328,7 +328,8 @@ pub enum ArgumentKind {
   Control
   Pattern
   SongItem
-  Plain
+  Number
+  Text
 }
 
 ///|
@@ -340,7 +341,8 @@ pub impl ToJson for ArgumentKind with fn to_json(self) {
     Control => "control"
     Pattern => "pattern"
     SongItem => "song-item"
-    Plain => "plain"
+    Number => "number"
+    Text => "text"
   }
   Json(name)
 }
@@ -513,7 +515,7 @@ fn StatementCall::signature(self : StatementCall) -> Signature {
   match self {
     Bpm =>
       signature("beats per minute, 4 beats per cycle; default 120", required=[
-        argument("tempo", Plain),
+        argument("tempo", Number),
       ])
     Song =>
       signature(
@@ -535,11 +537,9 @@ fn PatternCall::signature(self : PatternCall) -> Signature {
     Literal(Sound) =>
       signature("drum sounds", required=[argument("drums", Drums)])
     Literal(Note) =>
-      signature("MIDI numbers or note names", required=[
-        argument("notes", Plain),
-      ])
+      signature("MIDI numbers or note names", required=[argument("notes", Text)])
     Literal(Chord) =>
-      signature("chord names", required=[argument("chords", Plain)])
+      signature("chord names", required=[argument("chords", Text)])
     Silence => signature("silent pattern")
     Stack =>
       signature(
@@ -560,34 +560,34 @@ fn SongItem::signature(self : SongItem) -> Signature {
   match self {
     Bpm =>
       signature("the song's beats per minute", required=[
-        argument("tempo", Plain),
+        argument("tempo", Number),
       ])
     Section =>
       signature("a named pattern that plays for a length in cycles", required=[
-        argument("name", Plain),
-        argument("length", Plain),
+        argument("name", Text),
+        argument("length", Number),
         argument("pattern", Pattern),
       ])
     Part =>
       signature(
         "play a section, after the previous part or from a start",
-        required=[argument("name", Plain), argument("section", Plain)],
-        optional=[argument("start", Plain)],
+        required=[argument("name", Text), argument("section", Text)],
+        optional=[argument("start", Number)],
       )
     PartId =>
       signature(
         "a part with a stable occurrence id",
         required=[
-          argument("id", Plain),
-          argument("name", Plain),
-          argument("section", Plain),
+          argument("id", Text),
+          argument("name", Text),
+          argument("section", Text),
         ],
-        optional=[argument("start", Plain)],
+        optional=[argument("start", Number)],
       )
     Fill =>
       signature("play a section in the gaps between parts", required=[
-        argument("prefix", Plain),
-        argument("section", Plain),
+        argument("prefix", Text),
+        argument("section", Text),
       ])
   }
 }
@@ -620,16 +620,16 @@ fn Method::signature(self : Method) -> Signature {
     ])
   }
   match self {
-    Fast => signature("n× faster", required=[argument("factor", Plain)])
-    Slow => signature("n× slower", required=[argument("factor", Plain)])
+    Fast => signature("n× faster", required=[argument("factor", Number)])
+    Slow => signature("n× slower", required=[argument("factor", Number)])
     Gate =>
       signature("audible fraction of each step (0–1)", required=[
-        argument("fraction", Plain),
+        argument("fraction", Number),
       ])
     Rev => signature("reverse")
     DegradeBy =>
       signature("drop with probability p (0–1)", required=[
-        argument("p", Plain),
+        argument("p", Number),
       ])
     Lpf => filter("low-pass cutoff and optional resonance (Q)")
     Hpf => filter("high-pass cutoff and optional resonance (Q)")
@@ -641,14 +641,14 @@ fn Method::signature(self : Method) -> Signature {
     Room => control("send to shared room (0–1)")
     Every =>
       signature("apply f every nth cycle", required=[
-        argument("n", Plain),
+        argument("n", Number),
         argument("f", Callback),
       ])
     Jux =>
       signature("split stereo, apply f to right", required=[
         argument("f", Callback),
       ])
-    Instruments =>
+    Instrument =>
       signature("play notes on an instrument", required=[
         argument("instruments", Instruments),
       ])
@@ -663,8 +663,8 @@ fn Callback::call(self : Callback) -> Call {
 ///|
 fn Callback::signature(self : Callback) -> Signature {
   match self {
-    Fast => signature("k× faster", required=[argument("k", Plain)])
-    Slow => signature("k× slower", required=[argument("k", Plain)])
+    Fast => signature("k× faster", required=[argument("k", Number)])
+    Slow => signature("k× slower", required=[argument("k", Number)])
     Rev => signature("reverse")
   }
 }
@@ -679,10 +679,10 @@ fn SignalMethod::signature(self : SignalMethod) -> Signature {
   match self {
     Range =>
       signature("map 0–1 onto low–high", required=[
-        argument("low", Plain),
-        argument("high", Plain),
+        argument("low", Number),
+        argument("high", Number),
       ])
-    Fast => signature("n× faster", required=[argument("factor", Plain)])
-    Slow => signature("n× slower", required=[argument("factor", Plain)])
+    Fast => signature("n× faster", required=[argument("factor", Number)])
+    Slow => signature("n× slower", required=[argument("factor", Number)])
   }
 }

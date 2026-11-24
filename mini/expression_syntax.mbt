@@ -342,7 +342,7 @@ fn Parser::parse_method(
     raise Mistake(method_start, "unknown method '\{name}'")
   }
   let transform : MiniTransform[ControlArgument] = match called {
-    Instruments => {
+    Instrument => {
       self.expect_char('(')
       let (text, at) = self.read_quoted_string_with_start()
       self.expect_char(')')

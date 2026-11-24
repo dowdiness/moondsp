@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { buildParser } from "@lezer/generator";
-import { Draft } from "../src/authoring";
+import { CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import { ensureSyntaxTree, LRLanguage } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import { Draft, methodsAfter, vocabulary } from "../src/authoring";
+import { scoreCompletion, type ScoreLanguage } from "../src/lang/minilive-completion";
 import { platformKeys, replaceCode, readCode } from "./editor-helpers";
 
 const grammar = readFileSync(
@@ -222,4 +226,70 @@ test("MiniLive completes instrument names in .s and offers .s only on receivers 
   await editor.press("Control+Space");
   await expect(labels).toHaveText(["bd", "cp", "hh", "oh", "sd"]);
   await expect(page.locator(".cm-completionDetail").filter({ hasText: "kick drum" })).toHaveCount(1);
+});
+
+const miniliveLanguage = LRLanguage.define({ parser });
+
+// The labels completion offers at `|` in `source`, as if requested explicitly.
+function offered(source: string, language: ScoreLanguage | null): string[] | null {
+  const pos = source.indexOf("|");
+  const state = EditorState.create({ doc: source.replace("|", ""), extensions: [miniliveLanguage] });
+  ensureSyntaxTree(state, state.doc.length, 5000);
+  const result = scoreCompletion(language)(new CompletionContext(state, pos, true)) as CompletionResult | null;
+  return result ? result.options.map(option => option.label) : null;
+}
+
+test("completion offers each position's names from the vocabulary", () => {
+  const language = { vocabulary: vocabulary(), methodsAfter };
+  const patterns = ["s", "note", "chord", "silence", "stack"];
+  for (const [source, expected] of [
+    ["|", ["let", "$:", "bpm", "song", ...patterns]],
+    ['let beat = s("bd");\n|', ["beat", "let", "$:", "bpm", "song", ...patterns]],
+    ['let beat = s("bd");\nstack(|', ["beat", ...patterns]],
+    ['$: (|', patterns],
+    ["song(|", ["bpm", "section", "part", "part_id", "fill"]],
+    ['song(section("a", 4, |', patterns],
+    ['note("C4").jux(|', ["fast", "slow", "rev"]],
+    ['note("C4").every(2, |', ["fast", "slow", "rev"]],
+    ['note("C4").every(|', null],
+    ['note("C4").pan(|', ["sine", "cosine", "saw", "isaw", "tri", "square"]],
+    ['note("C4").lpf(200, |', ["sine", "cosine", "saw", "isaw", "tri", "square"]],
+    ['note("C4").lpf(sine.range(0, |', null],
+    ['note("C4").fast(|', null],
+    ['s("|', ["bd", "sd", "cp", "hh", "oh"]],
+    ['note("C4").s("|', ["triangle", "bass", "pad", "pluck", "sawtooth"]],
+    ['note("|', null],
+    ['note("C4").|', ["fast", "slow", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "every", "jux", "s"]],
+  ] as const) {
+    expect(offered(source, language), source).toEqual(expected);
+  }
+});
+
+test("before the score tools load, completion offers only bindings, let, and $:", () => {
+  for (const [source, expected] of [
+    ["|", ["let", "$:"]],
+    ['let beat = s("bd");\n|', ["beat", "let", "$:"]],
+    // Which call owns an argument is in the vocabulary.
+    ['let beat = s("bd");\nstack(|', null],
+    ['note("C4").|', null],
+    ['s("|', null],
+    ['note("C4").jux(|', null],
+  ] as const) {
+    expect(offered(source, null), source).toEqual(expected);
+  }
+});
+
+test("a call snippet fills in its required arguments, quoting strings", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
+  const editor = page.locator(".cm-content");
+  const labels = page.locator(".cm-completionLabel");
+  await replaceCode(page, "no");
+  await editor.press("Control+Space");
+  await labels.filter({ hasText: /^note$/ }).click();
+  await expect.poll(() => readCode(page)).toBe('note("notes")');
+  await replaceCode(page, 'note("C4").ev');
+  await editor.press("Control+Space");
+  await labels.filter({ hasText: /^every$/ }).click();
+  await expect.poll(() => readCode(page)).toBe('note("C4").every(n, f)');
 });

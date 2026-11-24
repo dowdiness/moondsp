@@ -2220,18 +2220,22 @@ fn sample(argument : @mini.Argument) -> String raise {
     Control => "sine.range(0.2, 0.8)"
     Pattern => "s(\"bd\")"
     SongItem => "section(\"a\", 4, s(\"bd\")), part(\"p\", \"a\")"
-    Plain =>
+    Number =>
       match argument.name {
         "tempo" | "factor" | "k" | "n" | "length" | "high" => "2"
         "fraction" | "p" | "low" => "0.5"
         "start" => "8"
+        name => fail("no sample for number '\{name}'")
+      }
+    Text =>
+      match argument.name {
         "notes" => "\"C4 E4\""
         "chords" => "\"C Am\""
         "name" => "\"x\""
         "section" => "\"a\""
         "prefix" => "\"f\""
         "id" => "\"occ_0123456789abcdef0123456789abcdef\""
-        name => fail("no sample for argument '\{name}'")
+        name => fail("no sample for text '\{name}'")
       }
   }
 }

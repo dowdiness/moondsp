@@ -68,7 +68,8 @@ pub enum ArgumentKind {
   Control
   Pattern
   SongItem
-  Plain
+  Number
+  Text
 }
 pub impl @json.ToJson for ArgumentKind
 

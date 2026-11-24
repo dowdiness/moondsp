@@ -1,7 +1,7 @@
 // CodeMirror language support for the moondsp live REPL surface
 // (Strudel-style `$:` lines, `+` overlays, groups, and method chains).
 // Wraps the Lezer parser with style tags for highlighting
-// and registers the autocomplete source via languageData.
+// and installs completion with the score language through `completion`.
 
 import { LRLanguage, LanguageSupport, syntaxHighlighting, HighlightStyle, defaultHighlightStyle } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
@@ -9,7 +9,7 @@ import { styleTags, tags as t } from "@lezer/highlight";
 
 import { parser } from "./minilive.grammar";
 import type { Extension } from "@codemirror/state";
-import { miniliveCompletion, scoreCompletion, type ScoreLanguage } from "./minilive-completion";
+import { scoreCompletion, type ScoreLanguage } from "./minilive-completion";
 
 const parserWithMetadata = parser.configure({
   props: [
@@ -37,7 +37,6 @@ export const miniliveLanguage = LRLanguage.define({
   languageData: {
     commentTokens: { line: "//", block: { open: "/*", close: "*/" } },
     closeBrackets: { brackets: ["(", "[", '"'] },
-    autocomplete: miniliveCompletion,
   },
 });
 
@@ -57,7 +56,7 @@ export function minilive(): LanguageSupport {
   ]);
 }
 
-// Completion from the score language, installed once the score tools load.
-export function scoreNames(language: ScoreLanguage): Extension {
+// Completion from the score language, or, before it loads, `null`.
+export function completion(language: ScoreLanguage | null): Extension {
   return miniliveLanguage.data.of({ autocomplete: scoreCompletion(language) });
 }

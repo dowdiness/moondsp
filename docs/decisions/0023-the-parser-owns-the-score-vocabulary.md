@@ -92,10 +92,10 @@ one name in two positions, ending in `;` only as a statement.
 
 Each argument has a name and a kind. A kind is what completion offers in
 that argument: drum names, instrument names, callbacks, control values
-(signals), pattern expressions, or song items. Every other argument, such as
-a number, a length, a quoted name, or note notation, has the kind that
-offers nothing, because completion has nothing to suggest there and a
-snippet needs only the argument's name.
+(signals), pattern expressions, or song items. Every other argument offers
+nothing, and is a number, such as a tempo or a length, or text, such as a
+quoted name or note notation. A snippet needs only to know which arguments
+are written in quotes: drums, instruments, and text.
 
 `browser_authoring` sends the vocabulary to the editor as JSON, and the
 editor parses it once, when the score tools load.
@@ -126,14 +126,19 @@ The Lezer grammar, highlighting, and the analysis of where the cursor is stay
 in TypeScript. Completion maps the cursor's place to the vocabulary and
 never names a call itself:
 
-- at a statement or pattern position: earlier bindings, `let`, `$:`, and the
-  calls of that position;
+- at the top of the score: earlier bindings, `let`, `$:`, and the statement
+  and pattern calls;
+- at a pattern elsewhere, such as in a binding, a group, or an argument of
+  the pattern kind: earlier bindings and the pattern calls;
 - in an argument of any call: the options of the argument's kind, such as
-  drum names inside `s("…")` and song items inside `song(…)`;
+  drum names inside `s("…")` and song items inside `song(…)`. The call that
+  owns the argument is found by its name in the position it stands in, and
+  the argument by the commas before the cursor;
 - after `.` on a signal in a control argument: the calls after a signal;
 - after any other `.`: the calls `methods_after` returns.
 
-Snippets fill in the required arguments only.
+Snippets fill in the required arguments only, in quotes when they are
+written as strings.
 
 ## Alternatives considered
 
@@ -173,7 +178,9 @@ Snippets fill in the required arguments only.
   kind of argument.
 - `let silence = …` and `let bpm = …` become errors.
 - Before the score tools load, or if they fail, completion offers only
-  earlier bindings, `let`, and `$:`.
+  earlier bindings, `let`, and `$:`, at the top of the score.
+- A snippet leaves out what the grammar adds around a call, such as the `;`
+  after a `bpm(…)` statement.
 - Each `.` completion compiles the receiver and the bindings before it; they
   are a small part of a score.
 - While an earlier binding does not compile, no method is offered after any
@@ -193,7 +200,7 @@ Snippets fill in the required arguments only.
    `sound_vocabulary()` and `takes_instruments`; the editor completes every
    method after `.` from them. Done.
 4. Complete the other positions from the vocabulary in the editor and
-   remove its remaining hand-written lists.
+   remove its remaining hand-written lists. Done.
 
 ## Not covered
 

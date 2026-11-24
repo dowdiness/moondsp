@@ -1,53 +1,32 @@
-// Context-aware completion for moondsp mini-notation.
-//
-// `miniliveCompletion` works before the score tools load. Three contexts, in
-// priority order:
-//   1. Inside a `String` or after `.` → nothing; `scoreCompletion` names
-//      sounds and methods there.
-//   2. Inside `Args` of a `MemberCall` whose method is `jux` (any
-//      position) or `every` (past the first comma) → callback names
-//      (`fast`, `slow`, `rev`); of a control method → signal names.
-//   3. Top-level prefix → `$:`, `s`, `note`, `chord`, `stack`.
-//
-// `scoreCompletion` arrives with the score tools: sound names inside
-// `s("…")` and `.s("…")`, and every method after `.` from the vocabulary.
+// Completion for moondsp mini-notation (ADR-0023). The editor decides where
+// the cursor is from the Lezer tree; every name it offers comes from the
+// score language's vocabulary, and the methods after a pattern from
+// `methodsAfter`. Before the score tools load, it offers only the earlier
+// bindings, `let`, and `$:`.
 
 import type { CompletionContext, CompletionResult, Completion } from "@codemirror/autocomplete";
 import { snippetCompletion } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import type { EditorState } from "@codemirror/state";
-import type { ArgumentKind, Call, Term, Vocabulary } from "../authoring";
+import type { Argument, ArgumentKind, Call, Position, Term, Vocabulary } from "../authoring";
 
-const TOP_LEVEL: Completion[] = [
-  snippetCompletion('let ${name} = ${pattern};', { label: "let", type: "keyword", detail: "define a reusable pattern" }),
-  snippetCompletion('$: ${}', { label: "$:", type: "keyword", detail: "stack line" }),
-  snippetCompletion('bpm(${120});', { label: "bpm", type: "function", detail: "beats per minute, 4 beats per cycle; default 120" }),
-  snippetCompletion("silence()", { label: "silence", type: "function", detail: "silent pattern" }),
-  snippetCompletion('song(section("${name}", ${4}, ${pattern}), part("${occurrence}", "${name}"))', { label: "song", type: "function", detail: "finite arrangement" }),
-  snippetCompletion('s("${}")', { label: "s", type: "function", detail: "drum sounds" }),
-  snippetCompletion('note("${}")', { label: "note", type: "function", detail: "MIDI numbers or note names" }),
-  snippetCompletion('chord("${}")', { label: "chord", type: "function", detail: "chord names" }),
-  snippetCompletion("stack(${})", { label: "stack", type: "function", detail: "combine layers" }),
+/** What the score language tells completion; it loads with the score tools. */
+export type ScoreLanguage = Readonly<{
+  vocabulary: Vocabulary;
+  methodsAfter(receiver: string): readonly Call[];
+}>;
+
+// The syntax that is not a name, which the grammar owns.
+const KEYWORDS: readonly Completion[] = [
+  snippetCompletion("let ${name} = ${pattern};", { label: "let", type: "keyword", detail: "define a reusable pattern" }),
+  snippetCompletion("$: ${}", { label: "$:", type: "keyword", detail: "stack line" }),
 ];
 
-const CALLBACKS: Completion[] = [
-  snippetCompletion("fast(${k})", { label: "fast", type: "function" }),
-  snippetCompletion("slow(${k})", { label: "slow", type: "function" }),
-  { label: "rev", type: "constant" },
-];
+const WORD = /^[A-Za-z_0-9]*$/;
 
-// Methods whose arguments take a number, a quoted pattern, or a signal.
-const CONTROL_METHODS = new Set(["gain", "pan", "room", "lpf", "hpf", "attack", "hold", "release"]);
-
-const SIGNALS: Completion[] = [
-  { label: "sine", type: "constant", detail: "0–1 sine, one period per cycle" },
-  { label: "cosine", type: "constant", detail: "sine starting at 1" },
-  { label: "saw", type: "constant", detail: "rise 0→1 each cycle" },
-  { label: "isaw", type: "constant", detail: "fall 1→0 each cycle" },
-  { label: "tri", type: "constant", detail: "0→1→0 each cycle" },
-  { label: "square", type: "constant", detail: "0, then 1 for the second half" },
-];
+/** What stands at a place: an argument's kind, or the top of the score. */
+type Place = ArgumentKind | "top";
 
 function ancestorOfType(node: SyntaxNode | null, name: string): SyntaxNode | null {
   for (let n: SyntaxNode | null = node; n; n = n.parent) {
@@ -70,102 +49,6 @@ function isClosedString(text: string): boolean {
   return backslashes % 2 === 0;
 }
 
-function pastFirstComma(args: SyntaxNode, pos: number, doc: { sliceString(from: number, to: number): string }): boolean {
-  // Only commas at the OUTER Args nesting level separate arguments.
-  // A raw includes(",") would falsely fire for `every(stack(a,b)|` —
-  // cursor is still in slot 1 of `every`, but the nested `stack(a,b)`
-  // contains a comma. Walk between the opening `(` and the cursor,
-  // tracking paren/bracket nesting and string literals.
-  const text = doc.sliceString(args.from + 1, pos);
-  let depth = 0;
-  let inString = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (ch === "\\") {
-        i++; // skip escaped char
-        continue;
-      }
-      if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === "(" || ch === "[") depth++;
-    else if (ch === ")" || ch === "]") {
-      // Clamp at zero — a stray unmatched close from a typo would
-      // otherwise drive depth negative and prevent any later top-level
-      // comma from being recognized.
-      if (depth > 0) depth--;
-    }
-    else if (ch === "," && depth === 0) return true;
-  }
-  return false;
-}
-
-export function miniliveCompletion(context: CompletionContext): CompletionResult | null {
-  const { state, pos } = context;
-  const tree = syntaxTree(state);
-  const node = tree.resolveInner(pos, -1);
-
-  // ── 1. Inside a String? ───────────────────────────────────
-  if (ancestorOfType(node, "String")) return null;
-  // After `.`, the methods come from the score language.
-  if (context.matchBefore(/\.[A-Za-z_]*$/)) return null;
-
-  // ── 2. Inside Args of `jux(…)` or `every(_, …)` → callbacks ─
-  const argsNode = ancestorOfType(node, "Args");
-  if (argsNode) {
-    const owner = argsNode.parent;
-    if (owner && owner.name === "MemberCall") {
-      const mname = owner.getChild("MethodName");
-      const mtext = mname ? state.doc.sliceString(mname.from, mname.to) : "";
-      const isCallbackSlot =
-        mtext === "jux" || (mtext === "every" && pastFirstComma(argsNode, pos, state.doc));
-      if (isCallbackSlot || CONTROL_METHODS.has(mtext)) {
-        const word = context.matchBefore(/[A-Za-z_]+$/);
-        if (!word && !context.explicit) return null;
-        return {
-          from: word ? word.from : pos,
-          options: isCallbackSlot ? CALLBACKS : SIGNALS,
-          validFor: /^[A-Za-z_0-9]*$/,
-        };
-      }
-    }
-  }
-
-  // ── 3. Top-level prefix ────────────────────────────────────
-  const bindings: Completion[] = [];
-  const seen = new Set<string>();
-  tree.iterate({ enter(node) {
-    if (node.name !== "Binding" || node.to >= pos) return;
-    const name = node.node.getChild("BindingName");
-    if (!name) return;
-    const label = state.doc.sliceString(name.from, name.to);
-    if (!seen.has(label)) {
-      seen.add(label);
-      bindings.push({ label, type: "variable", detail: "named pattern" });
-    }
-  } });
-  const dollarLine = context.matchBefore(/\$?$/);
-  if (dollarLine && (dollarLine.from < dollarLine.to || context.explicit)) {
-    return {
-      from: dollarLine.from,
-      options: [...bindings, ...TOP_LEVEL],
-      validFor: /^\$?$/,
-    };
-  }
-  const ident = context.matchBefore(/[A-Za-z_][A-Za-z_0-9]*$|$/);
-  if (ident && (ident.from < ident.to || context.explicit)) {
-    return {
-      from: ident.from,
-      options: [...bindings, ...TOP_LEVEL],
-      validFor: /^[A-Za-z_0-9]*$/,
-    };
-  }
-
-  return null;
-}
-
 // The String around `pos` when `pos` is inside its notation. The grammar
 // accepts unterminated strings (`'"' (...)* '"'?`): while the user is typing
 // one, `pos === string.to` is inside it; once the closing quote exists, the
@@ -179,72 +62,133 @@ function notationAt(state: EditorState, pos: number): SyntaxNode | null {
   return inside ? string : null;
 }
 
-/** What the score language tells completion; it loads with the score tools. */
-export type ScoreLanguage = Readonly<{
-  vocabulary: Vocabulary;
-  methodsAfter(receiver: string): readonly Call[];
-}>;
-
-// A method as a snippet that fills in its required arguments.
-function methodCompletion(call: Call): Completion {
-  const required = call.required.map(argument => `\${${argument.name}}`).join(", ");
-  return snippetCompletion(`${call.name}(${required})`, { label: call.name, type: "method", detail: call.description });
+// A call as a snippet that fills in its required arguments, quoting those
+// written as strings.
+function callCompletion(call: Call): Completion {
+  const quoted = new Set<ArgumentKind>(["drums", "instruments", "text"]);
+  const slot = (argument: Argument) => quoted.has(argument.kind) ? `"\${${argument.name}}"` : `\${${argument.name}}`;
+  const type = call.position.startsWith("after-") ? "method" : "function";
+  return snippetCompletion(`${call.name}(${call.required.map(slot).join(", ")})`, { label: call.name, type, detail: call.description });
 }
 
-// The kind of the argument `chain` is, when it is an argument of a method.
-function argumentKind(chain: SyntaxNode, state: EditorState, calls: readonly Call[]): ArgumentKind | null {
-  const args = chain.parent?.name === "Expression" ? chain.parent.parent : null;
-  const owner = args?.name === "Args" ? args.parent : null;
-  const name = owner?.name === "MemberCall" ? owner.getChild("MethodName") : null;
-  if (!args || !name) return null;
-  const text = state.doc.sliceString(name.from, name.to);
-  const call = calls.find(candidate => candidate.position === "after-pattern" && candidate.name === text);
-  if (!call) return null;
-  let index = 0;
-  for (let sibling = chain.parent!.prevSibling; sibling; sibling = sibling.prevSibling) index++;
-  return ([...call.required, ...call.optional][index] ?? call.repeated)?.kind ?? null;
+function termCompletion(term: Term, detail = term.description): Completion {
+  return { label: term.name, type: "constant", detail };
 }
 
-// Sound names inside `s("…")` and `.s("…")`, and the methods after `.`.
-export function scoreCompletion(language: ScoreLanguage) {
-  const option = (detail: (sound: Term) => string) => (sound: Term): Completion =>
-    ({ label: sound.name, type: "constant", detail: detail(sound) });
-  const drums = language.vocabulary.drums.map(option(sound => sound.description));
-  const { default: preferred, others } = language.vocabulary.instruments;
-  const signals = new Set(language.vocabulary.signals.map(signal => signal.name));
-  const signalMethods = language.vocabulary.calls.filter(call => call.position === "after-signal").map(methodCompletion);
-  const instruments = [
-    option(sound => `${sound.description} (default)`)(preferred),
-    ...others.map(option(sound => sound.description)),
-  ];
+export function scoreCompletion(language: ScoreLanguage | null) {
+  const vocabulary = language?.vocabulary;
+  const calls = vocabulary?.calls ?? [];
+  const callsAt = (position: Position) => calls.filter(call => call.position === position);
+  const options = {
+    top: [...callsAt("statement"), ...callsAt("pattern")].map(callCompletion),
+    pattern: callsAt("pattern").map(callCompletion),
+    songItem: callsAt("song-item").map(callCompletion),
+    callback: callsAt("callback").map(callCompletion),
+    signalMethods: callsAt("after-signal").map(callCompletion),
+    signals: (vocabulary?.signals ?? []).map(term => termCompletion(term)),
+    drums: (vocabulary?.drums ?? []).map(term => termCompletion(term)),
+    instruments: vocabulary ? [
+      termCompletion(vocabulary.instruments.default, `${vocabulary.instruments.default.description} (default)`),
+      ...vocabulary.instruments.others.map(term => termCompletion(term)),
+    ] : [],
+  };
+  const signals = new Set((vocabulary?.signals ?? []).map(term => term.name));
+
   return (context: CompletionContext): CompletionResult | null => {
     const { state, pos } = context;
+    const tree = syntaxTree(state);
+    const text = (node: SyntaxNode) => state.doc.sliceString(node.from, node.to);
+
+    // The calls a `Call` node can be, by where it stands.
+    const callPositions = (call: SyntaxNode): readonly Position[] => {
+      if (call.parent?.name === "Declaration") return ["statement"];
+      const place = call.parent?.name === "Chain" && call.parent.parent ? placeOf(call.parent.parent) : null;
+      switch (place) {
+        case "top": return ["statement", "pattern"];
+        case "pattern": return ["pattern"];
+        case "song-item": return ["song-item"];
+        case "callback": return ["callback"];
+        default: return [];
+      }
+    };
+    // The argument at `pos` in `args`, by the call that owns it and the
+    // commas before `pos`.
+    const argumentAt = (args: SyntaxNode, at: number): Argument | null => {
+      const owner = args.parent;
+      const name = owner?.getChild(owner.name === "MemberCall" ? "MethodName" : "CallName");
+      if (!owner || !name) return null;
+      const positions: readonly Position[] = owner.name === "MemberCall"
+        ? [owner.parent?.parent && placeOf(owner.parent.parent) === "control" ? "after-signal" : "after-pattern"]
+        : callPositions(owner);
+      const call = calls.find(candidate => positions.includes(candidate.position) && candidate.name === text(name));
+      if (!call) return null;
+      let index = 0;
+      for (let child = args.firstChild; child && child.to <= at; child = child.nextSibling) if (child.name === ",") index++;
+      return [...call.required, ...call.optional][index] ?? call.repeated;
+    };
+    // What stands at `at`, inside `node`.
+    const placeOf = (node: SyntaxNode, at = node.from): Place | null => {
+      for (let n: SyntaxNode | null = node; n; n = n.parent) {
+        switch (n.name) {
+          case "Args": return argumentAt(n, at)?.kind ?? null;
+          case "Group": case "DollarLine": return "pattern";
+          case "Binding": {
+            const equals = n.getChild("=");
+            return equals && at >= equals.to ? "pattern" : null;
+          }
+          case "Program": case "Declaration": return "top";
+        }
+      }
+      return null;
+    };
+    const result = (from: number, offered: readonly Completion[], validFor = WORD): CompletionResult | null =>
+      offered.length === 0 ? null : { from, options: [...offered], validFor };
+
+    // Inside a string: sound names, when the argument takes them.
     const string = notationAt(state, pos);
     if (string) {
-      const owner = string.parent?.name === "Args" ? string.parent.parent : null;
-      const name = owner?.name === "Call" ? owner.getChild("CallName")
-        : owner?.name === "MemberCall" ? owner.getChild("MethodName")
-        : null;
-      if (!name || state.doc.sliceString(name.from, name.to) !== "s") return null;
+      const kind = string.parent?.name === "Args" ? argumentAt(string.parent, string.from)?.kind : null;
+      if (kind !== "drums" && kind !== "instruments") return null;
       const word = context.matchBefore(/[a-z]+$/);
       if (!word && !context.explicit) return null;
-      return { from: word ? word.from : pos, options: owner?.name === "Call" ? drums : instruments, validFor: /^[a-z]*$/ };
+      return result(word ? word.from : pos, kind === "drums" ? options.drums : options.instruments, /^[a-z]*$/);
     }
+    if (ancestorOfType(tree.resolveInner(pos, -1), "String")) return null;
+
+    // After `.`: a signal's methods in a control argument; otherwise the
+    // methods the score language accepts after the receiver.
     const dot = context.matchBefore(/\.[A-Za-z_]*$/);
-    if (!dot) return null;
-    const chain = ancestorOfType(syntaxTree(state).resolveInner(dot.from, -1), "Chain");
-    if (!chain) return null;
-    const result = (options: readonly Completion[]): CompletionResult | null =>
-      options.length === 0 ? null : { from: dot.from + 1, options: [...options], validFor: /^[A-Za-z_0-9]*$/ };
-    // A signal is written only in a control argument, and its methods do not
-    // depend on it.
-    if (argumentKind(chain, state, language.vocabulary.calls) === "control") {
-      const head = chain.firstChild?.name === "Call" ? chain.firstChild.getChild("CallName") : null;
-      return head && signals.has(state.doc.sliceString(head.from, head.to)) ? result(signalMethods) : null;
+    if (dot) {
+      const chain = ancestorOfType(tree.resolveInner(dot.from, -1), "Chain");
+      if (!chain || !language) return null;
+      if (chain.parent && placeOf(chain.parent) === "control") {
+        const head = chain.firstChild?.name === "Call" ? chain.firstChild.getChild("CallName") : null;
+        return head && signals.has(text(head)) ? result(dot.from + 1, options.signalMethods) : null;
+      }
+      // The receiver before the `.`, after the `let` bindings before it.
+      const bindings = tree.topNode.getChildren("Binding").filter(binding => binding.to <= chain.from);
+      const receiver = [...bindings.map(text), state.doc.sliceString(chain.from, dot.from)].join("\n");
+      return result(dot.from + 1, language.methodsAfter(receiver).map(callCompletion));
     }
-    // The receiver before the `.`, after the `let` bindings before it.
-    const bindings = syntaxTree(state).topNode.getChildren("Binding").filter(binding => binding.to <= chain.from);
-    const receiver = [...bindings.map(binding => state.doc.sliceString(binding.from, binding.to)), state.doc.sliceString(chain.from, dot.from)].join("\n");
-    return result(language.methodsAfter(receiver).map(methodCompletion));
+
+    // A name being written: what its place takes.
+    const word = context.matchBefore(/(?:\$:?|[A-Za-z_][A-Za-z_0-9]*)$/);
+    if (!word && !context.explicit) return null;
+    const from = word ? word.from : pos;
+    const bindings: Completion[] = [];
+    for (const binding of tree.topNode.getChildren("Binding")) {
+      const name = binding.getChild("BindingName");
+      if (binding.to < pos && name && !bindings.some(earlier => earlier.label === text(name))) {
+        bindings.push({ label: text(name), type: "variable", detail: "named pattern" });
+      }
+    }
+    switch (placeOf(tree.resolveInner(pos, -1), from)) {
+      case "top": return result(from, [...bindings, ...KEYWORDS, ...options.top], /^(?:\$:?|[A-Za-z_0-9]*)$/);
+      case "pattern": return result(from, [...bindings, ...options.pattern]);
+      case "song-item": return result(from, options.songItem);
+      case "callback": return result(from, options.callback);
+      case "control": return result(from, options.signals);
+      default: return null;
+    }
   };
 }
