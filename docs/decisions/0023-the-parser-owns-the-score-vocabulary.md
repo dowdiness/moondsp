@@ -1,6 +1,6 @@
 # ADR-0023: The parser owns the score vocabulary
 
-- **Status:** Proposed 2026-11-24.
+- **Status:** Accepted 2026-11-24. All four steps are implemented.
 - **Date:** 2026-11-24
 - **Source:** [Amp thread T-01a1f1e8](https://ampcode.com/threads/T-01a1f1e8-a809-7228-bb5b-ef3c2fd0b344)
 - **Related:** [ADR-0022 score events carry the sound they play](0022-score-events-carry-their-sound.md)
