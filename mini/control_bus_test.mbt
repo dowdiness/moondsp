@@ -245,7 +245,7 @@ test "continuous bus signal is exact under rev and inside sequence" {
   // rev mirrors within the cycle: t -> 2c + 1 - t, and the ramp reads it.
   let read = gain_reader(reversed)
   @debug.assert_eq(times.map(t => read(t.num, t.den).get().unwrap()), [
-    0.875, 0.625, 0.9375,
+    0.875, 0.625, 1.9375,
   ])
   // Slot 0 of 2 maps [c, c + 1/2) onto the child's [0, 1).
   let read = gain_reader(in_slot)
@@ -399,6 +399,12 @@ test "ramp, fadeIn, and fadeOut run once and then hold their end value" {
   @debug.assert_eq(gain(".fadeIn(4)", bus_r(1L, 1L)), 0.25)
   // fadeOut multiplies an inner gain; a decimal length stays exact.
   @debug.assert_eq(gain(".gain(4).fadeOut(2.5)", bus_r(1L, 2L)), 3.2)
+  // rev mirrors each cycle in place, so the fade keeps going: cycle 2
+  // reads 2.75 at 2.25, and cycle 4 stays silent.
+  @debug.assert_eq(
+    [bus_r(9L, 4L), bus_r(9L, 2L)].map(t => gain(".fadeOut(4).rev()", t)),
+    [0.3125, 0.0],
+  )
   // ramp keeps its top after range and slow.
   @debug.assert_eq(times.map(t => gain(".gain(ramp.range(2, 6).slow(2))", t)), [
     6.0, 6.0, 6.0, 6.0,

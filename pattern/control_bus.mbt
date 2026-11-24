@@ -326,7 +326,7 @@ priv enum BusSignal {
   Fast(Int64, Int64, BusSignal)
   /// Local time = time − num / den.
   Shift(Int64, Int64, BusSignal)
-  /// Mirror each cycle.
+  /// Mirror each cycle in place: t -> 2c + 1 - t in cycle c.
   Rev(BusSignal)
   /// Equal slots; each child sees its own [0, 1).
   Sequence(Array[BusSignal])
@@ -404,7 +404,7 @@ fn BusSignal::eval(
     }
     Rev(child) => {
       let cycle = bus_floor(num, den, left)
-      child.eval((cycle + 1L) * den - num, den, !left)
+      child.eval((2L * cycle + 1L) * den - num, den, !left)
     }
     Sequence(children) => {
       let n = children.length().to_int64()

@@ -188,6 +188,25 @@ test "rev of fast(2) mirrors the two events" {
 }
 
 ///|
+test "rev of a pattern longer than one cycle reverses each of its cycles" {
+  // Cycle 0 holds 1 2, cycle 1 holds 3 4; rev must not replay cycle 0.
+  let p = @pattern.sequence([
+      @pattern.Pat::pure(1),
+      @pattern.Pat::pure(2),
+      @pattern.Pat::pure(3),
+      @pattern.Pat::pure(4),
+    ])
+    .slow(r(2, 1))
+    .rev()
+  let events = p.query(span(0, 1, 2, 1))
+  events.sort_by((a, b) => a.part.begin.compare(b.part.begin))
+  @debug.assert_eq(
+    events.map(e => (e.value, e.part.begin.num, e.part.begin.den)),
+    [(2, 0, 1), (1, 1, 2), (4, 1, 1), (3, 3, 2)],
+  )
+}
+
+///|
 test "fast(0) returns silence (no events)" {
   let p = @pattern.Pat::pure(42).fast(r(0, 1))
   let events = p.query(span(0, 1, 1, 1))

@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `rev()` reverses each cycle in place. A pattern longer than one cycle, such
+  as `note("60 64 67").slow(3).rev()`, used to replay its first cycle forever,
+  and a control under `rev` read its signal from the first cycle, so
+  `.fadeOut(4).rev()` and `saw.slow(4)` under `every(n, rev)` or `jux(rev)`
+  stopped moving after it.
 - Notation that is valid but over a playback limit, such as
   `note("c4(3,200) e4")`, no longer reports "Couldn't prepare this code"
   before the player's format is known. Quoted notation is now parsed once into

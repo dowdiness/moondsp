@@ -196,26 +196,22 @@ pub fn[A] Pat::rev(self : Pat[A]) -> Pat[A] {
       .whole_cycles()
       .iter()
       .flat_map(cycle_arc => {
-        // Determine the full cycle boundaries from cycle_arc.begin
+        // Mirror within cycle c: t -> 2c + 1 - t, which keeps the cycle, so
+        // a pattern longer than one cycle reverses each of its own cycles.
         let cycle_start = Rational(cycle_arc.begin.floor(), 1L)
-        let cycle_end = cycle_start + one
-        // Mirror the query sub-arc within the cycle:
-        // [begin, end) -> [cycle_end - end, cycle_end - begin)
+        let mirror = cycle_start + cycle_start + one
         let mirror_arc = TimeSpan(
-          cycle_end - cycle_arc.end_,
-          cycle_end - cycle_arc.begin,
+          mirror - cycle_arc.end_,
+          mirror - cycle_arc.begin,
         )
         inner
         .query(mirror_arc)
         .iter()
         .map(ev => {
           // Mirror part back
-          let new_part = TimeSpan(
-            cycle_end - ev.part.end_,
-            cycle_end - ev.part.begin,
-          )
+          let new_part = TimeSpan(mirror - ev.part.end_, mirror - ev.part.begin)
           let new_whole = ev.whole.map(w => {
-            TimeSpan(cycle_end - w.end_, cycle_end - w.begin)
+            TimeSpan(mirror - w.end_, mirror - w.begin)
           })
           { whole: new_whole, part: new_part, value: ev.value, }
         })
