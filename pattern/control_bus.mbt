@@ -268,16 +268,10 @@ pub fn Controls::placed(self : Controls, placement : Placement) -> Controls {
 ///|
 /// `signal` on this event's clock.
 fn Controls::place(self : Controls, signal : BusSignal) -> BusSignal {
-  let { origin, rate, } = self.placement
-  let scaled : BusSignal = if rate == Rational::from_int(1) {
+  if self.placement.is_identity() {
     signal
   } else {
-    Fast(rate.num, rate.den, signal)
-  }
-  if origin.num == 0L {
-    scaled
-  } else {
-    Shift(origin.num, origin.den, scaled)
+    Mapped(self.placement.time_map(), [signal])
   }
 }
 
@@ -322,16 +316,9 @@ priv enum BusSignal {
   Const(Double)
   /// A function of time; a `NaN` result counts as absent.
   Continuous((Double) -> Double)
-  /// Local time = time × num / den.
-  Fast(Int64, Int64, BusSignal)
-  /// Local time = time − num / den.
-  Shift(Int64, Int64, BusSignal)
-  /// Mirror each cycle in place: t -> 2c + 1 - t in cycle c.
-  Rev(BusSignal)
-  /// Equal slots; each child sees its own [0, 1).
-  Sequence(Array[BusSignal])
-  /// Weighted slots; `bounds` holds the n + 1 cumulative weights.
-  Weighted(Array[BusSignal], Array[Int64])
+  /// Each piece of the map reads its child (one per slot) at the mapped
+  /// time; a silent slot's child is `Absent`.
+  Mapped(TimeMap, Array[BusSignal])
   /// `(n, plain, transformed)`: cycles ≡ 0 mod n read `transformed`.
   Every(Int64, BusSignal, BusSignal)
   /// The last child with a value wins, like the merge fold.
@@ -358,21 +345,6 @@ fn bus_gcd(a : Int64, b : Int64) -> Int64 {
 }
 
 ///|
-/// The floor of `num / den`. With `left`, the limit from below: an exact
-/// integer belongs to the previous unit, because a sample at `t` stands for
-/// `[t, t + ε)` and mirroring turns that into `(t' - ε, t']`.
-fn bus_floor(num : Int64, den : Int64, left : Bool) -> Int64 {
-  let q = num / den
-  let r = num % den
-  let q = if r < 0L { q - 1L } else { q }
-  if left && r == 0L {
-    q - 1L
-  } else {
-    q
-  }
-}
-
-///|
 fn BusSignal::eval(
   self : BusSignal,
   num : Int64,
@@ -384,53 +356,35 @@ fn BusSignal::eval(
     Const(value) => @control.ControlValue::of(value)
     Continuous(f) =>
       @control.ControlValue::of(f(num.to_double() / den.to_double()))
-    Fast(fnum, fden, child) => {
-      // A non-positive factor silences the pattern (`Pat::fast`/`slow`), so
-      // the bus has no value; it must not divide by a zero denominator.
-      guard fnum > 0L && fden > 0L else {
-        return @control.ControlValue::absent()
+    Mapped(map, children) => {
+      let cycle = map.cycle_at(num, den, left)
+      let slot = map.slot_at(num, den, left, cycle)
+      // child = (an / ad)·(num / den) + bn / bd, over one denominator.
+      let an = map.scale_num()
+      let ad = map.scale_den(slot)
+      let bn = map.offset_num(cycle, slot)
+      let bd = map.offset_den(slot)
+      // `b` shares `a`'s denominator or has none, except for a placement
+      // with both an origin and a rate.
+      let (n, d) = if bd == 1L {
+        (num * an + bn * den * ad, den * ad)
+      } else if bd == ad {
+        (num * an + bn * den, den * ad)
+      } else {
+        let common = bus_gcd(ad, bd)
+        (
+          num * an * (bd / common) + bn * den * (ad / common),
+          den * ad * (bd / common),
+        )
       }
-      let n = num * fnum
-      let d = den * fden
-      let g = bus_gcd(n, d)
-      let g = if g == 0L { 1L } else { g }
-      child.eval(n / g, d / g, left)
-    }
-    Shift(snum, sden, child) => {
-      let n = num * sden - snum * den
-      let d = den * sden
-      let g = bus_gcd(n, d)
-      child.eval(n / g, d / g, left)
-    }
-    Rev(child) => {
-      let cycle = bus_floor(num, den, left)
-      child.eval((2L * cycle + 1L) * den - num, den, !left)
-    }
-    Sequence(children) => {
-      let n = children.length().to_int64()
-      let cycle = bus_floor(num, den, left)
-      let pos = (num - cycle * den) * n
-      let slot = bus_floor(pos, den, left)
-      children[slot.to_int()].eval(pos - slot * den, den, left)
-    }
-    Weighted(children, bounds) => {
-      let total = bounds[bounds.length() - 1]
-      let cycle = bus_floor(num, den, left)
-      let pos = (num - cycle * den) * total
-      let mut slot = 0
-      while slot + 1 < children.length() &&
-            (if left {
-              bounds[slot + 1] * den < pos
-            } else {
-              bounds[slot + 1] * den <= pos
-            }) {
-        slot += 1
-      }
-      let width = bounds[slot + 1] - bounds[slot]
-      children[slot].eval(pos - bounds[slot] * den, den * width, left)
+      // Reduce only when the denominator grew, so nested maps stay in range;
+      // equal slots and integer factors keep it.
+      let g = if d == den { 1L } else { bus_gcd(n, d) }
+      // A decreasing map turns a limit from below into one from above.
+      children[slot].eval(n / g, d / g, if an < 0L { !left } else { left })
     }
     Every(n, plain, transformed) => {
-      let cycle = bus_floor(num, den, left)
+      let cycle = time_floor(num, den, left)
       if (cycle % n + n) % n == 0L {
         transformed.eval(num, den, left)
       } else {
@@ -461,7 +415,8 @@ fn BusSignal::eval(
 fn BusSignal::is_constant(self : BusSignal) -> Bool {
   match self {
     Absent | Const(_) => true
-    Fast(_, _, child) | Shift(_, _, child) | Rev(child) => child.is_constant()
+    Mapped(Slots(_), _) => false
+    Mapped(_, children) => children[0].is_constant()
     _ => false
   }
 }
@@ -476,14 +431,11 @@ fn BusSignal::of_value(value : Double) -> BusSignal {
 }
 
 ///|
-fn BusSignal::transformed(
-  self : BusSignal,
-  transform : TimeTransform,
-) -> BusSignal {
-  match transform {
-    Fast(factor) => Fast(factor.num, factor.den, self)
-    Slow(factor) => Fast(factor.den, factor.num, self)
-    Reverse => Rev(self)
+/// This signal through `map`; `None` silences it.
+fn BusSignal::through(self : BusSignal, map : TimeMap?) -> BusSignal {
+  match map {
+    Some(map) => Mapped(map, [self])
+    None => Absent
   }
 }
 
@@ -499,7 +451,8 @@ fn euclid_slots(
   }
   let pattern = bjorklund(k, n)
   let r = (rotation % n + n) % n
-  Sequence(
+  Mapped(
+    TimeMap::sequence(n),
     Array::makei(n, i => if pattern[(i + r) % n] { hit } else { Absent }),
   )
 }
@@ -511,15 +464,6 @@ fn slot_signals(
   hit : BusSignal,
 ) -> Array[BusSignal] {
   Array::makei(count, i => if i == index { hit } else { Absent })
-}
-
-///|
-fn weight_bounds(weights : Array[Int32]) -> Array[Int64] {
-  let bounds = [0L]
-  for weight in weights {
-    bounds.push(bounds[bounds.length() - 1] + weight.to_int64())
-  }
-  bounds
 }
 
 ///|
@@ -601,21 +545,24 @@ fn[A : WithControls] compile_signal(
       }
     Runtime(_) => raise UnsupportedControl(id)
     Silence => Absent
-    Fast(child, factor) => Fast(factor.num, factor.den, sub(child))
-    Slow(child, factor) => Fast(factor.den, factor.num, sub(child))
-    Rev(child) => Rev(sub(child))
+    Fast(child, factor) =>
+      sub(child).through(TimeTransform::Fast(factor).time_map())
+    Slow(child, factor) =>
+      sub(child).through(TimeTransform::Slow(factor).time_map())
+    Rev(child) => sub(child).through(Some(MirrorCycles))
     Euclid(child, k, n, rotation) => euclid_slots(k, n, rotation, sub(child))
     Every(child, n, transform) => {
       let plain = sub(child)
       if n <= 0 {
         plain
       } else {
-        Every(n.to_int64(), plain, plain.transformed(transform))
+        Every(n.to_int64(), plain, plain.through(transform.time_map()))
       }
     }
-    Sequence(children) => Sequence(children.map(sub))
+    Sequence(children) =>
+      Mapped(TimeMap::sequence(children.length()), children.map(sub))
     WeightedSequence(children, weights) =>
-      Weighted(children.map(sub), weight_bounds(weights))
+      Mapped(TimeMap::weighted(weights), children.map(sub))
     Stack(children) => Stack(children.map(sub))
     MergeControl(left, right) =>
       match key {

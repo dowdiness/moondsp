@@ -137,8 +137,7 @@ pub fn[A] Pat::query(self : Pat[A], arc : TimeSpan) -> Array[Event[A]] {
 /// The inner pattern sees time `factor` times faster; its events come back on
 /// the caller's clock (`TimeMap::Affine`).
 pub fn[A] Pat::fast(self : Pat[A], factor : Rational) -> Pat[A] {
-  guard factor.num > 0L else { return Pat::silence() }
-  let map = TimeMap::Affine(factor, Rational::from_int(0))
+  guard TimeMap::scaled(factor) is Some(map) else { return Pat::silence() }
   guard !(self.body is Silence) else {
     return make_pat(
       self.query,

@@ -1317,7 +1317,9 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let child = lower(child)
       let result = child
         .transform(pat => prepend(pat.fast(factor)))
-        .map_buses(signal => Fast(factor.num, factor.den, signal))
+        .map_buses(signal => {
+          signal.through(TimeTransform::Fast(factor).time_map())
+        })
       if factor.num <= 0L {
         CompiledPattern(result.pat, [], buses=result.buses)
       } else {
@@ -1328,7 +1330,9 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let child = lower(child)
       let result = child
         .transform(pat => prepend(pat.slow(factor)))
-        .map_buses(signal => Fast(factor.den, factor.num, signal))
+        .map_buses(signal => {
+          signal.through(TimeTransform::Slow(factor).time_map())
+        })
       if factor.num <= 0L {
         CompiledPattern(result.pat, [], buses=result.buses)
       } else {
@@ -1340,7 +1344,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     Rev(child) =>
       lower(child)
       .transform(pat => prepend(pat.rev()))
-      .map_buses(signal => Rev(signal))
+      .map_buses(signal => signal.through(Some(MirrorCycles)))
     // The map sees the child's controls with their bus values, on the
     // child's clock. Returning them unchanged keeps the own values and their
     // buses; a replaced value becomes the event's own values and follows no
@@ -1409,7 +1413,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       } else {
         child.buses.map(bus => {
           bus.map_signal(signal => {
-            Every(n.to_int64(), signal, signal.transformed(transform))
+            Every(n.to_int64(), signal, signal.through(transform.time_map()))
           })
         })
       }
@@ -1437,7 +1441,9 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       ).map_payload(value => value.remap(value.value, scope))
       let buses = child.buses.copy()
       for bus in child.buses {
-        buses.push(bus.map_signal(signal => signal.transformed(transform)))
+        buses.push(
+          bus.map_signal(signal => signal.through(transform.time_map())),
+        )
       }
       CompiledPattern(pat, opaque_compiled_entries(pat, id), buses~)
     }
@@ -1540,7 +1546,7 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
       let (children, buses) = concat_child_buses(children.map(lower), (
         index,
         signal,
-      ) => Sequence(slot_signals(count, index, signal)))
+      ) => Mapped(TimeMap::sequence(count), slot_signals(count, index, signal)))
       let pats = children.map(child => child.pat)
       {
         ..CompiledPattern::single_material(prepend(sequence(pats)), id),
@@ -1549,11 +1555,12 @@ fn[A, O : DocumentOrigin] compile_pattern_node(
     }
     WeightedSequence(children, weights) => {
       let count = children.length()
-      let bounds = weight_bounds(weights)
       let (children, buses) = concat_child_buses(children.map(lower), (
         index,
         signal,
-      ) => Weighted(slot_signals(count, index, signal), bounds))
+      ) => {
+        Mapped(TimeMap::weighted(weights), slot_signals(count, index, signal))
+      })
       let pats = children.map(child => child.pat)
       let compiled = CompiledPattern::single_material(
         prepend(sequence_weighted(pats, weights)),

@@ -5,7 +5,7 @@ pub fn[A] sequence(pats : Array[Pat[A]]) -> Pat[A] {
     return Pat::silence()
   }
   let pats = pats.copy()
-  let map = TimeMap::Slots(Array::makei(n + 1, i => i.to_int64()))
+  let map = TimeMap::sequence(n)
   make_pat(
     arc => map.query(pats, arc),
     map.period(Rational::from_int(1)),
@@ -32,7 +32,7 @@ pub fn[A] sequence_weighted(
     guard total <= 256 else { return Pat::silence() }
   }
   let pats = pats.copy()
-  let map = TimeMap::Slots(weight_bounds(weights))
+  let map = TimeMap::weighted(weights)
   let signature = combine_signature(
     "weighted_sequence:\{weights.map(weight => "\{weight}").join(",")}",
     pats,

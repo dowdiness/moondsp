@@ -69,22 +69,14 @@ fn Placement::then(self : Placement, outer : Placement) -> Placement {
 ///|
 /// `span` from the local clock on the outer clock.
 fn Placement::span(self : Placement, span : TimeSpan) -> TimeSpan {
-  if self.rate == Rational::from_int(1) {
-    return span.shift(self.origin)
-  }
-  TimeSpan(
-    span.begin / self.rate + self.origin,
-    span.end_ / self.rate + self.origin,
-  )
+  let (a, b) = inverse_affine(self.rate, self.offset())
+  map_span(span, a, b)
 }
 
 ///|
 /// `span` from the outer clock on the local clock.
 pub fn Placement::local_span(self : Placement, span : TimeSpan) -> TimeSpan {
-  TimeSpan(
-    (span.begin - self.origin) * self.rate,
-    (span.end_ - self.origin) * self.rate,
-  )
+  map_span(span, self.rate, self.offset())
 }
 
 ///|
