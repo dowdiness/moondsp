@@ -52,6 +52,8 @@ export type Call = Readonly<{
 export type Vocabulary = Readonly<{
   drums: readonly Term[];
   instruments: Readonly<{ default: Term; others: readonly Term[] }>;
+  /** Recorded samples, accepted by both `s("…")` and `.s("…")` (ADR-0026). */
+  samples: readonly Term[];
   signals: readonly Term[];
   calls: readonly Call[];
 }>;
@@ -97,6 +99,7 @@ export function vocabulary(): Vocabulary {
   return Object.freeze({
     drums: list(wire.drums, decodeTerm),
     instruments: Object.freeze({ default: decodeTerm(instruments.default), others: list(instruments.others, decodeTerm) }),
+    samples: list(wire.samples, decodeTerm),
     signals: list(wire.signals, decodeTerm),
     calls: list(wire.calls, decodeCall),
   });

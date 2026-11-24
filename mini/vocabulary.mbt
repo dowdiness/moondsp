@@ -447,6 +447,8 @@ pub impl ToJson for Instruments with fn to_json(self) {
 pub struct Vocabulary {
   drums : Array[Term]
   instruments : Instruments
+  /// The recorded samples, which both `s("…")` and `.s("…")` accept (ADR-0026).
+  samples : Array[Term]
   signals : Array[Term]
   calls : Array[Call]
 }
@@ -456,6 +458,7 @@ pub impl ToJson for Vocabulary with fn to_json(self) {
   {
     "drums": ToJson::to_json(self.drums),
     "instruments": ToJson::to_json(self.instruments),
+    "samples": ToJson::to_json(self.samples),
     "signals": ToJson::to_json(self.signals),
     "calls": ToJson::to_json(self.calls),
   }
@@ -479,6 +482,10 @@ pub fn vocabulary() -> Vocabulary {
       .filter(other => other != default)
       .map(instrument),
     },
+    samples: @score.Sample::all().map(sample => {
+      name: sample.name(),
+      description: sample.description(),
+    }),
     signals: MiniShape::all().map(shape => {
       name: shape.name(),
       description: shape.description(),
@@ -577,7 +584,7 @@ fn PatternCall::call(self : PatternCall) -> Call {
 fn PatternCall::signature(self : PatternCall) -> Signature {
   match self {
     Literal(Sound) =>
-      signature("drum sounds", required=[argument("drums", Drums)])
+      signature("drum or sample sounds", required=[argument("drums", Drums)])
     Literal(Note) =>
       signature("MIDI numbers or note names", required=[argument("notes", Text)])
     Literal(Chord) =>
@@ -699,7 +706,7 @@ fn Method::signature(self : Method) -> Signature {
         argument("f", Callback),
       ])
     Instrument =>
-      signature("play notes on an instrument", required=[
+      signature("play notes on an instrument or sample", required=[
         argument("instruments", Instruments),
       ])
   }

@@ -267,6 +267,7 @@ pub fn TextEdit::TextEdit(from~ : Int32, to~ : Int32, inserted~ : String) -> Sel
 pub struct Vocabulary {
   drums : Array[Term]
   instruments : Instruments
+  samples : Array[Term]
   signals : Array[Term]
   calls : Array[Call]
 }

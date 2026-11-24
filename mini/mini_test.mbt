@@ -2318,6 +2318,18 @@ test "every vocabulary call parses as it describes its arguments" {
 }
 
 ///|
+test "every vocabulary sample plays through s and .s" {
+  let samples = @mini.vocabulary().samples
+  assert_true(samples.length() > 0)
+  for sample in samples {
+    for
+      source in ["s(\"\{sample.name}\")", "note(\"C4\").s(\"\{sample.name}\")"] {
+      assert_true(@mini.parse_play_source(source) is Ok(_), msg=source)
+    }
+  }
+}
+
+///|
 test "unknown names are errors that list their position's names" {
   for
     case in [

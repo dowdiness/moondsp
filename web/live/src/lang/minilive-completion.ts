@@ -23,10 +23,11 @@ type Names = Readonly<{
   signals: readonly Term[];
   drums: readonly Term[];
   instruments: readonly Completion[];
+  samples: readonly Term[];
   methodsAfter(receiver: string): readonly Call[];
 }>;
 
-const NO_NAMES: Names = { calls: [], signals: [], drums: [], instruments: [], methodsAfter: () => [] };
+const NO_NAMES: Names = { calls: [], signals: [], drums: [], instruments: [], samples: [], methodsAfter: () => [] };
 
 function namesOf({ vocabulary, methodsAfter }: ScoreLanguage): Names {
   const { default: preferred, others } = vocabulary.instruments;
@@ -35,6 +36,7 @@ function namesOf({ vocabulary, methodsAfter }: ScoreLanguage): Names {
     signals: vocabulary.signals,
     drums: vocabulary.drums,
     instruments: [termCompletion(preferred, `${preferred.description} (default)`), ...others.map(term => termCompletion(term))],
+    samples: vocabulary.samples,
     methodsAfter,
   };
 }
@@ -110,8 +112,9 @@ export function scoreCompletion(language: ScoreLanguage | null) {
     callback: callsAt("callback"),
     signalMethods: callsAt("after-signal"),
     signals: names.signals.map(term => termCompletion(term)),
-    drums: names.drums.map(term => termCompletion(term)),
-    instruments: names.instruments,
+    // `s("…")` takes drums and samples, `.s("…")` instruments and samples (ADR-0026).
+    drums: [...names.drums, ...names.samples].map(term => termCompletion(term)),
+    instruments: [...names.instruments, ...names.samples.map(term => termCompletion(term))],
   };
   const signals = new Set(names.signals.map(term => term.name));
 

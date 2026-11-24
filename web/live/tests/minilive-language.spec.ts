@@ -218,13 +218,13 @@ test("MiniLive completes instrument names in .s and offers .s only on receivers 
   await editor.press("Escape");
   await replaceCode(page, 'note("C4").s("');
   await editor.press("Control+Space");
-  await expect(labels).toHaveText(["bass", "pad", "pluck", "sawtooth", "triangle"]);
+  await expect(labels).toHaveText(["bass", "burst", "pad", "ping", "pluck", "sawtooth", "triangle"]);
   await expect(page.locator(".cm-completionDetail").filter({ hasText: "(default)" })).toHaveText(["soft triangle tone (default)"]);
   await labels.filter({ hasText: /^pad$/ }).click();
   await expect.poll(() => readCode(page)).toBe('note("C4").s("pad');
   await replaceCode(page, 's("');
   await editor.press("Control+Space");
-  await expect(labels).toHaveText(["bd", "cp", "hh", "oh", "sd"]);
+  await expect(labels).toHaveText(["bd", "burst", "cp", "hh", "oh", "ping", "sd"]);
   await expect(page.locator(".cm-completionDetail").filter({ hasText: "kick drum" })).toHaveCount(1);
 });
 
@@ -256,8 +256,8 @@ test("completion offers each position's names from the vocabulary", () => {
     ['note("C4").lpf(200, |', ["ramp", "sine", "cosine", "saw", "isaw", "tri", "square"]],
     ['note("C4").lpf(sine.range(0, |', null],
     ['note("C4").fast(|', null],
-    ['s("|', ["bd", "sd", "cp", "hh", "oh"]],
-    ['note("C4").s("|', ["triangle", "bass", "pad", "pluck", "sawtooth"]],
+    ['s("|', ["bd", "sd", "cp", "hh", "oh", "ping", "burst"]],
+    ['note("C4").s("|', ["triangle", "bass", "pad", "pluck", "sawtooth", "ping", "burst"]],
     ['note("|', null],
     ['note("C4").|', ["fast", "slow", "fadeIn", "fadeOut", "gate", "rev", "degradeBy", "lpf", "hpf", "attack", "hold", "release", "gain", "pan", "room", "every", "jux", "s"]],
   ] as const) {
