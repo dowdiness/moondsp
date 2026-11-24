@@ -1,0 +1,7 @@
+services:
+  live:
+    # `predev` rebuilds the wasm and authoring adapter from the MoonBit source first.
+    command: npm run dev -- --host 127.0.0.1 --port "$PORT" --strictPort
+    cwd: web/live
+    portal:
+      title: moondsp live editor
