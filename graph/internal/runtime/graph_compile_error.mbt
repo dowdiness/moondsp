@@ -198,6 +198,7 @@ fn build_graph_program(
   Ok({
     sample_rate,
     block_size: compiled_block_size(context),
+    samples: context.samples(),
     nodes: fixed_nodes,
     index_map: topo_map,
     feedback_edges,
@@ -378,7 +379,8 @@ fn invalid_compile_node(
       )
     Oscillator => invalid_oscillator_node(index, node, node_count)
     Noise => None
-    Adsr => invalid_adsr_node(index, node)
+    SamplePlayer => invalid_finite_params(index, node, 3)
+    Adsr => invalid_finite_params(index, node, 4)
     Biquad | StereoBiquad =>
       invalid_biquad_node(index, node, node_count, sample_rate)
     Delay | StereoDelay => invalid_delay_node(index, node, node_count)
@@ -412,14 +414,19 @@ fn invalid_oscillator_node(
 }
 
 ///|
-fn invalid_adsr_node(index : Int32, node : DspNode) -> GraphCompileError? {
+/// The first of the node's `count` leading value slots that is not finite.
+fn invalid_finite_params(
+  index : Int32,
+  node : DspNode,
+  count : Int32,
+) -> GraphCompileError? {
   let params : Array[(GraphParamSlot, Double)] = [
     (GraphParamSlot::Value0, node.value0()),
     (GraphParamSlot::Value1, node.value1()),
     (GraphParamSlot::Value2, node.value2()),
     (GraphParamSlot::Value3, node.value3()),
   ]
-  for param in params {
+  for param in params[:count] {
     match invalid_finite_param(index, node.kind(), param.0, param.1) {
       Some(error) => return Some(error)
       None => ()

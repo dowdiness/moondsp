@@ -3,18 +3,39 @@
 pub struct DspContext {
   priv sample_rate : Double
   priv block_size : Int32
+  priv samples : SampleStore
 }
 
 ///|
-/// Create a DSP context with normalized runtime parameters.
+/// Create a DSP context with normalized runtime parameters. Graphs compiled
+/// with it read recorded waveforms from `samples`, which defaults to a store
+/// with no entries (ADR-0026 Decision 2).
 pub fn DspContext::DspContext(
   sample_rate~ : Double,
   block_size~ : Int32,
+  samples~ : SampleStore = empty_sample_store,
 ) -> DspContext {
   {
     sample_rate: normalize_sample_rate(sample_rate),
     block_size: normalize_block_size(block_size),
+    samples,
   }
+}
+
+///|
+/// This context with another block size and the same sample rate and store.
+/// Derive contexts with this instead of constructing one, so the store stays.
+pub fn DspContext::with_block_size(
+  self : DspContext,
+  block_size : Int32,
+) -> DspContext {
+  { ..self, block_size: normalize_block_size(block_size), }
+}
+
+///|
+/// The store graphs compiled with this context read waveforms from.
+pub fn DspContext::samples(self : DspContext) -> SampleStore {
+  self.samples
 }
 
 ///|

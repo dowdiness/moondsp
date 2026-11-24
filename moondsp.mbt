@@ -16,6 +16,9 @@ pub using @dsp {
   // DSP primitives — stateful
   type Oscillator,
   type Noise,
+  type SamplePlayer,
+  type SampleStore,
+  type SampleLimit,
   type Adsr,
   type Biquad,
   type DelayLine,

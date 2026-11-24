@@ -39,6 +39,16 @@ fn process_node_block(
         )
       }
     Noise => graph.noise_states[index].unwrap().process(context, buffer)
+    SamplePlayer =>
+      graph.sample_states[index]
+      .unwrap()
+      .process(
+        context,
+        buffer,
+        number=node.value0(),
+        pitch=node.value1(),
+        speed=node.value2(),
+      )
     Adsr => graph.env_states[index].unwrap().process(context, buffer)
     Biquad => {
       copy_buffer(graph.buffers[node.input0()], buffer, sample_count)

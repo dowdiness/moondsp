@@ -41,7 +41,7 @@ fn valid_feedback_terminal_mono_graph(
         } else {
           MONO_SIGNAL_SHAPE
         }
-      Noise => MONO_SIGNAL_SHAPE
+      Noise | SamplePlayer => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad =>
         match
@@ -242,7 +242,7 @@ fn valid_terminal_mono_shapes(nodes : FixedArray[@model.DspNode]) -> Bool {
         } else {
           MONO_SIGNAL_SHAPE
         }
-      Noise => MONO_SIGNAL_SHAPE
+      Noise | SamplePlayer => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad =>
         match input_shape(node.input0(), shapes) {
@@ -346,7 +346,7 @@ fn compiled_stereo_shapes(
         } else {
           MONO_SIGNAL_SHAPE
         }
-      Noise => MONO_SIGNAL_SHAPE
+      Noise | SamplePlayer => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad =>
         match input_shape(node.input0(), shapes) {
@@ -468,7 +468,7 @@ fn compiled_feedback_stereo_shapes(
         } else {
           MONO_SIGNAL_SHAPE
         }
-      Noise => MONO_SIGNAL_SHAPE
+      Noise | SamplePlayer => MONO_SIGNAL_SHAPE
       Adsr => MONO_SIGNAL_SHAPE
       Biquad => {
         let s = feedback_resolved_input_shape(

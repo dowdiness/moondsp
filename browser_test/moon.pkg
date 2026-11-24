@@ -1,6 +1,7 @@
 import {
   "dowdiness/moondsp",
   "moonbitlang/core/json",
+  "moonbitlang/core/math",
   "moonbitlang/core/ref",
 }
 
@@ -51,6 +52,9 @@ options(
         "sample_copy_write",
         "sample_copy_sample",
         "sample_copy_checksum",
+        "sample_store_create",
+        "sample_player_probe_init",
+        "sample_player_probe_process",
       ],
     },
     "wasm-gc": {
@@ -92,6 +96,9 @@ options(
         "sample_copy_write",
         "sample_copy_sample",
         "sample_copy_checksum",
+        "sample_store_create",
+        "sample_player_probe_init",
+        "sample_player_probe_process",
       ],
     },
   },

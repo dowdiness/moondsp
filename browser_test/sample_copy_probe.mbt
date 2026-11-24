@@ -45,3 +45,95 @@ pub fn sample_copy_checksum() -> Double {
   }
   sum
 }
+
+///|
+/// Measurement prototype for ADR-0026 stage 3: the store a host would make at
+/// start-up, so JS can time making it.
+let sample_store_probe : @ref.Ref[@moondsp.SampleStore] = Ref(
+  @moondsp.SampleStore(entries=0, max_length=0, capacity=0),
+)
+
+///|
+/// Make a store of these sizes, replacing the previous one. Returns its
+/// capacity.
+pub fn sample_store_create(
+  entries : Int32,
+  max_length : Int32,
+  capacity : Int32,
+) -> Int32 {
+  sample_store_probe.val = @moondsp.SampleStore(
+    entries~,
+    max_length~,
+    capacity~,
+  )
+  sample_store_probe.val.capacity()
+}
+
+///|
+let sample_player_probe_graph : @ref.Ref[@moondsp.Dsp?] = Ref(None)
+
+///|
+let sample_player_probe_output : @ref.Ref[@moondsp.AudioBuffer] = Ref(
+  @moondsp.AudioBuffer::filled(128),
+)
+
+///|
+let sample_player_probe_context : @ref.Ref[@moondsp.DspContext] = Ref(
+  @moondsp.DspContext(sample_rate=48000.0, block_size=128),
+)
+
+///|
+/// Register one second of a 440 Hz sine as sample 0, root pitch 69, and
+/// compile a sample player of it at `pitch` and `speed` at 48 kHz in blocks
+/// of 128, for the allocation audit. Returns 1, or 0 when compiling fails.
+pub fn sample_player_probe_init(pitch : Double, speed : Double) -> Int32 {
+  let store = @moondsp.SampleStore(entries=1, max_length=48000, capacity=48000)
+  let sine = FixedArray::makei(48000, index => {
+    Float::from_double(
+      @math.sin(2.0 * @math.PI * 440.0 * index.to_double() / 48000.0),
+    )
+  })
+  guard store.register(0, sine, root_pitch=69.0) is None else { return 0 }
+  let context = @moondsp.DspContext(
+    sample_rate=48000.0,
+    block_size=128,
+    samples=store,
+  )
+  sample_player_probe_context.val = context
+  sample_player_probe_graph.val = @moondsp.Dsp::compile(
+    @moondsp.AnalyzedGraph::analyze([
+      @moondsp.DspNode::sample_player(number=0.0, pitch~, speed~),
+      @moondsp.DspNode::output(0),
+    ]),
+    context,
+  )
+  if sample_player_probe_graph.val is Some(_) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+/// Render `blocks` blocks, resetting the graph every `reset_every` blocks
+/// (never when 0), and return the sum of the squares of every rendered
+/// sample, its energy.
+pub fn sample_player_probe_process(
+  blocks : Int32,
+  reset_every : Int32,
+) -> Double {
+  guard sample_player_probe_graph.val is Some(graph) else { return 0.0 }
+  let context = sample_player_probe_context.val
+  let output = sample_player_probe_output.val
+  let mut sum = 0.0
+  for block in 0..<blocks {
+    if reset_every > 0 && block % reset_every == 0 {
+      graph.reset_runtime_state()
+    }
+    graph.process(context, output)
+    for index in 0..<output.length() {
+      sum = sum + output.get(index) * output.get(index)
+    }
+  }
+  sum
+}

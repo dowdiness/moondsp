@@ -68,9 +68,7 @@ pub fn PatternScheduler::PatternScheduler(
     clock,
     max_query_window,
     last_error: None,
-    contexts: Array::makei(ctx.block_size() + 1, n => {
-      @moondsp.DspContext(sample_rate=ctx.sample_rate(), block_size=n)
-    }),
+    contexts: Array::makei(ctx.block_size() + 1, n => ctx.with_block_size(n)),
     scratch_left: ctx.make_buffer(),
     scratch_right: ctx.make_buffer(),
     scratch_send_left: ctx.make_buffer(),

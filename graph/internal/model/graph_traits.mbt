@@ -66,8 +66,14 @@ pub impl NodeFoldable for DspNode with fn fold_value(
 ///|
 pub impl NodeStateful for DspNode with fn is_stateful(self) -> Bool {
   match self.kind {
-    Oscillator | Noise | Adsr | Biquad | Delay | StereoBiquad | StereoDelay =>
-      true
+    Oscillator
+    | Noise
+    | SamplePlayer
+    | Adsr
+    | Biquad
+    | Delay
+    | StereoBiquad
+    | StereoDelay => true
     _ => false
   }
 }

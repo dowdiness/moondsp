@@ -6,7 +6,9 @@
 priv struct TopologyGraph {
   mut authoring_nodes : Array[DspNode]
   compile_sample_rate : Double
-  compile_block_size : Int32
+  /// The context the graph was compiled with, which a recompile reuses so it
+  /// keeps the sample store (ADR-0026 Decision 2).
+  compile_context : DspContext
   hot_swap : HotSwapGraph
 }
 
@@ -94,7 +96,7 @@ fn build_topology_graph(
   Some({
     authoring_nodes: nodes.copy(),
     compile_sample_rate: context.sample_rate(),
-    compile_block_size: context.block_size(),
+    compile_context: context,
     hot_swap,
   })
 }
@@ -192,11 +194,7 @@ fn TopologyGraph::queue_topology_edits_impl(
         GraphTopologyQueueError::InvalidEdit(failure.edit_index, failure.reason),
       )
   }
-  let compile_context = DspContext(
-    sample_rate=self.compile_sample_rate,
-    block_size=self.compile_block_size,
-  )
-  let replacement = match compile_fn(edited_nodes, compile_context) {
+  let replacement = match compile_fn(edited_nodes, self.compile_context) {
     Some(replacement) => replacement
     None => return Err(GraphTopologyQueueError::RecompileRejected)
   }

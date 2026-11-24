@@ -4,6 +4,7 @@
 priv struct GraphProgram {
   sample_rate : Double
   block_size : Int32
+  samples : @dsp.SampleStore
   nodes : FixedArray[@model.DspNode]
   index_map : FixedArray[Int32]
   feedback_edges : FixedArray[(Int32, Int32, Int32)]

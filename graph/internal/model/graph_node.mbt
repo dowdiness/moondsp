@@ -20,6 +20,7 @@ pub(all) enum DspNodeKind {
   StereoDelay
   StereoMixDown
   StereoOutput
+  SamplePlayer
 }
 
 ///|
@@ -393,6 +394,32 @@ pub fn DspNode::noise(seed : UInt32) -> DspNode {
     0,
     0,
     seed,
+  )
+}
+
+///|
+/// Create a node that plays a recorded waveform from the compile context's
+/// sample store (ADR-0026): sample `number` (value0) at MIDI `pitch` (value1),
+/// times `speed` (value2). At the waveform's root pitch and speed 1 it plays
+/// the waveform as recorded; a number with no waveform plays silence.
+pub fn DspNode::sample_player(
+  number~ : Double,
+  pitch~ : Double,
+  speed~ : Double,
+) -> DspNode {
+  DspNode(
+    DspNodeKind::SamplePlayer,
+    -1,
+    -1,
+    number,
+    pitch,
+    speed,
+    0.0,
+    Waveform::Sine,
+    BiquadMode::LowPass,
+    0,
+    0,
+    0U,
   )
 }
 
@@ -900,6 +927,7 @@ pub fn node_accepts_slot(node : DspNode, slot : GraphParamSlot) -> Bool {
     Constant => slot is Value0
     Oscillator => node.input0 < 0 && slot is Value0
     Noise => false
+    SamplePlayer => slot is Value0 || slot is Value1 || slot is Value2
     Adsr => slot is Value0 || slot is Value1 || slot is Value2 || slot is Value3
     Biquad => slot is Value0 || slot is Value1
     Delay => slot is Value0 || slot is DelaySamples

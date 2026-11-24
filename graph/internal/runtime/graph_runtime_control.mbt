@@ -463,6 +463,9 @@ fn model_node_param_valid(
         _ => false
       })
     Noise => false
+    SamplePlayer =>
+      (slot is Value0 || slot is Value1 || slot is Value2) &&
+      @dsp.is_finite(value)
     Biquad =>
       match slot {
         Value0 => valid_biquad_graph_params(sample_rate, value, node.value1())
@@ -529,6 +532,7 @@ fn runtime_param_state_available(
           graph.stereo_delay_right_states[compiled_index] is Some(_)
         _ => false
       }
+    SamplePlayer => graph.sample_states[compiled_index] is Some(_)
     Constant
     | Oscillator
     | Biquad
@@ -584,6 +588,22 @@ fn set_model_node_param_in_place(
       true
     }
     Noise => false
+    SamplePlayer =>
+      match slot {
+        Value0 if @dsp.is_finite(value) => {
+          @model.set_node_value0(node, value)
+          true
+        }
+        Value1 if @dsp.is_finite(value) => {
+          @model.set_node_value1(node, value)
+          true
+        }
+        Value2 if @dsp.is_finite(value) => {
+          @model.set_node_value2(node, value)
+          true
+        }
+        _ => false
+      }
     Biquad =>
       match slot {
         Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) => {
@@ -727,6 +747,16 @@ fn updated_model_node_param(
       }
     }
     Noise => None
+    SamplePlayer =>
+      match slot {
+        Value0 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value0(node, value))
+        Value1 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value1(node, value))
+        Value2 if @dsp.is_finite(value) =>
+          Some(@model.node_with_value2(node, value))
+        _ => None
+      }
     Biquad =>
       match slot {
         Value0 if valid_biquad_graph_params(sample_rate, value, node.value1()) =>
@@ -850,6 +880,7 @@ fn apply_runtime_param_side_effect(
       }
     Constant => true
     Oscillator => true
+    SamplePlayer => true
     Biquad => true
     Gain => true
     Clip => true

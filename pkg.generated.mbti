@@ -152,6 +152,12 @@ pub using @dsp {type ParamSmoother}
 
 pub using @identity {type Revision}
 
+pub using @dsp {type SampleLimit}
+
+pub using @dsp {type SamplePlayer}
+
+pub using @dsp {type SampleStore}
+
 pub using @identity {type StableIdError}
 
 pub using @dsp {type Stereo}

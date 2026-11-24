@@ -86,3 +86,81 @@ from the per-call rate.
   Decision 6).
 - The prototype stores 32-bit floats. 480,000 samples take 1.92 MB, against
   3.84 MB for `Double`.
+
+## Stage 3: making the store, and rendering without allocation
+
+Measured 2026-11-24 with the stage 3 store and `SamplePlayer` (ADR-0026 Order
+of work, step 3). Same orb, Moon and Chromium as above; release wasm-gc
+artifact SHA-256
+`7218174bb03affb5f27bbbd477bfe8707a2529903eb03a44f7b1c1e0cbc1a482`.
+
+### Making the browser default store
+
+`sample_store_create(64, 1440000, 8388608)` in
+[`browser_test/sample_copy_probe.mbt`](../../browser_test/sample_copy_probe.mbt)
+makes the Decision 6 browser default: 64 entries, 1,440,000 samples per
+waveform and 8,388,608 samples (32 MiB of `Float`). The same AudioWorklet
+harness times it, before the copy measurements:
+
+1. One cold make, the first thing the module does after instantiation.
+2. Nine warm makes. Each one first replaces the store with an empty one, so the
+   32 MiB it replaces becomes garbage.
+
+Five realtime runs, `Date.now()` (1 ms):
+
+| Make | Result |
+|---|---:|
+| Cold, first make | 15–20 ms (20, 20, 15, 20, 18) |
+| Warm, median of nine per run | 12–14 ms |
+| Warm, range over all 45 | 10–21 ms |
+
+The ADR's estimate of 9–13 ms was extrapolated from the 480,000-float figure.
+The measurement is higher: 15–20 ms for the make that a host actually does, once,
+at start-up. That is 6–8 render quanta of 2.67 ms. A store made while an
+`AudioContext` is running would make those blocks late. Stage 4 must make it
+before the first `process()` call, for example in the processor's
+constructor before the node is connected, or while the context is suspended.
+
+```sh
+NEW_MOON_MOD=0 moon build browser_test --target wasm-gc --release
+node scripts/bench-sample-copy/run.cjs _build/wasm-gc/release/build/browser_test/browser_test.wasm 16384 rt
+```
+
+The copy figures in the same five runs matched the earlier ones: 2.65–3.0 ms
+warm median for 480,000 samples, and 5–6 ms for the cold copy.
+
+### No construction while a sample player renders
+
+[`scripts/bench-sample-copy/audit-player.cjs`](../../scripts/bench-sample-copy/audit-player.cjs)
+uses the instrumenter from the
+[browser update audit](2026-10-23-browser-updates.md). Each `struct.new*` and
+`array.new*` site gets a counter. The audit builds a one-second 440 Hz sine
+store and a `sample_player → output` graph, then zeroes the counters. It then
+renders 1,000 blocks of 128 frames in four cases:
+
+- root pitch at speed 1, which reaches the end of the waveform after 375 blocks;
+- pitch 62 at speed 1.5, which interpolates;
+- speed −1;
+- a `reset_runtime_state` every 50 blocks, which binds the waveform again.
+
+| Case | Constructions while rendering | Energy, counted = reference |
+|---|---:|---:|
+| Root pitch, speed 1 | 0 | 24,000.0 |
+| Pitch 62, speed 1.5 | 0 | 23,959.7 |
+| Speed −1 | 0 | 24,000.0 |
+| Reset every 50 blocks | 0 | 63,917.4 |
+
+Building the store and graph is the positive control: its counters are
+nonzero. The instrumented output matched the uninstrumented build exactly.
+
+```sh
+W=_build/wasm-gc/release/build/browser_test/browser_test.wasm
+moon-wasm-opt $W --all-features -S -o /tmp/folded.wat
+python3 scripts/instrument-wasm-allocations.py /tmp/folded.wat /tmp/counted.wat
+moon-wasm-opt /tmp/counted.wat --all-features -o /tmp/counted.wasm
+node --experimental-wasm-custom-descriptors scripts/bench-sample-copy/audit-player.cjs /tmp/counted.wasm $W
+```
+
+This counts constructions in the compiled graph's render path only. It does
+not cover the voice pool, the scheduler or MessagePort traffic, which
+stage 4 routes samples through, and it does not measure GC pauses.

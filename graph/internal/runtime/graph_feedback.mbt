@@ -77,6 +77,17 @@ fn CompiledGraph::process_feedback_graph_impl(
           sample_values[node_index] = value
           self.buffers[node_index].set(sample_index, value)
         }
+        SamplePlayer => {
+          let value = self.sample_states[node_index]
+            .unwrap()
+            .tick(
+              number=node.value0(),
+              pitch=node.value1(),
+              speed=node.value2(),
+            )
+          sample_values[node_index] = value
+          self.buffers[node_index].set(sample_index, value)
+        }
         Adsr => {
           let value = self.env_states[node_index].unwrap().tick(context)
           sample_values[node_index] = value

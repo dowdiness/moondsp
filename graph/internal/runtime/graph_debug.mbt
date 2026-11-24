@@ -117,6 +117,12 @@ fn validate_node_state(
       } else {
         None
       }
+    SamplePlayer =>
+      if graph.sample_states[node_index] is None {
+        Some("sample")
+      } else {
+        None
+      }
     Adsr =>
       if graph.env_states[node_index] is None {
         Some("env")

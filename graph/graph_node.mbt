@@ -27,6 +27,7 @@ pub(all) enum DspNodeKind {
   StereoDelay
   StereoMixDown
   StereoOutput
+  SamplePlayer
 }
 
 ///|
@@ -215,6 +216,18 @@ pub fn DspNode::oscillator_from(input : Int32, waveform : Waveform) -> DspNode {
 /// Create a white-noise source node.
 pub fn DspNode::noise(seed : UInt32) -> DspNode {
   DspNode::from_model(@model.DspNode::noise(seed))
+}
+
+///|
+/// Create a node that plays sample `number` of the compile context's sample
+/// store at MIDI `pitch`, times `speed` (ADR-0026). Slots: `Value0` number,
+/// `Value1` pitch, `Value2` speed.
+pub fn DspNode::sample_player(
+  number~ : Double,
+  pitch~ : Double,
+  speed~ : Double,
+) -> DspNode {
+  DspNode::from_model(@model.DspNode::sample_player(number~, pitch~, speed~))
 }
 
 ///|
@@ -419,6 +432,7 @@ fn dsp_node_kind_from_model(kind : @model.DspNodeKind) -> DspNodeKind {
     @model.DspNodeKind::StereoDelay => DspNodeKind::StereoDelay
     @model.DspNodeKind::StereoMixDown => DspNodeKind::StereoMixDown
     @model.DspNodeKind::StereoOutput => DspNodeKind::StereoOutput
+    @model.DspNodeKind::SamplePlayer => DspNodeKind::SamplePlayer
   }
 }
 

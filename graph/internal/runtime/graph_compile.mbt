@@ -19,6 +19,7 @@ pub struct CompiledGraph {
   priv right_buffers : FixedArray[AudioBuffer]
   priv osc_states : FixedArray[Oscillator?]
   priv noise_states : FixedArray[Noise?]
+  priv sample_states : FixedArray[@dsp.SamplePlayer?]
   priv env_states : FixedArray[Adsr?]
   priv biquad_states : FixedArray[Biquad?]
   priv stereo_biquad_left_states : FixedArray[Biquad?]
@@ -157,6 +158,12 @@ fn GraphProgram::instantiate(self : GraphProgram) -> CompiledGraph {
   let noise_states = FixedArray::makei(node_count, index => {
     make_graph_noise_state(fixed_nodes[index])
   })
+  let sample_states = FixedArray::makei(node_count, index => {
+    match fixed_nodes[index].kind() {
+      SamplePlayer => Some(@dsp.SamplePlayer(self.samples))
+      _ => None
+    }
+  })
   let env_states = FixedArray::makei(node_count, index => {
     make_graph_env_state(fixed_nodes[index])
   })
@@ -196,6 +203,7 @@ fn GraphProgram::instantiate(self : GraphProgram) -> CompiledGraph {
     right_buffers,
     osc_states,
     noise_states,
+    sample_states,
     env_states,
     biquad_states,
     stereo_biquad_left_states,
@@ -328,7 +336,7 @@ fn visit_graph_dependencies_with_feedback(
           feedback_edges,
         )
       }
-    Noise => ()
+    Noise | SamplePlayer => ()
     Adsr => ()
     Biquad =>
       visit_graph_input_with_feedback(

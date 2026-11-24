@@ -337,8 +337,8 @@ pub fn ClapSynthEngine::ClapSynthEngine(
     pool,
     left: @moondsp.AudioBuffer::filled(max_block_size),
     right: @moondsp.AudioBuffer::filled(max_block_size),
-    render_contexts: FixedArray::makei(max_block_size + 1, fn(block_size) {
-      @moondsp.DspContext(sample_rate~, block_size~)
+    render_contexts: FixedArray::makei(max_block_size + 1, block_size => {
+      ctx.with_block_size(block_size)
     }),
     active_notes: ActiveNoteTable(max_voices),
     last_frame_count: 0,

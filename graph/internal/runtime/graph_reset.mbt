@@ -12,6 +12,11 @@ fn CompiledGraph::reset_runtime_state(self : CompiledGraph) -> Unit {
   clear_compiled_buffers(self.right_buffers)
   reset_graph_osc_states(self.osc_states)
   reset_graph_noise_states(self.noise_states, self.nodes)
+  for player in self.sample_states {
+    if player is Some(player) {
+      player.reset()
+    }
+  }
   for index in 0..<self.env_states.length() {
     if self.env_states[index] is Some(env) {
       let node = self.nodes[index]

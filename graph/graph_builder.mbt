@@ -275,7 +275,8 @@ pub extend GraphBuilder with @dowdiness/moondsp/dsp.StereoDelaySym::{
 ///|
 /// Walk a `DspNode` array and reconstruct the DSP graph through the tagless
 /// API, enabling round-trip testing (GraphBuilder -> nodes -> replay -> Eval).
-/// Returns `None` for empty arrays or invalid node references.
+/// Returns `None` for empty arrays, invalid node references, or a sample
+/// player, which the tagless API does not express.
 pub fn[
   T : ArithSym + DspSym + FilterSym + DelaySym + StereoSym + StereoFilterSym + StereoDelaySym,
 ] replay(
@@ -305,6 +306,7 @@ pub fn[
           )
         }
       Noise => Some(@dsp.DspSym::noise(node.seed()))
+      SamplePlayer => None
       Adsr =>
         Some(
           @dsp.DspSym::adsr(

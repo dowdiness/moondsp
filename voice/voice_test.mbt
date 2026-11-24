@@ -1379,3 +1379,63 @@ fn gate_seconds(gate : @voice.NoteGate) -> Double? {
     _ => None
   }
 }
+
+///|
+/// The first block a voice plays after replaying sample 0 of `store`, which
+/// held `first` while an earlier voice played two blocks and now holds
+/// `second`. `steal` starts the new note on the sounding slot; otherwise the
+/// earlier voice is killed first, so its idle graph is reset and reused.
+fn sample_voice_restart(steal~ : Bool) -> (Array[Double], Double) raise {
+  let first = FixedArray::makei(16, index => {
+    Float::from_double(1.0 - index.to_double() / 16.0)
+  })
+  let second = FixedArray::makei(16, index => {
+    Float::from_double(-(index + 1).to_double() / 16.0)
+  })
+  let store = @dsp.SampleStore(entries=1, max_length=16, capacity=32)
+  assert_eq(store.register(0, first, root_pitch=60.0), None)
+  let ctx = DspContext(sample_rate=48000.0, block_size=4, samples=store)
+  let pool = @voice.BoundVoicePool(
+    AnalyzedGraph::analyze([
+      DspNode::sample_player(number=0.0, pitch=60.0, speed=1.0),
+      DspNode::output(0),
+    ]),
+    ctx,
+    ControlBindingBuilder(),
+    max_voices=1,
+  )
+  let play = [GraphControl::set_param(0, GraphParamSlot::Value0, 0.0)]
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  // The pool mixes into its outputs, so each block starts from silence.
+  let render = () => {
+    left.fill(0.0)
+    right.fill(0.0)
+    pool.process(ctx, left, right)
+  }
+  let earlier = pool.note_on_graph_controls(play).unwrap()
+  render()
+  // The pan law's gain on the left channel, from the first sample, 1.0.
+  let gain = left.get(0)
+  render()
+  assert_eq(store.register(0, second, root_pitch=60.0), None)
+  if !steal {
+    assert_true(pool.kill_result(earlier) is Ok(_))
+  }
+  let later = pool.note_on_graph_controls(play).unwrap()
+  render()
+  assert_true(pool.voice_state(later) is @voice.VoiceState::Active)
+  let expected = Array::makei(4, index => second[index].to_double() * gain)
+  (Array::makei(4, index => left.get(index) - expected[index]), gain)
+}
+
+///|
+test "a reused voice plays its sample from the start of the current waveform" {
+  for steal in [false, true] {
+    let (errors, gain) = sample_voice_restart(steal~)
+    assert_true(gain > 0.5)
+    for error in errors {
+      assert_true(error.abs() < 1.0e-12)
+    }
+  }
+}

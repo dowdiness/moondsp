@@ -33,6 +33,15 @@ pub fn CompiledGraph::copy_compatible_runtime_state_from(
         _ => ()
       }
       match
+        (
+          old_graph.sample_states[old_compiled],
+          self.sample_states[new_compiled],
+        ) {
+        (Some(old_state), Some(new_state)) =>
+          new_state.copy_state_from(old_state)
+        _ => ()
+      }
+      match
         (old_graph.env_states[old_compiled], self.env_states[new_compiled]) {
         (Some(old_state), Some(new_state)) =>
           new_state.copy_state_from(old_state)

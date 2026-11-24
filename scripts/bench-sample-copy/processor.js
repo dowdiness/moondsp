@@ -16,6 +16,19 @@ class P extends AudioWorkletProcessor {
     for (let i = 0; i < N; i++) { src[i] = Math.fround(Math.sin(i * 0.01) * 0.5); expect += src[i]; }
     this.src = src; this.N = N; this.expect = expect;
     const w = this.w;
+    // ADR-0026 Decision 6: the browser default store, made once at start-up.
+    // The first make is timed before anything else allocates.
+    const storeT0 = now();
+    const storeCapacity = w.sample_store_create(64, 1440000, 8388608);
+    const storeCold = now() - storeT0;
+    const storeWarm = [];
+    for (let r = 0; r < 9; r++) {
+      w.sample_store_create(0, 0, 0);
+      const t0 = now();
+      w.sample_store_create(64, 1440000, 8388608);
+      storeWarm.push(now() - t0);
+    }
+    w.sample_store_create(0, 0, 0);
     // warm up
     w.sample_copy_reserve(N);
     const coldT0 = now();
@@ -42,7 +55,7 @@ class P extends AudioWorkletProcessor {
     const reserveT0 = now();
     for (let r = 0; r < 20; r++) w.sample_copy_reserve(N);
     const reserve = (now() - reserveT0) / 20;
-    this.result = { clock: this.clock, cold, full, checksumOk, spot, empty, jsOnly, reserve };
+    this.result = { clock: this.clock, storeCapacity, storeCold, storeWarm, cold, full, checksumOk, spot, empty, jsOnly, reserve };
     // chunked copy inside process()
     this.chunk = o.chunk;
     this.pos = 0;
