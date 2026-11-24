@@ -31,6 +31,9 @@ test("phrase feedback survives closing controls and clears only after pending ma
   await replaceCode(page, 'note("60").slow(4)');
   await page.locator("#start").click();
   await expect(page.locator("#status")).toHaveText("Playing");
+  // "Playing" arrives before the first rendered block. At cycle 0 an edit
+  // switches at once, so wait until the transport moves to leave it pending.
+  await expect.poll(async () => Number(await page.locator("#status").getAttribute("data-sample-position"))).toBeGreaterThan(0);
   await page.locator(".moving-score__note-block").click();
   await page.locator(".moving-score__canvas").press("ArrowUp");
   const update = page.locator(".score-pattern .phrase-update[role=status]");
