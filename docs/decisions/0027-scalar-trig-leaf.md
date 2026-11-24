@@ -1,6 +1,6 @@
 # ADR-0027: Allocation-free trigonometry is a leaf below dsp and Mini
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Source:** [Amp thread T-01a1f1e9](https://ampcode.com/threads/T-01a1f1e9-f526-7738-a2f7-d0eedb4d46b5)
 - **Refines:** [ADR-0001](0001-layered-package-architecture.md) (layered
@@ -43,9 +43,11 @@ dsp/  mini/
 
 ## Consequences
 
-- ADR-0001's guarantees hold. `dsp` has no dependency on any layer above
-  it, and Mini has none on the DSP layers. `trig` is not a DSP layer: it
-  has no buffers, processors, or audio state.
+- This refines ADR-0001's dependency rules. ADR-0001 gives `dsp` zero
+  internal dependencies; `dsp` now has exactly one, on `trig`, and still
+  none on any layer above it. Mini still has zero dependency on the DSP
+  layers: `trig` is not a DSP layer, because it has no buffers,
+  processors, or audio state.
 - `dsp` no longer exports `sine_of_turns` and `cosine_of_turns`. Mini was
   their only user, and it calls `trig` directly.
 - The architecture boundary script lists `trig` as a leaf, and as the only

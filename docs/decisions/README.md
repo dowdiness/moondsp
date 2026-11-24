@@ -44,4 +44,4 @@ shipped plan or spec.
 - [ADR-0024 — Each time transform is defined once, for events and signals](0024-time-maps-defined-once.md)
 - [ADR-0025 — One-shot signals start where their material enters](0025-one-shot-signals-start-at-entry.md)
 - [ADR-0026 — Scores play recorded samples](0026-sample-playback.md)
-- [ADR-0027 — Allocation-free trigonometry is a leaf below dsp and Mini](0027-scalar-trig-leaf.md) (Proposed)
+- [ADR-0027 — Allocation-free trigonometry is a leaf below dsp and Mini](0027-scalar-trig-leaf.md) (Accepted)

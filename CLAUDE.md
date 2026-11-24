@@ -36,6 +36,7 @@ NEW_MOON_MOD=0 moon build --target wasm-gc
 scripts/smoke-clap-prototype.sh
 ```
 
+- Before every push: always run the Boundary Check job's steps, whatever the change touches: `NEW_MOON_MOD=0 moon check --target all --deny-warn`, `scripts/check-cookbook-mini.py`, `scripts/check-public-boundary.sh`, `scripts/check-architecture-boundaries.sh`, `scripts/check-incr-import-boundaries.sh`, and `scripts/check-browser-abi.sh`. Run the other `.github/workflows/` jobs for the surfaces the change touches.
 - MoonBit behavior changes: check coherent changes with `NEW_MOON_MOD=0 moon check` and run the affected test file or package, including sibling tests; use the full suite when shared behavior or public APIs change. Fix failures before building on the change, not by running checks after every individual file edit.
 - Public API changes: run `NEW_MOON_MOD=0 moon info` and inspect `.mbti` diffs. Before committing MoonBit source changes, run `NEW_MOON_MOD=0 moon info && NEW_MOON_MOD=0 moon fmt`; investigate unexpected generated changes.
 - Browser changes: build the relevant target and exercise the actual browser surface when available.
