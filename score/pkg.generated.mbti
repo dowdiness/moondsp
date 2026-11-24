@@ -23,6 +23,7 @@ pub enum Drum {
   Oh
 }
 pub fn Drum::all() -> Array[Self]
+pub fn Drum::description(Self) -> String
 pub fn Drum::equal(Self, Self) -> Bool
 pub fn Drum::name(Self) -> String
 pub fn Drum::not_equal(Self, Self) -> Bool
@@ -39,6 +40,7 @@ pub enum Instrument {
 }
 pub fn Instrument::all() -> Array[Self]
 pub fn Instrument::default() -> Self
+pub fn Instrument::description(Self) -> String
 pub fn Instrument::equal(Self, Self) -> Bool
 pub fn Instrument::name(Self) -> String
 pub fn Instrument::not_equal(Self, Self) -> Bool

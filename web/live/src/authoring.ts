@@ -7,6 +7,8 @@ import {
   edit_draft as editDraft,
   prepare_playback as preparePlayback,
   locate_onsets as locateOnsets,
+  sound_vocabulary as soundVocabularyWire,
+  takes_instruments as takesInstruments,
   type DraftHandle,
 } from "./generated/authoring.js";
 
@@ -29,6 +31,35 @@ export type LocatedOnset = Readonly<{
   references: readonly Readonly<{ from: number; to: number }>[];
   notation: Readonly<{ from: number; to: number; start: number; pitch: number | null }> | null;
 }>;
+
+/** A drum or instrument, as people choose it. */
+export type SoundEntry = Readonly<{ name: string; description: string }>;
+/** The score's sounds. `instruments.default` is what a note plays without `.s`. */
+export type SoundVocabulary = Readonly<{
+  drums: readonly SoundEntry[];
+  instruments: Readonly<{ default: SoundEntry; others: readonly SoundEntry[] }>;
+}>;
+
+export function soundVocabulary(): SoundVocabulary {
+  const invalid = (): never => { throw new Error("invalid sound vocabulary"); };
+  const record = (value: unknown): Record<string, unknown> =>
+    typeof value === "object" && value !== null ? value as Record<string, unknown> : invalid();
+  const entry = (value: unknown): SoundEntry => {
+    const { name, description } = record(value);
+    return typeof name === "string" && typeof description === "string" ? Object.freeze({ name, description }) : invalid();
+  };
+  const entries = (value: unknown): readonly SoundEntry[] =>
+    Array.isArray(value) ? Object.freeze(value.map(entry)) : invalid();
+  const wire = record(JSON.parse(soundVocabularyWire()));
+  const instruments = record(wire.instruments);
+  return Object.freeze({
+    drums: entries(wire.drums),
+    instruments: Object.freeze({ default: entry(instruments.default), others: entries(instruments.others) }),
+  });
+}
+
+/** Whether `.s` may follow `receiver`, its `let` bindings and one expression. */
+export { takesInstruments };
 
 function decodeProblem(raw: unknown, text: string): SourceProblem | null | undefined {
   if (raw === null) return null;

@@ -26,6 +26,8 @@ pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]],
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
+pub fn takes_instruments(String) -> Bool
+
 // Errors
 #derive(Eq, @debug.Debug)
 pub(all) suberror DraftEditError {

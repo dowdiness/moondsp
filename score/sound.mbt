@@ -36,6 +36,18 @@ pub fn Drum::name(self : Drum) -> String {
 }
 
 ///|
+/// What the drum is, for people choosing one.
+pub fn Drum::description(self : Drum) -> String {
+  match self {
+    Bd => "kick drum"
+    Sd => "snare drum"
+    Cp => "hand clap"
+    Hh => "closed hi-hat"
+    Oh => "open hi-hat"
+  }
+}
+
+///|
 pub fn Drum::parse(name : String) -> Drum? {
   Drum::all().iter().find_first(drum => drum.name() == name)
 }
@@ -80,6 +92,18 @@ pub fn Instrument::name(self : Instrument) -> String {
     Pad => "pad"
     Pluck => "pluck"
     Sawtooth => "sawtooth"
+  }
+}
+
+///|
+/// What the instrument plays, for people choosing one.
+pub fn Instrument::description(self : Instrument) -> String {
+  match self {
+    Triangle => "soft triangle tone"
+    Bass => "bass line"
+    Pad => "slow-swelling pad"
+    Pluck => "short plucked note"
+    Sawtooth => "bright sawtooth lead"
   }
 }
 

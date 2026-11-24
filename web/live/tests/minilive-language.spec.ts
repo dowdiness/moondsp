@@ -161,3 +161,39 @@ test("MiniLive completes signals inside control arguments and their methods", as
   await expect(labels.filter({ hasText: /^gain$/ })).toBeVisible();
   await expect(labels.filter({ hasText: /^range$/ })).toHaveCount(0);
 });
+
+test("MiniLive completes instrument names in .s and offers .s only on receivers without drums", async ({ page }) => {
+  await page.goto("/");
+  // The score language decides, so its completion arrives with the score tools.
+  await expect(page.locator("body")).toHaveAttribute("data-authoring", "ready");
+  const editor = page.locator(".cm-content");
+  const labels = page.locator(".cm-completionLabel");
+  for (const [receiver, offered] of [
+    ['note("C4")', true],
+    ['s("bd") + note("C4")', true],
+    ['silence()', true],
+    ['let lead = note("C4"); lead.fast(2)', true],
+    ['s("bd")', false],
+    ['stack(s("bd"), note("C4"))', false],
+    ['(s("bd") + note("C4")).fast(2)', false],
+    ['let beat = s("bd"); beat', false],
+    ['let beat = s("bd"); let both = stack(beat, note("C4")); both', false],
+    ['saw', false],
+  ] as const) {
+    await replaceCode(page, `${receiver}.`);
+    await editor.press("Control+Space");
+    await expect(labels.filter({ hasText: receiver === "saw" ? /^range$/ : /^gain$/ }), receiver).toBeVisible();
+    await expect(labels.filter({ hasText: /^s$/ }), receiver).toHaveCount(offered ? 1 : 0);
+    await editor.press("Escape");
+  }
+  await replaceCode(page, 'note("C4").s("');
+  await editor.press("Control+Space");
+  await expect(labels).toHaveText(["bass", "pad", "pluck", "sawtooth", "triangle"]);
+  await expect(page.locator(".cm-completionDetail").filter({ hasText: "(default)" })).toHaveText(["soft triangle tone (default)"]);
+  await labels.filter({ hasText: /^pad$/ }).click();
+  await expect.poll(() => readCode(page)).toBe('note("C4").s("pad');
+  await replaceCode(page, 's("');
+  await editor.press("Control+Space");
+  await expect(labels).toHaveText(["bd", "cp", "hh", "oh", "sd"]);
+  await expect(page.locator(".cm-completionDetail").filter({ hasText: "kick drum" })).toHaveCount(1);
+});

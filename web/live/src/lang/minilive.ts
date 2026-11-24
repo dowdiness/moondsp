@@ -8,7 +8,8 @@ import { autocompletion } from "@codemirror/autocomplete";
 import { styleTags, tags as t } from "@lezer/highlight";
 
 import { parser } from "./minilive.grammar";
-import { miniliveCompletion } from "./minilive-completion";
+import type { Extension } from "@codemirror/state";
+import { miniliveCompletion, scoreCompletion, type ScoreLanguage } from "./minilive-completion";
 
 const parserWithMetadata = parser.configure({
   props: [
@@ -54,4 +55,9 @@ export function minilive(): LanguageSupport {
     autocompletion(),
     syntaxHighlighting(scoreHighlightStyle, { fallback: true }),
   ]);
+}
+
+// Completion from the score language, installed once the score tools load.
+export function scoreNames(language: ScoreLanguage): Extension {
+  return miniliveLanguage.data.of({ autocomplete: scoreCompletion(language) });
 }

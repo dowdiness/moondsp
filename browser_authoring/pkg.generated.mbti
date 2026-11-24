@@ -25,6 +25,10 @@ pub fn prepare_playback(@mini.Draft) -> String
 
 pub fn project_notation(String, String) -> String
 
+pub fn sound_vocabulary() -> String
+
+pub fn takes_instruments(String) -> Bool
+
 // Errors
 
 // Types and methods

@@ -2149,3 +2149,28 @@ test ".s keeps exact origins; default instruments keep chord tone paths" {
   let paths = plain.map(event => event.pattern_node_path())
   assert_true(paths[0] != paths[1] && paths[1] != paths[2])
 }
+
+///|
+test "takes_instruments follows the rule that rejects .s" {
+  for
+    case in [
+      ("note(\"C4\")", true),
+      ("chord(\"C\").fast(2)", true),
+      ("silence()", true),
+      ("let lead = note(\"C4\"); lead.fast(2)", true),
+      ("note(\"C4\").s(\"bass\")", true),
+      ("s(\"bd\")", false),
+      ("stack(s(\"bd\"), note(\"C4\"))", false),
+      ("let beat = s(\"bd\"); beat", false),
+      (
+        "let beat = s(\"bd\"); let both = stack(beat, note(\"C4\")); both", false,
+      ),
+      // Not a score: a signal, an unknown name, unfinished code.
+      ("saw", false),
+      ("lead", false),
+      ("note(\"C4\"", false),
+    ] {
+    let (receiver, expected) = case
+    assert_eq(@mini.takes_instruments(receiver), expected, msg=receiver)
+  }
+}

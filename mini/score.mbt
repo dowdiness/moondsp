@@ -100,3 +100,25 @@ fn played_on(
     Hit(_) => event
   }
 }
+
+///|
+/// Whether `.s` may follow `receiver`: one expression, after the `let`
+/// bindings it uses, that compiles to a score of only notes or silence.
+/// Drums have no instrument, and code that is not a score takes none.
+pub fn takes_instruments(receiver : String) -> Bool {
+  let parser = Parser(receiver)
+  let builder = MiniDocBuilder()
+  let score = (fn() raise SourceProblem {
+    parser.parse_bindings(builder)
+    let score = compile_score(
+      resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings),
+      builder,
+    )
+    parser.skip_whitespace()
+    guard parser.at_end() else { raise Mistake(parser.pos, "trailing input") }
+    score
+  })() catch {
+    _ => return false
+  }
+  score is (Silent(_) | Notes(_))
+}

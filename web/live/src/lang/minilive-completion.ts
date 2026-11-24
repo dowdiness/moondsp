@@ -1,7 +1,8 @@
 // Context-aware completion for moondsp mini-notation.
 //
-// Four contexts, in priority order:
-//   1. Inside a `String` whose enclosing call is `s(...)` → drum names.
+// `miniliveCompletion` works before the score tools load. Four contexts, in
+// priority order:
+//   1. Inside a `String` → nothing; `scoreCompletion` names sounds there.
 //   2. After `.<word>` → method names (`fast`, `slow`, `rev`, …).
 //   2a. After `.` on a chain that starts with a signal → `range`, `fast`, `slow`.
 //   3. Inside `Args` of a `MemberCall` whose method is `jux` (any
@@ -13,6 +14,8 @@ import type { CompletionContext, CompletionResult, Completion } from "@codemirro
 import { snippetCompletion } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
+import type { EditorState } from "@codemirror/state";
+import type { SoundEntry, SoundVocabulary } from "../authoring";
 
 const TOP_LEVEL: Completion[] = [
   snippetCompletion('let ${name} = ${pattern};', { label: "let", type: "keyword", detail: "define a reusable pattern" }),
@@ -66,14 +69,6 @@ const SIGNAL_METHODS: Completion[] = [
   snippetCompletion("range(${low}, ${high})", { label: "range", type: "method", detail: "map 0–1 onto low–high" }),
   snippetCompletion("slow(${n})", { label: "slow", type: "method", detail: "n× slower" }),
   snippetCompletion("fast(${n})", { label: "fast", type: "method", detail: "n× faster" }),
-];
-
-const DRUMS: Completion[] = [
-  { label: "bd", type: "constant", detail: "kick (36)" },
-  { label: "sd", type: "constant", detail: "snare (38)" },
-  { label: "cp", type: "constant", detail: "clap (39)" },
-  { label: "hh", type: "constant", detail: "closed hat (42)" },
-  { label: "oh", type: "constant", detail: "open hat (46)" },
 ];
 
 function ancestorOfType(node: SyntaxNode | null, name: string): SyntaxNode | null {
@@ -135,39 +130,7 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
   const node = tree.resolveInner(pos, -1);
 
   // ── 1. Inside a String? ───────────────────────────────────
-  const stringNode = ancestorOfType(node, "String");
-  if (stringNode) {
-    // The grammar accepts unterminated strings (`'"' (...)* '"'?`), so
-    // the bounds check has to differ between closed and unclosed forms.
-    // While the user is typing the string, `pos === stringNode.to` IS
-    // inside the contents; once the closing quote exists, the same
-    // position sits AFTER the close and must be rejected.
-    const text = state.doc.sliceString(stringNode.from, stringNode.to);
-    const inside = isClosedString(text)
-      ? pos > stringNode.from && pos < stringNode.to
-      : pos > stringNode.from && pos <= stringNode.to;
-    if (!inside) return null;
-
-    const args = stringNode.parent;
-    if (args && args.name === "Args") {
-      const owner = args.parent;
-      const nameNode = owner?.getChild("CallName");
-      const callText =
-        owner?.name === "Call" && nameNode
-          ? state.doc.sliceString(nameNode.from, nameNode.to)
-          : "";
-      if (callText === "s") {
-        const word = context.matchBefore(/[a-z]+$/);
-        if (!word && !context.explicit) return null;
-        return {
-          from: word ? word.from : pos,
-          options: DRUMS,
-          validFor: /^[a-z]*$/,
-        };
-      }
-    }
-    return null;
-  }
+  if (ancestorOfType(node, "String")) return null;
 
   // ── 2. After `.` → method completion ───────────────────────
   const dot = context.matchBefore(/\.[A-Za-z_]*$/);
@@ -234,4 +197,61 @@ export function miniliveCompletion(context: CompletionContext): CompletionResult
   }
 
   return null;
+}
+
+// The String around `pos` when `pos` is inside its notation. The grammar
+// accepts unterminated strings (`'"' (...)* '"'?`): while the user is typing
+// one, `pos === string.to` is inside it; once the closing quote exists, the
+// same position is past it.
+function notationAt(state: EditorState, pos: number): SyntaxNode | null {
+  const string = ancestorOfType(syntaxTree(state).resolveInner(pos, -1), "String");
+  if (!string) return null;
+  const inside = isClosedString(state.doc.sliceString(string.from, string.to))
+    ? pos > string.from && pos < string.to
+    : pos > string.from && pos <= string.to;
+  return inside ? string : null;
+}
+
+/** What the score language tells completion; it loads with the score tools. */
+export type ScoreLanguage = Readonly<{
+  sounds: SoundVocabulary;
+  takesInstruments(receiver: string): boolean;
+}>;
+
+const CHOOSE_INSTRUMENT = snippetCompletion('s("${name}")', { label: "s", type: "method", detail: "play notes on an instrument" });
+
+// Sound names inside `s("…")` and `.s("…")`, and `.s` after a receiver the
+// score language accepts it on.
+export function scoreCompletion(language: ScoreLanguage) {
+  const option = (detail: (sound: SoundEntry) => string) => (sound: SoundEntry): Completion =>
+    ({ label: sound.name, type: "constant", detail: detail(sound) });
+  const drums = language.sounds.drums.map(option(sound => sound.description));
+  const { default: preferred, others } = language.sounds.instruments;
+  const instruments = [
+    option(sound => `${sound.description} (default)`)(preferred),
+    ...others.map(option(sound => sound.description)),
+  ];
+  return (context: CompletionContext): CompletionResult | null => {
+    const { state, pos } = context;
+    const string = notationAt(state, pos);
+    if (string) {
+      const owner = string.parent?.name === "Args" ? string.parent.parent : null;
+      const name = owner?.name === "Call" ? owner.getChild("CallName")
+        : owner?.name === "MemberCall" ? owner.getChild("MethodName")
+        : null;
+      if (!name || state.doc.sliceString(name.from, name.to) !== "s") return null;
+      const word = context.matchBefore(/[a-z]+$/);
+      if (!word && !context.explicit) return null;
+      return { from: word ? word.from : pos, options: owner?.name === "Call" ? drums : instruments, validFor: /^[a-z]*$/ };
+    }
+    const dot = context.matchBefore(/\.[A-Za-z_]*$/);
+    if (!dot) return null;
+    const chain = ancestorOfType(syntaxTree(state).resolveInner(dot.from, -1), "Chain");
+    if (!chain) return null;
+    // The receiver before the `.`, after the `let` bindings before it.
+    const bindings = syntaxTree(state).topNode.getChildren("Binding").filter(binding => binding.to <= chain.from);
+    const receiver = [...bindings.map(binding => state.doc.sliceString(binding.from, binding.to)), state.doc.sliceString(chain.from, dot.from)].join("\n");
+    if (!language.takesInstruments(receiver)) return null;
+    return { from: dot.from + 1, options: [CHOOSE_INSTRUMENT], validFor: /^[A-Za-z_0-9]*$/ };
+  };
 }

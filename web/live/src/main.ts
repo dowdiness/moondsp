@@ -8,7 +8,7 @@ import { bracketMatching } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, acceptCompletion } from "@codemirror/autocomplete";
 
 
-import { minilive, miniliveLanguage } from "./lang/minilive";
+import { minilive, miniliveLanguage, scoreNames } from "./lang/minilive";
 import { inlineControls } from "./inline-controls";
 import type * as PatternControls from "./pattern-controls";
 import { loadScore, mountScoreSession } from "./score-session";
@@ -64,6 +64,7 @@ const notice = scope.own(mountNotice(dom.sessionMessage));
 const listenerCompartment = new Compartment();
 const controlsCompartment = new Compartment();
 const patternCompartment = new Compartment();
+const scoreNamesCompartment = new Compartment();
 const contentAttributesCompartment = new Compartment();
 /** Score tools: the draft, its player, and the score controls, present together once they load. */
 type Tools = Readonly<{ draft: Draft; playback: Player; observation: ReturnType<typeof mountPlaybackObservation>; controls: typeof PatternControls }>;
@@ -84,6 +85,7 @@ const view = new EditorView({
       closeBrackets(),
       inlineControls(),
       patternCompartment.of([]),
+      scoreNamesCompartment.of([]),
       playbackHighlights(sources),
       sourceHints(sources),
       codeLayout(),
@@ -321,6 +323,7 @@ async function prepareAuthoring(): Promise<void> {
       effects: [
         view.scrollSnapshot(),
         patternCompartment.reconfigure(controls.patternControls(sources)),
+        scoreNamesCompartment.reconfigure(scoreNames({ sounds: authoring.soundVocabulary(), takesInstruments: authoring.takesInstruments })),
         controlsCompartment.reconfigure(controls.patternControlsVisible.of(dom.transport.sourceToggle.getAttribute("aria-pressed") === "true")),
       ],
     });

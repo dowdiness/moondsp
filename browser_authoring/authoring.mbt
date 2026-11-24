@@ -495,6 +495,40 @@ pub fn locate_onsets(draft : @mini.Draft, wire : String) -> String {
 }
 
 ///|
+/// The score's sounds for completion, each with its name and description:
+/// `{"drums": [...], "instruments": {"default": ..., "others": [...]}}`,
+/// where `default` is what a note plays without `.s`.
+pub fn sound_vocabulary() -> String {
+  fn entry(name : String, description : String) -> Json {
+    { "name": Json(name), "description": Json(description) }
+  }
+  fn instrument(instrument : @score.Instrument) -> Json {
+    entry(instrument.name(), instrument.description())
+  }
+  let default = @score.Instrument::default()
+  let vocabulary : Json = {
+    "drums": Json::array(
+      @score.Drum::all().map(drum => entry(drum.name(), drum.description())),
+    ),
+    "instruments": {
+      "default": instrument(default),
+      "others": Json::array(
+        @score.Instrument::all()
+        .filter(other => other != default)
+        .map(instrument),
+      ),
+    },
+  }
+  vocabulary.stringify()
+}
+
+///|
+/// Whether `.s` may follow `receiver` (`@mini.takes_instruments`).
+pub fn takes_instruments(receiver : String) -> Bool {
+  @mini.takes_instruments(receiver)
+}
+
+///|
 /// Each control's nesting rule, keyed by its text name, as a JSON object:
 /// `"multiply"` or `"override"` (ADR-0020 Decision 5). The editor reads this
 /// instead of naming any control's rule itself.
