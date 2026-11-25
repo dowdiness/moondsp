@@ -36,8 +36,11 @@ fn test_voice(_ : @score.Instrument) -> NoteVoice {
 }
 
 ///|
-fn test_player() -> Player raise {
-  let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
+fn test_player(
+  sample_rate~ : Double = 48000.0,
+  block_size~ : Int32 = 128,
+) -> Player raise PlayerError {
+  let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   Player(ctx, drum=test_drum, instrument=test_voice, sampler={
     attack_ms: 0.0,
     decay_ms: 0.0,
@@ -60,14 +63,14 @@ fn draft_input(text : String) -> @mini.PlaybackInput raise {
 }
 
 ///|
-fn render(player : Player, count : Int32) -> Unit raise {
+fn render_blocks(player : Player, count : Int32) -> Unit raise {
   for _ in 0..<count {
     guard player.process() else { fail("expected a rendered block") }
   }
 }
 
 ///|
-fn output_energy(player : Player) -> Double {
+fn block_energy(player : Player) -> Double {
   let mut energy = 0.0
   for i in 0..<player.left.length() {
     energy += player.left.get(i).abs()
@@ -93,16 +96,18 @@ test "offline rendering plays a finite song to its end and keeps its tails" {
   let mut blocks = 0
   let mut energy = 0.0
   while player.state() is Playing && blocks < 1000 {
-    render(player, 1)
-    energy += output_energy(player)
+    render_blocks(player, 1)
+    energy += block_energy(player)
     blocks += 1
   }
   assert_eq(player.state(), Ended)
   assert_eq(blocks, 375)
   assert_true(energy > 0.01)
   assert_eq(player.view().sample_position, 48000.0)
-  render(player, 1)
+  // The last note ends with the song; its release still sounds.
+  render_blocks(player, 1)
   assert_eq(player.state(), Ended)
+  assert_true(block_energy(player) > 0.0)
 }
 
 ///|
@@ -112,11 +117,11 @@ test "source tempo commits at unchanged musical position" {
     "song(bpm(\{bpm}),section(\"a\",8,note(\"60\")),part(\"a1\",\"a\"))"
   }
   player.restart(draft_input(song(120)))
-  render(player, 4)
+  render_blocks(player, 4)
   player.update(draft_input(song(90)))
   assert_eq(player.scheduler.sample_counter(), 512L)
   assert_eq(player.scheduler.bpm(), 90.0)
-  render(player, 1)
+  render_blocks(player, 1)
   assert_eq(
     player.scheduler.current_block().unwrap().logical_arc.begin,
     @pattern.Rational(512L * 120L + 128L * 90L, 11520000L),
@@ -129,15 +134,15 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
   let after = "song(section(\"a\",4,s(\"bd\").slow(8).gain(0)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
   let player = test_player()
   player.restart(draft_input(before))
-  render(player, 30)
+  render_blocks(player, 30)
   assert_true(wet_energy(player) > 0.0)
   player.update(draft_input(after))
-  render(player, 1)
+  render_blocks(player, 1)
   assert_true(wet_energy(player) > 0.0)
   assert_true(player.scheduler.active_note_count() > 0)
-  assert_true(output_energy(player) > 0.0)
+  assert_true(block_energy(player) > 0.0)
   player.restart(draft_input(after))
-  render(player, 1)
+  render_blocks(player, 1)
   assert_eq(wet_energy(player), 0.0)
   assert_true(player.scheduler.active_note_count() > 0)
 }
@@ -146,13 +151,13 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
 test "room send leaves dry playback dry and adds one wet return" {
   let dry = test_player()
   dry.restart(draft_input("s(\"bd\").slow(8)"))
-  render(dry, 30)
+  render_blocks(dry, 30)
   assert_eq(wet_energy(dry), 0.0)
   let wet = test_player()
   wet.restart(draft_input("s(\"bd\").slow(8).room(1)"))
-  render(wet, 30)
+  render_blocks(wet, 30)
   assert_true(wet_energy(wet) > 0.0)
-  assert_true((output_energy(wet) - output_energy(dry)).abs() > 0.000001)
+  assert_true((block_energy(wet) - block_energy(dry)).abs() > 0.000001)
 }
 
 ///|

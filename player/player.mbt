@@ -103,7 +103,6 @@ priv enum Session {
 
 ///|
 /// Kind of the latest accepted score, independent of the visible draft.
-/// Internal observation value, projected into the browser's public enum.
 #derive(Eq, Debug)
 pub(all) enum PlaybackMode {
   None
@@ -555,8 +554,9 @@ pub fn PlayerError::message(self : PlayerError) -> String {
 /// Render the next block into `left()` and `right()`; `false` in Fault, whose
 /// reason `fault()` gives. Empty, Ready and Paused render silence without
 /// advancing. A Playing finite song becomes Ended at its end; Ended keeps
-/// rendering its tails. A transport fault silences every voice and leaves the
-/// player in Fault. It returns a `Bool` rather than raising because it runs on
+/// rendering its tails. A scheduler transport error silences the block, kills
+/// every voice and leaves the player in Fault; a song end the transport cannot
+/// reach leaves it in Fault after the block rendered. It returns a `Bool` rather than raising because it runs on
 /// the audio thread every block, and a `Result` there cost one construction
 /// per block; the reason stays in `fault()`.
 pub fn Player::process(self : Player) -> Bool {

@@ -157,16 +157,6 @@ fn assert_position(position : Int32) -> Unit raise {
 }
 
 ///|
-fn test_song(length~ : Int32, bpm~ : Int32) -> String {
-  "song(bpm(\{bpm}),section(\"a\",\{length},note(\"60\")),part(\"a1\",\"a\"))"
-}
-
-///|
-fn assert_tempo(bpm : Double) -> Unit raise {
-  assert_eq(scheduler_bpm(), bpm)
-}
-
-///|
 test "live edits preserve the sounding envelope" {
   fn render(edit : Bool) -> Array[Double] raise {
     assert_true(init_scheduler_graph_for_test())

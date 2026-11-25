@@ -35,11 +35,13 @@ the session logic was written against those globals.
 
 ## Consequences
 
-- Behaviour and the browser ABI are unchanged. Tests that needed the player's
-  internals (exact transport position, reverb returns, active notes, song
-  snapshot preparation, the sampler pool's bindings and shaping) moved to
-  `player`; the host keeps tests of its exports, including one that a score
-  is silent until its sample's load commits.
+- Behaviour and the browser ABI are unchanged. The session tests (Play,
+  Pause, Ended, updates, tempo, admission) moved to `player`, where they read
+  the scheduler's own clock and tempo and submit untracked text as the host's
+  wire does; so did the tests of reverb returns, active notes, song snapshot
+  preparation, and the sampler pool's bindings and shaping. The host keeps
+  tests of its exports: owner reset, UTF-16 diagnostics, wire witnesses, and
+  that a score is silent until its sample's load commits.
 - The render path is unchanged: `scripts/audit-player-source-allocations.mjs`
   counts the same executed constructions, onset rows and fields, and PCM as
   before for tracked and untracked patterns and songs. `process()` returns a

@@ -126,6 +126,7 @@ check_manifest "graph/browser/moon.pkg" '^(dowdiness/moondsp/(dsp|engine/lifecyc
 check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(control|identity|pattern|score|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 # The platform-free player (ADR-0029): prepares, accepts and renders scores for
 # the browser host and offline renderers. It knows no browser or CLAP detail.
+# `identity` names the live song sections it rebuilds for each accepted song.
 check_manifest "player/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|mini|pattern|scheduler|score|song))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(graph/browser|scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
