@@ -9,7 +9,7 @@ test "the sampler is silent until its sample commits" {
   // A noise burst.
   let length = 4800
   let mut state = 12345
-  assert_eq(sample_load_begin(ping, length, 60.0), 0)
+  assert_eq(sample_load_begin(ping, length), 0)
   for offset in 0..<length {
     state = (state * 1103515245 + 12345) & 0x7fffffff
     sample_load_write(
@@ -27,8 +27,9 @@ test "the sampler is silent until its sample commits" {
 ///|
 test "sample loads report the limit they exceed" {
   ignore(init_sample_store())
-  assert_eq(sample_load_begin(SAMPLE_ENTRIES, 4, 60.0), 1)
-  assert_eq(sample_load_begin(1, SAMPLE_MAX_LENGTH + 1, 60.0), 2)
+  // The store has room past the bank, but only bank samples load.
+  assert_eq(sample_load_begin(sample_bank_count(), 4), 1)
+  assert_eq(sample_load_begin(1, SAMPLE_MAX_LENGTH + 1), 2)
   assert_eq(sample_bank_name(0), "ping")
   assert_eq(sample_bank_name(sample_bank_count()), "")
 }
@@ -37,7 +38,7 @@ test "sample loads report the limit they exceed" {
 /// Load a one-second 440 Hz sine, the bank's `ping` at its root of A4, into
 /// sample number `entry`.
 fn load_sine_for_test(entry : Int32) -> Unit raise {
-  assert_eq(sample_load_begin(entry, 48000, 0.0), 0)
+  assert_eq(sample_load_begin(entry, 48000), 0)
   for i in 0..<48000 {
     sample_load_write(
       i,
@@ -126,7 +127,7 @@ test "loading scans the sampler pool for the waveform a sounding voice plays" {
   )
   let ping = @score.Sample::parse("ping").unwrap().number()
   let load = () => {
-    let result = sample_load_begin(ping, 48000, 0.0)
+    let result = sample_load_begin(ping, 48000)
     if result == 0 {
       for i in 0..<48000 {
         sample_load_write(i, Float::from_double(0.5))

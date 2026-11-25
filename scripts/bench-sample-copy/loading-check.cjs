@@ -115,11 +115,11 @@ async function run(page, load) {
       await new Promise(r => setTimeout(r, 2000));
       const data = new Float32Array(480000);
       for (let i = 0; i < data.length; i++) data[i] = 0.5 * Math.sin(i * 0.0576) * Math.exp(-i / 96000);
-      node.port.postMessage({ type: 'sample-load', name: 'ping', rootPitch: 69, data }, [data.buffer]);
+      node.port.postMessage({ type: 'sample-load', name: 'ping', data }, [data.buffer]);
       // One sample longer than a waveform may be (ADR-0026 Decision 6).
       await new Promise(r => setTimeout(r, 1000));
       const tooLong = new Float32Array(1440001);
-      node.port.postMessage({ type: 'sample-load', name: 'burst', rootPitch: 60, data: tooLong }, [tooLong.buffer]);
+      node.port.postMessage({ type: 'sample-load', name: 'burst', data: tooLong }, [tooLong.buffer]);
     }
     const result = await report;
     const wall = (performance.now() - wallStart) / 1000;

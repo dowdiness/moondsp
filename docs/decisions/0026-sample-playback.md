@@ -212,9 +212,9 @@ no voices can still read the store.
   readers and nothing has to be released when a graph is dropped. An idle
   voice marks nothing: it plays nothing until it is reset for its next
   note.
-- A player marks its waveform while its read position is inside its slice.
-  Playback ends when the position leaves the slice, and the player stays
-  silent until it takes a waveform again, even if its speed turns back.
+- A player marks the waveform it holds. When its read position leaves its
+  slice it lets go of the waveform, so it stays silent until it takes one
+  again, even if its speed turns back or its slice widens.
 - Freed blocks merge with free neighbours. The block table holds every
   entry's waveform and as many replaced ones still sounding; a load that
   needs more blocks fails as over-limit.
@@ -298,11 +298,14 @@ used as names in `mini`, `control`, or `score` today.
 5. `begin`, `end`, and `speed`, and the `follows` rule. Done. `DspNode`
    gains `value4` and `GraphParamSlot` gains `Value4`: the player takes
    speed on `Value2`, begin on `Value3` and end on `Value4`. `Value5` was not
-   needed. The slice covers waveform samples from `⌈begin × length⌉` up to,
-   not including, `⌈end × length⌉`, where a product within rounding error
-   of a whole sample counts as that sample; a negative speed starts at its
-   last sample.
-6. Samples declared in the score.
+   needed. The slice covers waveform samples from `begin × length` up to,
+   not including, `end × length`, each rounded to the nearest sample; a
+   negative speed starts at its last sample. The player computes the slice
+   from the `begin` and `end` it receives; only `Control::follows` keeps
+   them fixed from a voice's onset (Decision 4).
+6. Samples declared in the score. Before it, revisit Decision 2: a context
+   without the store renders samples as silence instead of failing, so
+   passing the store only where the sampler pool is compiled may be better.
 
 ## Not covered
 

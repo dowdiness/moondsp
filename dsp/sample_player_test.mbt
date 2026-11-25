@@ -117,8 +117,11 @@ test "begin and end play a slice forwards and backwards; an empty slice is silen
   // 0.25 × 8 = 2 and 0.75 × 8 = 6: samples 2 to 5.
   assert_eq(play(0.25, 0.75, 1.0), [3.0, 4.0, 5.0, 6.0, 0.0, 0.0])
   assert_eq(play(0.25, 0.75, -1.0), [6.0, 5.0, 4.0, 3.0, 0.0, 0.0])
-  // 0.3 × 8 = 2.4 starts at sample 3; 0.6 × 8 = 4.8 ends before sample 5.
-  assert_eq(play(0.3, 0.6, 1.0), [4.0, 5.0, 0.0, 0.0, 0.0, 0.0])
+  // Bounds round to the nearest sample: 0.3 × 8 = 2.4 starts at sample 2,
+  // and 0.6 × 8 = 4.8 ends before sample 5.
+  assert_eq(play(0.3, 0.6, 1.0), [3.0, 4.0, 5.0, 0.0, 0.0, 0.0])
+  // 0.35 × 8 = 2.8 starts at sample 3, and 0.55 × 8 = 4.4 before sample 4.
+  assert_eq(play(0.35, 0.55, 1.0), [4.0, 0.0, 0.0, 0.0, 0.0, 0.0])
   // Out-of-range fractions clamp to the waveform.
   assert_eq(play(-1.0, 0.25, 1.0), [1.0, 2.0, 0.0, 0.0, 0.0, 0.0])
   assert_eq(play(0.875, 2.0, -1.0), [8.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -129,38 +132,35 @@ test "begin and end play a slice forwards and backwards; an empty slice is silen
 }
 
 ///|
-test "a slice bound within rounding error of a whole sample lands on it" {
+test "a slice bound a rounding error off a whole sample lands on it" {
   let store = @dsp.SampleStore(entries=1, max_length=100, capacity=100)
   let waveform = sample_test_waveform(100, index => (index + 1).to_double())
   assert_eq(store.register(0, waveform, root_pitch=60.0), None)
-  // 0.07 × 100 is 7.000000000000001 in doubles; the slice is samples 7 to 9.
+  // 0.07 × 100 is 7.000000000000001 and 0.29 × 100 is 28.999999999999996
+  // in doubles; the slice is samples 7 to 28.
   let played = sample_test_play(
     @dsp.SamplePlayer(store),
-    4,
+    23,
     begin=0.07,
-    end=0.1,
+    end=0.29,
   )
-  assert_eq(played, [8.0, 9.0, 10.0, 0.0])
-  // A fraction genuinely between samples still starts at the next one.
-  let between = sample_test_play(
-    @dsp.SamplePlayer(store),
-    2,
-    begin=0.0705,
-    end=0.09,
-  )
-  assert_eq(between, [9.0, 0.0])
+  assert_eq(played[0], 8.0)
+  assert_eq(played[21], 29.0)
+  assert_eq(played[22], 0.0)
 }
 
 ///|
-test "begin and end are fixed at onset; reset reads them again" {
+test "the slice follows begin and end; a finished player stays silent" {
   let store = sample_test_store()
   let waveform = sample_test_waveform(8, index => (index + 1).to_double())
   assert_eq(store.register(0, waveform, root_pitch=60.0), None)
   let player = @dsp.SamplePlayer(store)
-  let head = sample_test_play(player, 4, begin=0.5)
-  // A later begin and end do not move the sounding voice.
-  let tail = sample_test_play(player, 4, begin=0.0, end=0.25)
-  assert_eq([..head, ..tail], [5.0, 6.0, 7.0, 8.0, 0.0, 0.0, 0.0, 0.0])
+  let head = sample_test_play(player, 4, end=0.5)
+  // A later end moves the slice, not the read position.
+  let tail = sample_test_play(player, 4, end=0.75)
+  assert_eq([..head, ..tail], [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0])
+  // The position left the slice, so a wider one does not bring it back.
+  assert_eq(sample_test_play(player, 4, end=1.0), [0.0, 0.0, 0.0, 0.0])
   player.reset()
   assert_eq(sample_test_play(player, 4, begin=0.0, end=0.25), [
     1.0, 2.0, 0.0, 0.0,

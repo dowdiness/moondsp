@@ -171,7 +171,7 @@ pub fn sample_bank_name_char(Int32, Int32) -> Int32
 
 pub fn sample_bank_name_length(Int32) -> Int32
 
-pub fn sample_load_begin(Int32, Int32, Double) -> Int32
+pub fn sample_load_begin(Int32, Int32) -> Int32
 
 pub fn sample_load_commit() -> Bool
 

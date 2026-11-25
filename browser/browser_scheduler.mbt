@@ -210,15 +210,11 @@ pub fn sample_bank_name_char(entry : Int32, index : Int32) -> Int32 {
 }
 
 ///|
-/// Begin loading `length` samples into sample number `entry`, recorded at
-/// MIDI pitch `root_pitch`. Returns 0, or what refused it: 1 the sample
-/// number, 2 the length, 3 the store's memory, 4 no store.
-pub fn sample_load_begin(
-  entry : Int32,
-  length : Int32,
-  root_pitch : Double,
-) -> Int32 {
-  @playback_host.sample_load_begin(entry, length, root_pitch)
+/// Begin loading `length` samples into bank sample number `entry`. Returns 0,
+/// or what refused it: 1 the sample number, 2 the length, 3 the store's
+/// memory, 4 no store.
+pub fn sample_load_begin(entry : Int32, length : Int32) -> Int32 {
+  @playback_host.sample_load_begin(entry, length)
 }
 
 ///|

@@ -68,16 +68,11 @@ pub fn sample_bank_name(entry : Int32) -> String {
 }
 
 ///|
-/// Begin loading a waveform of `length` samples into sample number `entry`.
-/// A bank sample's root is its `@score.Sample::root_pitch`, which `s("…")`
-/// plays it at; `root_pitch` is the root of any other sample number.
-/// Returns 0, or what refused it: 1 the sample number, 2 the length, 3 the
+/// Begin loading a waveform of `length` samples into bank sample number
+/// `entry`, whose root is its `@score.Sample::root_pitch`, which `s("…")`
+/// plays it at. Returns 0, or what refused it: 1 the sample number, 2 the length, 3 the
 /// store's memory (ADR-0026 Decision 6), 4 no store yet.
-pub fn sample_load_begin(
-  entry : Int32,
-  length : Int32,
-  root_pitch : Double,
-) -> Int32 {
+pub fn sample_load_begin(entry : Int32, length : Int32) -> Int32 {
   guard sample_store.val is Some(store) else { return 4 }
   // A replaced waveform no sounding voice plays is free for this load.
   if player.val is Some(owner) {
@@ -86,12 +81,8 @@ pub fn sample_load_begin(
     store.begin_scan()
     store.end_scan()
   }
-  let root_pitch = if entry >= 0 && entry < bank.length() {
-    bank[entry].root_pitch()
-  } else {
-    root_pitch
-  }
-  match store.begin(entry, length, root_pitch~) {
+  guard entry >= 0 && entry < bank.length() else { return 1 }
+  match store.begin(entry, length, root_pitch=bank[entry].root_pitch()) {
     None => 0
     Some(Entries) => 1
     Some(Length) => 2

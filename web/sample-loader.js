@@ -28,20 +28,18 @@ export class SampleLoader {
   }
 
   /**
-   * Queue a `{ type: "sample-load", name, data: Float32Array }` message. A
-   * bank sample's root pitch comes from the engine; `rootPitch` is for others.
+   * Queue a `{ type: "sample-load", name, data: Float32Array }` message. The
+   * engine knows each bank sample's root pitch.
    */
   enqueue(message) {
     const { name, data } = message;
-    const rootPitch = message.rootPitch ?? 60;
-    if (typeof name !== "string" || !(data instanceof Float32Array) ||
-        typeof rootPitch !== "number" || !Number.isFinite(rootPitch)) {
+    if (typeof name !== "string" || !(data instanceof Float32Array)) {
       this.post({ type: "error", message: "invalid sample-load message" });
       return;
     }
     const entry = this.names.indexOf(name);
     if (entry < 0) this.unknown.add(name);
-    else this.queue.push({ entry, name, rootPitch, data, offset: -1 });
+    else this.queue.push({ entry, name, data, offset: -1 });
     this.report();
   }
 
@@ -55,7 +53,7 @@ export class SampleLoader {
     while (budget > 0 && this.queue.length > 0) {
       const load = this.queue[0];
       if (load.offset < 0) {
-        const refusal = this.wasm.sample_load_begin(load.entry, load.data.length, load.rootPitch);
+        const refusal = this.wasm.sample_load_begin(load.entry, load.data.length);
         if (refusal !== 0) {
           this.overLimit.set(load.name, REFUSALS[refusal] ?? "unknown");
           this.queue.shift();
