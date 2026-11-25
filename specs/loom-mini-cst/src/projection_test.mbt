@@ -20,10 +20,10 @@ fn projection_boundary_doc(
 ///|
 fn projection_boundary_snapshot(
   result : Result[
-    @pattern.PatternSnapshot,
+    @pattern.UntrackedPatternSnapshot,
     @pattern.PatternDocError,
   ],
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   match result {
     Ok(snapshot) => snapshot
     Err(_) => abort("expected lowered PatternDoc snapshot")
@@ -33,12 +33,12 @@ fn projection_boundary_snapshot(
 ///|
 fn projection_boundary_draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   match draft.prepare_playback() {
     Ok(input) =>
       match input.compile() {
-        Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) =>
-          snapshot.as_snapshot()
+        Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) =>
+          snapshot.as_untracked()
         _ => abort("expected Mini pattern playback")
       }
     Err(diagnostic) => abort(diagnostic.message())
@@ -78,7 +78,7 @@ fn projection_boundary_mini_draft_snapshot(
   old_start~ : Int,
   old_end~ : Int,
   new_end~ : Int,
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   let draft = try! @mini.Draft(input)
   projection_boundary_edit_draft(
     draft,
@@ -99,7 +99,7 @@ fn projection_boundary_one_cycle() -> @pattern.TimeSpan {
 
 ///|
 fn projection_boundary_leaf_ids(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.UntrackedPatternSnapshot,
 ) -> Array[String] {
   let events = snapshot.query_sourced_events(projection_boundary_one_cycle())
   let ids : Array[String] = []
@@ -113,7 +113,7 @@ fn projection_boundary_leaf_ids(
 fn projection_boundary_leaf_ids_from_doc(
   doc : @pattern.PatternDoc,
 ) -> Array[String] {
-  projection_boundary_leaf_ids(projection_boundary_snapshot(try? doc.lower()))
+  projection_boundary_leaf_ids(projection_boundary_snapshot(try? doc.lower_untracked()))
 }
 
 ///|
@@ -174,7 +174,7 @@ priv struct BoundaryEvent {
 /// Canonicalize a lowered snapshot's sourced events over the fixed parity window
 /// for value-level differential parity (Phase 2 plan Step 2).
 fn projection_boundary_value_events(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.UntrackedPatternSnapshot,
 ) -> Array[BoundaryEvent] {
   let events = snapshot.query_sourced_events(
     projection_boundary_parity_window(),
@@ -198,7 +198,7 @@ fn projection_boundary_value_events_from_doc(
   doc : @pattern.PatternDoc,
 ) -> Array[BoundaryEvent] {
   projection_boundary_value_events(
-    projection_boundary_snapshot(try? doc.lower()),
+    projection_boundary_snapshot(try? doc.lower_untracked()),
   )
 }
 
@@ -244,8 +244,8 @@ fn projection_boundary_assert_control_method_matches_mini(
   if loom_doc.root().value() != expected_root {
     abort("expected loom root ID to match control-method root")
   }
-  let loom_snapshot = projection_boundary_snapshot(try? loom_doc.lower())
-  let mini_snapshot = projection_boundary_snapshot(try? mini_doc.lower())
+  let loom_snapshot = projection_boundary_snapshot(try? loom_doc.lower_untracked())
+  let mini_snapshot = projection_boundary_snapshot(try? mini_doc.lower_untracked())
   let loom_ids = projection_boundary_leaf_ids(loom_snapshot)
   let mini_ids = projection_boundary_leaf_ids(mini_snapshot)
   projection_boundary_assert_ids_equal(loom_ids, mini_ids)
@@ -304,14 +304,14 @@ fn projection_boundary_assert_control_method_cache_reused_after_edit(
   let projection = LoomMiniAtomProjection::new(input)
   let initial_doc = projection_boundary_doc(projection.parse_doc())
   let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
-  ignore(projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)))
+  ignore(projection_boundary_snapshot(try? initial_doc.lower_untracked_with_cache(cache)))
   cache.reset_stats()
   projection.apply_edit(edit, edited)
   let edited_doc = projection_boundary_doc(projection.parse_doc())
   if edited_doc.root().value() != initial_doc.root().value() {
     abort("expected control-method edit to preserve root ID")
   }
-  ignore(projection_boundary_snapshot(try? edited_doc.lower_with_cache(cache)))
+  ignore(projection_boundary_snapshot(try? edited_doc.lower_untracked_with_cache(cache)))
   if cache.hit_count() != 1 {
     abort("expected one control-method lowering-cache hit")
   }
