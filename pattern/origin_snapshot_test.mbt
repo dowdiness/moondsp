@@ -100,7 +100,7 @@ test "exact compiler shares musical kernels without changing material metadata" 
   for index in 0..<docs.length() {
     let exact = docs[index].lower_tracked()
     let general = docs[index].lower_untracked()
-    let projected = exact.as_snapshot()
+    let projected = exact.as_untracked()
     let events = exact.query(arc)
     @debug.assert_eq(
       musical_rows(events.map(event => event.event())),

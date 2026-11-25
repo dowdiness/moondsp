@@ -515,47 +515,47 @@ fn PatternNodePath::prepend(
 }
 
 ///|
-pub struct PatternSnapshotEvent[A] {
+pub struct UntrackedPatternSnapshotEvent[A] {
   priv event : Event[A]
   priv path : PatternNodePath
   priv controls : Controls
 }
 
 ///|
-fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
+fn[A] UntrackedPatternSnapshotEvent::UntrackedPatternSnapshotEvent(
   event~ : Event[A],
   path~ : PatternNodePath,
   controls~ : Controls,
-) -> PatternSnapshotEvent[A] {
+) -> UntrackedPatternSnapshotEvent[A] {
   { event, path, controls, }
 }
 
 ///|
 /// This event's controls: its values at the onset and the buses they follow
 /// while it sounds.
-pub fn[A] PatternSnapshotEvent::controls(
-  self : PatternSnapshotEvent[A],
+pub fn[A] UntrackedPatternSnapshotEvent::controls(
+  self : UntrackedPatternSnapshotEvent[A],
 ) -> Controls {
   self.controls
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::event(
-  self : PatternSnapshotEvent[A],
+pub fn[A] UntrackedPatternSnapshotEvent::event(
+  self : UntrackedPatternSnapshotEvent[A],
 ) -> Event[A] {
   self.event
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::pattern_nodes(
-  self : PatternSnapshotEvent[A],
+pub fn[A] UntrackedPatternSnapshotEvent::pattern_nodes(
+  self : UntrackedPatternSnapshotEvent[A],
 ) -> Array[@identity.PatternNodeId] {
   self.path.nodes()
 }
 
 ///|
-pub fn[A] PatternSnapshotEvent::pattern_node_path(
-  self : PatternSnapshotEvent[A],
+pub fn[A] UntrackedPatternSnapshotEvent::pattern_node_path(
+  self : UntrackedPatternSnapshotEvent[A],
 ) -> PatternNodePath {
   self.path
 }
@@ -927,7 +927,7 @@ fn[A, O] Pat::capture_source_frame(
 fn[A : WithControls, O] scoped_event(
   event : Event[ScopedValue[A, O]],
   buses : Array[ControlBus],
-) -> PatternSnapshotEvent[A] {
+) -> UntrackedPatternSnapshotEvent[A] {
   let value = event.value
   let controls = Controls::lowered(
     value.value.controls(),
@@ -935,7 +935,7 @@ fn[A : WithControls, O] scoped_event(
     buses,
     event.part.begin,
   )
-  PatternSnapshotEvent(
+  UntrackedPatternSnapshotEvent(
     event={
       whole: event.whole,
       part: event.part,
@@ -1849,7 +1849,7 @@ pub fn[A] UntrackedPatternSnapshot::query(
 pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(
   self : UntrackedPatternSnapshot[A],
   arc : TimeSpan,
-) -> Array[PatternSnapshotEvent[A]] {
+) -> Array[UntrackedPatternSnapshotEvent[A]] {
   self.sourced.query(arc).map(event => scoped_event(event, self.buses))
 }
 
@@ -1861,7 +1861,7 @@ pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entr
   self : UntrackedPatternSnapshot[A],
   source_index : Int32,
   arc : TimeSpan,
-) -> Array[PatternSnapshotEvent[A]] {
+) -> Array[UntrackedPatternSnapshotEvent[A]] {
   match self.entry_sourced.get(source_index) {
     Some(entry) =>
       entry.source.query(arc).map(event => scoped_event(event, self.buses))
@@ -1990,7 +1990,7 @@ pub fn[A : WithControls] TrackedPatternSnapshot::entered(
 
 ///|
 /// Erase only origin capability, without compiling or interpreting time again.
-pub fn[A] TrackedPatternSnapshot::as_snapshot(
+pub fn[A] TrackedPatternSnapshot::as_untracked(
   self : TrackedPatternSnapshot[A],
 ) -> UntrackedPatternSnapshot[A] {
   fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {
