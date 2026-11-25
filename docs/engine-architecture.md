@@ -146,6 +146,7 @@ Shared authoring identity:
 | [`mini/`](../mini/README.mbt.md) | Mini-notation parsing, causal draft editing, and frozen playback inputs with exact pattern origins | `parse`, `parse_song`, `parse_doc`, `parse_snapshot`, `Draft`, `PlaybackInput` |
 | [`song/`](../song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[C]`, `Section[C]`, `SongPart[C]`, `TimeScope`, `SongDoc[C]`, `SongSnapshot[C]`, `SongContent` |
 | [`scheduler/`](../scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
+| `player/` | The performance of one score: preparation, acceptance, Play/Pause/Ended, tempo, gain, reverb, and block rendering, shared by the browser host and offline renderers (ADR-0029) | `Player`, `PlayerError`, `PlayerView`, `PlayState`, `PlaybackMode`, `NoteVoice`, `SamplerVoice` |
 
 ### Platform Adapters & Native Scaffolding
 

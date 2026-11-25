@@ -153,7 +153,7 @@ pub fn drum_template(drum : @score.Drum) -> Array[@moondsp.DspNode] {
 ///|
 /// The sound of the sampler. A sample plays from its onset for as long as
 /// its note lasts, then fades over the release, like an instrument note.
-pub fn sampler_voice() -> @playback_host.SamplerVoice {
+pub fn sampler_voice() -> @player.SamplerVoice {
   {
     attack_ms: 1.0,
     decay_ms: 0.0,
@@ -171,9 +171,7 @@ pub fn sampler_voice() -> @playback_host.SamplerVoice {
 /// the brighter waveforms sit behind a low-pass default. Triangle, the
 /// default, has 24 voices for a 5-note chord × 4 layers of jux/stereo, so
 /// fewer steals click; the others have 12, a 5-note chord under `.jux`.
-pub fn instrument_voice(
-  instrument : @score.Instrument,
-) -> @playback_host.NoteVoice {
+pub fn instrument_voice(instrument : @score.Instrument) -> @player.NoteVoice {
   match instrument {
     // The default instrument is Triangle for now: Dsp Sine still crackles
     // in AudioWorklet probes, while JS sine and direct wasm tick-block are

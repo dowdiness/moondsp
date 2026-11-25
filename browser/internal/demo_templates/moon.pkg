@@ -1,5 +1,5 @@
 import {
   "dowdiness/moondsp",
   "dowdiness/moondsp/score",
-  "dowdiness/moondsp/browser/internal/playback_host",
+  "dowdiness/moondsp/player",
 }

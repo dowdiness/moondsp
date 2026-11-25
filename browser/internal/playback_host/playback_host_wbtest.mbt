@@ -27,7 +27,7 @@ fn test_drum(drum : @score.Drum) -> Array[@moondsp.DspNode] {
 }
 
 ///|
-fn test_voice(_ : @score.Instrument) -> NoteVoice {
+fn test_voice(_ : @score.Instrument) -> @player.NoteVoice {
   {
     waveform: Sine,
     attack_ms: 10.0,
@@ -42,7 +42,7 @@ fn test_voice(_ : @score.Instrument) -> NoteVoice {
 }
 
 ///|
-let test_sampler : SamplerVoice = {
+let test_sampler : @player.SamplerVoice = {
   attack_ms: 0.0,
   decay_ms: 0.0,
   sustain: 1.0,
@@ -152,33 +152,8 @@ test "live synth applies gain, cutoff, and independent filter resonance" {
 }
 
 ///|
-fn wet_energy() -> Double {
-  let owner = player.val.unwrap()
-  let mut energy = 0.0
-  for i in 0..<128 {
-    energy += owner.wet_left.get(i).abs() + owner.wet_right.get(i).abs()
-  }
-  energy
-}
-
-///|
-fn active_notes() -> Int32 {
-  player.val.unwrap().scheduler.active_note_count()
-}
-
-///|
 fn assert_position(position : Int32) -> Unit raise {
-  assert_eq(player.val.unwrap().scheduler.sample_counter(), position.to_int64())
-}
-
-///|
-fn test_song(length~ : Int32, bpm~ : Int32) -> String {
-  "song(bpm(\{bpm}),section(\"a\",\{length},note(\"60\")),part(\"a1\",\"a\"))"
-}
-
-///|
-fn assert_tempo(bpm : Double) -> Unit raise {
-  assert_eq(player.val.unwrap().scheduler.bpm(), bpm)
+  assert_eq(scheduler_sample_position(), position.to_double())
 }
 
 ///|
@@ -254,45 +229,11 @@ test "envelope controls on a mixed stack leave drum voices unchanged" {
 }
 
 ///|
-test "shared room tail survives a two-part continue edit and restart clears it" {
-  let before = "song(section(\"a\",4,s(\"bd\").slow(8).room(1)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
-  let after = "song(section(\"a\",4,s(\"bd\").slow(8).gain(0)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
-  assert_true(init_scheduler_graph_for_test())
-  assert_eq(submit_for_test(before), 0)
-  render_for_test(30)
-  assert_true(wet_energy() > 0.0)
-  assert_eq(submit_for_test(after, restart=false), 0)
-  render_for_test(1)
-  assert_true(wet_energy() > 0.0)
-  assert_true(active_notes() > 0)
-  assert_true(output_energy() > 0.0)
-  assert_eq(submit_for_test(after), 0)
-  render_for_test(1)
-  assert_eq(wet_energy(), 0.0)
-  assert_true(active_notes() > 0)
-}
-
-///|
 test "drums apply gain through the voice frame" {
   let baseline = rendered_synth_energy("s(\"hh*8\")")
   let quieter = rendered_synth_energy("s(\"hh*8\").gain(0.1)")
   assert_true(baseline > 0.0)
   assert_true(quieter > baseline * 0.09 && quieter < baseline * 0.11)
-}
-
-///|
-test "room send leaves dry playback dry and adds one wet return" {
-  assert_true(init_scheduler_graph_for_test())
-  assert_eq(submit_for_test("s(\"bd\").slow(8)"), 0)
-  render_for_test(30)
-  let dry_output = output_energy()
-  assert_eq(wet_energy(), 0.0)
-  assert_true(init_scheduler_graph_for_test())
-  assert_eq(submit_for_test("s(\"bd\").slow(8).room(1)"), 0)
-  render_for_test(30)
-  let reverberant_output = output_energy()
-  assert_true(wet_energy() > 0.0)
-  assert_true((reverberant_output - dry_output).abs() > 0.000001)
 }
 
 ///|
