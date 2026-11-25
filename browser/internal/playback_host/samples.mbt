@@ -79,6 +79,13 @@ pub fn sample_load_begin(
   root_pitch : Double,
 ) -> Int32 {
   guard sample_store.val is Some(store) else { return 4 }
+  // A replaced waveform no sounding voice plays is free for this load.
+  if player.val is Some(owner) {
+    owner.reclaim_samples()
+  } else {
+    store.begin_scan()
+    store.end_scan()
+  }
   let root_pitch = if entry >= 0 && entry < bank.length() {
     bank[entry].root_pitch()
   } else {

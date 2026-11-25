@@ -5,6 +5,17 @@ pub fn Dsp::reset_runtime_state(self : Dsp) -> Unit {
 }
 
 ///|
+/// Mark the waveforms this graph's sample players still play in a scan of
+/// their store (`SampleStore::begin_scan`, ADR-0026). Allocates nothing.
+pub fn Dsp::mark_samples(self : Dsp) -> Unit {
+  for player in self.0.sample_states {
+    if player is Some(player) {
+      player.mark_samples()
+    }
+  }
+}
+
+///|
 fn CompiledGraph::reset_runtime_state(self : CompiledGraph) -> Unit {
   restore_default_nodes(self.nodes, self.default_nodes)
   clear_compiled_buffers(self.buffers)

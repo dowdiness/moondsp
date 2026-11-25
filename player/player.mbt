@@ -4,6 +4,7 @@
 /// AudioWorklet and an offline renderer drive it the same way.
 pub struct Player {
   priv scheduler : @scheduler.PatternScheduler
+  priv sampler_pool : @moondsp.BoundVoicePool
   priv onsets : @scheduler.OnsetBuffer
   priv signals : @scheduler.SignalBuffer
   priv context : @moondsp.DspContext
@@ -29,7 +30,8 @@ pub fn Player::Player(
   instrument~ : (@score.Instrument) -> NoteVoice,
   sampler~ : SamplerVoice,
 ) -> Player raise PlayerError {
-  guard scheduler_with_sounds(ctx, drum, instrument, sampler) is Some(scheduler) else {
+  guard scheduler_with_sounds(ctx, drum, instrument, sampler)
+    is Some((scheduler, sampler_pool)) else {
     raise UnsupportedFormat
   }
   let size = ctx.block_size()
@@ -39,6 +41,7 @@ pub fn Player::Player(
   scheduler.attach_signal_buffer(signals)
   {
     scheduler,
+    sampler_pool,
     onsets,
     signals,
     context: ctx,
@@ -52,6 +55,17 @@ pub fn Player::Player(
     gain: 0.5,
     session: Empty,
   }
+}
+
+///|
+/// Reclaim replaced waveforms no sounding sampler voice reads. Call before
+/// loading a waveform into this player's context store (ADR-0026). Allocates
+/// nothing; the pool stays private to the player.
+pub fn Player::reclaim_samples(self : Player) -> Unit {
+  let store = self.context.samples()
+  store.begin_scan()
+  self.sampler_pool.mark_samples()
+  store.end_scan()
 }
 
 ///|

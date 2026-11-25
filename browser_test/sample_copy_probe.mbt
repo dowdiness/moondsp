@@ -73,6 +73,12 @@ pub fn sample_store_create(
 let sample_player_probe_graph : @ref.Ref[@moondsp.Dsp?] = Ref(None)
 
 ///|
+/// The audit's store and the waveform it registers as sample 0.
+let sample_player_probe_store : @ref.Ref[
+  (@moondsp.SampleStore, FixedArray[Float])?,
+] = Ref(None)
+
+///|
 let sample_player_probe_output : @ref.Ref[@moondsp.AudioBuffer] = Ref(
   @moondsp.AudioBuffer::filled(128),
 )
@@ -93,13 +99,20 @@ pub fn sample_player_probe_init(
   begin : Double,
   end : Double,
 ) -> Int32 {
-  let store = @moondsp.SampleStore(entries=1, max_length=48000, capacity=48000)
+  // Room for the waveform and two replacements, which `reload` writes while
+  // the player still plays an earlier one.
+  let store = @moondsp.SampleStore(
+    entries=1,
+    max_length=48000,
+    capacity=3 * 48000,
+  )
   let sine = FixedArray::makei(48000, index => {
     Float::from_double(
       @math.sin(2.0 * @math.PI * 440.0 * index.to_double() / 48000.0),
     )
   })
   guard store.register(0, sine, root_pitch=69.0) is None else { return 0 }
+  sample_player_probe_store.val = Some((store, sine))
   let context = @moondsp.DspContext(
     sample_rate=48000.0,
     block_size=128,
@@ -114,6 +127,25 @@ pub fn sample_player_probe_init(
     context,
   )
   if sample_player_probe_graph.val is Some(_) {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+/// Load sample 0 again as a host does: scan the store for the waveform the
+/// player still plays, then register the same sine. Returns 1, or 0 when the
+/// registration fails.
+pub fn sample_player_probe_reload() -> Int32 {
+  guard sample_player_probe_store.val is Some((store, sine)) &&
+    sample_player_probe_graph.val is Some(graph) else {
+    return 0
+  }
+  store.begin_scan()
+  graph.mark_samples()
+  store.end_scan()
+  if store.register(0, sine, root_pitch=69.0) is None {
     1
   } else {
     0

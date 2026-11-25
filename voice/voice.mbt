@@ -504,6 +504,19 @@ pub fn BoundVoicePool::set_template(
 }
 
 ///|
+/// Mark the waveforms this pool's sounding voices play in a scan of their
+/// sample store (`SampleStore::begin_scan`, ADR-0026). An idle voice plays
+/// nothing until it is reset for its next note, so it marks nothing.
+/// Allocates nothing.
+pub fn BoundVoicePool::mark_samples(self : BoundVoicePool) -> Unit {
+  for slot in self.pool.slots {
+    if !(slot.state is VoiceState::Idle) && slot.compiled is Some(compiled) {
+      compiled.mark_samples()
+    }
+  }
+}
+
+///|
 /// Pair the parameter bound to `key` with the bus `read`, or `None` when this
 /// pool does not bind `key`.
 pub fn BoundVoicePool::follower(

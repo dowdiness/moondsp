@@ -131,6 +131,7 @@ pub fn Dsp::has_feedback_edges(Self) -> Bool
 pub fn Dsp::is_voice_finished(Self) -> Bool
 pub fn Dsp::last_sanitized_count(Self) -> Int32
 pub fn Dsp::last_validation_errors(Self) -> Array[GraphValidationError]
+pub fn Dsp::mark_samples(Self) -> Unit
 pub fn Dsp::process(Self, @dsp.DspContext, @dsp.AudioBuffer) -> Unit
 pub fn Dsp::reset_runtime_state(Self) -> Unit
 pub fn Dsp::set_param(Self, Int32, GraphParamSlot, Double) -> Result[Unit, GraphControlError]

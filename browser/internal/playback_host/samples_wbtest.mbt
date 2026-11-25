@@ -111,3 +111,40 @@ test "begin, end and speed slice and pace a sample from the score" {
     0.0,
   )
 }
+
+///|
+test "loading scans the sampler pool for the waveform a sounding voice plays" {
+  // A store with room for two one-second waveforms, so a third load needs a
+  // replaced waveform's memory. The real store is restored afterwards.
+  let saved = sample_store.val
+  sample_store.val = Some(
+    @moondsp.SampleStore(
+      entries=SAMPLE_ENTRIES,
+      max_length=48000,
+      capacity=96000,
+    ),
+  )
+  let ping = @score.Sample::parse("ping").unwrap().number()
+  let load = () => {
+    let result = sample_load_begin(ping, 48000, 0.0)
+    if result == 0 {
+      for i in 0..<48000 {
+        sample_load_write(i, Float::from_double(0.5))
+      }
+      ignore(sample_load_commit())
+    }
+    result
+  }
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(load(), 0)
+  assert_eq(submit_for_test("s(\"ping\").slow(40)"), 0)
+  render_for_test(4)
+  // The voice plays the first waveform: the second load fits beside it,
+  // and a third finds no free memory (3, the store's memory).
+  assert_eq(load(), 0)
+  assert_eq(load(), 3)
+  // Without the scheduler graph no voice plays it, and the load fits.
+  reset_scheduler_graph()
+  assert_eq(load(), 0)
+  sample_store.val = saved
+}

@@ -68,6 +68,8 @@ pub fn sample_player_probe_init(Double, Double, Double, Double) -> Int32
 
 pub fn sample_player_probe_process(Int32, Int32) -> Double
 
+pub fn sample_player_probe_reload() -> Int32
+
 pub fn sample_store_create(Int32, Int32, Int32) -> Int32
 
 pub fn scheduler_left_sample(Int32) -> Double

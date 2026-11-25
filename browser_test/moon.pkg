@@ -55,6 +55,7 @@ options(
         "sample_store_create",
         "sample_player_probe_init",
         "sample_player_probe_process",
+        "sample_player_probe_reload",
       ],
     },
     "wasm-gc": {
@@ -99,6 +100,7 @@ options(
         "sample_store_create",
         "sample_player_probe_init",
         "sample_player_probe_process",
+        "sample_player_probe_reload",
       ],
     },
   },

@@ -270,3 +270,127 @@ test "a chunked registration is invisible until commit, and a new begin reuses i
     0.5, 0.5, 0.5, 0.5, 0.0,
   ])
 }
+
+///|
+/// Scan `store` for the waveforms `players` still play.
+fn sample_test_scan(
+  store : @dsp.SampleStore,
+  players : Array[@dsp.SamplePlayer],
+) -> Unit {
+  store.begin_scan()
+  for player in players {
+    player.mark_samples()
+  }
+  store.end_scan()
+}
+
+///|
+test "a replaced waveform's memory is free after a scan finds no player on it" {
+  // Room for two waveforms of six: a replacement is written while the
+  // waveform it replaces still plays.
+  let store = @dsp.SampleStore(entries=1, max_length=6, capacity=12)
+  let first = sample_test_waveform(6, index => (index + 1).to_double())
+  let second = sample_test_waveform(6, index => -(index + 1).to_double())
+  let third = sample_test_waveform(6, index => (index + 1).to_double() / 8.0)
+  assert_eq(store.register(0, first, root_pitch=60.0), None)
+  let sounding = @dsp.SamplePlayer(store)
+  let head = sample_test_play(sounding, 4)
+  assert_eq(store.register(0, second, root_pitch=60.0), None)
+  // The scan finds `first` still playing, so a third waveform has no room.
+  sample_test_scan(store, [sounding])
+  assert_eq(
+    store.register(0, third, root_pitch=60.0),
+    Some(@dsp.SampleLimit::Memory),
+  )
+  // The sounding player plays `first` to its end.
+  let tail = sample_test_play(sounding, 4)
+  assert_eq([..head, ..tail], [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 0.0])
+  sample_test_scan(store, [sounding])
+  assert_eq(store.register(0, third, root_pitch=60.0), None)
+  assert_eq(
+    sample_test_play(@dsp.SamplePlayer(store), 6),
+    sample_test_doubles(third, 6),
+  )
+  // Playback has ended, so the player stays silent even when its speed
+  // turns back into memory that now holds `third`.
+  assert_eq(sample_test_play(sounding, 4, speed=-1.0), [0.0, 0.0, 0.0, 0.0])
+}
+
+///|
+test "a scan marks copied players, and not reset ones" {
+  let store = @dsp.SampleStore(entries=1, max_length=6, capacity=12)
+  let waveform = (sign : Double) => {
+    sample_test_waveform(6, index => sign * (index + 1).to_double())
+  }
+  assert_eq(store.register(0, waveform(1.0), root_pitch=60.0), None)
+  let player = @dsp.SamplePlayer(store)
+  ignore(sample_test_play(player, 2))
+  let copy = @dsp.SamplePlayer(store)
+  copy.copy_state_from(player)
+  assert_eq(store.register(0, waveform(-1.0), root_pitch=60.0), None)
+  player.reset()
+  // The copy still plays the first waveform.
+  sample_test_scan(store, [player, copy])
+  assert_eq(
+    store.register(0, waveform(2.0), root_pitch=60.0),
+    Some(@dsp.SampleLimit::Memory),
+  )
+  // The helper plays blocks of 4, so the original stopped after sample 4.
+  assert_eq(sample_test_play(copy, 2), [5.0, 6.0])
+  copy.reset()
+  sample_test_scan(store, [player, copy])
+  assert_eq(store.register(0, waveform(2.0), root_pitch=60.0), None)
+}
+
+///|
+test "freed memory merges with its free neighbours" {
+  let store = @dsp.SampleStore(entries=3, max_length=8, capacity=8)
+  let fill = (value : Double, length : Int32) => {
+    sample_test_waveform(length, _ => value)
+  }
+  // Entry 0 at 0–2, entry 1 at 3–5, and 6–7 free.
+  assert_eq(store.register(0, fill(1.0, 3), root_pitch=60.0), None)
+  assert_eq(store.register(1, fill(2.0, 3), root_pitch=60.0), None)
+  // Entry 0 moves to 6–7, and a scan frees 0–2. Entry 1 moves to 0–1, and a
+  // scan frees 3–5, which merges with the free 2 into 2–5.
+  assert_eq(store.register(0, fill(3.0, 2), root_pitch=60.0), None)
+  sample_test_scan(store, [])
+  assert_eq(store.register(1, fill(4.0, 2), root_pitch=60.0), None)
+  sample_test_scan(store, [])
+  assert_eq(store.register(2, fill(5.0, 4), root_pitch=60.0), None)
+  for case in [(0.0, 3.0, 2), (1.0, 4.0, 2), (2.0, 5.0, 4)] {
+    let (number, value, length) = case
+    let played = sample_test_play(@dsp.SamplePlayer(store), length, number~)
+    assert_eq(played, Array::make(length, value))
+  }
+}
+
+///|
+test "replaced waveforms still playing beyond the block table fail as Memory" {
+  // One entry: its waveform and one replaced waveform are guaranteed.
+  let store = @dsp.SampleStore(entries=1, max_length=4, capacity=400)
+  let waveform = sample_test_waveform(4, _ => 0.5)
+  let players = []
+  let mut refused = None
+  for _ in 0..<20 {
+    match store.register(0, waveform, root_pitch=60.0) {
+      None => {
+        let player = @dsp.SamplePlayer(store)
+        ignore(player.tick(number=0.0, pitch=60.0, speed=1.0))
+        players.push(player)
+      }
+      limit => {
+        refused = limit
+        break
+      }
+    }
+  }
+  assert_eq(refused, Some(@dsp.SampleLimit::Memory))
+  assert_true(players.length() >= 2)
+  // Once those voices end, the same registration fits.
+  for player in players {
+    player.reset()
+  }
+  sample_test_scan(store, players)
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+}

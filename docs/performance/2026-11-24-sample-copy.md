@@ -146,6 +146,10 @@ renders 1,000 blocks of 128 frames in four cases:
   resets, so each bind computes the slice. Rerun after stage 5 added
   `begin` and `end`.
 
+Halfway through every case, the audit also loads sample 0 again as a host
+does: a store scan that marks the sounding player's waveform, then a
+registration that replaces it. That loading path constructs nothing either.
+
 | Case | Constructions while rendering | Energy, counted = reference |
 |---|---:|---:|
 | Root pitch, speed 1 | 0 | 24,000.0 |

@@ -199,6 +199,7 @@ pub struct SamplePlayer {
 }
 pub fn SamplePlayer::SamplePlayer(SampleStore) -> Self
 pub fn SamplePlayer::copy_state_from(Self, Self) -> Unit
+pub fn SamplePlayer::mark_samples(Self) -> Unit
 pub fn SamplePlayer::process(Self, DspContext, AudioBuffer, number~ : Double, pitch~ : Double, speed~ : Double, begin? : Double, end? : Double) -> Unit
 pub fn SamplePlayer::reset(Self) -> Unit
 pub fn SamplePlayer::tick(Self, number~ : Double, pitch~ : Double, speed~ : Double, begin? : Double, end? : Double) -> Double
@@ -208,8 +209,10 @@ pub struct SampleStore {
 }
 pub fn SampleStore::SampleStore(entries~ : Int32, max_length~ : Int32, capacity~ : Int32) -> Self
 pub fn SampleStore::begin(Self, Int32, Int32, root_pitch~ : Double) -> SampleLimit?
+pub fn SampleStore::begin_scan(Self) -> Unit
 pub fn SampleStore::capacity(Self) -> Int32
 pub fn SampleStore::commit(Self) -> Bool
+pub fn SampleStore::end_scan(Self) -> Unit
 pub fn SampleStore::entries(Self) -> Int32
 pub fn SampleStore::has(Self, Int32) -> Bool
 pub fn SampleStore::register(Self, Int32, FixedArray[Float], root_pitch~ : Double) -> SampleLimit?

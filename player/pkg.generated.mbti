@@ -75,6 +75,7 @@ pub fn Player::onsets(Self) -> @scheduler.OnsetBuffer
 pub fn Player::pause(Self) -> Unit raise PlayerError
 pub fn Player::play(Self) -> Unit raise PlayerError
 pub fn Player::process(Self) -> Bool
+pub fn Player::reclaim_samples(Self) -> Unit
 pub fn Player::restart(Self, @mini.PlaybackInput) -> Unit raise PlayerError
 pub fn Player::right(Self) -> @dsp.AudioBuffer
 pub fn Player::set_gain(Self, Double) -> Unit

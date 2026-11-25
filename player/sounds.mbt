@@ -210,7 +210,7 @@ fn scheduler_with_sounds(
   drum : (@score.Drum) -> @moondsp.AnalyzedGraph,
   instrument : (@score.Instrument) -> NoteVoice,
   sampler : SamplerVoice,
-) -> @scheduler.PatternScheduler? {
+) -> (@scheduler.PatternScheduler, @moondsp.BoundVoicePool)? {
   let drums = @score.Drum::all()
   let instruments = @score.Instrument::all()
   // Every sample plays on the sampler pool, the last.
@@ -233,7 +233,12 @@ fn scheduler_with_sounds(
       Play(_, ..) => drums.length() + instruments.length()
     }
   }
-  Some(@scheduler.PatternScheduler(bpm=@mini.DEFAULT_BPM, ctx~, pools~, route~)) catch {
+  Some(
+    (
+      @scheduler.PatternScheduler(bpm=@mini.DEFAULT_BPM, ctx~, pools~, route~),
+      pools.last().unwrap(),
+    ),
+  ) catch {
     _ => None
   }
 }

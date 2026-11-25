@@ -1385,7 +1385,9 @@ fn gate_seconds(gate : @voice.NoteGate) -> Double? {
 /// held `first` while an earlier voice played two blocks and now holds
 /// `second`. `steal` starts the new note on the sounding slot; otherwise the
 /// earlier voice is killed first, so its idle graph is reset and reused.
-fn sample_voice_restart(steal~ : Bool) -> (Array[Double], Double) raise {
+fn sample_voice_restart(
+  steal~ : Bool,
+) -> (Array[Double], Double, @dsp.SampleLimit?) raise {
   let first = FixedArray::makei(16, index => {
     Float::from_double(1.0 - index.to_double() / 16.0)
   })
@@ -1426,14 +1428,21 @@ fn sample_voice_restart(steal~ : Bool) -> (Array[Double], Double) raise {
   render()
   assert_true(pool.voice_state(later) is @voice.VoiceState::Active)
   let expected = Array::makei(4, index => second[index].to_double() * gain)
-  (Array::makei(4, index => left.get(index) - expected[index]), gain)
+  // No sounding voice plays `first` now, so a scan frees its memory for a
+  // third waveform.
+  store.begin_scan()
+  pool.mark_samples()
+  store.end_scan()
+  let third = store.register(0, first, root_pitch=60.0)
+  (Array::makei(4, index => left.get(index) - expected[index]), gain, third)
 }
 
 ///|
 test "a reused voice plays its sample from the start of the current waveform" {
   for steal in [false, true] {
-    let (errors, gain) = sample_voice_restart(steal~)
+    let (errors, gain, third) = sample_voice_restart(steal~)
     assert_true(gain > 0.5)
+    assert_eq(third, None, msg="steal=\{steal}")
     for error in errors {
       assert_true(error.abs() < 1.0e-12)
     }
@@ -1494,4 +1503,54 @@ test "controls fixed at onset get no follower; speed and gain follow" {
     followed.push(follower.key())
   }
   assert_eq(followed, [@control.Control::Speed, Gain])
+}
+
+///|
+test "a scan finds the sample of a releasing voice, and not of a finished one" {
+  let waveform = FixedArray::make(4800, Float::from_double(0.5))
+  let store = @dsp.SampleStore(entries=1, max_length=4800, capacity=9600)
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+  let ctx = DspContext(sample_rate=48000.0, block_size=4, samples=store)
+  let pool = @voice.BoundVoicePool(
+    AnalyzedGraph::analyze([
+      DspNode::sample_player(number=0.0, pitch=60.0, speed=1.0),
+      DspNode::adsr(attack_ms=0.0, decay_ms=0.0, sustain=1.0, release_ms=1.0),
+      DspNode::envelope_gain(input=0, envelope=1, amount=1.0),
+      DspNode::output(2),
+    ]),
+    ctx,
+    ControlBindingBuilder(),
+    max_voices=2,
+  )
+  let left = AudioBuffer::filled(4)
+  let right = AudioBuffer::filled(4)
+  let voice = pool
+    .note_on_graph_controls([
+      GraphControl::set_param(0, GraphParamSlot::Value0, 0.0),
+    ])
+    .unwrap()
+  pool.process(ctx, left, right)
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
+  let scan = () => {
+    store.begin_scan()
+    pool.mark_samples()
+    store.end_scan()
+  }
+  // The sounding voice plays the first waveform, 4,796 samples from its end,
+  // and keeps it through its release.
+  pool.note_off_result(voice).unwrap()
+  pool.process(ctx, left, right)
+  assert_true(pool.voice_state(voice) is @voice.VoiceState::Releasing)
+  scan()
+  assert_eq(
+    store.register(0, waveform, root_pitch=60.0),
+    Some(@dsp.SampleLimit::Memory),
+  )
+  for _ in 0..<100 {
+    pool.process(ctx, left, right)
+  }
+  // Idle, with a free slot beside it, the voice plays nothing.
+  assert_true(pool.voice_state(voice) is @voice.VoiceState::Idle)
+  scan()
+  assert_eq(store.register(0, waveform, root_pitch=60.0), None)
 }

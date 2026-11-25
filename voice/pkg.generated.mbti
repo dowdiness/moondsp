@@ -56,6 +56,7 @@ pub fn BoundVoicePool::follower(Self, @control.Control, (Int64, Int64) -> @contr
 pub fn BoundVoicePool::kill_all(Self) -> Unit
 pub fn BoundVoicePool::kill_result(Self, VoiceHandle) -> Result[Unit, VoiceControlError]
 pub fn BoundVoicePool::last_sanitized_count(Self) -> Int32
+pub fn BoundVoicePool::mark_samples(Self) -> Unit
 pub fn[C : @control.ControlSource] BoundVoicePool::note_gate(Self, C) -> NoteGate
 pub fn BoundVoicePool::note_off_all(Self) -> Unit
 pub fn BoundVoicePool::note_off_bool(Self, VoiceHandle) -> Bool

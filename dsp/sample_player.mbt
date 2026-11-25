@@ -6,11 +6,18 @@
 /// the store replaces later plays to its end. Its state is that waveform and
 /// a read position, and `reset` clears both. It reads `begin` and `end` at
 /// the same moment, so a voice's slice is fixed at its onset.
+///
+/// Playback ends when the read position leaves the slice: the player stays
+/// silent until it takes a waveform again, even if its speed turns back.
+/// Until then, `mark_samples` marks its waveform in a store scan, so the
+/// store keeps a replaced waveform's memory while the player reads it.
 pub struct SamplePlayer {
   priv store : SampleStore
   priv mut bound : Bool
   priv mut number : Double
   priv mut start : Int32
+  /// The store block of its waveform, or -1.
+  priv mut block : Int32
   /// 0 when the sample number had no waveform.
   priv mut length : Int32
   /// The slice that plays: waveform samples `first` to `last`, inclusive.
@@ -34,6 +41,7 @@ pub fn SamplePlayer::SamplePlayer(store : SampleStore) -> SamplePlayer {
     bound: false,
     number: 0.0,
     start: 0,
+    block: -1,
     length: 0,
     first: 0,
     last: -1,
@@ -50,6 +58,7 @@ pub fn SamplePlayer::SamplePlayer(store : SampleStore) -> SamplePlayer {
 /// Forget the waveform and the read position.
 pub fn SamplePlayer::reset(self : SamplePlayer) -> Unit {
   self.bound = false
+  self.block = -1
   self.number = 0.0
   self.start = 0
   self.length = 0
@@ -72,6 +81,7 @@ pub fn SamplePlayer::copy_state_from(
   if physical_equal(self.store, source.store) {
     self.bound = source.bound
     self.number = source.number
+    self.block = source.block
     self.start = source.start
     self.length = source.length
     self.first = source.first
@@ -98,10 +108,12 @@ fn SamplePlayer::bind(
   self.bound = true
   self.number = number
   if entry.to_double() == number && store.has(entry) {
+    self.block = store.blocks[entry]
     self.start = store.starts[entry]
     self.length = store.lengths[entry]
     self.root = store.roots[entry]
   } else {
+    self.block = -1
     self.start = 0
     self.length = 0
     self.root = 0.0
@@ -117,6 +129,25 @@ fn SamplePlayer::bind(
   }
   // The root may differ, so the next tick recomputes the rate.
   self.rate_known = false
+}
+
+///|
+/// End playback: the slice is empty until the player takes a waveform
+/// again, because once no scan marks it, its memory may hold another one.
+fn SamplePlayer::finish(self : SamplePlayer) -> Unit {
+  self.first = 0
+  self.last = -1
+}
+
+///|
+/// Mark the waveform this player is still playing in a scan of its store
+/// (`SampleStore::begin_scan`).
+pub fn SamplePlayer::mark_samples(self : SamplePlayer) -> Unit {
+  if self.block >= 0 &&
+    self.position >= self.first.to_double() &&
+    self.position <= self.last.to_double() {
+    self.store.mark(self.block)
+  }
 }
 
 ///|
@@ -170,6 +201,7 @@ pub fn SamplePlayer::tick(
   }
   let position = self.position
   guard position >= self.first.to_double() && position <= self.last.to_double() else {
+    self.finish()
     return 0.0
   }
   let memory = self.store.memory

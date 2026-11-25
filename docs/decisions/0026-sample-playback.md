@@ -198,9 +198,29 @@ Voices are panned as they are today.
 Re-registering a slot copies the new waveform into free memory and then
 switches the entry between two blocks. Voices that already sound keep the
 old waveform and play it to its end. The old memory returns to the free list
-once no voice of the sampler pool reads it, which is a scan of at most
-`max_voices` voices. A registration that needs that memory before then fails
-as over-limit. It never takes memory away from a sounding voice.
+once no voice of the sampler pool reads it. A registration that needs that
+memory before then fails as over-limit. It never takes memory away from a
+sounding voice.
+
+Before loading, the host calls `Player::reclaim_samples`. The player owns
+the sampler pool and runs `SampleStore::begin_scan`,
+`BoundVoicePool::mark_samples` on that pool, then `SampleStore::end_scan`.
+The host then calls `begin`. With no player, the host runs an empty scan:
+no voices can still read the store.
+
+- The scan is computed from the voices as they are, so nothing counts
+  readers and nothing has to be released when a graph is dropped. An idle
+  voice marks nothing: it plays nothing until it is reset for its next
+  note.
+- A player marks its waveform while its read position is inside its slice.
+  Playback ends when the position leaves the slice, and the player stays
+  silent until it takes a waveform again, even if its speed turns back.
+- Freed blocks merge with free neighbours. The block table holds every
+  entry's waveform and as many replaced ones still sounding; a load that
+  needs more blocks fails as over-limit.
+- A graph the host leaves out of the scan is not protected: it may play
+  another waveform written into memory it still reads. In the browser the
+  sampler pool is the only graph that reads the store.
 
 ## Design this rests on
 
@@ -264,7 +284,7 @@ used as names in `mini`, `control`, or `score` today.
    ([record](../performance/2026-11-24-sample-copy.md)).
 3. The store and `SamplePlayer`, with offline tests: rate, interpolation,
    reset, empty entry, and replacement while sounding. Done. A replaced
-   waveform's memory is not reused yet.
+   waveform's memory is reused from stage 4 on.
 4. The built-in bank, the sampler pool, routing, and browser loading in
    16,384-sample chunks. The pool reclaims a replaced waveform's memory once
    no voice reads it. Done: the bank as `@score.Sample` with generated
@@ -273,7 +293,8 @@ used as names in `mini`, `control`, or `score` today.
    the status channel, and the real-browser loading and playback checks
    ([record](../performance/2026-11-24-sample-copy.md#stage-4-loading-while-a-realtime-context-plays)).
    The editor's vocabulary lists the samples, so completion offers them in
-   both strings. Not done: reclaiming a replaced waveform's memory.
+   both strings. A replaced waveform's memory is free again once no player
+   reads it (see Replacing a sounding sample).
 5. `begin`, `end`, and `speed`, and the `follows` rule. Done. `DspNode`
    gains `value4` and `GraphParamSlot` gains `Value4`: the player takes
    speed on `Value2`, begin on `Value3` and end on `Value4`. `Value5` was not

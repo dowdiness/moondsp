@@ -19,6 +19,8 @@ async function instantiate(path) {
 // - backwards;
 // - with a reset every 50 blocks, which binds the waveform again;
 // - on a begin/end slice, forwards and backwards, which computes the slice at each bind.
+// Halfway through each, sample 0 is loaded again with a store scan, so the
+// counts also cover a host's loading path.
 const CASES = [
   { name: 'root pitch, speed 1', pitch: 69, speed: 1, resetEvery: 0 },
   { name: 'pitch 62, speed 1.5', pitch: 62, speed: 1.5, resetEvery: 0 },
@@ -39,9 +41,15 @@ const CASES = [
     const built = counters.reduce((sum, [, v]) => sum + v.value, 0n);
     assert.ok(built > 0n, 'building the store and graph is an allocation-positive control');
     for (const [, v] of counters) v.value = 0n;
-    const sum = counted.sample_player_probe_process(1000, c.resetEvery);
+    // Halfway, load the sample again as a host does: a scan, then a
+    // registration that replaces the waveform the player plays.
+    let sum = counted.sample_player_probe_process(500, c.resetEvery);
+    assert.equal(counted.sample_player_probe_reload(), 1, 'the reload fits');
+    sum += counted.sample_player_probe_process(500, c.resetEvery);
     const allocating = counters.filter(([, v]) => v.value > 0n).map(([n, v]) => `${n}=${v.value}`);
-    const expected = reference.sample_player_probe_process(1000, c.resetEvery);
+    let expected = reference.sample_player_probe_process(500, c.resetEvery);
+    assert.equal(reference.sample_player_probe_reload(), 1);
+    expected += reference.sample_player_probe_process(500, c.resetEvery);
     assert.equal(sum, expected, 'instrumentation does not change the output');
     assert.ok(sum !== 0, 'the player renders sound');
     console.log(JSON.stringify({ case: c.name, constructionsWhileRendering: allocating.length ? allocating : 0, outputEnergy: sum }));

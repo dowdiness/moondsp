@@ -222,6 +222,13 @@ pub fn Dsp::reset_runtime_state(self : Dsp) -> Unit {
 }
 
 ///|
+/// Mark the waveforms this graph's sample players still play in a scan of
+/// their store (`SampleStore::begin_scan`, ADR-0026). Allocates nothing.
+pub fn Dsp::mark_samples(self : Dsp) -> Unit {
+  self.raw().mark_samples()
+}
+
+///|
 /// Trigger `gate_on()` on a stereo-graph ADSR node using its original
 /// authoring index.
 pub fn StereoDsp::gate_on(
