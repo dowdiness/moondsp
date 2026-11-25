@@ -5,7 +5,7 @@
 - **Refines:** [ADR-0021](0021-song-structure-generic-over-content.md) §6
   (the scheduler names the two playable kinds)
 - **Related:** [ADR-0018](0018-playback-visualization-origin-truth.md),
-  [playback and origin performance summary](../performance/2026-09-24-playback-and-origin-summary.md)
+  [tracked and untracked entry allocation audit](../performance/2026-11-25-tracked-untracked-entry-allocations.md)
 
 ## Context
 
@@ -16,8 +16,9 @@ are told apart "at the scheduler". In practice the scheduler spelled the
 difference in three places: the facade's `PlaybackSnapshot`, the internal
 `PlaybackSnapshot`, and `EntrySource`, with `EntrySpec::entered`,
 `PlaybackSnapshot::entries` and `EntrySpec::query_sourced` each repeating one
-arm per kind. Untracked events also carried `-1.0` and NaN placeholders for
-source facts they do not have.
+arm per kind. Sourced events also carried four source fields with placeholders:
+`-1.0` for the facts untracked events lack, and NaN for the pitch of a tracked
+drum hit.
 
 ## Decision
 
