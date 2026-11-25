@@ -501,9 +501,10 @@ test "exact pattern origins survive admission and active queries" {
       @pattern.Rational::from_int(1),
     ),
   )
-  guard events[0].source_origin() is Some(origin) else {
-    fail("exact source origin was erased during admission")
+  guard events[0].source() is Some(source) else {
+    fail("tracked source origin was erased during admission")
   }
+  let origin = source.origin()
   assert_true(origin.atom() == @identity.SourceAtomId::SourceAtomId(epoch, 1L))
 }
 
@@ -530,9 +531,10 @@ test "origin-only edits update retained material provenance" {
       @pattern.Rational::from_int(1),
     ),
   )
-  guard events[0].source_origin() is Some(origin) else {
-    fail("retained exact material lost its source origin")
+  guard events[0].source() is Some(source) else {
+    fail("retained tracked material lost its source origin")
   }
+  let origin = source.origin()
   assert_true(origin.atom() == @identity.SourceAtomId::SourceAtomId(epoch, 2L))
 }
 
@@ -563,10 +565,12 @@ test "pending material retains old exact origins until its musical boundary" {
     ),
   )
   guard events is [old, next] &&
-    old.source_origin() is Some(old_origin) &&
-    next.source_origin() is Some(next_origin) else {
-    fail("expected old and pending exact material")
+    old.source() is Some(old_source) &&
+    next.source() is Some(next_source) else {
+    fail("expected old and pending tracked material")
   }
+  let old_origin = old_source.origin()
+  let next_origin = next_source.origin()
   assert_eq(pitch_of(old.event().value), Some(60.0))
   assert_eq(pitch_of(next.event().value), Some(72.0))
   assert_eq(old_origin.atom(), @identity.SourceAtomId::SourceAtomId(epoch, 1L))

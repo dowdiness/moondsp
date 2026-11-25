@@ -148,10 +148,7 @@ fn PatternScheduler::process_single_event(
   self : PatternScheduler,
   event : @pattern.Event[@score.ScoreEvent],
   origin : @model.VoiceOrigin,
-  source_origin : @pattern.EventOrigin?,
-  source_frame : @identity.SourceFrameId?,
-  source_start : Double,
-  source_pitch : Double,
+  source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
   controls : @pattern.Controls,
   onset_sample : Int64,
   arc : @pattern.TimeSpan,
@@ -204,13 +201,7 @@ fn PatternScheduler::process_single_event(
               signals.follow(controls.controls, pool, instrument, handle)
             }
             if onset_sample >= 0L && self.onsets is Some(buffer) {
-              buffer.record(
-                onset_sample,
-                source_origin,
-                source_frame~,
-                source_start~,
-                source_pitch~,
-              )
+              buffer.record(onset_sample, source)
             }
           }
         }
@@ -233,9 +224,6 @@ fn PatternScheduler::process_events_with_origin(
       event,
       origin,
       None,
-      None,
-      -1.0,
-      -1.0,
       @pattern.Controls::fixed(event.value.controls),
       -1L,
       arc,
@@ -362,10 +350,7 @@ fn PatternScheduler::process_block_events(
           self.process_single_event(
             event,
             sourced.origin(),
-            sourced.source_origin(),
-            sourced.source_frame(),
-            sourced.source_start(),
-            sourced.source_pitch(),
+            sourced.source(),
             sourced.controls(),
             frame.sample_begin,
             @pattern.TimeSpan(whole.begin, whole.end_),
@@ -402,10 +387,7 @@ fn PatternScheduler::process_block_events(
       self.process_single_event(
         event,
         sourced.origin(),
-        sourced.source_origin(),
-        sourced.source_frame(),
-        sourced.source_start(),
-        sourced.source_pitch(),
+        sourced.source(),
         sourced.controls(),
         start,
         frame.logical_arc,

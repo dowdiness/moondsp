@@ -77,22 +77,20 @@ fn origin_id_is_wire_safe(value : Int64) -> Bool {
 fn OnsetBuffer::record(
   self : OnsetBuffer,
   sample : Int64,
-  origin : @pattern.EventOrigin?,
-  source_frame~ : @identity.SourceFrameId? = None,
-  source_start~ : Double = -1.0,
-  source_pitch~ : Double = -1.0,
+  source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
 ) -> Unit {
   if !self.enabled {
     return
   }
-  guard origin is Some(origin) else { return }
+  guard source is Some(source) else { return }
+  let origin = source.origin()
   if !origin_id_is_wire_safe(sample) ||
     !origin_id_is_wire_safe(origin.atom().epoch().serial()) ||
     !origin_id_is_wire_safe(origin.atom().serial()) {
     self.dropped_count += 1
     return
   }
-  if source_frame is Some(frame) &&
+  if source.source_frame() is Some(frame) &&
     (
       frame.epoch() != origin.atom().epoch() ||
       !origin_id_is_wire_safe(frame.serial())
@@ -120,12 +118,17 @@ fn OnsetBuffer::record(
   self.rows[base] = sample.to_double()
   self.rows[base + 1] = origin.atom().epoch().serial().to_double()
   self.rows[base + 2] = origin.atom().serial().to_double()
-  self.rows[base + 3] = match source_frame {
+  // The wire row is flat doubles: no frame is serial 0 with start -1, and a
+  // drum hit has no pitch, which is NaN.
+  self.rows[base + 3] = match source.source_frame() {
     Some(frame) => frame.serial().to_double()
     None => 0.0
   }
-  self.rows[base + 4] = source_start
-  self.rows[base + 5] = source_pitch
+  self.rows[base + 4] = source.source_start()
+  self.rows[base + 5] = match source.event().value.sound {
+    Note(_, pitch~) | Play(_, pitch~) => pitch
+    Hit(_) => @double.not_a_number
+  }
   self.rows[base + 6] = binding_count.to_double()
 }
 

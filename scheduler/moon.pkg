@@ -9,6 +9,7 @@ import {
   "dowdiness/moondsp/scheduler/internal/playback",
   "dowdiness/moondsp/scheduler/internal/transport",
   "dowdiness/moondsp/scheduler/internal/voice_runtime",
+  "moonbitlang/core/double",
   "moonbitlang/core/debug",
   "moonbitlang/core/bench",
 }

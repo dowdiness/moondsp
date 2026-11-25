@@ -1,12 +1,11 @@
 ///|
 /// A playback event paired with the material version that produced it.
+/// `source` is the lowered event with its authored origin, which only tracked
+/// material has; it is `None` for untracked material.
 pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@score.ScoreEvent]
   priv origin : @model.VoiceOrigin
-  priv source_origin : @pattern.EventOrigin?
-  priv source_frame : @identity.SourceFrameId?
-  priv source_start : Double
-  priv source_pitch : Double
+  priv source : @pattern.EventWithOrigin[@score.ScoreEvent]?
   priv controls : @pattern.Controls
 }
 
@@ -17,10 +16,7 @@ pub fn PlaybackSourcedEvent::anonymous(
   {
     event,
     origin: @model.VoiceOrigin::Anonymous,
-    source_origin: None,
-    source_frame: None,
-    source_start: -1.0,
-    source_pitch: -1.0,
+    source: None,
     controls: @pattern.Controls::fixed(event.value.controls),
   }
 }
@@ -34,31 +30,10 @@ pub fn PlaybackSourcedEvent::controls(
 }
 
 ///|
-pub fn PlaybackSourcedEvent::source_origin(
+pub fn PlaybackSourcedEvent::source(
   self : PlaybackSourcedEvent,
-) -> @pattern.EventOrigin? {
-  self.source_origin
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_frame(
-  self : PlaybackSourcedEvent,
-) -> @identity.SourceFrameId? {
-  self.source_frame
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_start(
-  self : PlaybackSourcedEvent,
-) -> Double {
-  self.source_start
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_pitch(
-  self : PlaybackSourcedEvent,
-) -> Double {
-  self.source_pitch
+) -> @pattern.EventWithOrigin[@score.ScoreEvent]? {
+  self.source
 }
 
 ///|
@@ -425,10 +400,7 @@ pub fn PlaybackState::query_active_sourced_events(
         {
           event: sourced.event.placed(placement),
           origin: sourced.origin,
-          source_origin: sourced.source_origin,
-          source_frame: sourced.source_frame,
-          source_start: sourced.source_start,
-          source_pitch: sourced.source_pitch,
+          source: sourced.source,
           controls: sourced.controls.placed(placement),
         }
       })

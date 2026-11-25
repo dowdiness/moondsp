@@ -511,10 +511,7 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().placed(placement),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source_origin: None,
-        source_frame: None,
-        source_start: -1.0,
-        source_pitch: -1.0,
+        source: None,
         controls: event.controls().on_playback_clock(origin),
       })
     TrackedPattern(snapshot, index) =>
@@ -523,20 +520,14 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().placed(placement),
         origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source_origin: Some(event.origin()),
-        source_frame: event.source_frame(),
-        source_start: event.source_start(),
-        source_pitch: authored_pitch(event.event().value),
+        source: Some(event),
         controls: event.controls().on_playback_clock(origin),
       })
     UntrackedSong(song_origin) =>
       query_entry(self, origin, arc).map(event => {
         event,
         origin: @model.VoiceOrigin::Song(song_origin),
-        source_origin: None,
-        source_frame: None,
-        source_start: -1.0,
-        source_pitch: -1.0,
+        source: None,
         controls: @pattern.Controls::fixed(event.value.controls),
       })
     TrackedSong(entry) => {
@@ -552,10 +543,7 @@ fn EntrySpec::query_sourced(
       .map(event => {
         event: event.event().placed(slice.placement()).placed(placement),
         origin: @model.VoiceOrigin::Song(slice.origin()),
-        source_origin: Some(event.origin()),
-        source_frame: event.source_frame(),
-        source_start: event.source_start(),
-        source_pitch: authored_pitch(event.event().value),
+        source: Some(event),
         controls: event
         .controls()
         .placed(slice.placement())
@@ -706,14 +694,4 @@ fn[A] query_entry_segments(
     }
   }
   result
-}
-
-///|
-/// The pitch an exact event plays, or NaN for a drum hit. A sample played
-/// with `s("…")` plays its root pitch.
-fn authored_pitch(event : @score.ScoreEvent) -> Double {
-  match event.sound {
-    Note(_, pitch~) | Play(_, pitch~) => pitch
-    Hit(_) => @double.not_a_number
-  }
 }

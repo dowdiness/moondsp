@@ -4,7 +4,6 @@ import {
   "dowdiness/moondsp/score",
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/song",
-  "moonbitlang/core/double",
 }
 
 import {
