@@ -99,8 +99,8 @@ test "exact compiler shares musical kernels without changing material metadata" 
   let arc = doc_span(-5, 4, 9, 4)
   for index in 0..<docs.length() {
     let exact = docs[index].lower_tracked()
-    let general = docs[index].lower_untracked()
-    let projected = exact.as_untracked()
+    let general = docs[index].lower()
+    let projected = exact.as_snapshot()
     let events = exact.query(arc)
     @debug.assert_eq(
       musical_rows(events.map(event => event.event())),
@@ -217,7 +217,7 @@ test "filtering changes values but retains source" {
   )
   @debug.assert_eq(
     snapshot.pat().entries()[0].entry_key(),
-    doc.lower_untracked().pat().entries()[0].entry_key(),
+    doc.lower().pat().entries()[0].entry_key(),
   )
 }
 
@@ -268,7 +268,7 @@ test "same music refreshes origins through reused cache without changing entry i
   let before_doc = resolved_use("use", origin_note("atom", 1L, 60.0), 3L, 4L)
   let after_doc = resolved_use("use", origin_note("atom", 2L, 60.0), 3L, 5L)
   // Populate the untracked specialization first; tracked compilation must not reuse it.
-  ignore(before_doc.lower_untracked_with_cache(cache))
+  ignore(before_doc.lower_with_cache(cache))
   let before = before_doc.lower_tracked(cache~)
   let after = after_doc.lower_tracked(cache~)
   let arc = doc_span(0, 1, 1, 1)
@@ -313,7 +313,7 @@ test "same music refreshes origins through reused cache without changing entry i
 test "exact lowering rejects missing attribution before returning a snapshot" {
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=n(1))
-  ignore(runtime.lower_untracked_with_cache(cache))
+  ignore(runtime.lower_with_cache(cache))
   let missing_atom = try {
     ignore(runtime.lower_tracked(cache~))
     None
@@ -364,10 +364,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     0,
   )
   @debug.assert_eq(
-    runtime
-    .lower_untracked()
-    .query(doc_span(0, 1, 1, 1))
-    .map(event => event.value),
+    runtime.lower().query(doc_span(0, 1, 1, 1)).map(event => event.value),
     [n(1)],
   )
 }

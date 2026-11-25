@@ -463,7 +463,7 @@ test "MiniDocBuilder transforms documents it did not build" {
   let fast = builder.fast(parsed, @pattern.Rational::from_int(2)).unwrap()
   let dropped = builder.degrade(fast, 0.5).unwrap()
   let doc = builder.sequence([dropped, own]).unwrap()
-  assert_true(doc.lower_untracked().pat().entries().length() > 0)
+  assert_true(doc.lower().pat().entries().length() > 0)
 }
 
 ///|
@@ -485,7 +485,7 @@ test "reparsing lpf edit preserves sound atom id" {
   assert_true(
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:lpf:200")),
   )
-  let snapshot = edited.lower_untracked()
+  let snapshot = edited.lower()
   let events = snapshot.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -508,7 +508,7 @@ test "reparsing gain edit preserves sound atom id" {
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:gain:1")),
   )
   let events = edited
-    .lower_untracked()
+    .lower()
     .query(
       @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
@@ -531,7 +531,7 @@ test "reparsing pan edit preserves sound atom id" {
     !edited.contains_node(pid("mini:merge_control:mini:sound:bd:0:pan:-1")),
   )
   let events = edited
-    .lower_untracked()
+    .lower()
     .query(
       @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
@@ -550,7 +550,7 @@ test "reparsing token replacement preserves unaffected token ids" {
   assert_true(!edited.contains_node(pid("mini:sound:sd:0")))
   assert_true(edited.contains_node(pid("mini:sound:cp:0")))
   assert_true(edited.contains_node(pid("mini:sound:hh:0")))
-  let snapshot = edited.lower_untracked()
+  let snapshot = edited.lower()
   let events = snapshot.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -1013,7 +1013,7 @@ test "Draft exact lowering preserves music material and graph scopes" {
       fail("general parse failed")
     }
     guard source.body() is Pattern(doc) else { fail("expected pattern") }
-    let general = doc.lower_untracked()
+    let general = doc.lower()
     let span = song_span(0L, 1L, 4L, 1L)
     let actual = exact.query(span)
     let expected = general.query_sourced_events(span)
@@ -1154,10 +1154,7 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
     fail("text input must be explicitly untracked")
   }
   guard raw.body() is Pattern(doc) else { fail("expected runtime pattern") }
-  assert_eq(
-    pitch_of(doc.lower_untracked().query(draft_arc())[0].value),
-    Some(62.0),
-  )
+  assert_eq(pitch_of(doc.lower().query(draft_arc())[0].value), Some(62.0))
 }
 
 ///|

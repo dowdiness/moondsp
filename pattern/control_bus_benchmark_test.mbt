@@ -26,7 +26,7 @@ test "bench/control_bus/per_block" (b : @bench.T) {
   ).slow(id=id("slow"), factor=@pattern.Rational::from_int(2)) catch {
     _ => abort("doc")
   }
-  let snapshot = doc.lower_untracked() catch { _ => abort("lower") }
+  let snapshot = doc.lower() catch { _ => abort("lower") }
   let arcs = Array::makei(750, n => {
     @pattern.TimeSpan(
       @pattern.Rational((n * 128).to_int64(), 48000L),

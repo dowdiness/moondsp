@@ -63,7 +63,7 @@ pub fn parse_song(
     return Err("position \{song_at}: expected 'song('")
   }
   let result = p.parse_song_body(song_at, builder, lower=doc => {
-    doc.lower_untracked().pat()
+    doc.lower().pat()
   }) catch {
     problem => return Err(problem.to_string())
   }

@@ -167,9 +167,9 @@ pub fn[A : WithControls] PatternDoc::filter_map(Self[A], id~ : @identity.Pattern
 pub fn[A] PatternDoc::from_pattern(id~ : @identity.PatternNodeId, pat~ : Pat[A]) -> Self[A]
 pub fn[A] PatternDoc::gate(Self[A], id~ : @identity.PatternNodeId, factor~ : Rational) -> Self[A] raise PatternDocError
 pub fn[A : WithControls] PatternDoc::jux(Self[A], id~ : @identity.PatternNodeId, transform~ : TimeTransform) -> Self[A] raise PatternDocError
+pub fn[A : WithControls] PatternDoc::lower(Self[A]) -> UntrackedPatternSnapshot[A] raise PatternDocError
 pub fn[A : WithControls] PatternDoc::lower_tracked(Self[A], cache? : PatternLoweringCache[A]) -> TrackedPatternSnapshot[A] raise PatternDocError
-pub fn[A : WithControls] PatternDoc::lower_untracked(Self[A]) -> UntrackedPatternSnapshot[A] raise PatternDocError
-pub fn[A : WithControls] PatternDoc::lower_untracked_with_cache(Self[A], PatternLoweringCache[A]) -> UntrackedPatternSnapshot[A] raise PatternDocError
+pub fn[A : WithControls] PatternDoc::lower_with_cache(Self[A], PatternLoweringCache[A]) -> UntrackedPatternSnapshot[A] raise PatternDocError
 pub fn[A] PatternDoc::merge_control(id~ : @identity.PatternNodeId, left~ : Self[A], right~ : Self[ControlMap]) -> Self[A] raise PatternDocError
 pub fn[A, B] PatternDoc::merge_values(id~ : @identity.PatternNodeId, left~ : Self[A], right~ : Self[B], apply~ : (A, B) -> A) -> Self[A] raise PatternDocError
 pub fn[A] PatternDoc::node_count(Self[A]) -> Int32
@@ -305,7 +305,7 @@ pub fn[A : WithControls] TimeTransform::jux(Self, Pat[A]) -> Pat[A]
 pub struct TrackedPatternSnapshot[A] {
   // private fields
 }
-pub fn[A] TrackedPatternSnapshot::as_untracked(Self[A]) -> UntrackedPatternSnapshot[A]
+pub fn[A] TrackedPatternSnapshot::as_snapshot(Self[A]) -> UntrackedPatternSnapshot[A]
 pub fn[A] TrackedPatternSnapshot::control_traces(Self[A], @identity.SourceAtomId) -> Array[ControlTrace]
 pub fn[A : WithControls] TrackedPatternSnapshot::entered(Self[A], Rational) -> Self[A]
 pub fn[A] TrackedPatternSnapshot::pat(Self[A]) -> Pat[A]

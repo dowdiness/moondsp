@@ -105,7 +105,7 @@ test "bounded play source preserves ordinary musical output" {
     query_window=calibrated_window(),
   ).unwrap()
   guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
-  let snapshot = doc.lower_untracked()
+  let snapshot = doc.lower()
   let events = snapshot
     .pat()
     .query(

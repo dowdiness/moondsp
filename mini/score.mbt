@@ -132,7 +132,7 @@ pub fn methods_after(receiver : String) -> Array[Call] {
           builder,
           None,
           None,
-          lower=doc => doc.lower_untracked().pat(),
+          lower=doc => doc.lower().pat(),
         )
         if repeating {
           []

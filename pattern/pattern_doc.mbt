@@ -1990,7 +1990,7 @@ pub fn[A : WithControls] TrackedPatternSnapshot::entered(
 
 ///|
 /// Erase only origin capability, without compiling or interpreting time again.
-pub fn[A] TrackedPatternSnapshot::as_untracked(
+pub fn[A] TrackedPatternSnapshot::as_snapshot(
   self : TrackedPatternSnapshot[A],
 ) -> UntrackedPatternSnapshot[A] {
   fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {
@@ -2310,10 +2310,10 @@ pub fn[A] PatternDoc::node_revision(
 }
 
 ///|
-pub fn[A : WithControls] PatternDoc::lower_untracked(
+pub fn[A : WithControls] PatternDoc::lower(
   self : PatternDoc[A],
 ) -> UntrackedPatternSnapshot[A] raise PatternDocError {
-  self.lower_untracked_with_cache(PatternLoweringCache::new())
+  self.lower_with_cache(PatternLoweringCache::new())
 }
 
 ///|
@@ -2332,7 +2332,7 @@ fn[A] PatternDoc::values(self : PatternDoc[A]) -> Pat[A] raise PatternDocError {
 }
 
 ///|
-pub fn[A : WithControls] PatternDoc::lower_untracked_with_cache(
+pub fn[A : WithControls] PatternDoc::lower_with_cache(
   self : PatternDoc[A],
   cache : PatternLoweringCache[A],
 ) -> UntrackedPatternSnapshot[A] raise PatternDocError {

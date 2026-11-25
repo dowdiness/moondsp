@@ -1540,7 +1540,7 @@ fn loom_song_section_body_pat(
     Ok(doc) => doc
     Err(msg) => return Err(msg)
   }
-  let lowered = try? doc.lower_untracked()
+  let lowered = try? doc.lower()
   match lowered {
     Ok(snapshot) => Ok(snapshot.pat())
     Err(_) => Err("loom song section body lowering failed")

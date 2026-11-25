@@ -361,7 +361,7 @@ test "time transforms move bus signals where the reference map does" {
         right=doc,
       )
     }
-    let snapshot = doc.lower_untracked()
+    let snapshot = doc.lower()
     let (begin, split) = random.bounds()
     let events = tm_query(
       arc => snapshot.query_sourced_events(arc).map(e => e.event()),

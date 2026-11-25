@@ -136,7 +136,7 @@ fn parse_play_source_with_origins(
         builder,
         admission,
         authored_bpm,
-        lower=doc => doc.lower_untracked().pat(),
+        lower=doc => doc.lower().pat(),
       )
       { body: UntrackedArrangement(song, repeating), bpm, }
     }

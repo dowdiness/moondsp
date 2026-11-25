@@ -38,7 +38,7 @@ fn projection_boundary_draft_snapshot(
     Ok(input) =>
       match input.compile() {
         Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) =>
-          snapshot.as_untracked()
+          snapshot.as_snapshot()
         _ => abort("expected Mini pattern playback")
       }
     Err(diagnostic) => abort(diagnostic.message())
@@ -113,7 +113,7 @@ fn projection_boundary_leaf_ids(
 fn projection_boundary_leaf_ids_from_doc(
   doc : @pattern.PatternDoc,
 ) -> Array[String] {
-  projection_boundary_leaf_ids(projection_boundary_snapshot(try? doc.lower_untracked()))
+  projection_boundary_leaf_ids(projection_boundary_snapshot(try? doc.lower()))
 }
 
 ///|
@@ -198,7 +198,7 @@ fn projection_boundary_value_events_from_doc(
   doc : @pattern.PatternDoc,
 ) -> Array[BoundaryEvent] {
   projection_boundary_value_events(
-    projection_boundary_snapshot(try? doc.lower_untracked()),
+    projection_boundary_snapshot(try? doc.lower()),
   )
 }
 
@@ -244,8 +244,8 @@ fn projection_boundary_assert_control_method_matches_mini(
   if loom_doc.root().value() != expected_root {
     abort("expected loom root ID to match control-method root")
   }
-  let loom_snapshot = projection_boundary_snapshot(try? loom_doc.lower_untracked())
-  let mini_snapshot = projection_boundary_snapshot(try? mini_doc.lower_untracked())
+  let loom_snapshot = projection_boundary_snapshot(try? loom_doc.lower())
+  let mini_snapshot = projection_boundary_snapshot(try? mini_doc.lower())
   let loom_ids = projection_boundary_leaf_ids(loom_snapshot)
   let mini_ids = projection_boundary_leaf_ids(mini_snapshot)
   projection_boundary_assert_ids_equal(loom_ids, mini_ids)
@@ -304,14 +304,14 @@ fn projection_boundary_assert_control_method_cache_reused_after_edit(
   let projection = LoomMiniAtomProjection::new(input)
   let initial_doc = projection_boundary_doc(projection.parse_doc())
   let cache : @pattern.PatternLoweringCache = @pattern.PatternLoweringCache::new()
-  ignore(projection_boundary_snapshot(try? initial_doc.lower_untracked_with_cache(cache)))
+  ignore(projection_boundary_snapshot(try? initial_doc.lower_with_cache(cache)))
   cache.reset_stats()
   projection.apply_edit(edit, edited)
   let edited_doc = projection_boundary_doc(projection.parse_doc())
   if edited_doc.root().value() != initial_doc.root().value() {
     abort("expected control-method edit to preserve root ID")
   }
-  ignore(projection_boundary_snapshot(try? edited_doc.lower_untracked_with_cache(cache)))
+  ignore(projection_boundary_snapshot(try? edited_doc.lower_with_cache(cache)))
   if cache.hit_count() != 1 {
     abort("expected one control-method lowering-cache hit")
   }

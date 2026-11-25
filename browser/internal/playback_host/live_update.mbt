@@ -248,7 +248,7 @@ fn Player::prepare(
       }
       match parsed.body() {
         Pattern(doc) => {
-          let snapshot = doc.lower_untracked() catch {
+          let snapshot = doc.lower() catch {
             error =>
               return Err(
                 InvalidSource("could not lower source: \{Repr(error)}"),

@@ -810,7 +810,7 @@ pub fn parse_snapshot(
   match parse_doc(input) {
     Err(msg) => Err(msg)
     Ok(doc) => {
-      let snapshot = doc.lower_untracked() catch {
+      let snapshot = doc.lower() catch {
         _ => return Err("internal mini PatternDoc lowering failed")
       }
       Ok(snapshot)

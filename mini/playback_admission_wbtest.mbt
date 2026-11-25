@@ -16,10 +16,7 @@ test "query bounds cover phase edges full-cycle slots and future callbacks" {
     let syntax = resolve_mini_expr(parser.parse_syntax_expr(), parser.bindings)
     let admission = PlaybackAdmission(0.125)
     let work = admission.expression(syntax)
-    let pat = compile_score(syntax, MiniDocBuilder())
-      .doc()
-      .lower_untracked()
-      .pat()
+    let pat = compile_score(syntax, MiniDocBuilder()).doc().lower().pat()
     for start in starts {
       for width in widths {
         let events = pat.query(@pattern.TimeSpan(start, start + width))
@@ -140,7 +137,7 @@ test "generated transform compositions respect estimated events and preserve out
           ).unwrap(),
         ).unwrap()
         guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
-        let snapshot = doc.lower_untracked()
+        let snapshot = doc.lower()
         for start in starts {
           for width in widths {
             let arc = @pattern.TimeSpan(start, start + width)

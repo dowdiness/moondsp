@@ -45,7 +45,7 @@ fn bench_origin_check_parity(
   @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
   @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
 ) raise {
-  let ordinary = try! doc.lower_untracked()
+  let ordinary = try! doc.lower()
   let exact = try! doc.lower_tracked()
   for arc in arcs {
     assert_true(
