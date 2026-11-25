@@ -307,4 +307,5 @@ samples.
   - the browser's underrun or glitch count where it exposes one.
 
   The check runs in Chromium at least, and repeats in Firefox and Safari
-  before the browser path is called done.
+  before the browser path is called done. Done in all three
+  ([record](../performance/2026-11-24-sample-copy.md#safari-on-macos)).

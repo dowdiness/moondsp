@@ -3,7 +3,7 @@
 // See docs/performance/2026-11-24-sample-copy.md.
 //
 // npm --prefix web/live run sync:assets
-// node scripts/bench-sample-copy/loading-check.cjs [chromium|firefox] [seconds]
+// node scripts/bench-sample-copy/loading-check.cjs [chromium|firefox|webkit|safari] [seconds]
 //
 // It runs the production scheduler-processor.js twice, with a subclass that
 // records every rendered block by engine sample position: once as a control,
@@ -14,7 +14,8 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const pw = require('playwright');
+// Safari runs through safaridriver on a Mac (safari-driver.cjs); the rest through Playwright.
+const pw = process.argv[2] === 'safari' ? require('./safari-driver.cjs') : require('playwright');
 
 const root = path.resolve(__dirname, '../../web/live/public');
 const types = { '.js': 'text/javascript', '.wasm': 'application/wasm', '.html': 'text/html' };

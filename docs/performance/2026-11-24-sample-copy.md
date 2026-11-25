@@ -195,6 +195,7 @@ as a difference from the control.
 | Chromium 159 (headless shell), 4 runs | 3,000 / 0 | 30 (31 with the over-limit run) | 1 ms |
 | Firefox 159 (Playwright), 3 runs | 3,000 / 0 | 30 | 1–2 ms |
 | Playwright WebKit 27.2 (Linux, not Safari), 2 runs | 3,000 / 0 | 30 | 3 ms |
+| Safari 27.2 (macOS 27.2, Mac satellite), 3 runs | 3,000 / 0 | 31 | 2–3 ms |
 
 - **Output:** every block of every loading run matched the control exactly
   (largest difference 0). The crackle-probe metrics over the copying blocks
@@ -224,8 +225,8 @@ Limits:
   callbacks come from the Chromium trace only.
 - **Firefox:** the 1 ms clock cannot show a callback just over 2.67 ms.
 - **WebKit:** this is Linux WebKit, not Safari on macOS. Its 3 ms reading may
-  be one late block or clock granularity. Safari still needs its own check
-  on a Mac before the browser path is called done.
+  be one late block or clock granularity. Safari on a Mac is covered in
+  [Safari on macOS](#safari-on-macos).
 - **Device:** the runs used a headless device in a shared orb.
 
 ## Stage 4: scores play bank samples
@@ -265,8 +266,7 @@ npm --prefix web/live run sync:assets
 NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/play-check.cjs chromium
 ```
 
-Chromium only. Firefox and Safari remain required before the browser path is
-called done.
+First run in Chromium only; Firefox and Safari follow below.
 
 ## Stage 5: begin, end and speed in a realtime context
 
@@ -317,4 +317,47 @@ Two harness races turned up first, and both are fixed:
   resuming. The editor already does this (`waitForReady` in
   `web/live/src/audio.ts`), and so does `loading-check.cjs`.
 
-Safari still needs its own run on a Mac.
+### Safari on macOS
+
+Measured 2026-11-25 in Safari 27.2 on macOS 27.2, on a Mac satellite (a cloud
+Mac, not a laptop with speakers), at commit 4bcd9cc. Playwright cannot drive
+Safari, so [`safari-driver.cjs`](../../scripts/bench-sample-copy/safari-driver.cjs)
+gives both checks the same `launch`/`goto`/`evaluate` calls through
+`safaridriver`. Both checks run unchanged with `safari` as the browser.
+
+- **Playback:** 3 runs of `play-check.cjs`. Every check passed, and every
+  energy equals the Chromium and Firefox figures to the last digit, including
+  `speed(2)` at 16.37 and the first-0.1 s sum backwards, 0.000014× of
+  forwards.
+- **Loading:** 3 runs of `loading-check.cjs`. Every run rendered 3,000 of
+  3,000 blocks identical to the control (largest difference 0) and copied in
+  31 blocks. Its crackle-probe steps over the copying blocks equal the
+  control's over the same blocks. The status channel reported `ping` loading
+  for 80 ms, and `burst` over the length limit in the block it arrived. In
+  every run, audio time and wall time agree within 6 ms over 9 s.
+- **Timing:** the longest `process()` while copying was 2–3 ms on the 1 ms
+  clock, which cannot tell 3 ms from just over the 2.67 ms quantum. The
+  longest anywhere in a loading run was 4–5 ms, outside the copying blocks;
+  the control runs, with no load, reached 3–4 ms. The first render, which
+  builds the voice pools, took 11–13 ms.
+
+Two things the driver does for Safari:
+
+- **A click per context.** Safari starts an `AudioContext` only after a user
+  gesture, and one click let only one later context start: the loading
+  check's second context never settled `resume()`. The driver clicks a page
+  button before each evaluation, as a person pressing Play would.
+- **Results as one string.** The evaluated result returns as a single JSON
+  string, which holds the same numbers.
+
+```sh
+sudo safaridriver --enable   # once per Mac
+node scripts/bench-sample-copy/play-check.cjs safari
+node scripts/bench-sample-copy/loading-check.cjs safari 8
+```
+
+The generated assets in `web/live/public` must be on the Mac; this run copied
+the orb's build there (same SHA-1 for `moonbit_dsp.wasm`).
+
+Limits: this checks Safari's rendering and timing, not an audible device.
+Safari's underrun or glitch counts were not read here.

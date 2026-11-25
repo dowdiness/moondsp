@@ -7,11 +7,12 @@
 // and measures the energy of 1.5 s of output.
 //
 // npm --prefix web/live run sync:assets
-// NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/play-check.cjs [chromium|firefox|webkit]
+// NODE_PATH=web/live/node_modules node scripts/bench-sample-copy/play-check.cjs [chromium|firefox|webkit|safari]
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const pw = require('playwright');
+// Safari runs through safaridriver on a Mac (safari-driver.cjs); the rest through Playwright.
+const pw = process.argv[2] === 'safari' ? require('./safari-driver.cjs') : require('playwright');
 
 const root = path.resolve(__dirname, '../../web/live/public');
 const web = path.resolve(__dirname, '../../web');
