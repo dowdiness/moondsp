@@ -35,7 +35,7 @@ fn bus_doc(
     ),
   )
   .slow(id=bus_id("slow"), factor=@pattern.Rational::from_int(2))
-  .lower_untracked()
+  .lower()
 }
 
 ///|
@@ -158,7 +158,7 @@ fn bus_first_block_rms(
   let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => {
     0
   })
-  scheduler.queue_pattern_snapshot(doc.lower_untracked())
+  scheduler.queue_pattern_snapshot(doc.lower())
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   scheduler.render_block(left, right)
@@ -244,7 +244,7 @@ test "a signal buffer records the value held voices follow, once per block, on i
       ),
     )
     .slow(id=bus_id("slow"), factor=@pattern.Rational::from_int(2))
-    .lower_untracked()
+    .lower()
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let scheduler = @scheduler.PatternScheduler(
     bpm=240.0,
@@ -298,7 +298,7 @@ test "a signal buffer keeps recording through a voice's release and stops once i
         ),
       ),
     ),
-  ).lower_untracked()
+  ).lower()
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let scheduler = @scheduler.PatternScheduler(
     bpm=240.0,
@@ -352,7 +352,7 @@ test "a signal buffer keeps signals of different epochs apart even when their se
   let snapshot = @pattern.PatternDoc::stack(id=bus_id("both"), docs=[
     voice("old", 3L, 60.0),
     voice("new", 4L, 64.0),
-  ]).lower_untracked()
+  ]).lower()
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let scheduler = @scheduler.PatternScheduler(
     bpm=240.0,

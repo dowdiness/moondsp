@@ -302,13 +302,13 @@ test "edit orchestration stages a replacement and reconciles active voices" {
     id=edited,
     pat=@score.note(60.0),
   )
-  let active_snapshot = try! active_doc.lower_untracked()
+  let active_snapshot = try! active_doc.lower()
 
   let replacement_doc = @pattern.PatternDoc::from_pattern(
     id=replacement_root,
     pat=@score.note(67.0),
   )
-  let replacement = try! replacement_doc.lower_untracked()
+  let replacement = try! replacement_doc.lower()
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.queue_pattern_snapshot(active_snapshot)

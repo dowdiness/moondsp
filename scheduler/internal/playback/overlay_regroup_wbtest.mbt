@@ -21,8 +21,8 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
       docs=[a, b],
     ),
     c,
-  ]).lower_untracked()
-  let after = @pattern.PatternDoc::stack(id=new_root, docs=[a, b, c]).lower_untracked()
+  ]).lower()
+  let after = @pattern.PatternDoc::stack(id=new_root, docs=[a, b, c]).lower()
   let control = PlaybackState()
   let edited = PlaybackState()
   for state in [control, edited] {

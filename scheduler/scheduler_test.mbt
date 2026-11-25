@@ -203,7 +203,7 @@ fn note_snapshot(
     id=pid(id_value),
     pat=@score.note(note_value),
   )
-  doc.lower_untracked() catch {
+  doc.lower() catch {
     _ => abort("expected pattern snapshot")
   }
 }
@@ -215,7 +215,7 @@ fn silence_snapshot(
   let doc : @pattern.PatternDoc[@score.ScoreEvent] = @pattern.PatternDoc::silence(
     id=pid(id_value),
   )
-  doc.lower_untracked() catch {
+  doc.lower() catch {
     _ => abort("expected pattern snapshot")
   }
 }
@@ -503,7 +503,7 @@ test "Pattern selection kills the selected child but leaves its sibling sounding
     @pattern.PatternDoc::from_pattern(id=pid("selected"), pat=@score.note(60.0)),
     @pattern.PatternDoc::from_pattern(id=pid("sibling"), pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(doc.lower_untracked())
+  sched.queue_pattern_snapshot(doc.lower())
   sched.render_block(left, right)
   let outcome = sched
     .apply_pattern_voice_effect_result(
@@ -605,7 +605,7 @@ test "Retune preflights later voices before mutating the first voice" {
         pat=@score.note(60.0).fast(@pattern.Rational::from_int(400)),
       ),
     ])
-    s.queue_pattern_snapshot(quick.lower_untracked())
+    s.queue_pattern_snapshot(quick.lower())
     s.render_block(left, right)
   }
   @debug.assert_eq(sched.active_note_count(), 2)
@@ -1143,7 +1143,7 @@ test "Switching send output leaves dry playback and transport unchanged" {
     pat=@pattern.Pat::pure(
       played(@pattern.ControlMap::single(Note, 60.0).set(Room, 0.5)),
     ),
-  ).lower_untracked()
+  ).lower()
   sched.queue_pattern_snapshot(snapshot)
   dry_sched.queue_pattern_snapshot(snapshot)
   let send_left = @moondsp.AudioBuffer::filled(left.length())
@@ -1182,7 +1182,7 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
         @pattern.ControlMap::single(Note, 60.0).set(Pan, -0.4).set(Room, 0.5),
       ),
     ),
-  ).lower_untracked()
+  ).lower()
   sched.queue_pattern_snapshot(snapshot)
   let send_left = @moondsp.AudioBuffer::filled(left.length(), init=1.0)
   let send_right = @moondsp.AudioBuffer::filled(right.length(), init=-1.0)
@@ -1212,10 +1212,10 @@ test "deferred pattern replacement preserves selected voice provenance" {
     ),
     @pattern.PatternDoc::from_pattern(id=sibling, pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(initial.lower_untracked())
+  sched.queue_pattern_snapshot(initial.lower())
   sched.render_block(left, right)
   @debug.assert_eq(sched.active_note_count(), 2)
-  sched.queue_pattern_snapshot(replacement.lower_untracked())
+  sched.queue_pattern_snapshot(replacement.lower())
   let old_outcome = sched
     .apply_pattern_voice_effect_result(
       @scheduler.PatternVoiceScope::node(selected),
@@ -1322,7 +1322,7 @@ test "Retune changes only its instrument's voices" {
       pat=@score.note(62.0),
     ),
   ])
-  sched.queue_pattern_snapshot(doc.lower_untracked())
+  sched.queue_pattern_snapshot(doc.lower())
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.render_block(left, right)

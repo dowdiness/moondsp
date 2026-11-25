@@ -8,7 +8,7 @@ fn addressed(
     id=@identity.PatternNodeId::from_string(name),
     pat=pat.material(),
   )
-  .lower_untracked()
+  .lower()
   .pat()
 }
 
@@ -35,7 +35,7 @@ fn score(
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string("test"),
       pat=@pattern.stack(parts),
-    ).lower_untracked(),
+    ).lower(),
   )
 }
 
@@ -628,7 +628,7 @@ fn accept_layers(
       docs=layers,
     )
   }
-  state.queue(PlaybackSnapshot::untracked_pattern(doc.lower_untracked()))
+  state.queue(PlaybackSnapshot::untracked_pattern(doc.lower()))
   state.commit_pending(at)
 }
 

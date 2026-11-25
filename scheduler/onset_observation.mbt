@@ -120,11 +120,16 @@ fn OnsetBuffer::record(
   self.rows[base + 2] = origin.atom().serial().to_double()
   // The wire row is flat doubles: no frame is serial 0 with start -1, and a
   // drum hit has no pitch, which is NaN.
-  self.rows[base + 3] = match source.source_frame() {
-    Some(frame) => frame.serial().to_double()
-    None => 0.0
+  match source.source_frame() {
+    Some(frame) => {
+      self.rows[base + 3] = frame.serial().to_double()
+      self.rows[base + 4] = source.source_start()
+    }
+    None => {
+      self.rows[base + 3] = 0.0
+      self.rows[base + 4] = -1.0
+    }
   }
-  self.rows[base + 4] = source.source_start()
   self.rows[base + 5] = match source.event().value.sound {
     Note(_, pitch~) | Play(_, pitch~) => pitch
     Hit(_) => @double.not_a_number

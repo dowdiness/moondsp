@@ -1,7 +1,10 @@
 ///|
 /// A playback event paired with the material version that produced it.
 /// `source` is the lowered event with its authored origin, which only tracked
-/// material has; it is `None` for untracked material.
+/// material has; it is `None` for untracked material. Read only its origin,
+/// source frame, source start and sound from it: those do not depend on where
+/// the event is placed. Its `event()` and `controls()` are not placed; use this
+/// type's own `event()` and `controls()` for times and controls.
 pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@score.ScoreEvent]
   priv origin : @model.VoiceOrigin
@@ -30,6 +33,8 @@ pub fn PlaybackSourcedEvent::controls(
 }
 
 ///|
+/// The tracked source of this event, as described on the type. `None` for
+/// untracked material.
 pub fn PlaybackSourcedEvent::source(
   self : PlaybackSourcedEvent,
 ) -> @pattern.EventWithOrigin[@score.ScoreEvent]? {
