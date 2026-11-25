@@ -75,3 +75,41 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   render_for_test(1)
   assert_true(output_energy() > 0.01)
 }
+
+///|
+/// The exports map the player's states, kinds and errors to the codes and
+/// messages the Worklet reads: states 0-4 here (Fault is 5), modes, command
+/// results 0/1/2, and the last diagnostic.
+test "exports map player states, modes and errors to their codes" {
+  assert_true(init_scheduler_graph_for_test())
+  assert_eq(player_state(), 0)
+  assert_true(player_mode() is None)
+  assert_eq(submit_for_test(HELD_NOTE, restart=false), 0)
+  assert_eq(player_state(), 1)
+  assert_true(player_mode() is Pattern)
+  assert_eq(player_play(), 0)
+  assert_eq(player_state(), 2)
+  assert_eq(player_pause(), 0)
+  assert_eq(player_state(), 3)
+  let song = "song(section(\"a\",8,note(\"60\")),part(\"a1\",\"a\"))"
+  assert_eq(submit_for_test(song), 0)
+  assert_eq(player_state(), 2)
+  assert_true(player_mode() is Song)
+  let longer = "song(section(\"a\",9,note(\"60\")),part(\"a1\",\"a\"))"
+  assert_eq(submit_for_test(longer, restart=false), 2)
+  assert_eq(get_playback_error(), "song layout changed; restart required")
+  assert_eq(set_scheduler_bpm(0.0), 1)
+  assert_eq(get_playback_error(), "tempo must be 0.001..1000 BPM")
+  assert_eq(scheduler_bpm(), 120.0)
+  assert_eq(set_scheduler_bpm(90.0), 0)
+  assert_eq(get_playback_error(), "")
+  assert_eq(scheduler_bpm(), 90.0)
+  let short = "song(section(\"a\",1/200,note(\"60\")),part(\"a1\",\"a\"))"
+  assert_eq(submit_for_test(short), 0)
+  for _ in 0..<4 {
+    assert_true(process_scheduler_block())
+  }
+  assert_eq(player_state(), 4)
+  assert_eq(submit_for_test("note(\"60\""), 1)
+  assert_true(get_playback_error() != "")
+}
