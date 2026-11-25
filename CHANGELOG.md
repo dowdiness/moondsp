@@ -34,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `PatternSnapshot` is `UntrackedPatternSnapshot`;
   `PatternDoc::lower_with_origins` is `lower_tracked`, while `lower` and
   `lower_with_cache`, which return untracked snapshots, keep their names;
-  `PatternSnapshotEvent` is `UntrackedPatternSnapshotEvent`;
   `PlaybackSnapshot::pattern` and `pattern_with_origins` are `untracked_pattern`
   and `tracked_pattern`, and the variants `Pattern` and `PatternWithOrigins` of
   `PlaybackSnapshot` are `UntrackedPattern` and `TrackedPattern`.

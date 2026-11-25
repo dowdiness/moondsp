@@ -216,6 +216,14 @@ pub fn PatternNodePath::nodes(Self) -> Array[@identity.PatternNodeId]
 pub fn PatternNodePath::not_equal(Self, Self) -> Bool
 pub fn PatternNodePath::to_repr(Self) -> @debug.Repr
 
+pub struct PatternSnapshotEvent[A] {
+  // private fields
+}
+pub fn[A] PatternSnapshotEvent::controls(Self[A]) -> Controls
+pub fn[A] PatternSnapshotEvent::event(Self[A]) -> Event[A]
+pub fn[A] PatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
+pub fn[A] PatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
+
 pub struct Placement {
   // private fields
 }
@@ -320,18 +328,10 @@ pub struct UntrackedPatternSnapshot[A] {
 pub fn[A : WithControls] UntrackedPatternSnapshot::entered(Self[A], Rational) -> Self[A]
 pub fn[A] UntrackedPatternSnapshot::pat(Self[A]) -> Pat[A]
 pub fn[A] UntrackedPatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
-pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[UntrackedPatternSnapshotEvent[A]]
-pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entry(Self[A], Int32, TimeSpan) -> Array[UntrackedPatternSnapshotEvent[A]]
+pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
+pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entry(Self[A], Int32, TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A] UntrackedPatternSnapshot::revision(Self[A]) -> @identity.Revision
 pub fn[A] UntrackedPatternSnapshot::root(Self[A]) -> @identity.PatternNodeId
-
-pub struct UntrackedPatternSnapshotEvent[A] {
-  // private fields
-}
-pub fn[A] UntrackedPatternSnapshotEvent::controls(Self[A]) -> Controls
-pub fn[A] UntrackedPatternSnapshotEvent::event(Self[A]) -> Event[A]
-pub fn[A] UntrackedPatternSnapshotEvent::pattern_node_path(Self[A]) -> PatternNodePath
-pub fn[A] UntrackedPatternSnapshotEvent::pattern_nodes(Self[A]) -> Array[@identity.PatternNodeId]
 
 // Type aliases
 

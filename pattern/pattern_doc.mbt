@@ -515,47 +515,47 @@ fn PatternNodePath::prepend(
 }
 
 ///|
-pub struct UntrackedPatternSnapshotEvent[A] {
+pub struct PatternSnapshotEvent[A] {
   priv event : Event[A]
   priv path : PatternNodePath
   priv controls : Controls
 }
 
 ///|
-fn[A] UntrackedPatternSnapshotEvent::UntrackedPatternSnapshotEvent(
+fn[A] PatternSnapshotEvent::PatternSnapshotEvent(
   event~ : Event[A],
   path~ : PatternNodePath,
   controls~ : Controls,
-) -> UntrackedPatternSnapshotEvent[A] {
+) -> PatternSnapshotEvent[A] {
   { event, path, controls, }
 }
 
 ///|
 /// This event's controls: its values at the onset and the buses they follow
 /// while it sounds.
-pub fn[A] UntrackedPatternSnapshotEvent::controls(
-  self : UntrackedPatternSnapshotEvent[A],
+pub fn[A] PatternSnapshotEvent::controls(
+  self : PatternSnapshotEvent[A],
 ) -> Controls {
   self.controls
 }
 
 ///|
-pub fn[A] UntrackedPatternSnapshotEvent::event(
-  self : UntrackedPatternSnapshotEvent[A],
+pub fn[A] PatternSnapshotEvent::event(
+  self : PatternSnapshotEvent[A],
 ) -> Event[A] {
   self.event
 }
 
 ///|
-pub fn[A] UntrackedPatternSnapshotEvent::pattern_nodes(
-  self : UntrackedPatternSnapshotEvent[A],
+pub fn[A] PatternSnapshotEvent::pattern_nodes(
+  self : PatternSnapshotEvent[A],
 ) -> Array[@identity.PatternNodeId] {
   self.path.nodes()
 }
 
 ///|
-pub fn[A] UntrackedPatternSnapshotEvent::pattern_node_path(
-  self : UntrackedPatternSnapshotEvent[A],
+pub fn[A] PatternSnapshotEvent::pattern_node_path(
+  self : PatternSnapshotEvent[A],
 ) -> PatternNodePath {
   self.path
 }
@@ -927,7 +927,7 @@ fn[A, O] Pat::capture_source_frame(
 fn[A : WithControls, O] scoped_event(
   event : Event[ScopedValue[A, O]],
   buses : Array[ControlBus],
-) -> UntrackedPatternSnapshotEvent[A] {
+) -> PatternSnapshotEvent[A] {
   let value = event.value
   let controls = Controls::lowered(
     value.value.controls(),
@@ -935,7 +935,7 @@ fn[A : WithControls, O] scoped_event(
     buses,
     event.part.begin,
   )
-  UntrackedPatternSnapshotEvent(
+  PatternSnapshotEvent(
     event={
       whole: event.whole,
       part: event.part,
@@ -1849,7 +1849,7 @@ pub fn[A] UntrackedPatternSnapshot::query(
 pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(
   self : UntrackedPatternSnapshot[A],
   arc : TimeSpan,
-) -> Array[UntrackedPatternSnapshotEvent[A]] {
+) -> Array[PatternSnapshotEvent[A]] {
   self.sourced.query(arc).map(event => scoped_event(event, self.buses))
 }
 
@@ -1861,7 +1861,7 @@ pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entr
   self : UntrackedPatternSnapshot[A],
   source_index : Int32,
   arc : TimeSpan,
-) -> Array[UntrackedPatternSnapshotEvent[A]] {
+) -> Array[PatternSnapshotEvent[A]] {
   match self.entry_sourced.get(source_index) {
     Some(entry) =>
       entry.source.query(arc).map(event => scoped_event(event, self.buses))

@@ -38,7 +38,7 @@ fn unwrap_snapshot(
 
 ///|
 fn assert_pattern_event_path(
-  event : @pattern.UntrackedPatternSnapshotEvent[@pattern.ControlMap],
+  event : @pattern.PatternSnapshotEvent[@pattern.ControlMap],
   expected : Array[String],
 ) -> Unit {
   let nodes = event.pattern_nodes()
