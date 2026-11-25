@@ -215,7 +215,10 @@ fn[W] project_notation(
   }
   // A reduced p/q period repeats on the integer-cycle grid after p cycles.
   // Ceil(p/q) is not a repeat span (e.g. 3/2 needs 3 cycles, not 2).
-  let pattern = MiniDocBuilder().notation_doc(syntax, word_doc).lower().pat() catch {
+  let pattern = MiniDocBuilder()
+    .notation_doc(syntax, word_doc)
+    .lower_untracked()
+    .pat() catch {
       _ => return Err("internal mini PatternDoc lowering failed")
     }
   let span = pattern.entry_period().num.to_double().max(1.0)

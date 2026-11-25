@@ -9,11 +9,11 @@ test "a prepared entry switch is audible at its rounded sample inside the block"
   let old = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("entry"),
     pat=note.filter_map(_ => None).material(),
-  ).lower()
+  ).lower_untracked()
   let next = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("entry"),
     pat=note.material(),
-  ).lower()
+  ).lower_untracked()
   sched.queue_pattern_snapshot(old)
   sched.render_block(left, right)
   sched.queue_pattern_snapshot(next)

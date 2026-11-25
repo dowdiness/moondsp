@@ -95,8 +95,8 @@ test "parentheses preserve document events and source paths" {
     @mini.parse_doc("stack(s(\"bd\").gain(0.25), s(\"sd\").pan(-0.5))"),
   )
   let arc = song_span(0L, 1L, 1L, 1L)
-  let actual = plus.lower()
-  let expected = explicit.lower()
+  let actual = plus.lower_untracked()
+  let expected = explicit.lower_untracked()
   @debug.assert_eq(
     overlay_event_signatures(actual.query(arc)),
     overlay_event_signatures(expected.query(arc)),
@@ -135,10 +135,10 @@ test "plus inside quoted chord notation remains chord content" {
 test "editing a binding keeps the playback identity of its use site" {
   let before = unwrap_doc(
     @mini.parse_doc("let motif = note(\"60\").slow(3); motif"),
-  ).lower()
+  ).lower_untracked()
   let after = unwrap_doc(
     @mini.parse_doc("let motif = note(\"72\").slow(4); motif"),
-  ).lower()
+  ).lower_untracked()
   @debug.assert_eq(
     before.pat().entries()[0].entry_key(),
     after.pat().entries()[0].entry_key(),
@@ -155,12 +155,12 @@ test "regrouping a shaped document preserves known material content and addresse
     @mini.parse_doc(
       "(stack(note(\"60\"), note(\"72\")) + note(\"84\")).gain(0.3).slow(3).rev()",
     ),
-  ).lower()
+  ).lower_untracked()
   let after = unwrap_doc(
     @mini.parse_doc(
       "(note(\"60\") + (note(\"72\") + note(\"84\"))).gain(0.3).slow(3).rev()",
     ),
-  ).lower()
+  ).lower_untracked()
   assert_true(before.pat().material().same_content(after.pat().material()))
   let old_entries = before.pat().entries()
   let new_entries = after.pat().entries()

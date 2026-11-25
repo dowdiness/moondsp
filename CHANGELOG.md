@@ -29,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** tracked and untracked material are named alike everywhere
+  (see `CONTEXT.md`). `PatternSnapshotWithOrigins` is `TrackedPatternSnapshot`
+  and `PatternSnapshot` is `UntrackedPatternSnapshot`;
+  `PatternDoc::lower_with_origins` is `lower_tracked`, `PatternDoc::lower` is
+  `lower_untracked`, and `lower_with_cache` is `lower_untracked_with_cache`;
+  `PlaybackSnapshot::pattern` and `pattern_with_origins` are `untracked_pattern`
+  and `tracked_pattern`, and the variants `Pattern` and `PatternWithOrigins` of
+  `PlaybackSnapshot` are `UntrackedPattern` and `TrackedPattern`.
+  `SongMaterial::Runtime` and `Exact` are `Untracked` and `Tracked`;
+  `PlayBody::Arrangement` and `ExactArrangement` are `UntrackedArrangement`
+  and `TrackedArrangement`; `PreparedPlayback::Pattern` and `Runtime` are
+  `TrackedPattern` and `Source`.
+
 - `PatternDoc::continuous` takes a required `signature` that names its
   function, and `PatternDoc::once` builds a one-shot signal (ADR-0025). A live
   edit keeps a material with a signal only when its signatures are unchanged;

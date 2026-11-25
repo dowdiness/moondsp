@@ -152,7 +152,7 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
       source.slow(@pattern.Rational::from_int(3)).material(),
       source.slow(@pattern.Rational::from_int(4)).material(),
     ]),
-  ).lower()
+  ).lower_untracked()
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   scheduler.queue_pattern_snapshot(snapshot)

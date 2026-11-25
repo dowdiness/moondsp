@@ -268,7 +268,7 @@ fn notation_projection_events(
   rests_only : Bool,
 ) -> Array[Json] raise EditWireError {
   match compiled {
-    @mini.PreparedPlayback::Pattern(snapshot, _) => {
+    @mini.PreparedPlayback::TrackedPattern(snapshot, _) => {
       let arc = @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(span),
@@ -323,8 +323,8 @@ fn notation_projection_events(
       }
       projected
     }
-    @mini.PreparedPlayback::Runtime(_) =>
-      raise InvalidEdit("notation did not compile to an exact pattern")
+    @mini.PreparedPlayback::Source(_) =>
+      raise InvalidEdit("notation did not compile to a tracked pattern")
   }
 }
 

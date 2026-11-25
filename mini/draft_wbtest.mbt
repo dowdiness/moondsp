@@ -3,8 +3,8 @@ fn wb_draft_origin(draft : Draft) -> @pattern.EventOrigin raise {
   guard draft.prepare_playback() is Ok(input) else {
     fail("expected valid draft")
   }
-  guard input.compile() is Ok(Pattern(snapshot, _)) else {
-    fail("expected exact pattern")
+  guard input.compile() is Ok(TrackedPattern(snapshot, _)) else {
+    fail("expected tracked pattern")
   }
   let span = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),

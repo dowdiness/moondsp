@@ -22,19 +22,19 @@ pub(all) struct PlaybackInspection {
 }
 
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
-pub fn PlaybackSnapshot::pattern(@pattern.PatternSnapshot[@score.ScoreEvent]) -> Self
-pub fn PlaybackSnapshot::pattern_with_origins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn PlaybackSnapshot::song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
+pub fn PlaybackSnapshot::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::untracked_pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]) -> Self
 
 pub struct PlaybackSourcedEvent {
   // private fields
@@ -64,8 +64,8 @@ pub fn PlaybackState::reset(Self) -> Unit
 pub fn PlaybackState::skipped_entry_count(Self) -> Int32
 
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Exact(@song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]])
+  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Tracked(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]])
 }
 
 // Type aliases

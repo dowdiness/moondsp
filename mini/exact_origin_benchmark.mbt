@@ -5,7 +5,7 @@ fn bench_origin_draft_doc(text : String) -> ScoreDoc {
     Playable(source, _) =>
       match source.body() {
         Pattern(doc) => doc
-        Arrangement(_, _) | ExactArrangement(_, _) =>
+        UntrackedArrangement(_, _) | TrackedArrangement(_, _) =>
           abort("expected pattern source")
       }
     Rejected(diagnostic) =>
@@ -42,11 +42,11 @@ fn bench_origin_check_parity(
   arcs : Array[@pattern.TimeSpan],
   require_bindings : Bool,
 ) -> (
-  @pattern.PatternSnapshot[@score.ScoreEvent],
-  @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
+  @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
 ) raise {
-  let ordinary = try! doc.lower()
-  let exact = try! doc.lower_with_origins()
+  let ordinary = try! doc.lower_untracked()
+  let exact = try! doc.lower_tracked()
   for arc in arcs {
     assert_true(
       bench_origin_rows(ordinary.query(arc)) ==
@@ -129,8 +129,6 @@ test "bench/exact_origin/prepare" (b : @bench.T) {
     ),
   ]
   for (name, doc) in cases {
-    b.bench(name="\{name}/cold_exact", fn() {
-      b.keep(try! doc.lower_with_origins())
-    })
+    b.bench(name="\{name}/cold_exact", fn() { b.keep(try! doc.lower_tracked()) })
   }
 }

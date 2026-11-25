@@ -8,7 +8,7 @@ fn addressed(
     id=@identity.PatternNodeId::from_string(name),
     pat=pat.material(),
   )
-  .lower()
+  .lower_untracked()
   .pat()
 }
 
@@ -31,11 +31,11 @@ fn material(
 fn score(
   parts : Array[@pattern.Pat[@score.ScoreEvent]],
 ) -> PlaybackSnapshot raise {
-  PlaybackSnapshot::pattern(
+  PlaybackSnapshot::untracked_pattern(
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string("test"),
       pat=@pattern.stack(parts),
-    ).lower(),
+    ).lower_untracked(),
   )
 }
 
@@ -134,7 +134,7 @@ test "finite phrase keeps its current content until a new playback" {
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      Runtime(
+      Untracked(
         @song.SongDoc(parts=[
           @song.SongOccurrenceDoc::at(
             id=@identity.OccurrenceId::from_string("once"),
@@ -170,7 +170,7 @@ test "settling after an old finite end retains its already entered replacement" 
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      Runtime(
+      Untracked(
         @song.SongDoc(parts=[
           @song.SongOccurrenceDoc::at(
             id=@identity.OccurrenceId::from_string("once"),
@@ -312,7 +312,7 @@ fn finite_occurrence_score(lead_start : Int32?) -> PlaybackSnapshot raise {
       ),
     )
   }
-  PlaybackSnapshot::song(Runtime(@song.SongDoc(parts~).lower()))
+  PlaybackSnapshot::song(Untracked(@song.SongDoc(parts~).lower()))
 }
 
 ///|
@@ -364,7 +364,7 @@ fn finite_single_score(start : Int32, note : Int32) -> PlaybackSnapshot raise {
     body=material("moving", note, 3),
   )
   PlaybackSnapshot::song(
-    Runtime(
+    Untracked(
       @song.SongDoc(parts=[
         @song.SongOccurrenceDoc::at(
           id=@identity.OccurrenceId::from_string("moving-occurrence"),
@@ -491,9 +491,7 @@ test "exact pattern origins survive admission and active queries" {
     source_atom=@identity.SourceAtomId::SourceAtomId(epoch, 1L),
     value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
   )
-  let snapshot = PlaybackSnapshot::pattern_with_origins(
-    doc.lower_with_origins(),
-  )
+  let snapshot = PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
   let state = PlaybackState()
   state.queue(snapshot)
   state.commit_pending(@pattern.Rational::from_int(0))
@@ -518,7 +516,7 @@ test "origin-only edits update retained material provenance" {
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
       value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
     )
-    PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
+    PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
   }
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
   let state = PlaybackState()
@@ -550,7 +548,7 @@ test "pending material retains old exact origins until its musical boundary" {
       id=@identity.PatternNodeId::from_string("phrase"),
       factor=@pattern.Rational::from_int(3),
     )
-    PlaybackSnapshot::pattern_with_origins(doc.lower_with_origins())
+    PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
   }
   let state = PlaybackState()
   state.queue(exact(1L, 60.0))
@@ -626,7 +624,7 @@ fn accept_layers(
       docs=layers,
     )
   }
-  state.queue(PlaybackSnapshot::pattern(doc.lower()))
+  state.queue(PlaybackSnapshot::untracked_pattern(doc.lower_untracked()))
   state.commit_pending(at)
 }
 

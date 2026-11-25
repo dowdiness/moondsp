@@ -137,11 +137,11 @@ does not revive it.
 `prepare_playback()` returns a frozen `PlaybackInput` or a version-tagged
 `DraftDiagnostic`. Preparing input is **not playback acceptance**. The input owns
 its captured text/version/source witnesses; subsequent edits or disposal do not
-change it. `compile()` returns `PreparedPlayback::Pattern(exact_snapshot, bpm)`
-for a tracked pattern or `PreparedPlayback::Runtime(play_source)` for a song;
-tracked Song sections retain exact source snapshots inside that runtime source.
+change it. `compile()` returns `PreparedPlayback::TrackedPattern(snapshot, bpm)`
+for a tracked pattern or `PreparedPlayback::Source(play_source)` for a song;
+tracked Song sections retain tracked source snapshots inside that source.
 `PlaybackInput::text(text)` explicitly selects untracked programmatic input.
-An exact compilation failure never falls back to untracked playback.
+A tracked compilation failure never falls back to untracked playback.
 
 `encode_wire()` serializes a frozen input as schema-1 JSON. `decode_wire(wire)`
 returns a `Result`, validating bounded source/wire sizes, safe integer identities,

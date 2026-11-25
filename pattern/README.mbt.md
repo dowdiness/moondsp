@@ -40,8 +40,8 @@ streams, situated between text notation and audio-rate scheduling:
 | **Combinators** | `sequence`, `stack`, `controls`, `+` | `sequence`, `stack`, `controls`, `Pat::entries`, `Pat::material`, `Pat::select_control` |
 | **Time Transforms** | `Pat[A]` methods | `Pat::fast`, `Pat::slow`, `Pat::rev`, `Pat::euclid`, `Pat::degrade_by`, `every`, `Pat::gate`, `Pat::jux`, `Pat::filter_map` |
 | **Control Helpers** | `ControlMap`, helper functions | `control`, `s_gain`, `s_cutoff`, `s_pan`, `ControlMap::get`, `ControlMap::set`, `ControlMap::merge` |
-| **Document & Identity** | `PatternDoc`, `PatternSnapshot`, `PatternLoweringCache` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower`, `PatternDoc::lower_with_cache`, `PatternSnapshot::query` |
-| **Exact Origins** | `PatternSnapshotWithOrigins`, `EventWithOrigin`, `EventOrigin`, `ResolvedReference` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::lower_with_origins` |
+| **Document & Identity** | `PatternDoc`, `UntrackedPatternSnapshot`, `PatternLoweringCache` | `PatternDoc::from_pattern`, `PatternDoc::pure`, `PatternDoc::sequence`, `PatternDoc::stack`, `PatternDoc::lower_untracked`, `PatternDoc::lower_untracked_with_cache`, `UntrackedPatternSnapshot::query` |
+| **Tracked material** | `TrackedPatternSnapshot`, `EventWithOrigin`, `EventOrigin`, `ResolvedReference` | `PatternDoc::atom`, `PatternDoc::control_atom`, `PatternDoc::reference_with_binding`, `PatternDoc::lower_tracked` |
 
 A pattern is a query:
 
@@ -224,7 +224,7 @@ parameter.
 ## Live-editing identity
 
 `PatternDoc[A]` adds stable `PatternNodeId` values and revisions to an
-authored pattern tree. General lowering produces a `PatternSnapshot` with voice-scope
+authored pattern tree. Untracked lowering produces an `UntrackedPatternSnapshot` with voice-scope
 paths. A scope may contain several leaves; its last node is not an exact source
 atom. Use `pattern_node_path()` for scope operations, not source highlighting.
 
@@ -250,13 +250,13 @@ definition, and binding IDs must share a source epoch. Identity constructors
 check positive JavaScript-safe `Int64` components; `mini.Draft`, not this compiler,
 allocates non-reused epochs and serials for edited text.
 
-`doc.lower_with_origins(cache?)` returns `PatternSnapshotWithOrigins` or raises
+`doc.lower_tracked(cache?)` returns `TrackedPatternSnapshot` or raises
 `PatternDocError`. It rejects unattributed primary leaves with `MissingAtomOrigin`
 and ordinary references with `MissingReferenceBinding` during lowering. A merge's
 right-hand control provider needs no primary origin. `pure`, `from_pattern`,
-ordinary `reference`, and `lower` remain valid general APIs.
+ordinary `reference`, and `lower_untracked` remain valid general APIs.
 
-The exact snapshot's `query(arc)` and `query_for_entry(index, arc)` return
+The tracked snapshot's `query(arc)` and `query_for_entry(index, arc)` return
 `EventWithOrigin`: `event()` carries the musical event, `origin()` carries its
 atom and outer-to-inner bindings, and `pattern_node_path()` carries the separate
 voice scope. Returned binding arrays are defensive copies. `pat()` and

@@ -94,7 +94,7 @@ pub fn Draft::signal_graphs(
   let signals = self.sources.atoms.filter(atom => atom.kind == "signal")
   match source.body {
     Pattern(doc) => {
-      let snapshot = doc.lower_with_origins() catch { _ => return [] }
+      let snapshot = doc.lower_tracked() catch { _ => return [] }
       signals.filter_map(signal => {
         let traces = snapshot.control_traces(signal.id)
         guard !traces.is_empty() else { return None }
@@ -111,8 +111,8 @@ pub fn Draft::signal_graphs(
       })
     }
     // A tracked Draft lowers every song section with origins.
-    Arrangement(_, _) => []
-    ExactArrangement(song, _) => {
+    UntrackedArrangement(_, _) => []
+    TrackedArrangement(song, _) => {
       let window = song.duration()
       signals.filter_map(signal => {
         // Curve i follows the i-th trace in every occurrence, placed as

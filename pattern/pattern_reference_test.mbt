@@ -7,7 +7,7 @@ test "references retain distinct use-site paths into the same definition" {
   let left = @pattern.PatternDoc::reference(id=pid("left"), definition~)
   let right = @pattern.PatternDoc::reference(id=pid("right"), definition~)
   let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right])
-  let snapshot = doc.lower()
+  let snapshot = doc.lower_untracked()
   let events = snapshot.query_sourced_events(doc_span(0, 1, 3, 1))
   @debug.assert_eq(events.length(), 2)
   assert_pattern_event_path(events[0], ["mix", "left", "phrase", "note"])
@@ -29,7 +29,7 @@ test "references to divergent definition revisions never share stale values" {
     @pattern.PatternDoc::reference(id=pid("original"), definition=original),
     @pattern.PatternDoc::reference(id=pid("edited"), definition=edited),
   ])
-  let snapshot = doc.lower()
+  let snapshot = doc.lower_untracked()
   @debug.assert_eq(
     snapshot.query(doc_span(0, 1, 3, 1)).map(event => event.value),
     [n(60), n(72)],
@@ -49,9 +49,9 @@ test "rebuilding references to an edited definition invalidates a persistent cac
   let before = @pattern.PatternDoc::reference(
     id=pid("use"),
     definition=original,
-  ).lower_with_cache(cache)
+  ).lower_untracked_with_cache(cache)
   let edited = original.replace_with_pure(id=pid("note"), value=n(72))
-  let after = @pattern.PatternDoc::reference(id=pid("use"), definition=edited).lower_with_cache(
+  let after = @pattern.PatternDoc::reference(id=pid("use"), definition=edited).lower_untracked_with_cache(
     cache,
   )
   @debug.assert_eq(

@@ -22,7 +22,7 @@ pub fn parse_doc(String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], Strin
 
 pub fn parse_play_source(String, query_window? : @pattern.QueryWindow) -> Result[PlaySource, SourceProblem]
 
-pub fn parse_snapshot(String) -> Result[@pattern.PatternSnapshot[@score.ScoreEvent], String]
+pub fn parse_snapshot(String) -> Result[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], String]
 
 pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String]
 
@@ -193,8 +193,8 @@ pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
 
 pub enum PlayBody {
   Pattern(@pattern.PatternDoc[@score.ScoreEvent])
-  Arrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
-  ExactArrangement(@song.Song[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]], Bool)
+  UntrackedArrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  TrackedArrangement(@song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
 }
 
 pub struct PlaySource {
@@ -226,8 +226,8 @@ pub enum Position {
 pub impl @json.ToJson for Position
 
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
-  Runtime(PlaySource)
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Double)
+  Source(PlaySource)
 }
 
 pub struct SignalCurve {

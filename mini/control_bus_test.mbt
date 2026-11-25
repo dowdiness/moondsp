@@ -187,7 +187,7 @@ test "a provider that is itself a merge sets the key wherever its left has an ev
       ),
       right=bus_steps("st", [0.3, 0.6, 0.9]),
     ),
-  ).lower()
+  ).lower_untracked()
   let events = snapshot.query_sourced_events(
     @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L)),
   )
@@ -210,7 +210,7 @@ test "held voice follows a stretched sweep through its bus" {
     id=bus_id("slow"),
     factor=bus_r(2L, 1L),
   )
-  let snapshot = doc.lower()
+  let snapshot = doc.lower_untracked()
   let step = bus_r(1L, 4L)
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), step),
@@ -233,12 +233,14 @@ test "held voice follows a stretched sweep through its bus" {
 test "continuous bus signal is exact under rev and inside sequence" {
   let reversed = bus_with_ramp("note(\"60 64\")", "a")
     .rev(id=bus_id("rev"))
-    .lower()
+    .lower_untracked()
   let in_slot = @pattern.PatternDoc::sequence(id=bus_id("seq"), docs=[
     bus_with_ramp("note(\"60 64\")", "a"),
     bus_doc("note(\"67\")"),
-  ]).lower()
-  let gain_reader = (snapshot : @pattern.PatternSnapshot[@score.ScoreEvent]) => {
+  ]).lower_untracked()
+  let gain_reader = (
+    snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  ) => {
     snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
@@ -265,7 +267,7 @@ test "filter_map that rewrites a bound value unbinds it" {
     .filter_map(id=bus_id("f"), f=event => {
       Some({ ..event, controls: event.controls.set(Gain, 1.0), })
     })
-    .lower()
+    .lower_untracked()
   let onset = snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
@@ -274,7 +276,7 @@ test "filter_map that rewrites a bound value unbinds it" {
   // An unchanged value keeps following its bus.
   let kept = bus_with("note(\"60\")", "k", bus_steps("st", [0.5]))
     .filter_map(id=bus_id("f"), f=c => Some(c))
-    .lower()
+    .lower_untracked()
   let onset = kept.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
@@ -292,7 +294,7 @@ test "cached subtree buses follow their new position after an edit" {
     bus_with("note(\"64\")", "b", bus_steps("sb", [0.6, 0.8])),
   ])
   fn gain_buses(
-    snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+    snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
   ) -> Array[(Double?, Double)] {
     let arc = @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L))
     snapshot
@@ -306,13 +308,13 @@ test "cached subtree buses follow their new position after an edit" {
     })
   }
   let cache : @pattern.PatternLoweringCache[@score.ScoreEvent] = @pattern.PatternLoweringCache::new()
-  let original = doc.lower_with_cache(cache)
+  let original = doc.lower_untracked_with_cache(cache)
   @debug.assert_eq(gain_buses(original), [(Some(60.0), 0.4), (Some(64.0), 0.8)])
   let edited = doc.replace_with_silence(id=bus_id("a"))
   cache.reset_stats()
-  let cached = edited.lower_with_cache(cache)
+  let cached = edited.lower_untracked_with_cache(cache)
   assert_true(cache.hit_count() > 0)
-  let fresh = edited.lower()
+  let fresh = edited.lower_untracked()
   @debug.assert_eq(gain_buses(cached), [(Some(64.0), 0.8)])
   @debug.assert_eq(gain_buses(cached), gain_buses(fresh))
 }
@@ -456,7 +458,7 @@ test "step argument spelling does not change identity or degrade drops" {
       "s(\"bd sd hh cp\").gain(\"" + steps + "\").degradeBy(0.5)",
     ).unwrap()
     let kept = doc
-      .lower()
+      .lower_untracked()
       .query(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(8L, 1L)))
       .map(event => event.part.begin)
     (doc.root().value(), kept)
@@ -495,7 +497,7 @@ fn[A : @pattern.WithControls] bus_gain_reads(
   doc : @pattern.PatternDoc[A],
 ) -> (Double?, Array[Double]) raise {
   let onset = doc
-    .lower()
+    .lower_untracked()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   let read = onset.controls().reader(Gain).unwrap()
   (
@@ -556,7 +558,7 @@ test "an overriding key falls back to the note's own value where the outer one r
       left=note,
       right=outer,
     )
-    .lower()
+    .lower_untracked()
     .query_sourced_events(@pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)))[0]
   let read = onset.controls().reader(Pan).unwrap()
   // The same rule as `gain`: where the outer value rests, the inner applies.

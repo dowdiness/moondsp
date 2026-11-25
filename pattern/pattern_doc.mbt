@@ -1758,55 +1758,55 @@ fn[A, O] CompiledCache::clear(self : CompiledCache[A, O]) -> Unit {
 }
 
 ///|
-/// Exact and general specializations never exchange cached payloads.
+/// Tracked and untracked specializations never exchange cached payloads.
 pub struct PatternLoweringCache[A] {
-  priv general : CompiledCache[A, Unit]
-  priv exact : CompiledCache[A, EventOrigin]
+  priv untracked : CompiledCache[A, Unit]
+  priv tracked : CompiledCache[A, EventOrigin]
 }
 
 ///|
 pub fn[A] PatternLoweringCache::new() -> PatternLoweringCache[A] {
-  { general: CompiledCache::new(), exact: CompiledCache::new(), }
+  { untracked: CompiledCache::new(), tracked: CompiledCache::new(), }
 }
 
 ///|
 pub fn[A] PatternLoweringCache::hit_count(
   self : PatternLoweringCache[A],
 ) -> Int32 {
-  self.general.hit_count() + self.exact.hit_count()
+  self.untracked.hit_count() + self.tracked.hit_count()
 }
 
 ///|
 pub fn[A] PatternLoweringCache::miss_count(
   self : PatternLoweringCache[A],
 ) -> Int32 {
-  self.general.miss_count() + self.exact.miss_count()
+  self.untracked.miss_count() + self.tracked.miss_count()
 }
 
 ///|
 pub fn[A] PatternLoweringCache::entry_count(
   self : PatternLoweringCache[A],
 ) -> Int32 {
-  self.general.entry_count() + self.exact.entry_count()
+  self.untracked.entry_count() + self.tracked.entry_count()
 }
 
 ///|
 pub fn[A] PatternLoweringCache::reset_stats(
   self : PatternLoweringCache[A],
 ) -> Unit {
-  self.general.reset_stats()
-  self.exact.reset_stats()
+  self.untracked.reset_stats()
+  self.tracked.reset_stats()
 }
 
 ///|
 pub fn[A] PatternLoweringCache::clear(self : PatternLoweringCache[A]) -> Unit {
-  self.general.clear()
-  self.exact.clear()
+  self.untracked.clear()
+  self.tracked.clear()
 }
 
 ///|
 /// Lowered pattern snapshot for scheduler/runtime consumers.
-pub struct PatternSnapshot[A] {
+pub struct UntrackedPatternSnapshot[A] {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
   priv pat : Pat[A]
@@ -1817,35 +1817,37 @@ pub struct PatternSnapshot[A] {
 }
 
 ///|
-pub fn[A] PatternSnapshot::root(
-  self : PatternSnapshot[A],
+pub fn[A] UntrackedPatternSnapshot::root(
+  self : UntrackedPatternSnapshot[A],
 ) -> @identity.PatternNodeId {
   self.root
 }
 
 ///|
-pub fn[A] PatternSnapshot::revision(
-  self : PatternSnapshot[A],
+pub fn[A] UntrackedPatternSnapshot::revision(
+  self : UntrackedPatternSnapshot[A],
 ) -> @identity.Revision {
   self.revision
 }
 
 ///|
-pub fn[A] PatternSnapshot::pat(self : PatternSnapshot[A]) -> Pat[A] {
+pub fn[A] UntrackedPatternSnapshot::pat(
+  self : UntrackedPatternSnapshot[A],
+) -> Pat[A] {
   self.pat
 }
 
 ///|
-pub fn[A] PatternSnapshot::query(
-  self : PatternSnapshot[A],
+pub fn[A] UntrackedPatternSnapshot::query(
+  self : UntrackedPatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[Event[A]] {
   self.pat.query(arc)
 }
 
 ///|
-pub fn[A : WithControls] PatternSnapshot::query_sourced_events(
-  self : PatternSnapshot[A],
+pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(
+  self : UntrackedPatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
   self.sourced.query(arc).map(event => scoped_event(event, self.buses))
@@ -1855,8 +1857,8 @@ pub fn[A : WithControls] PatternSnapshot::query_sourced_events(
 /// Query one canonical `Pat::entries()` member with authored provenance.
 /// `source_index` is the member index retained by playback entry state.
 /// Invalid indexes return an empty result.
-pub fn[A : WithControls] PatternSnapshot::query_sourced_events_for_entry(
-  self : PatternSnapshot[A],
+pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entry(
+  self : UntrackedPatternSnapshot[A],
   source_index : Int32,
   arc : TimeSpan,
 ) -> Array[PatternSnapshotEvent[A]] {
@@ -1871,10 +1873,10 @@ pub fn[A : WithControls] PatternSnapshot::query_sourced_events_for_entry(
 /// This snapshot for material that entered `delay` after its origin: its
 /// one-shot signals start `delay` later (ADR-0025), on the payloads and the
 /// buses alike. `delay` must be a whole number of the pattern's periods.
-pub fn[A : WithControls] PatternSnapshot::entered(
-  self : PatternSnapshot[A],
+pub fn[A : WithControls] UntrackedPatternSnapshot::entered(
+  self : UntrackedPatternSnapshot[A],
   delay : Rational,
-) -> PatternSnapshot[A] {
+) -> UntrackedPatternSnapshot[A] {
   guard delayed_buses(self.buses, delay) is Some(buses) else { return self }
   {
     ..self,
@@ -1900,7 +1902,7 @@ fn delayed_buses(
 
 ///|
 /// A compiled pattern whose every emitted event carries an exact source origin.
-pub struct PatternSnapshotWithOrigins[A] {
+pub struct TrackedPatternSnapshot[A] {
   priv root : @identity.PatternNodeId
   priv revision : @identity.Revision
   priv pat : Pat[A]
@@ -1911,15 +1913,15 @@ pub struct PatternSnapshotWithOrigins[A] {
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::root(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A] TrackedPatternSnapshot::root(
+  self : TrackedPatternSnapshot[A],
 ) -> @identity.PatternNodeId {
   self.root
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::revision(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A] TrackedPatternSnapshot::revision(
+  self : TrackedPatternSnapshot[A],
 ) -> @identity.Revision {
   self.revision
 }
@@ -1928,8 +1930,8 @@ pub fn[A] PatternSnapshotWithOrigins::revision(
 /// The control signals the authored signal `source` gives this snapshot, one
 /// per bus that follows it: the curves the voices it controls follow, in root
 /// time. A reused binding or `jux` gives several.
-pub fn[A] PatternSnapshotWithOrigins::control_traces(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A] TrackedPatternSnapshot::control_traces(
+  self : TrackedPatternSnapshot[A],
   source : @identity.SourceAtomId,
 ) -> Array[ControlTrace] {
   self.buses.filter_map(bus => {
@@ -1942,15 +1944,15 @@ pub fn[A] PatternSnapshotWithOrigins::control_traces(
 }
 
 ///|
-pub fn[A] PatternSnapshotWithOrigins::pat(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A] TrackedPatternSnapshot::pat(
+  self : TrackedPatternSnapshot[A],
 ) -> Pat[A] {
   self.pat
 }
 
 ///|
-pub fn[A : WithControls] PatternSnapshotWithOrigins::query(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A : WithControls] TrackedPatternSnapshot::query(
+  self : TrackedPatternSnapshot[A],
   arc : TimeSpan,
 ) -> Array[EventWithOrigin[A]] {
   self.sourced.query(arc).map(event => EventWithOrigin(event, self.buses))
@@ -1958,8 +1960,8 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::query(
 
 ///|
 /// Query a canonical material member; invalid indexes produce no events.
-pub fn[A : WithControls] PatternSnapshotWithOrigins::query_for_entry(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A : WithControls] TrackedPatternSnapshot::query_for_entry(
+  self : TrackedPatternSnapshot[A],
   index : Int32,
   arc : TimeSpan,
 ) -> Array[EventWithOrigin[A]] {
@@ -1972,10 +1974,10 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::query_for_entry(
 
 ///|
 /// `PatternSnapshot::entered` with origins.
-pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(
-  self : PatternSnapshotWithOrigins[A],
+pub fn[A : WithControls] TrackedPatternSnapshot::entered(
+  self : TrackedPatternSnapshot[A],
   delay : Rational,
-) -> PatternSnapshotWithOrigins[A] {
+) -> TrackedPatternSnapshot[A] {
   guard delayed_buses(self.buses, delay) is Some(buses) else { return self }
   {
     ..self,
@@ -1988,9 +1990,9 @@ pub fn[A : WithControls] PatternSnapshotWithOrigins::entered(
 
 ///|
 /// Erase only origin capability, without compiling or interpreting time again.
-pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
-  self : PatternSnapshotWithOrigins[A],
-) -> PatternSnapshot[A] {
+pub fn[A] TrackedPatternSnapshot::as_snapshot(
+  self : TrackedPatternSnapshot[A],
+) -> UntrackedPatternSnapshot[A] {
   fn erase_origin(value : ScopedValue[A, EventOrigin]) -> ScopedValue[A, Unit] {
     ScopedValue(
       value.value,
@@ -2014,15 +2016,15 @@ pub fn[A] PatternSnapshotWithOrigins::as_snapshot(
 }
 
 ///|
-pub fn[A : WithControls] PatternDoc::lower_with_origins(
+pub fn[A : WithControls] PatternDoc::lower_tracked(
   self : PatternDoc[A],
   cache~ : PatternLoweringCache[A] = PatternLoweringCache::new(),
-) -> PatternSnapshotWithOrigins[A] raise PatternDocError {
+) -> TrackedPatternSnapshot[A] raise PatternDocError {
   let compiled = lower_pattern_node_cached(
     self.nodes,
     self.root,
-    cache.exact,
-    cache.general,
+    cache.tracked,
+    cache.untracked,
     {},
     End,
   )
@@ -2144,7 +2146,7 @@ pub fn[A] PatternDoc::from_pattern(
 /// evaluates `f` at exact time, and `rev` reads limits from below. `period` is
 /// the cycles after which `f` repeats, when it does; `ControlTrace::period`
 /// reads it. `source` is the authored signal it compiles, by which
-/// `PatternSnapshotWithOrigins::control_traces` finds the buses it provides
+/// `TrackedPatternSnapshot::control_traces` finds the buses it provides
 /// and which they report as `Controls::signal_source`.
 /// `signature` names `f`: two signals with the same key and signature must
 /// compute the same function. A live edit keeps a material whose content,
@@ -2308,10 +2310,10 @@ pub fn[A] PatternDoc::node_revision(
 }
 
 ///|
-pub fn[A : WithControls] PatternDoc::lower(
+pub fn[A : WithControls] PatternDoc::lower_untracked(
   self : PatternDoc[A],
-) -> PatternSnapshot[A] raise PatternDocError {
-  self.lower_with_cache(PatternLoweringCache::new())
+) -> UntrackedPatternSnapshot[A] raise PatternDocError {
+  self.lower_untracked_with_cache(PatternLoweringCache::new())
 }
 
 ///|
@@ -2330,15 +2332,15 @@ fn[A] PatternDoc::values(self : PatternDoc[A]) -> Pat[A] raise PatternDocError {
 }
 
 ///|
-pub fn[A : WithControls] PatternDoc::lower_with_cache(
+pub fn[A : WithControls] PatternDoc::lower_untracked_with_cache(
   self : PatternDoc[A],
   cache : PatternLoweringCache[A],
-) -> PatternSnapshot[A] raise PatternDocError {
+) -> UntrackedPatternSnapshot[A] raise PatternDocError {
   let compiled = lower_pattern_node_cached(
     self.nodes,
     self.root,
-    cache.general,
-    cache.general,
+    cache.untracked,
+    cache.untracked,
     {},
     End,
   )

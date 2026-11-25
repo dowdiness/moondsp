@@ -28,9 +28,9 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
       @pattern.PatternDoc::from_pattern(id=right, pat=@score.note(67.0)),
     ])
     .euclid(id=euclid, k=1, n=2)
-    .lower()
+    .lower_untracked()
   let state = PlaybackState()
-  state.queue(PlaybackSnapshot::pattern(snapshot))
+  state.queue(PlaybackSnapshot::untracked_pattern(snapshot))
   state.commit_pending(@pattern.Rational::from_int(0))
   let whole = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),

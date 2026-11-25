@@ -29,8 +29,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_snapshot(
-  build : () -> @pattern.PatternSnapshot[@pattern.ControlMap] raise @pattern.PatternDocError,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  build : () -> @pattern.UntrackedPatternSnapshot[@pattern.ControlMap] raise @pattern.PatternDocError,
+) -> @pattern.UntrackedPatternSnapshot[@pattern.ControlMap] {
   build() catch {
     _ => abort("expected pattern snapshot")
   }
@@ -94,7 +94,7 @@ fn revisioned_leaf_doc(
 ///|
 test "PatternDoc::pure lowers to runtime Pat" {
   let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(7))
-  let snapshot = unwrap_snapshot(() => doc.lower())
+  let snapshot = unwrap_snapshot(() => doc.lower_untracked())
   inspect(snapshot.revision().value(), content="0")
   inspect(snapshot.root().value(), content="leaf")
   let events = snapshot.query(doc_span(0, 1, 1, 1))
@@ -114,7 +114,9 @@ test "PatternDoc::fast adds stable root and bumps revision" {
   inspect(doc.revision().value(), content="1")
   inspect(doc.node_count(), content="2")
   assert_true(doc.contains_node(pid("leaf")))
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
 }
 
@@ -126,7 +128,7 @@ test "PatternSnapshot::query_sourced_events tags fast ancestor and leaf path" {
       factor=@pattern.Rational::from_int(2),
     )
   })
-  let snapshot = unwrap_snapshot(() => doc.lower())
+  let snapshot = unwrap_snapshot(() => doc.lower_untracked())
   let events = snapshot.query_sourced_events(doc_span(0, 1, 1, 1))
   let raw_events = snapshot.query(doc_span(0, 1, 1, 1))
   @debug.assert_eq(events.length(), raw_events.length())
@@ -145,7 +147,7 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
   let seq = unwrap_doc(() => {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
-  let seq_events = unwrap_snapshot(() => seq.lower()).query_sourced_events(
+  let seq_events = unwrap_snapshot(() => seq.lower_untracked()).query_sourced_events(
     doc_span(0, 1, 1, 1),
   )
   @debug.assert_eq(seq_events.length(), 2)
@@ -159,7 +161,7 @@ test "PatternSnapshot::query_sourced_events tags sequence and stack children" {
       @pattern.PatternDoc::pure(id=pid("stack-right"), value=n(4)),
     ])
   })
-  let stack_events = unwrap_snapshot(() => stack.lower()).query_sourced_events(
+  let stack_events = unwrap_snapshot(() => stack.lower_untracked()).query_sourced_events(
     doc_span(0, 1, 1, 1),
   )
   @debug.assert_eq(stack_events.length(), 2)
@@ -182,7 +184,7 @@ test "PatternSnapshot::query_sourced_events covers every callback subtrees" {
       transform=@pattern.TimeTransform::Fast(@pattern.Rational::from_int(2)),
     )
   })
-  let events = unwrap_snapshot(() => doc.lower()).query_sourced_events(
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query_sourced_events(
     doc_span(0, 1, 1, 100),
   )
   assert_true(events.length() > 0)
@@ -211,7 +213,7 @@ test "PatternSnapshot::query_sourced_events covers jux callback subtrees" {
       transform=@pattern.TimeTransform::Fast(@pattern.Rational::from_int(2)),
     )
   })
-  let events = unwrap_snapshot(() => doc.lower()).query_sourced_events(
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query_sourced_events(
     doc_span(0, 1, 1, 100),
   )
   assert_true(events.length() > 0)
@@ -234,7 +236,7 @@ test "PatternSnapshot::query_sourced_events covers merge_control inputs" {
   let doc = unwrap_doc(() => {
     @pattern.PatternDoc::merge_control(id=pid("merge"), left~, right~)
   })
-  let events = unwrap_snapshot(() => doc.lower()).query_sourced_events(
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query_sourced_events(
     doc_span(0, 1, 1, 100),
   )
   @debug.assert_eq(events.length(), 1)
@@ -257,7 +259,9 @@ test "PatternDoc edit preserves ids and changes lowered future events" {
   inspect(edited.root().value(), content="fast")
   inspect(edited.revision().value(), content="2")
   assert_true(edited.contains_node(pid("leaf")))
-  let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => edited.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(2))
   @debug.assert_eq(events[1].value, n(2))
@@ -266,12 +270,12 @@ test "PatternDoc edit preserves ids and changes lowered future events" {
 ///|
 test "PatternDoc snapshot remains stable after document edit" {
   let doc = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
-  let snapshot = unwrap_snapshot(() => doc.lower())
+  let snapshot = unwrap_snapshot(() => doc.lower_untracked())
   let edited = unwrap_doc(() => {
     doc.replace_with_pure(id=pid("leaf"), value=n(2))
   })
   let old_events = snapshot.query(doc_span(0, 1, 1, 1))
-  let new_events = unwrap_snapshot(() => edited.lower()).query(
+  let new_events = unwrap_snapshot(() => edited.lower_untracked()).query(
     doc_span(0, 1, 1, 1),
   )
   @debug.assert_eq(old_events[0].value, n(1))
@@ -307,7 +311,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left, right])
   })
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  ignore(unwrap_snapshot(() => base.lower_with_cache(cache)))
+  ignore(unwrap_snapshot(() => base.lower_untracked_with_cache(cache)))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="3")
   inspect(cache.entry_count(), content="3")
@@ -318,7 +322,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[edited_left, right])
   })
   cache.reset_stats()
-  let snapshot = unwrap_snapshot(() => edited.lower_with_cache(cache))
+  let snapshot = unwrap_snapshot(() => edited.lower_untracked_with_cache(cache))
   let events = snapshot.query(doc_span(0, 1, 1, 1))
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(3))
@@ -327,7 +331,7 @@ test "PatternLoweringCache reuses unchanged child after pattern edit" {
   inspect(cache.miss_count(), content="2")
   inspect(cache.entry_count(), content="5")
   cache.reset_stats()
-  ignore(unwrap_snapshot(() => edited.lower_with_cache(cache)))
+  ignore(unwrap_snapshot(() => edited.lower_untracked_with_cache(cache)))
   inspect(cache.hit_count(), content="1")
   inspect(cache.miss_count(), content="0")
 }
@@ -337,10 +341,14 @@ test "PatternLoweringCache does not reuse fresh doc with same id and revision" {
   let first = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(1))
   let second = @pattern.PatternDoc::pure(id=pid("leaf"), value=n(2))
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
+  let first_snapshot = unwrap_snapshot(() => {
+    first.lower_untracked_with_cache(cache)
+  })
   @debug.assert_eq(first_snapshot.query(doc_span(0, 1, 1, 1))[0].value, n(1))
   cache.reset_stats()
-  let second_snapshot = unwrap_snapshot(() => second.lower_with_cache(cache))
+  let second_snapshot = unwrap_snapshot(() => {
+    second.lower_untracked_with_cache(cache)
+  })
   @debug.assert_eq(second_snapshot.query(doc_span(0, 1, 1, 1))[0].value, n(2))
   inspect(cache.hit_count(), content="0")
   inspect(cache.miss_count(), content="1")
@@ -361,12 +369,16 @@ test "PatternLoweringCache does not reuse divergent replacements" {
     base.replace_with_pure(id=pid("left"), value=n(4))
   })
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
-  let first_snapshot = unwrap_snapshot(() => first.lower_with_cache(cache))
+  let first_snapshot = unwrap_snapshot(() => {
+    first.lower_untracked_with_cache(cache)
+  })
   let first_events = first_snapshot.query(doc_span(0, 1, 1, 1))
   @debug.assert_eq(first_events[0].value, n(3))
   @debug.assert_eq(first_events[1].value, n(2))
   cache.reset_stats()
-  let second_snapshot = unwrap_snapshot(() => second.lower_with_cache(cache))
+  let second_snapshot = unwrap_snapshot(() => {
+    second.lower_untracked_with_cache(cache)
+  })
   let second_events = second_snapshot.query(doc_span(0, 1, 1, 1))
   @debug.assert_eq(second_events[0].value, n(4))
   @debug.assert_eq(second_events[1].value, n(2))
@@ -386,7 +398,9 @@ test "PatternDoc::replace_with_pattern swaps runtime body under stable id" {
   })
   inspect(edited.root().value(), content="leaf")
   inspect(edited.revision().value(), content="1")
-  let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => edited.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(2))
   @debug.assert_eq(events[1].value, n(3))
@@ -402,7 +416,9 @@ test "PatternDoc::sequence combines child documents" {
   inspect(doc.node_count(), content="3")
   inspect(doc.root().value(), content="seq")
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(1))
   @debug.assert_eq(events[1].value, n(2))
@@ -416,7 +432,9 @@ test "PatternDoc::stack combines child documents in parallel" {
     @pattern.PatternDoc::stack(id=pid("stack"), docs=[a, b])
   })
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(1))
   @debug.assert_eq(events[1].value, n(2))
@@ -437,7 +455,7 @@ test "PatternDoc aggregate revisions preserve child edits" {
   inspect(base.revision().value(), content="1")
   inspect(edited.revision().value(), content="2")
   @debug.assert_eq(
-    unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))[0].value,
+    unwrap_snapshot(() => edited.lower_untracked()).query(doc_span(0, 1, 1, 1))[0].value,
     n(2),
   )
 }
@@ -505,10 +523,10 @@ test "PatternDoc aggregate revisions distinguish shifted child revisions" {
     @pattern.PatternDoc::sequence(id=pid("seq"), docs=[left_two, right_zero])
   })
   assert_true(first.revision() != second.revision())
-  let first_events = unwrap_snapshot(() => first.lower()).query(
+  let first_events = unwrap_snapshot(() => first.lower_untracked()).query(
     doc_span(0, 1, 1, 1),
   )
-  let second_events = unwrap_snapshot(() => second.lower()).query(
+  let second_events = unwrap_snapshot(() => second.lower_untracked()).query(
     doc_span(0, 1, 1, 1),
   )
   assert_true(first_events[0].value != second_events[0].value)
@@ -556,7 +574,7 @@ test "PatternDoc::with_root selects an existing stable node" {
   let rerooted = unwrap_doc(() => doc.with_root(root=pid("leaf")))
   inspect(rerooted.root().value(), content="leaf")
   inspect(rerooted.revision().value(), content="2")
-  let events = unwrap_snapshot(() => rerooted.lower()).query(
+  let events = unwrap_snapshot(() => rerooted.lower_untracked()).query(
     doc_span(0, 1, 1, 1),
   )
   inspect(events.length(), content="1")
@@ -573,7 +591,9 @@ test "PatternDoc::slow and rev lower through runtime combinators" {
   let revved = unwrap_doc(() => doc.rev(id=pid("rev")))
   inspect(revved.root().value(), content="rev")
   inspect(revved.revision().value(), content="2")
-  let events = unwrap_snapshot(() => revved.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => revved.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="1")
 }
 
@@ -592,7 +612,9 @@ test "PatternDoc::filter_map lowers through runtime combinator" {
     )
   })
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="1")
   @debug.assert_eq(events[0].value, n(20))
 }
@@ -607,7 +629,9 @@ test "PatternDoc::euclid lowers through runtime combinator" {
     )
   })
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="3")
   inspect(events[0].part.begin, content="{ num: 0, den: 1 }")
   inspect(events[1].part.begin, content="{ num: 3, den: 8 }")
@@ -624,7 +648,9 @@ test "PatternDoc::degrade_by lowers through runtime combinator" {
     )
   })
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="0")
 }
 
@@ -638,7 +664,9 @@ test "PatternDoc::every lowers through runtime combinator" {
     )
   })
   inspect(doc.revision().value(), content="1")
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 2, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 2, 1),
+  )
   inspect(events.length(), content="3")
 }
 
@@ -655,7 +683,9 @@ test "PatternDoc::jux lowers through control-map runtime combinator" {
     doc.jux(id=pid("jux"), transform=@pattern.TimeTransform::Reverse)
   })
   inspect(juxed.revision().value(), content="1")
-  let events = unwrap_snapshot(() => juxed.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => juxed.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="4")
   let (pan_neg1, pan_pos1) = for event in events; neg = 0, pos = 0 {
     match event.value.get(Pan) {
@@ -689,7 +719,9 @@ test "PatternDoc::merge_control lowers through control-map runtime combinator" {
     )
   })
   inspect(merged.revision().value(), content="1")
-  let events = unwrap_snapshot(() => merged.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => merged.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="1")
   assert_true(events[0].value.get(Note) == Some(60.0))
   assert_true(events[0].value.get(Gain) == Some(0.5))
@@ -744,7 +776,9 @@ test "PatternDoc::merge_control revision changes when lower-revision input chang
     )
   })
   assert_true(base.revision() != edited.revision())
-  let events = unwrap_snapshot(() => edited.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => edited.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   assert_true(events[0].value.get(Gain) == Some(0.75))
 }
 
@@ -799,7 +833,9 @@ test "PatternDoc::from_pattern wraps existing runtime patterns" {
     id=pid("runtime"),
     pat=@pattern.sequence([@pattern.Pat::pure(n(1)), @pattern.Pat::pure(n(2))]),
   )
-  let events = unwrap_snapshot(() => doc.lower()).query(doc_span(0, 1, 1, 1))
+  let events = unwrap_snapshot(() => doc.lower_untracked()).query(
+    doc_span(0, 1, 1, 1),
+  )
   inspect(events.length(), content="2")
   @debug.assert_eq(events[0].value, n(1))
   @debug.assert_eq(events[1].value, n(2))
@@ -829,7 +865,7 @@ test "merge_values gives a fragment the value at its event's onset" {
     ),
     right=values,
     apply=(controls, gain) => controls.set(Gain, gain),
-  ).lower()
+  ).lower_untracked()
   // The whole event starts at 0; its second half still reads 0.25.
   let later = merged.query(
     @pattern.TimeSpan(@pattern.Rational(1L, 2L), @pattern.Rational::from_int(1)),

@@ -158,7 +158,8 @@ fn assert_first_pattern_queued(
   sched : @scheduler.PatternScheduler,
 ) -> Unit raise {
   assert_true(sched.accepted_snapshot() is None)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected a queued first Pattern snapshot")
   }
 }
@@ -173,7 +174,8 @@ fn assert_first_song_queued(sched : @scheduler.PatternScheduler) -> Unit raise {
 
 ///|
 fn assert_pattern_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
-  guard accepted_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard accepted_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected an accepted Pattern snapshot")
   }
 }
@@ -196,12 +198,12 @@ fn pid(value : String) -> @identity.PatternNodeId {
 fn note_snapshot(
   id_value : String,
   note_value : Double,
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
   let doc = @pattern.PatternDoc::from_pattern(
     id=pid(id_value),
     pat=@score.note(note_value),
   )
-  doc.lower() catch {
+  doc.lower_untracked() catch {
     _ => abort("expected pattern snapshot")
   }
 }
@@ -209,11 +211,11 @@ fn note_snapshot(
 ///|
 fn silence_snapshot(
   id_value : String,
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
   let doc : @pattern.PatternDoc[@score.ScoreEvent] = @pattern.PatternDoc::silence(
     id=pid(id_value),
   )
-  doc.lower() catch {
+  doc.lower_untracked() catch {
     _ => abort("expected pattern snapshot")
   }
 }
@@ -270,7 +272,7 @@ fn scheduler_song_doc(
 fn song_snapshot(
   doc : @song.SongDoc[@pattern.Pat[@score.ScoreEvent]],
 ) -> @scheduler.SongMaterial {
-  Runtime(doc.lower()) catch {
+  Untracked(doc.lower()) catch {
     _ => abort("expected song snapshot")
   }
 }
@@ -472,7 +474,8 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   )
   assert_pattern_accepted(sched)
   assert_true(accepted_snapshot(sched).revision() == playing.revision())
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected the previously queued Pattern snapshot")
   }
   assert_true(queued_snapshot(sched).revision() == pending.revision())
@@ -500,7 +503,7 @@ test "Pattern selection kills the selected child but leaves its sibling sounding
     @pattern.PatternDoc::from_pattern(id=pid("selected"), pat=@score.note(60.0)),
     @pattern.PatternDoc::from_pattern(id=pid("sibling"), pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(doc.lower())
+  sched.queue_pattern_snapshot(doc.lower_untracked())
   sched.render_block(left, right)
   let outcome = sched
     .apply_pattern_voice_effect_result(
@@ -602,7 +605,7 @@ test "Retune preflights later voices before mutating the first voice" {
         pat=@score.note(60.0).fast(@pattern.Rational::from_int(400)),
       ),
     ])
-    s.queue_pattern_snapshot(quick.lower())
+    s.queue_pattern_snapshot(quick.lower_untracked())
     s.render_block(left, right)
   }
   @debug.assert_eq(sched.active_note_count(), 2)
@@ -821,7 +824,9 @@ test "render_block: pattern and song snapshots share one pending slot" {
       section~,
     ),
   ])
-  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+  )
   sched.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
   )
@@ -843,9 +848,12 @@ test "render_block: pattern and song snapshots share one pending slot" {
   )
   assert_true(sched.queued_snapshot() is None)
   @debug.assert_eq(pool.active_voice_count(), 0)
-  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+  )
   assert_song_accepted(sched)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected a queued Pattern replacement")
   }
   assert_true(queued_snapshot(sched).revision() == pattern.revision())
@@ -1135,7 +1143,7 @@ test "Switching send output leaves dry playback and transport unchanged" {
     pat=@pattern.Pat::pure(
       played(@pattern.ControlMap::single(Note, 60.0).set(Room, 0.5)),
     ),
-  ).lower()
+  ).lower_untracked()
   sched.queue_pattern_snapshot(snapshot)
   dry_sched.queue_pattern_snapshot(snapshot)
   let send_left = @moondsp.AudioBuffer::filled(left.length())
@@ -1174,7 +1182,7 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
         @pattern.ControlMap::single(Note, 60.0).set(Pan, -0.4).set(Room, 0.5),
       ),
     ),
-  ).lower()
+  ).lower_untracked()
   sched.queue_pattern_snapshot(snapshot)
   let send_left = @moondsp.AudioBuffer::filled(left.length(), init=1.0)
   let send_right = @moondsp.AudioBuffer::filled(right.length(), init=-1.0)
@@ -1204,10 +1212,10 @@ test "deferred pattern replacement preserves selected voice provenance" {
     ),
     @pattern.PatternDoc::from_pattern(id=sibling, pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(initial.lower())
+  sched.queue_pattern_snapshot(initial.lower_untracked())
   sched.render_block(left, right)
   @debug.assert_eq(sched.active_note_count(), 2)
-  sched.queue_pattern_snapshot(replacement.lower())
+  sched.queue_pattern_snapshot(replacement.lower_untracked())
   let old_outcome = sched
     .apply_pattern_voice_effect_result(
       @scheduler.PatternVoiceScope::node(selected),
@@ -1314,7 +1322,7 @@ test "Retune changes only its instrument's voices" {
       pat=@score.note(62.0),
     ),
   ])
-  sched.queue_pattern_snapshot(doc.lower())
+  sched.queue_pattern_snapshot(doc.lower_untracked())
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.render_block(left, right)

@@ -14,7 +14,7 @@ test "Unrepresentable render frame silences dry and send without accepting queue
   let snapshot = @pattern.PatternDoc::from_pattern(
     id=@identity.PatternNodeId::from_string("unaccepted"),
     pat=@score.note(60.0),
-  ).lower()
+  ).lower_untracked()
   sched.queue_pattern_snapshot(snapshot)
   // Move directly to the last representable sample at 1000 BPM without
   // rendering billions of blocks. The next 128-sample frame overflows ticks.

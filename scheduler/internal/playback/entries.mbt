@@ -1,13 +1,10 @@
 ///|
 priv enum EntrySource {
-  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent], Int32)
-  PatternWithOrigins(
-    @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
-    Int32,
-  )
-  RuntimeSong(@song.SongEventOrigin)
-  ExactSong(
-    @song.SongEntry[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], Int32)
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Int32)
+  UntrackedSong(@song.SongEventOrigin)
+  TrackedSong(
+    @song.SongEntry[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
   )
 }
 
@@ -42,25 +39,25 @@ fn EntrySpec::EntrySpec(
 fn EntrySpec::entered(self : EntrySpec, delay : @pattern.Rational) -> EntrySpec {
   guard delay.num != 0L else { return self }
   match self.source {
-    Pattern(snapshot, index) => {
+    UntrackedPattern(snapshot, index) => {
       let snapshot = snapshot.entered(delay)
       {
         ..self,
         body: snapshot.pat().entries()[index],
-        source: Pattern(snapshot, index),
+        source: UntrackedPattern(snapshot, index),
         delay,
       }
     }
-    PatternWithOrigins(snapshot, index) => {
+    TrackedPattern(snapshot, index) => {
       let snapshot = snapshot.entered(delay)
       {
         ..self,
         body: snapshot.pat().entries()[index],
-        source: PatternWithOrigins(snapshot, index),
+        source: TrackedPattern(snapshot, index),
         delay,
       }
     }
-    RuntimeSong(_) | ExactSong(_) => self
+    UntrackedSong(_) | TrackedSong(_) => self
   }
 }
 
@@ -134,7 +131,7 @@ fn EntryState::material(self : EntryState) -> EntrySpec {
 ///|
 fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
   match self {
-    Pattern(snapshot) => {
+    UntrackedPattern(snapshot) => {
       let result : Array[EntrySpec] = []
       for index, body in snapshot.pat().entries() {
         result.push(
@@ -143,13 +140,13 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
             body~,
             start=@pattern.Rational::from_int(0),
             end_=None,
-            source=Pattern(snapshot, index),
+            source=UntrackedPattern(snapshot, index),
           ),
         )
       }
       result
     }
-    PatternWithOrigins(snapshot) => {
+    TrackedPattern(snapshot) => {
       let result : Array[EntrySpec] = []
       for index, body in snapshot.pat().entries() {
         result.push(
@@ -158,16 +155,16 @@ fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
             body~,
             start=@pattern.Rational::from_int(0),
             end_=None,
-            source=PatternWithOrigins(snapshot, index),
+            source=TrackedPattern(snapshot, index),
           ),
         )
       }
       result
     }
-    Song(Runtime(snapshot)) | RepeatSong(Runtime(snapshot)) =>
-      song_entry_specs(snapshot, entry => RuntimeSong(entry.origin()))
-    Song(Exact(snapshot)) | RepeatSong(Exact(snapshot)) =>
-      song_entry_specs(snapshot, entry => ExactSong(entry))
+    Song(Untracked(snapshot)) | RepeatSong(Untracked(snapshot)) =>
+      song_entry_specs(snapshot, entry => UntrackedSong(entry.origin()))
+    Song(Tracked(snapshot)) | RepeatSong(Tracked(snapshot)) =>
+      song_entry_specs(snapshot, entry => TrackedSong(entry))
   }
 }
 
@@ -508,7 +505,7 @@ fn EntrySpec::query_sourced(
 ) -> Array[PlaybackSourcedEvent] {
   let placement = @pattern.Placement(origin~)
   match self.source {
-    Pattern(snapshot, index) =>
+    UntrackedPattern(snapshot, index) =>
       snapshot
       .query_sourced_events_for_entry(index, arc)
       .map(event => {
@@ -520,7 +517,7 @@ fn EntrySpec::query_sourced(
         source_pitch: -1.0,
         controls: event.controls().on_playback_clock(origin),
       })
-    PatternWithOrigins(snapshot, index) =>
+    TrackedPattern(snapshot, index) =>
       snapshot
       .query_for_entry(index, arc)
       .map(event => {
@@ -532,7 +529,7 @@ fn EntrySpec::query_sourced(
         source_pitch: authored_pitch(event.event().value),
         controls: event.controls().on_playback_clock(origin),
       })
-    RuntimeSong(song_origin) =>
+    UntrackedSong(song_origin) =>
       query_entry(self, origin, arc).map(event => {
         event,
         origin: @model.VoiceOrigin::Song(song_origin),
@@ -542,7 +539,7 @@ fn EntrySpec::query_sourced(
         source_pitch: -1.0,
         controls: @pattern.Controls::fixed(event.value.controls),
       })
-    ExactSong(entry) => {
+    TrackedSong(entry) => {
       let source_arc = @pattern.TimeSpan(
         arc.begin + self.start,
         arc.end_ + self.start,

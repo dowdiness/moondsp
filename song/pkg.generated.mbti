@@ -303,4 +303,4 @@ pub trait SongContent {
   fn pat(Self) -> @pattern.Pat[@score.ScoreEvent]
 }
 pub impl SongContent for @pattern.Pat[@score.ScoreEvent]
-pub impl SongContent for @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]
+pub impl SongContent for @pattern.TrackedPatternSnapshot[@score.ScoreEvent]

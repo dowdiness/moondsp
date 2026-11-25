@@ -628,15 +628,15 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 }
 
 ///|
-/// Exact patterns and explicitly untracked runtime sources are distinct capabilities.
+/// A tracked pattern is lowered here; a parsed source (a tracked song or untracked text) is lowered by the player.
 pub(all) enum PreparedPlayback {
-  Pattern(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent], Double)
-  Runtime(PlaySource)
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Double)
+  Source(PlaySource)
 }
 
 ///|
 /// Compile this frozen input, independently of any subsequent Draft edits.
-/// A failed exact compilation never falls back to runtime-only playback.
+/// A failed tracked compilation never falls back to untracked playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
   query_window? : @pattern.QueryWindow,
@@ -644,7 +644,7 @@ pub fn PlaybackInput::compile(
   match self.payload {
     Text =>
       parse_play_source(self.input, query_window?)
-      .map(source => Runtime(source))
+      .map(source => Source(source))
       .map_err(SourceProblem::to_string)
     Song(_, origins) => {
       let source = parse_play_source_with_origins(
@@ -655,10 +655,10 @@ pub fn PlaybackInput::compile(
       ) catch {
         problem => return Err(problem.to_string())
       }
-      guard source.body() is ExactArrangement(_, _) else {
+      guard source.body() is TrackedArrangement(_, _) else {
         return Err("song input changed source mode")
       }
-      Ok(Runtime(source))
+      Ok(Source(source))
     }
     Pattern(_, origins) => {
       let source = parse_play_source_with_origins(
@@ -670,12 +670,12 @@ pub fn PlaybackInput::compile(
         problem => return Err(problem.to_string())
       }
       guard source.body() is Pattern(doc) else {
-        return Err("exact pattern input changed source mode")
+        return Err("tracked pattern input changed source mode")
       }
-      try doc.lower_with_origins() catch {
+      try doc.lower_tracked() catch {
         error => Err(draft_origin_error(error))
       } noraise {
-        snapshot => Ok(Pattern(snapshot, source.bpm()))
+        snapshot => Ok(TrackedPattern(snapshot, source.bpm()))
       }
     }
   }
@@ -684,17 +684,17 @@ pub fn PlaybackInput::compile(
 ///|
 fn draft_origin_error(error : @pattern.PatternDocError) -> String {
   match error {
-    MissingNode(id) => "exact compilation: missing node \{id}"
-    DuplicateNodeId(id) => "exact compilation: duplicate node \{id}"
-    EmptyPatternDocs => "exact compilation: empty document list"
+    MissingNode(id) => "tracked compilation: missing node \{id}"
+    DuplicateNodeId(id) => "tracked compilation: duplicate node \{id}"
+    EmptyPatternDocs => "tracked compilation: empty document list"
     InvalidSequenceWeights =>
-      "exact compilation: invalid relative sequence weights"
+      "tracked compilation: invalid relative sequence weights"
     MissingAtomOrigin(id) =>
-      "exact compilation: missing atom origin \{id.value()}"
+      "tracked compilation: missing atom origin \{id.value()}"
     MissingReferenceBinding(id) =>
-      "exact compilation: missing reference binding \{id.value()}"
+      "tracked compilation: missing reference binding \{id.value()}"
     UnsupportedControl(id) =>
-      "exact compilation: unsupported control provider \{id.value()}"
+      "tracked compilation: unsupported control provider \{id.value()}"
   }
 }
 

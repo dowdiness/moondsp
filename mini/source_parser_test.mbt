@@ -38,12 +38,12 @@ test "play source parses arrangement declaration and repeat marker" {
   let parsed = @mini.parse_play_source(source).unwrap()
   assert_eq(parsed.bpm(), 96.0)
   match parsed.body() {
-    Arrangement(_, repeats) => assert_true(repeats)
+    UntrackedArrangement(_, repeats) => assert_true(repeats)
     _ => fail("expected arrangement")
   }
   let finite = @mini.parse_play_source(play_source_song()).unwrap()
   match finite.body() {
-    Arrangement(_, repeats) => assert_false(repeats)
+    UntrackedArrangement(_, repeats) => assert_false(repeats)
     _ => fail("expected arrangement")
   }
 }
@@ -105,7 +105,7 @@ test "bounded play source preserves ordinary musical output" {
     query_window=calibrated_window(),
   ).unwrap()
   guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
-  let snapshot = doc.lower()
+  let snapshot = doc.lower_untracked()
   let events = snapshot
     .pat()
     .query(

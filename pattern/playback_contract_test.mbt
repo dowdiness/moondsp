@@ -19,7 +19,7 @@ test "document control merge preserves material clocks and broad voice scopes" {
     id=pid("merge"),
     left=source,
     right=controls,
-  ).lower()
+  ).lower_untracked()
   let arc = doc_span(1, 4, 3, 4)
   let expected = [
     (Some(doc_span(0, 1, 2, 1)), doc_span(1, 4, 3, 4), Some(60.0), Some(0.0)),
@@ -48,7 +48,7 @@ test "document control merge preserves material clocks and broad voice scopes" {
     @pattern.Rational::from_int(2),
     @pattern.Rational(1L, 2L),
   ])
-  let before = source.lower()
+  let before = source.lower_untracked()
   @debug.assert_eq(
     snapshot.pat().entries()[0].entry_key(),
     before.pat().entries()[0].entry_key(),
@@ -84,7 +84,7 @@ test "document every preserves negative cycle selection and branch voice scopes"
       n=2,
       transform=@pattern.TimeTransform::Fast(@pattern.Rational::from_int(2)),
     )
-    .lower()
+    .lower_untracked()
   let events = snapshot.query_sourced_events(doc_span(-1, 1, 1, 1))
   @debug.assert_eq(events.map(e => e.event().value), [
     n(1),
@@ -119,7 +119,7 @@ test "document jux preserves atomic material pan precedence and its content" {
   ])
   let snapshot = source
     .jux(id=pid("jux"), transform=@pattern.TimeTransform::Reverse)
-    .lower()
+    .lower_untracked()
   let events = snapshot.query_sourced_events(doc_span(0, 1, 1, 1))
   @debug.assert_eq(
     events.map(e => (e.event().value.get(Note), e.event().value.get(Pan))),
@@ -140,7 +140,7 @@ test "document jux preserves atomic material pan precedence and its content" {
   )
   // The typed transform is part of the content, so a different one differs.
   fn jux_with(transform) raise {
-    source.jux(id=pid("jux"), transform~).lower().pat()
+    source.jux(id=pid("jux"), transform~).lower_untracked().pat()
   }
 
   assert_true(snapshot.pat().same_content(jux_with(Reverse)))
