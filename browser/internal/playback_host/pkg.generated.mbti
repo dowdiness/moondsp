@@ -2,11 +2,9 @@
 package "dowdiness/moondsp/browser/internal/playback_host"
 
 import {
-  "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
-  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/player",
   "dowdiness/moondsp/score",
-  "moonbitlang/core/debug",
 }
 
 // Values
@@ -26,9 +24,9 @@ pub fn get_playback_error_length() -> Int32
 
 pub fn init_sample_store() -> Int32
 
-pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> NoteVoice, sampler~ : SamplerVoice) -> Bool
+pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> @player.NoteVoice, sampler~ : @player.SamplerVoice) -> Bool
 
-pub fn player_mode() -> PlaybackMode
+pub fn player_mode() -> @player.PlaybackMode
 
 pub fn player_onset_clear() -> Unit
 
@@ -99,81 +97,6 @@ pub fn set_scheduler_gain(Double) -> Unit
 // Errors
 
 // Types and methods
-pub(all) struct NoteVoice {
-  waveform : @dsp.Waveform
-  attack_ms : Double
-  decay_ms : Double
-  sustain : Double
-  release_ms : Double
-  lpf_hz : Double
-  lpf_q : Double
-  amount : Double
-  voices : Int32
-}
-
-#derive(Eq, @debug.Debug)
-pub(all) enum PlayState {
-  Empty
-  Ready
-  Playing
-  Paused
-  Ended
-  Fault
-}
-pub fn PlayState::equal(Self, Self) -> Bool
-pub fn PlayState::not_equal(Self, Self) -> Bool
-pub fn PlayState::to_repr(Self) -> @debug.Repr
-
-#derive(Eq, @debug.Debug)
-pub enum PlaybackMode {
-  None
-  Pattern
-  Song
-}
-pub fn PlaybackMode::equal(Self, Self) -> Bool
-pub fn PlaybackMode::not_equal(Self, Self) -> Bool
-pub fn PlaybackMode::to_repr(Self) -> @debug.Repr
-
-pub struct Player {
-  // private fields
-}
-pub fn Player::pause(Self) -> Result[Unit, PlayerError]
-pub fn Player::play(Self) -> Result[Unit, PlayerError]
-pub fn Player::restart(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
-pub fn Player::update(Self, @mini.PlaybackInput) -> Result[Unit, PlayerError]
-pub fn Player::view(Self) -> PlayerView
-
-#derive(Eq, @debug.Debug)
-pub(all) enum PlayerError {
-  InvalidSource(String)
-  RestartRequired
-  NoSong
-  TransportRange
-  Failed(String)
-}
-pub fn PlayerError::equal(Self, Self) -> Bool
-pub fn PlayerError::not_equal(Self, Self) -> Bool
-pub fn PlayerError::to_repr(Self) -> @debug.Repr
-
-pub struct PlayerView {
-  state : PlayState
-  source : String?
-  bpm : Double
-  sample_position : Double
-  pending_materials : Int32
-  skipped_materials : Int32
-}
-
-pub(all) struct SamplerVoice {
-  attack_ms : Double
-  decay_ms : Double
-  sustain : Double
-  release_ms : Double
-  lpf_hz : Double
-  lpf_q : Double
-  amount : Double
-  voices : Int32
-}
 
 // Type aliases
 

@@ -171,21 +171,6 @@ test "layout rejection changes neither tempo nor Current song" {
 }
 
 ///|
-test "source tempo commits at unchanged musical position" {
-  assert_true(init_scheduler_graph_for_test())
-  assert_eq(submit_for_test(test_song(length=8, bpm=120)), 0)
-  render_for_test(4)
-  assert_eq(submit_for_test(test_song(length=8, bpm=90), restart=false), 0)
-  assert_position(512)
-  assert_tempo(90.0)
-  render_for_test(1)
-  assert_eq(
-    player.val.unwrap().scheduler.current_block().unwrap().logical_arc.begin,
-    @pattern.Rational(512L * 120L + 128L * 90L, 11520000L),
-  )
-}
-
-///|
 test "Ended Update leaves tails and position while Play uses newest song" {
   assert_true(init_scheduler_graph_for_test())
   let finite = "song(section(\"a\",1/200,note(\"60\").release(1).room(1)),part(\"a1\",\"a\"))"

@@ -1,0 +1,109 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/player"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/scheduler",
+  "dowdiness/moondsp/score",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+#derive(Eq, @debug.Debug)
+pub suberror PlayerError {
+  InvalidSource(String)
+  RestartRequired
+  NoSong
+  TransportRange
+  Failed(String)
+  UnsupportedFormat
+}
+pub fn PlayerError::equal(Self, Self) -> Bool
+pub fn PlayerError::message(Self) -> String
+pub fn PlayerError::not_equal(Self, Self) -> Bool
+pub fn PlayerError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) struct NoteVoice {
+  waveform : @dsp.Waveform
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  lpf_hz : Double
+  lpf_q : Double
+  amount : Double
+  voices : Int32
+}
+
+#derive(Eq, @debug.Debug)
+pub enum PlayState {
+  Empty
+  Ready
+  Playing
+  Paused
+  Ended
+  Fault
+}
+pub fn PlayState::equal(Self, Self) -> Bool
+pub fn PlayState::not_equal(Self, Self) -> Bool
+pub fn PlayState::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub(all) enum PlaybackMode {
+  None
+  Pattern
+  Song
+}
+pub fn PlaybackMode::equal(Self, Self) -> Bool
+pub fn PlaybackMode::not_equal(Self, Self) -> Bool
+pub fn PlaybackMode::to_repr(Self) -> @debug.Repr
+
+pub struct Player {
+  // private fields
+}
+pub fn Player::Player(@dsp.DspContext, drum~ : (@score.Drum) -> @graph.AnalyzedGraph, instrument~ : (@score.Instrument) -> NoteVoice, sampler~ : SamplerVoice) -> Self raise PlayerError
+pub fn Player::cycle_position(Self) -> Double
+pub fn Player::fault(Self) -> String?
+pub fn Player::left(Self) -> @dsp.AudioBuffer
+pub fn Player::mode(Self) -> PlaybackMode
+pub fn Player::onsets(Self) -> @scheduler.OnsetBuffer
+pub fn Player::pause(Self) -> Unit raise PlayerError
+pub fn Player::play(Self) -> Unit raise PlayerError
+pub fn Player::process(Self) -> Bool
+pub fn Player::restart(Self, @mini.PlaybackInput) -> Unit raise PlayerError
+pub fn Player::right(Self) -> @dsp.AudioBuffer
+pub fn Player::set_gain(Self, Double) -> Unit
+pub fn Player::set_tempo(Self, Double) -> Unit raise PlayerError
+pub fn Player::signals(Self) -> @scheduler.SignalBuffer
+pub fn Player::state(Self) -> PlayState
+pub fn Player::update(Self, @mini.PlaybackInput) -> Unit raise PlayerError
+pub fn Player::view(Self) -> PlayerView
+
+pub struct PlayerView {
+  state : PlayState
+  source : String?
+  bpm : Double
+  sample_position : Double
+  pending_materials : Int32
+  skipped_materials : Int32
+}
+
+pub(all) struct SamplerVoice {
+  attack_ms : Double
+  decay_ms : Double
+  sustain : Double
+  release_ms : Double
+  lpf_hz : Double
+  lpf_q : Double
+  amount : Double
+  voices : Int32
+}
+
+// Type aliases
+
+// Traits

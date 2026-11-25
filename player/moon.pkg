@@ -1,0 +1,10 @@
+import {
+  "dowdiness/moondsp",
+  "dowdiness/moondsp/identity",
+  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
+  "dowdiness/moondsp/scheduler",
+  "dowdiness/moondsp/score",
+  "dowdiness/moondsp/song",
+  "moonbitlang/core/debug",
+}

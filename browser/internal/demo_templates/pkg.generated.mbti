@@ -2,17 +2,17 @@
 package "dowdiness/moondsp/browser/internal/demo_templates"
 
 import {
-  "dowdiness/moondsp/browser/internal/playback_host",
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/player",
   "dowdiness/moondsp/score",
 }
 
 // Values
 pub fn drum_template(@score.Drum) -> Array[@graph.DspNode]
 
-pub fn instrument_voice(@score.Instrument) -> @playback_host.NoteVoice
+pub fn instrument_voice(@score.Instrument) -> @player.NoteVoice
 
-pub fn sampler_voice() -> @playback_host.SamplerVoice
+pub fn sampler_voice() -> @player.SamplerVoice
 
 // Errors
 
