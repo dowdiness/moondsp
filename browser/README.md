@@ -33,7 +33,9 @@ AudioWorklet transport adapter:
   `web/live/`, and the `@moondsp/browser` package.
 - **Downstream dependencies**: Delegates graph compilation and mounting to
   [`engine/`](../engine/) (`GraphEngine`); delegates pattern/song playback to
-  [`scheduler/`](../scheduler/) via `browser/internal/playback_host`; uses
+  [`player/`](../player/) (ADR-0029) through its adapter
+  `browser/internal/playback_host`, and `player` drives
+  [`scheduler/`](../scheduler/); uses
   [`dsp/`](../dsp/) and [`graph/`](../graph/) for demo and probe templates.
 
 ## API quick reference
