@@ -806,7 +806,7 @@ pub fn parse_doc(input : String) -> Result[ScoreDoc, String] {
 /// Parse a mini-notation string into a lowered pattern snapshot.
 pub fn parse_snapshot(
   input : String,
-) -> Result[@pattern.PatternSnapshot[@score.ScoreEvent], String] {
+) -> Result[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], String] {
   match parse_doc(input) {
     Err(msg) => Err(msg)
     Ok(doc) => {

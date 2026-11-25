@@ -158,7 +158,8 @@ fn assert_first_pattern_queued(
   sched : @scheduler.PatternScheduler,
 ) -> Unit raise {
   assert_true(sched.accepted_snapshot() is None)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected a queued first Pattern snapshot")
   }
 }
@@ -173,7 +174,8 @@ fn assert_first_song_queued(sched : @scheduler.PatternScheduler) -> Unit raise {
 
 ///|
 fn assert_pattern_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
-  guard accepted_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard accepted_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected an accepted Pattern snapshot")
   }
 }
@@ -196,7 +198,7 @@ fn pid(value : String) -> @identity.PatternNodeId {
 fn note_snapshot(
   id_value : String,
   note_value : Double,
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
   let doc = @pattern.PatternDoc::from_pattern(
     id=pid(id_value),
     pat=@score.note(note_value),
@@ -209,7 +211,7 @@ fn note_snapshot(
 ///|
 fn silence_snapshot(
   id_value : String,
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
   let doc : @pattern.PatternDoc[@score.ScoreEvent] = @pattern.PatternDoc::silence(
     id=pid(id_value),
   )
@@ -270,7 +272,7 @@ fn scheduler_song_doc(
 fn song_snapshot(
   doc : @song.SongDoc[@pattern.Pat[@score.ScoreEvent]],
 ) -> @scheduler.SongMaterial {
-  Runtime(doc.lower()) catch {
+  Untracked(doc.lower()) catch {
     _ => abort("expected song snapshot")
   }
 }
@@ -472,7 +474,8 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   )
   assert_pattern_accepted(sched)
   assert_true(accepted_snapshot(sched).revision() == playing.revision())
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected the previously queued Pattern snapshot")
   }
   assert_true(queued_snapshot(sched).revision() == pending.revision())
@@ -821,7 +824,9 @@ test "render_block: pattern and song snapshots share one pending slot" {
       section~,
     ),
   ])
-  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+  )
   sched.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
   )
@@ -843,9 +848,12 @@ test "render_block: pattern and song snapshots share one pending slot" {
   )
   assert_true(sched.queued_snapshot() is None)
   @debug.assert_eq(pool.active_voice_count(), 0)
-  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::pattern(pattern))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+  )
   assert_song_accepted(sched)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Pattern(_) else {
+  guard queued_snapshot(sched)
+    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
     fail("expected a queued Pattern replacement")
   }
   assert_true(queued_snapshot(sched).revision() == pattern.revision())

@@ -185,8 +185,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_mini_snapshot(
-  result : Result[@pattern.PatternSnapshot[@score.ScoreEvent], String],
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] {
+  result : Result[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], String],
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
   match result {
     Ok(snapshot) => snapshot
     Err(msg) => abort("expected Ok, got Err(\{msg})")
@@ -582,14 +582,14 @@ test "reparsing insertion and removal keep surviving token ids" {
 ///|
 fn draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent] raise {
+) -> @pattern.TrackedPatternSnapshot[@score.ScoreEvent] raise {
   let input = match draft.prepare_playback() {
     Ok(input) => input
     Err(diagnostic) => fail(diagnostic.problem().to_string())
   }
   match input.compile() {
-    Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) => snapshot
-    Ok(_) => fail("expected exact pattern")
+    Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) => snapshot
+    Ok(_) => fail("expected tracked pattern")
     Err(message) => fail(message)
   }
 }
@@ -666,7 +666,8 @@ test "Draft same-text replacement is causal and frozen input is immutable" {
   assert_eq(old[1].origin(), fresh[1].origin())
   assert_true(draft.locate_origin(old[0].origin()) is Unavailable(AtomRetired))
   assert_eq(input.version(), Some(version))
-  guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(retained, _)) else {
+  guard input.compile()
+    is Ok(@mini.PreparedPlayback::TrackedPattern(retained, _)) else {
     fail("frozen compilation failed")
   }
   assert_eq(retained.query(draft_arc())[0].origin(), old[0].origin())
@@ -1112,7 +1113,8 @@ test "resetting a Draft does not invalidate a separately frozen playback input" 
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
   assert_true(draft.reset("note(\"62\")") is Ok(_))
   assert_true(draft.locate_origin(origin) is Unavailable(SourceReset))
-  guard input.compile() is Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) else {
+  guard input.compile()
+    is Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) else {
     fail("frozen input was invalidated")
   }
   assert_eq(snapshot.query(draft_arc())[0].origin(), origin)
@@ -1128,12 +1130,12 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
   guard draft.prepare_playback() is Ok(input) else {
     fail("valid song preparation failed")
   }
-  guard input.compile() is Ok(@mini.PreparedPlayback::Runtime(source)) else {
+  guard input.compile() is Ok(@mini.PreparedPlayback::Source(source)) else {
     fail("song must use runtime capability")
   }
   assert_eq(source.bpm(), 72.0)
-  guard source.body() is ExactArrangement(song, repeating) else {
-    fail("expected exact arrangement")
+  guard source.body() is TrackedArrangement(song, repeating) else {
+    fail("expected tracked arrangement")
   }
   assert_true(repeating)
   assert_eq(drum_of(song.query(draft_arc())[0].value), Some("bd"))
@@ -1148,7 +1150,7 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
   )
   let untracked = @mini.PlaybackInput::text("note(\"62\")")
   assert_true(untracked.version() is None)
-  guard untracked.compile() is Ok(@mini.PreparedPlayback::Runtime(raw)) else {
+  guard untracked.compile() is Ok(@mini.PreparedPlayback::Source(raw)) else {
     fail("text input must be explicitly untracked")
   }
   guard raw.body() is Pattern(doc) else { fail("expected runtime pattern") }

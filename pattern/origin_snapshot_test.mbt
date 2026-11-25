@@ -98,7 +98,7 @@ test "exact compiler shares musical kernels without changing material metadata" 
   ]
   let arc = doc_span(-5, 4, 9, 4)
   for index in 0..<docs.length() {
-    let exact = docs[index].lower_with_origins()
+    let exact = docs[index].lower_tracked()
     let general = docs[index].lower()
     let projected = exact.as_snapshot()
     let events = exact.query(arc)
@@ -168,7 +168,7 @@ test "control providers keep left origin and overlap precedence including zero g
     left~,
     right=provider,
   )
-  let snapshot = doc.lower_with_origins()
+  let snapshot = doc.lower_tracked()
   let events = snapshot.query(doc_span(1, 4, 3, 4))
   guard events is [event] else { fail("expected one primary note") }
   @debug.assert_eq(event.event().value.get(Gain), Some(0.0))
@@ -194,7 +194,7 @@ test "filtering changes values but retains source" {
       None => None
     }
   })
-  let snapshot = doc.lower_with_origins()
+  let snapshot = doc.lower_tracked()
   guard snapshot.query(doc_span(0, 1, 1, 1)) is [event, _] else {
     fail("expected the transposed chord tone and the other note")
   }
@@ -226,7 +226,7 @@ test "nested reference bindings are immutable outer to inner and distinct per us
   let definition = resolved_use("inner", origin_note("atom", 1L, 60.0), 3L, 4L)
   let left = resolved_use("left", definition, 5L, 6L)
   let right = resolved_use("right", definition, 7L, 8L)
-  let snapshot = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right]).lower_with_origins()
+  let snapshot = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right]).lower_tracked()
   let arc = doc_span(0, 1, 1, 1)
   guard snapshot.query(arc) is [a, b] else {
     fail("expected both reference uses")
@@ -267,10 +267,10 @@ test "same music refreshes origins through reused cache without changing entry i
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let before_doc = resolved_use("use", origin_note("atom", 1L, 60.0), 3L, 4L)
   let after_doc = resolved_use("use", origin_note("atom", 2L, 60.0), 3L, 5L)
-  // Populate general specialization first; exact compilation must not reuse it.
+  // Populate the untracked specialization first; tracked compilation must not reuse it.
   ignore(before_doc.lower_with_cache(cache))
-  let before = before_doc.lower_with_origins(cache~)
-  let after = after_doc.lower_with_origins(cache~)
+  let before = before_doc.lower_tracked(cache~)
+  let after = after_doc.lower_tracked(cache~)
   let arc = doc_span(0, 1, 1, 1)
   assert_true(before.pat().same_content(after.pat()))
   @debug.assert_eq(
@@ -294,15 +294,15 @@ test "same music refreshes origins through reused cache without changing entry i
     [5L],
   )
   @debug.assert_eq(
-    before_doc.lower_with_origins(cache~).query(arc)[0].origin(),
+    before_doc.lower_tracked(cache~).query(arc)[0].origin(),
     before.query(arc)[0].origin(),
   )
   let old_degraded = before_doc
     .degrade_by(id=pid("random"), p=0.5, seed=37)
-    .lower_with_origins(cache~)
+    .lower_tracked(cache~)
   let new_degraded = after_doc
     .degrade_by(id=pid("random"), p=0.5, seed=37)
-    .lower_with_origins(cache~)
+    .lower_tracked(cache~)
   @debug.assert_eq(
     musical_rows(old_degraded.pat().query(doc_span(-4, 1, 8, 1))),
     musical_rows(new_degraded.pat().query(doc_span(-4, 1, 8, 1))),
@@ -315,7 +315,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
   let runtime = @pattern.PatternDoc::pure(id=pid("runtime"), value=n(1))
   ignore(runtime.lower_with_cache(cache))
   let missing_atom = try {
-    ignore(runtime.lower_with_origins(cache~))
+    ignore(runtime.lower_tracked(cache~))
     None
   } catch {
     error => Some(error)
@@ -329,7 +329,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     pat=@pattern.Pat::pure(n(1)),
   )
   let missing_opaque = try {
-    ignore(custom.lower_with_origins(cache~))
+    ignore(custom.lower_tracked(cache~))
     None
   } catch {
     error => Some(error)
@@ -347,7 +347,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     ),
   )
   let missing_binding = try {
-    ignore(reference.lower_with_origins(cache~))
+    ignore(reference.lower_tracked(cache~))
     None
   } catch {
     error => Some(error)
@@ -360,7 +360,7 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
     id=pid("silence"),
   )
   @debug.assert_eq(
-    silence.lower_with_origins().query(doc_span(0, 1, 1, 1)).length(),
+    silence.lower_tracked().query(doc_span(0, 1, 1, 1)).length(),
     0,
   )
   @debug.assert_eq(
@@ -373,16 +373,14 @@ test "exact lowering rejects missing attribution before returning a snapshot" {
 test "prepared reference contexts outlive cache clearing before their first query" {
   let cache : @pattern.PatternLoweringCache[@pattern.ControlMap] = @pattern.PatternLoweringCache::new()
   let definition = resolved_use("inner", origin_note("atom", 1L, 60.0), 3L, 4L)
-  let standalone = definition.lower_with_origins(cache~)
+  let standalone = definition.lower_tracked(cache~)
   let left = resolved_use("left", definition, 5L, 6L)
   let right = resolved_use("right", definition, 7L, 8L)
-  let retained = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right]).lower_with_origins(
+  let retained = @pattern.PatternDoc::stack(id=pid("mix"), docs=[left, right]).lower_tracked(
     cache~,
   )
   cache.clear()
-  let rebound = resolved_use("left", definition, 5L, 9L).lower_with_origins(
-    cache~,
-  )
+  let rebound = resolved_use("left", definition, 5L, 9L).lower_tracked(cache~)
   let arc = doc_span(12, 1, 13, 1)
   @debug.assert_eq(
     standalone.query(arc)[0].origin().bindings().map(b => b.id().serial()),
@@ -413,7 +411,7 @@ test "origin cache retains full witnesses when binding serials coincide" {
     resolved_use("second", definition, 20L, 7L),
     resolved_use("third", definition, 30L, 7L),
   ]
-  let snapshots = uses.map(doc => doc.lower_with_origins(cache~))
+  let snapshots = uses.map(doc => doc.lower_tracked(cache~))
   let arc = doc_span(0, 1, 1, 1)
   @debug.assert_eq(
     snapshots.map(snapshot => {
@@ -437,7 +435,7 @@ test "source frame distinguishes repeated atoms through reference slow and rever
   let transformed = resolved_use("frame-use", framed, 201L, 301L)
     .rev(id=pid("outer-reverse"))
     .slow(id=pid("outer-slow"), factor=@pattern.Rational::from_int(2))
-    .lower_with_origins()
+    .lower_tracked()
   let events = transformed.query(doc_span(0, 1, 2, 1))
   let rows = events.map(event => {
     let whole = event.event().whole.unwrap()
@@ -484,7 +482,7 @@ test "source frame uses full whole-cycle repeat span for rational notation rates
     .fast(id=pid("literal-fast"), factor=@pattern.Rational::from_int(2))
     .with_source_frame(frame~)
     .fast(id=pid("playback-fast"), factor=@pattern.Rational::from_int(2))
-    .lower_with_origins()
+    .lower_tracked()
   for cycle in [-3L, 3L] {
     let arc = @pattern.TimeSpan(
       @pattern.Rational(cycle, 2L),
@@ -518,7 +516,7 @@ test "bounded origin transport preserves the complete path or leaves storage unt
     )
   }
   let arc = doc_span(0, 1, 1, 1)
-  let origin = doc.lower_with_origins().query(arc)[0].origin()
+  let origin = doc.lower_tracked().query(arc)[0].origin()
   let storage = Array::make(96, -9.0)
   assert_eq(origin.write_binding_serials(storage, 0, 32), 32)
   for index in 0..<32 {
@@ -528,7 +526,7 @@ test "bounded origin transport preserves the complete path or leaves storage unt
   }
   let accepted = storage.copy()
   let oversized = resolved_use("wire-overflow", doc, 1032L, 2032L)
-  .lower_with_origins()
+  .lower_tracked()
   .query(arc)[0].origin()
   assert_eq(oversized.write_binding_serials(storage, 0, 32), -1)
   @debug.assert_eq(storage, accepted)

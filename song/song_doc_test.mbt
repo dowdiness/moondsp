@@ -56,8 +56,8 @@ fn[C] song_doc_test_song(doc : @song.SongDoc[C]) -> @song.Song[C] {
 
 ///|
 fn song_doc_test_snapshot(
-  doc : @song.SongDoc[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
-) -> @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]] {
+  doc : @song.SongDoc[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+) -> @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]] {
   doc.lower() catch {
     _ => abort("song snapshot lowering failed")
   }
@@ -67,13 +67,13 @@ fn song_doc_test_snapshot(
 fn song_doc_test_content(
   name : String,
   midi : Double,
-) -> @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent] {
+) -> @pattern.TrackedPatternSnapshot[@score.ScoreEvent] {
   @pattern.PatternDoc::atom(
     id=@identity.PatternNodeId::from_string(name),
     source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7000L), 1L),
     value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=midi)),
     content="note:\{midi}",
-  ).lower_with_origins() catch {
+  ).lower_tracked() catch {
     _ => abort("pattern lowering failed")
   }
 }
@@ -91,7 +91,7 @@ priv struct SongDocTestEvent {
 ///|
 fn song_doc_test_query(
   slices : Array[
-    @song.SongSlice[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+    @song.SongSlice[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
   ],
 ) -> Array[SongDocTestEvent] {
   let result : Array[SongDocTestEvent] = []
@@ -461,7 +461,7 @@ test "exact Song entry origins survive scoped placement" {
         value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=67.0)),
       ),
     ],
-  ).lower_with_origins()
+  ).lower_tracked()
   let section = @song.SectionDoc::single(
     id=song_doc_test_section_id("section:exact"),
     name="Exact",
@@ -538,7 +538,7 @@ test "song events read their buses on the song clock" {
       f=(t, _) => 100.0 * t,
       signature="100t",
     ),
-  ).lower_with_origins()
+  ).lower_tracked()
   // Placed at cycle 3 and played twice as fast: local = (t - 3) × 2.
   let section = @song.SectionDoc::single(
     id=song_doc_test_section_id("section:bus"),

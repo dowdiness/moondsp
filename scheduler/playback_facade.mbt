@@ -1,26 +1,26 @@
 ///|
-/// A lowered song the scheduler can play. Its sections hold either anonymous
-/// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
+/// A lowered song the scheduler can play. Its sections hold either untracked
+/// patterns or tracked pattern snapshots (ADR-0021).
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Exact(
-    @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Tracked(
+    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
   )
 }
 
 ///|
 fn SongMaterial::raw(self : SongMaterial) -> @playback.SongMaterial {
   match self {
-    Runtime(snapshot) => Runtime(snapshot)
-    Exact(snapshot) => Exact(snapshot)
+    Untracked(snapshot) => Untracked(snapshot)
+    Tracked(snapshot) => Tracked(snapshot)
   }
 }
 
 ///|
 fn SongMaterial::from_raw(material : @playback.SongMaterial) -> SongMaterial {
   match material {
-    Runtime(snapshot) => Runtime(snapshot)
-    Exact(snapshot) => Exact(snapshot)
+    Untracked(snapshot) => Untracked(snapshot)
+    Tracked(snapshot) => Tracked(snapshot)
   }
 }
 
@@ -31,24 +31,24 @@ fn SongMaterial::from_raw(material : @playback.SongMaterial) -> SongMaterial {
 /// coherent staging boundary when higher-level live orchestration prepares the
 /// next playback state.
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 
 ///|
-pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+pub fn PlaybackSnapshot::untracked_pattern(
+  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  Pattern(snapshot)
+  UntrackedPattern(snapshot)
 }
 
 ///|
-pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
+pub fn PlaybackSnapshot::tracked_pattern(
+  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  PatternWithOrigins(snapshot)
+  TrackedPattern(snapshot)
 }
 
 ///|
@@ -67,9 +67,10 @@ pub fn PlaybackSnapshot::repeat_song(
 ///|
 fn PlaybackSnapshot::raw(self : PlaybackSnapshot) -> @playback.PlaybackSnapshot {
   match self {
-    Pattern(snapshot) => @playback.PlaybackSnapshot::pattern(snapshot)
-    PatternWithOrigins(snapshot) =>
-      @playback.PlaybackSnapshot::pattern_with_origins(snapshot)
+    UntrackedPattern(snapshot) =>
+      @playback.PlaybackSnapshot::untracked_pattern(snapshot)
+    TrackedPattern(snapshot) =>
+      @playback.PlaybackSnapshot::tracked_pattern(snapshot)
     Song(song) => @playback.PlaybackSnapshot::song(song.raw())
     RepeatSong(song) => @playback.PlaybackSnapshot::repeat_song(song.raw())
   }
@@ -80,9 +81,10 @@ fn PlaybackSnapshot::from_raw(
   snapshot : @playback.PlaybackSnapshot,
 ) -> PlaybackSnapshot {
   match snapshot {
-    @playback.PlaybackSnapshot::Pattern(pattern) => Pattern(pattern)
-    @playback.PlaybackSnapshot::PatternWithOrigins(pattern) =>
-      PatternWithOrigins(pattern)
+    @playback.PlaybackSnapshot::UntrackedPattern(pattern) =>
+      UntrackedPattern(pattern)
+    @playback.PlaybackSnapshot::TrackedPattern(pattern) =>
+      TrackedPattern(pattern)
     @playback.PlaybackSnapshot::Song(song) => Song(SongMaterial::from_raw(song))
     @playback.PlaybackSnapshot::RepeatSong(song) =>
       RepeatSong(SongMaterial::from_raw(song))

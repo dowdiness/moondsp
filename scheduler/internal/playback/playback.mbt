@@ -1,12 +1,14 @@
 ///|
 /// A playback event paired with the material version that produced it.
+/// `source` is the lowered event with its authored origin, which only tracked
+/// material has; it is `None` for untracked material. Read only its origin,
+/// source frame, source start and sound from it: those do not depend on where
+/// the event is placed. Its `event()` and `controls()` are not placed; use this
+/// type's own `event()` and `controls()` for times and controls.
 pub struct PlaybackSourcedEvent {
   priv event : @pattern.Event[@score.ScoreEvent]
   priv origin : @model.VoiceOrigin
-  priv source_origin : @pattern.EventOrigin?
-  priv source_frame : @identity.SourceFrameId?
-  priv source_start : Double
-  priv source_pitch : Double
+  priv source : @pattern.EventWithOrigin[@score.ScoreEvent]?
   priv controls : @pattern.Controls
 }
 
@@ -17,10 +19,7 @@ pub fn PlaybackSourcedEvent::anonymous(
   {
     event,
     origin: @model.VoiceOrigin::Anonymous,
-    source_origin: None,
-    source_frame: None,
-    source_start: -1.0,
-    source_pitch: -1.0,
+    source: None,
     controls: @pattern.Controls::fixed(event.value.controls),
   }
 }
@@ -34,31 +33,12 @@ pub fn PlaybackSourcedEvent::controls(
 }
 
 ///|
-pub fn PlaybackSourcedEvent::source_origin(
+/// The tracked source of this event, as described on the type. `None` for
+/// untracked material.
+pub fn PlaybackSourcedEvent::source(
   self : PlaybackSourcedEvent,
-) -> @pattern.EventOrigin? {
-  self.source_origin
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_frame(
-  self : PlaybackSourcedEvent,
-) -> @identity.SourceFrameId? {
-  self.source_frame
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_start(
-  self : PlaybackSourcedEvent,
-) -> Double {
-  self.source_start
-}
-
-///|
-pub fn PlaybackSourcedEvent::source_pitch(
-  self : PlaybackSourcedEvent,
-) -> Double {
-  self.source_pitch
+) -> @pattern.EventWithOrigin[@score.ScoreEvent]? {
+  self.source
 }
 
 ///|
@@ -77,51 +57,51 @@ pub fn PlaybackSourcedEvent::origin(
 
 ///|
 pub enum PlaybackSnapshot {
-  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent])
-  PatternWithOrigins(@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
   Song(SongMaterial)
   RepeatSong(SongMaterial)
 }
 
 ///|
-/// A lowered song the scheduler can play. Its sections hold either anonymous
-/// runtime patterns or exact, origin-bearing pattern snapshots (ADR-0021).
+/// A lowered song the scheduler can play. Its sections hold either untracked
+/// patterns or tracked pattern snapshots (ADR-0021).
 pub(all) enum SongMaterial {
-  Runtime(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Exact(
-    @song.SongSnapshot[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
+  Tracked(
+    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
   )
 }
 
 ///|
 fn SongMaterial::revision(self : SongMaterial) -> @identity.Revision {
   match self {
-    Runtime(snapshot) => snapshot.revision()
-    Exact(snapshot) => snapshot.revision()
+    Untracked(snapshot) => snapshot.revision()
+    Tracked(snapshot) => snapshot.revision()
   }
 }
 
 ///|
 fn SongMaterial::layout_revision(self : SongMaterial) -> @identity.Revision {
   match self {
-    Runtime(snapshot) => snapshot.layout_revision()
-    Exact(snapshot) => snapshot.layout_revision()
+    Untracked(snapshot) => snapshot.layout_revision()
+    Tracked(snapshot) => snapshot.layout_revision()
   }
 }
 
 ///|
 fn SongMaterial::duration(self : SongMaterial) -> @pattern.Rational {
   match self {
-    Runtime(snapshot) => snapshot.song().duration()
-    Exact(snapshot) => snapshot.song().duration()
+    Untracked(snapshot) => snapshot.song().duration()
+    Tracked(snapshot) => snapshot.song().duration()
   }
 }
 
 ///|
 fn SongMaterial::entry_count(self : SongMaterial) -> Int32 {
   match self {
-    Runtime(snapshot) => snapshot.entries().length()
-    Exact(snapshot) => snapshot.entries().length()
+    Untracked(snapshot) => snapshot.entries().length()
+    Tracked(snapshot) => snapshot.entries().length()
   }
 }
 
@@ -131,23 +111,23 @@ fn SongMaterial::query(
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@score.ScoreEvent]] {
   match self {
-    Runtime(snapshot) => snapshot.song().query(arc)
-    Exact(snapshot) => snapshot.song().query(arc)
+    Untracked(snapshot) => snapshot.song().query(arc)
+    Tracked(snapshot) => snapshot.song().query(arc)
   }
 }
 
 ///|
-pub fn PlaybackSnapshot::pattern_with_origins(
-  snapshot : @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
+pub fn PlaybackSnapshot::tracked_pattern(
+  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  PatternWithOrigins(snapshot)
+  TrackedPattern(snapshot)
 }
 
 ///|
-pub fn PlaybackSnapshot::pattern(
-  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+pub fn PlaybackSnapshot::untracked_pattern(
+  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  Pattern(snapshot)
+  UntrackedPattern(snapshot)
 }
 
 ///|
@@ -167,8 +147,8 @@ pub fn PlaybackSnapshot::revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision {
   match self {
-    Pattern(snapshot) => snapshot.revision()
-    PatternWithOrigins(snapshot) => snapshot.revision()
+    UntrackedPattern(snapshot) => snapshot.revision()
+    TrackedPattern(snapshot) => snapshot.revision()
     Song(song) | RepeatSong(song) => song.revision()
   }
 }
@@ -178,7 +158,7 @@ pub fn PlaybackSnapshot::song_layout_revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision? {
   match self {
-    Pattern(_) | PatternWithOrigins(_) => None
+    UntrackedPattern(_) | TrackedPattern(_) => None
     Song(song) | RepeatSong(song) => Some(song.layout_revision())
   }
 }
@@ -187,8 +167,8 @@ pub fn PlaybackSnapshot::song_layout_revision(
 /// Count source entries independently of the current play position.
 pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   match self {
-    Pattern(snapshot) => snapshot.pat().entries().length()
-    PatternWithOrigins(snapshot) => snapshot.pat().entries().length()
+    UntrackedPattern(snapshot) => snapshot.pat().entries().length()
+    TrackedPattern(snapshot) => snapshot.pat().entries().length()
     Song(song) | RepeatSong(song) => song.entry_count()
   }
 }
@@ -425,10 +405,7 @@ pub fn PlaybackState::query_active_sourced_events(
         {
           event: sourced.event.placed(placement),
           origin: sourced.origin,
-          source_origin: sourced.source_origin,
-          source_frame: sourced.source_frame,
-          source_start: sourced.source_start,
-          source_pitch: sourced.source_pitch,
+          source: sourced.source,
           controls: sourced.controls.placed(placement),
         }
       })
@@ -441,9 +418,8 @@ pub fn PlaybackSnapshot::query_events(
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@score.ScoreEvent]] {
   match self {
-    Pattern(snapshot) => snapshot.query(arc)
-    PatternWithOrigins(snapshot) =>
-      snapshot.query(arc).map(event => event.event())
+    UntrackedPattern(snapshot) => snapshot.query(arc)
+    TrackedPattern(snapshot) => snapshot.query(arc).map(event => event.event())
     Song(song) => song.query(arc)
     RepeatSong(_) =>
       PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(

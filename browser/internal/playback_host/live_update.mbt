@@ -228,7 +228,7 @@ fn Player::prepare(
   }
   let source = input.source()
   let prepared = match prepared {
-    @mini.PreparedPlayback::Pattern(snapshot, bpm) => {
+    @mini.PreparedPlayback::TrackedPattern(snapshot, bpm) => {
       let tempo = match @scheduler.Tempo::from_bpm(bpm) {
         Ok(tempo) => tempo
         Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
@@ -237,11 +237,11 @@ fn Player::prepare(
         source,
         tempo,
         layout: PatternLayout,
-        snapshot: @scheduler.PlaybackSnapshot::pattern_with_origins(snapshot),
+        snapshot: @scheduler.PlaybackSnapshot::tracked_pattern(snapshot),
         span: Continuous,
       })
     }
-    @mini.PreparedPlayback::Runtime(parsed) => {
+    @mini.PreparedPlayback::Source(parsed) => {
       let tempo = match @scheduler.Tempo::from_bpm(parsed.bpm()) {
         Ok(tempo) => tempo
         Err(_) => return Err(InvalidSource("tempo must be 0.001..1000 BPM"))
@@ -258,17 +258,17 @@ fn Player::prepare(
             source,
             tempo,
             layout: PatternLayout,
-            snapshot: @scheduler.PlaybackSnapshot::pattern(snapshot),
+            snapshot: @scheduler.PlaybackSnapshot::untracked_pattern(snapshot),
             span: Continuous,
           })
         }
-        Arrangement(song, repeated) =>
+        UntrackedArrangement(song, repeated) =>
           self.prepare_arrangement(source, tempo, song, repeated, snapshot => {
-            @scheduler.SongMaterial::Runtime(snapshot)
+            @scheduler.SongMaterial::Untracked(snapshot)
           })
-        ExactArrangement(song, repeated) =>
+        TrackedArrangement(song, repeated) =>
           self.prepare_arrangement(source, tempo, song, repeated, snapshot => {
-            @scheduler.SongMaterial::Exact(snapshot)
+            @scheduler.SongMaterial::Tracked(snapshot)
           })
       }
     }

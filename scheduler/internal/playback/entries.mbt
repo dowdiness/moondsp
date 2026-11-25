@@ -1,14 +1,122 @@
 ///|
-priv enum EntrySource {
-  Pattern(@pattern.PatternSnapshot[@score.ScoreEvent], Int32)
-  PatternWithOrigins(
-    @pattern.PatternSnapshotWithOrigins[@score.ScoreEvent],
-    Int32,
-  )
-  RuntimeSong(@song.SongEventOrigin)
-  ExactSong(
-    @song.SongEntry[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
-  )
+/// What an entry plays and what it knows about where its events came from. It
+/// is built once, where the kind of material is known, so the entry's own
+/// operations have no per-kind branches.
+priv struct EntryContent {
+  /// The entry's body and content when the material entered `delay` after its
+  /// origin (ADR-0025); `None` when entering changes nothing.
+  entered : (@pattern.Rational) -> (
+    @pattern.Pat[@score.ScoreEvent],
+    EntryContent,
+  )?
+  /// The entry's events over `arc`, each with its tracked source if it has one.
+  query_sourced : (EntrySpec, @pattern.Rational, @pattern.TimeSpan) -> Array[
+    PlaybackSourcedEvent,
+  ]
+}
+
+///|
+fn untracked_pattern_content(
+  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  index : Int32,
+) -> EntryContent {
+  {
+    entered: delay => {
+      let snapshot = snapshot.entered(delay)
+      Some(
+        (
+          snapshot.pat().entries()[index],
+          untracked_pattern_content(snapshot, index),
+        ),
+      )
+    },
+    query_sourced: (_, origin, arc) => {
+      let placement = @pattern.Placement(origin~)
+      snapshot
+      .query_sourced_events_for_entry(index, arc)
+      .map(event => {
+        event: event.event().placed(placement),
+        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
+        source: None,
+        controls: event.controls().on_playback_clock(origin),
+      })
+    },
+  }
+}
+
+///|
+fn tracked_pattern_content(
+  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
+  index : Int32,
+) -> EntryContent {
+  {
+    entered: delay => {
+      let snapshot = snapshot.entered(delay)
+      Some(
+        (
+          snapshot.pat().entries()[index],
+          tracked_pattern_content(snapshot, index),
+        ),
+      )
+    },
+    query_sourced: (_, origin, arc) => {
+      let placement = @pattern.Placement(origin~)
+      snapshot
+      .query_for_entry(index, arc)
+      .map(event => {
+        event: event.event().placed(placement),
+        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
+        source: Some(event),
+        controls: event.controls().on_playback_clock(origin),
+      })
+    },
+  }
+}
+
+///|
+/// A song occurrence keeps its one-shot signals on its section's clock, so
+/// entering changes nothing.
+fn untracked_song_content(song_origin : @song.SongEventOrigin) -> EntryContent {
+  {
+    entered: _ => None,
+    query_sourced: (spec, origin, arc) => {
+      query_entry(spec, origin, arc).map(event => {
+        event,
+        origin: @model.VoiceOrigin::Song(song_origin),
+        source: None,
+        controls: @pattern.Controls::fixed(event.value.controls),
+      })
+    },
+  }
+}
+
+///|
+fn tracked_song_content(
+  entry : @song.SongEntry[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+) -> EntryContent {
+  {
+    entered: _ => None,
+    query_sourced: (spec, origin, arc) => {
+      let source_arc = @pattern.TimeSpan(
+        arc.begin + spec.start,
+        arc.end_ + spec.start,
+      )
+      guard entry.slice(source_arc) is Some(slice) else { return [] }
+      let placement = @pattern.Placement(origin=origin - spec.start)
+      slice
+      .content()
+      .query_for_entry(slice.entry(), slice.arc())
+      .map(event => {
+        event: event.event().placed(slice.placement()).placed(placement),
+        origin: @model.VoiceOrigin::Song(slice.origin()),
+        source: Some(event),
+        controls: event
+        .controls()
+        .placed(slice.placement())
+        .on_playback_clock(origin - spec.start),
+      })
+    },
+  }
 }
 
 ///|
@@ -18,7 +126,7 @@ priv struct EntrySpec {
   body : @pattern.Pat[@score.ScoreEvent]
   start : @pattern.Rational
   end_ : @pattern.Rational?
-  source : EntrySource
+  source : EntryContent
   /// How long after its origin the material entered; its one-shot signals
   /// start there (ADR-0025).
   delay : @pattern.Rational
@@ -30,7 +138,7 @@ fn EntrySpec::EntrySpec(
   body~ : @pattern.Pat[@score.ScoreEvent],
   start~ : @pattern.Rational,
   end_~ : @pattern.Rational?,
-  source~ : EntrySource,
+  source~ : EntryContent,
 ) -> EntrySpec {
   { id, body, start, end_, source, delay: @pattern.Rational::from_int(0), }
 }
@@ -41,26 +149,9 @@ fn EntrySpec::EntrySpec(
 /// section's clock.
 fn EntrySpec::entered(self : EntrySpec, delay : @pattern.Rational) -> EntrySpec {
   guard delay.num != 0L else { return self }
-  match self.source {
-    Pattern(snapshot, index) => {
-      let snapshot = snapshot.entered(delay)
-      {
-        ..self,
-        body: snapshot.pat().entries()[index],
-        source: Pattern(snapshot, index),
-        delay,
-      }
-    }
-    PatternWithOrigins(snapshot, index) => {
-      let snapshot = snapshot.entered(delay)
-      {
-        ..self,
-        body: snapshot.pat().entries()[index],
-        source: PatternWithOrigins(snapshot, index),
-        delay,
-      }
-    }
-    RuntimeSong(_) | ExactSong(_) => self
+  match (self.source.entered)(delay) {
+    Some((body, source)) => { ..self, body, source, delay, }
+    None => self
   }
 }
 
@@ -134,48 +225,47 @@ fn EntryState::material(self : EntryState) -> EntrySpec {
 ///|
 fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
   match self {
-    Pattern(snapshot) => {
-      let result : Array[EntrySpec] = []
-      for index, body in snapshot.pat().entries() {
-        result.push(
-          EntrySpec(
-            id=body.entry_key(),
-            body~,
-            start=@pattern.Rational::from_int(0),
-            end_=None,
-            source=Pattern(snapshot, index),
-          ),
-        )
-      }
-      result
-    }
-    PatternWithOrigins(snapshot) => {
-      let result : Array[EntrySpec] = []
-      for index, body in snapshot.pat().entries() {
-        result.push(
-          EntrySpec(
-            id=body.entry_key(),
-            body~,
-            start=@pattern.Rational::from_int(0),
-            end_=None,
-            source=PatternWithOrigins(snapshot, index),
-          ),
-        )
-      }
-      result
-    }
-    Song(Runtime(snapshot)) | RepeatSong(Runtime(snapshot)) =>
-      song_entry_specs(snapshot, entry => RuntimeSong(entry.origin()))
-    Song(Exact(snapshot)) | RepeatSong(Exact(snapshot)) =>
-      song_entry_specs(snapshot, entry => ExactSong(entry))
+    UntrackedPattern(snapshot) =>
+      pattern_entry_specs(snapshot.pat(), index => {
+        untracked_pattern_content(snapshot, index)
+      })
+    TrackedPattern(snapshot) =>
+      pattern_entry_specs(snapshot.pat(), index => {
+        tracked_pattern_content(snapshot, index)
+      })
+    Song(Untracked(snapshot)) | RepeatSong(Untracked(snapshot)) =>
+      song_entry_specs(snapshot, entry => untracked_song_content(entry.origin()))
+    Song(Tracked(snapshot)) | RepeatSong(Tracked(snapshot)) =>
+      song_entry_specs(snapshot, entry => tracked_song_content(entry))
   }
+}
+
+///|
+/// One spec per canonical entry of a pattern, in `Pat::entries` order.
+fn pattern_entry_specs(
+  pat : @pattern.Pat[@score.ScoreEvent],
+  content : (Int32) -> EntryContent,
+) -> Array[EntrySpec] {
+  let result : Array[EntrySpec] = []
+  for index, body in pat.entries() {
+    result.push(
+      EntrySpec(
+        id=body.entry_key(),
+        body~,
+        start=@pattern.Rational::from_int(0),
+        end_=None,
+        source=content(index),
+      ),
+    )
+  }
+  result
 }
 
 ///|
 /// One spec per canonical song entry, in the snapshot's entry order.
 fn[C] song_entry_specs(
   snapshot : @song.SongSnapshot[C],
-  source : (@song.SongEntry[C]) -> EntrySource,
+  source : (@song.SongEntry[C]) -> EntryContent,
 ) -> Array[EntrySpec] {
   snapshot
   .entries()
@@ -506,66 +596,7 @@ fn EntrySpec::query_sourced(
   origin : @pattern.Rational,
   arc : @pattern.TimeSpan,
 ) -> Array[PlaybackSourcedEvent] {
-  let placement = @pattern.Placement(origin~)
-  match self.source {
-    Pattern(snapshot, index) =>
-      snapshot
-      .query_sourced_events_for_entry(index, arc)
-      .map(event => {
-        event: event.event().placed(placement),
-        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source_origin: None,
-        source_frame: None,
-        source_start: -1.0,
-        source_pitch: -1.0,
-        controls: event.controls().on_playback_clock(origin),
-      })
-    PatternWithOrigins(snapshot, index) =>
-      snapshot
-      .query_for_entry(index, arc)
-      .map(event => {
-        event: event.event().placed(placement),
-        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source_origin: Some(event.origin()),
-        source_frame: event.source_frame(),
-        source_start: event.source_start(),
-        source_pitch: authored_pitch(event.event().value),
-        controls: event.controls().on_playback_clock(origin),
-      })
-    RuntimeSong(song_origin) =>
-      query_entry(self, origin, arc).map(event => {
-        event,
-        origin: @model.VoiceOrigin::Song(song_origin),
-        source_origin: None,
-        source_frame: None,
-        source_start: -1.0,
-        source_pitch: -1.0,
-        controls: @pattern.Controls::fixed(event.value.controls),
-      })
-    ExactSong(entry) => {
-      let source_arc = @pattern.TimeSpan(
-        arc.begin + self.start,
-        arc.end_ + self.start,
-      )
-      guard entry.slice(source_arc) is Some(slice) else { return [] }
-      let placement = @pattern.Placement(origin=origin - self.start)
-      slice
-      .content()
-      .query_for_entry(slice.entry(), slice.arc())
-      .map(event => {
-        event: event.event().placed(slice.placement()).placed(placement),
-        origin: @model.VoiceOrigin::Song(slice.origin()),
-        source_origin: Some(event.origin()),
-        source_frame: event.source_frame(),
-        source_start: event.source_start(),
-        source_pitch: authored_pitch(event.event().value),
-        controls: event
-        .controls()
-        .placed(slice.placement())
-        .on_playback_clock(origin - self.start),
-      })
-    }
-  }
+  (self.source.query_sourced)(self, origin, arc)
 }
 
 ///|
@@ -709,14 +740,4 @@ fn[A] query_entry_segments(
     }
   }
   result
-}
-
-///|
-/// The pitch an exact event plays, or NaN for a drum hit. A sample played
-/// with `s("…")` plays its root pitch.
-fn authored_pitch(event : @score.ScoreEvent) -> Double {
-  match event.sound {
-    Note(_, pitch~) | Play(_, pitch~) => pitch
-    Hit(_) => @double.not_a_number
-  }
 }

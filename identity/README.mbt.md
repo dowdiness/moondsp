@@ -18,7 +18,7 @@ providing identity types for structural live editing:
    ↓ uses GraphNodeId, Revision
 [ identity ] ← (stable node identities & revision tokens)
    ↑ uses PatternNodeId, Revision
-[ pattern ] (PatternDoc, PatternSnapshot)
+[ pattern ] (PatternDoc, UntrackedPatternSnapshot, TrackedPatternSnapshot)
 ```
 
 - **Upstream consumers**: [`graph/`](../graph/) uses `GraphNodeId` and

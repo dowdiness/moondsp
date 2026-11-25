@@ -22,7 +22,7 @@ pub extend ActiveVoiceEffectOutcome with @moonbitlang/core/debug.Debug::{
 ///|
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
   self : PatternScheduler,
-  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
   scope : PatternVoiceScope,
   effect : ActiveVoiceEffect,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {

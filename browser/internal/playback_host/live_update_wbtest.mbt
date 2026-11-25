@@ -384,7 +384,7 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   let original = "/* \u{10400} */ " + HELD_NOTE
   let draft = @mini.Draft(original)
   guard draft.prepare_playback() is Ok(input) else {
-    fail("expected exact input")
+    fail("expected tracked input")
   }
   stage(input.encode_wire())
   assert_eq(player_restart_input(), 0)

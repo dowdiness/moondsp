@@ -29,8 +29,8 @@ fn unwrap_doc(
 
 ///|
 fn unwrap_snapshot(
-  build : () -> @pattern.PatternSnapshot[@pattern.ControlMap] raise @pattern.PatternDocError,
-) -> @pattern.PatternSnapshot[@pattern.ControlMap] {
+  build : () -> @pattern.UntrackedPatternSnapshot[@pattern.ControlMap] raise @pattern.PatternDocError,
+) -> @pattern.UntrackedPatternSnapshot[@pattern.ControlMap] {
   build() catch {
     _ => abort("expected pattern snapshot")
   }

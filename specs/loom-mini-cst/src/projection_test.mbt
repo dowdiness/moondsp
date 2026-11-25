@@ -20,10 +20,10 @@ fn projection_boundary_doc(
 ///|
 fn projection_boundary_snapshot(
   result : Result[
-    @pattern.PatternSnapshot,
+    @pattern.UntrackedPatternSnapshot,
     @pattern.PatternDocError,
   ],
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   match result {
     Ok(snapshot) => snapshot
     Err(_) => abort("expected lowered PatternDoc snapshot")
@@ -33,11 +33,11 @@ fn projection_boundary_snapshot(
 ///|
 fn projection_boundary_draft_snapshot(
   draft : @mini.Draft,
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   match draft.prepare_playback() {
     Ok(input) =>
       match input.compile() {
-        Ok(@mini.PreparedPlayback::Pattern(snapshot, _)) =>
+        Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) =>
           snapshot.as_snapshot()
         _ => abort("expected Mini pattern playback")
       }
@@ -78,7 +78,7 @@ fn projection_boundary_mini_draft_snapshot(
   old_start~ : Int,
   old_end~ : Int,
   new_end~ : Int,
-) -> @pattern.PatternSnapshot {
+) -> @pattern.UntrackedPatternSnapshot {
   let draft = try! @mini.Draft(input)
   projection_boundary_edit_draft(
     draft,
@@ -99,7 +99,7 @@ fn projection_boundary_one_cycle() -> @pattern.TimeSpan {
 
 ///|
 fn projection_boundary_leaf_ids(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.UntrackedPatternSnapshot,
 ) -> Array[String] {
   let events = snapshot.query_sourced_events(projection_boundary_one_cycle())
   let ids : Array[String] = []
@@ -174,7 +174,7 @@ priv struct BoundaryEvent {
 /// Canonicalize a lowered snapshot's sourced events over the fixed parity window
 /// for value-level differential parity (Phase 2 plan Step 2).
 fn projection_boundary_value_events(
-  snapshot : @pattern.PatternSnapshot,
+  snapshot : @pattern.UntrackedPatternSnapshot,
 ) -> Array[BoundaryEvent] {
   let events = snapshot.query_sourced_events(
     projection_boundary_parity_window(),

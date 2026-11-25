@@ -1,13 +1,13 @@
 ///|
 /// The source accepted by the player, after pattern bindings and declarations
 /// have been separated from the playable body.
-/// A song's sections are lowered while parsing: to exact snapshots when the
-/// source is tracked, to anonymous runtime patterns otherwise.
+/// A song's sections are lowered while parsing: to tracked snapshots when the
+/// source is tracked, to untracked patterns otherwise.
 pub enum PlayBody {
   Pattern(ScoreDoc)
-  Arrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
-  ExactArrangement(
-    @song.Song[@pattern.PatternSnapshotWithOrigins[@score.ScoreEvent]],
+  UntrackedArrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  TrackedArrangement(
+    @song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
   )
 }
@@ -127,9 +127,9 @@ fn parse_play_source_with_origins(
         builder,
         admission,
         authored_bpm,
-        lower=doc => doc.lower_with_origins(),
+        lower=doc => doc.lower_tracked(),
       )
-      { body: ExactArrangement(song, repeating), bpm, }
+      { body: TrackedArrangement(song, repeating), bpm, }
     } else {
       let (song, repeating, bpm) = parser.parse_play_song(
         song_at,
@@ -138,7 +138,7 @@ fn parse_play_source_with_origins(
         authored_bpm,
         lower=doc => doc.lower().pat(),
       )
-      { body: Arrangement(song, repeating), bpm, }
+      { body: UntrackedArrangement(song, repeating), bpm, }
     }
   } else {
     guard !parser.at_end() else { raise Mistake(body_at, "empty input") }

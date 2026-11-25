@@ -238,7 +238,9 @@ test "continuous bus signal is exact under rev and inside sequence" {
     bus_with_ramp("note(\"60 64\")", "a"),
     bus_doc("note(\"67\")"),
   ]).lower()
-  let gain_reader = (snapshot : @pattern.PatternSnapshot[@score.ScoreEvent]) => {
+  let gain_reader = (
+    snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  ) => {
     snapshot.query_sourced_events(
       @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 8L)),
     )[0]
@@ -292,7 +294,7 @@ test "cached subtree buses follow their new position after an edit" {
     bus_with("note(\"64\")", "b", bus_steps("sb", [0.6, 0.8])),
   ])
   fn gain_buses(
-    snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+    snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
   ) -> Array[(Double?, Double)] {
     let arc = @pattern.TimeSpan(bus_r(0L, 1L), bus_r(1L, 1L))
     snapshot

@@ -44,8 +44,8 @@ between pattern queries and the scheduler:
 
 `Section[C]` gives content a name, duration in cycles, and local `TimeScope`.
 Structure never looks inside `C`; querying a section as a pattern requires
-`C : SongContent`, which runtime patterns (`Pat[ScoreEvent]`) and exact
-snapshots (`PatternSnapshotWithOrigins[ScoreEvent]`) implement (ADR-0021).
+`C : SongContent`, which untracked patterns (`Pat[ScoreEvent]`) and tracked
+snapshots (`TrackedPatternSnapshot[ScoreEvent]`) implement (ADR-0021).
 `single` is the concise one-cycle constructor.
 
 ```mbt check
@@ -199,11 +199,11 @@ updates.
 Document edit methods return new values and reject duplicate identities, names,
 invalid indices, and removal of the final occurrence.
 
-Exact content is a type: a `Song[PatternSnapshotWithOrigins]` holds an exact
+Tracked content is a type: a `Song[TrackedPatternSnapshot]` holds a tracked
 snapshot in every layer, so querying a slice's content yields events with
 their source origin, frame, and local onset/pitch. Section rate, clipping,
 placement, and repeating playback change event spans without reinterpreting
-those source-local coordinates. A runtime pattern cannot replace an exact
+those source-local coordinates. An untracked pattern cannot replace a tracked
 layer's body; choosing the content type is the only way to change kind.
 
 ## Package boundary

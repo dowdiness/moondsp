@@ -47,7 +47,7 @@ pub fn[C] ParsedSong::bpm(self : ParsedSong[C]) -> Double? {
 /// `pattern_expr` is the existing pattern mini-notation surface, such as
 /// `s("bd sd")`, `note("60 64")`, `stack(...)`, and method chains. The result
 /// keeps the optional `bpm(number)` metadata beside the layout. Sections are
-/// anonymous runtime patterns, without source origins.
+/// untracked patterns, without source origins.
 pub fn parse_song(
   input : String,
 ) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String] {

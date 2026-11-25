@@ -20,7 +20,7 @@ fn bus_id(name : String) -> @identity.PatternNodeId {
 /// over the first cycle before the stretch.
 fn bus_doc(
   cutoff : (Double) -> Double,
-) -> @pattern.PatternSnapshot[@score.ScoreEvent] raise {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] raise {
   @pattern.PatternDoc::merge_control(
     id=bus_id("merge"),
     left=@pattern.PatternDoc::atom(
@@ -72,7 +72,7 @@ fn bus_pool(ctx : @moondsp.DspContext) -> @moondsp.BoundVoicePool raise {
 /// Per-block brightness (RMS of the first difference, which rises with the
 /// lowpass cutoff) of two cycles played through the scheduler.
 fn bus_brightness(
-  snapshot : @pattern.PatternSnapshot[@score.ScoreEvent],
+  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
 ) -> Array[Double] raise {
   let ctx = @moondsp.DspContext(sample_rate=BUS_RATE, block_size=BUS_BLOCK)
   let scheduler = @scheduler.PatternScheduler(

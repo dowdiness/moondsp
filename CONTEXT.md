@@ -68,6 +68,14 @@ The continuously established relationship between a pattern reference and its de
 **Event origin**:
 An event's source atom and route through named pattern references. It exists before playback and does not by itself identify a playback run or material version.
 
+**Tracked material**:
+Playback material whose events carry event origins, so each playback onset can be attributed to a source atom. Scores prepared from a draft score are always tracked.
+_Avoid_: Exact, with origins (for this meaning)
+
+**Untracked material**:
+Playback material whose events carry no event origin, so its playback onsets cannot be attributed to a source atom and it produces no playback highlight. It sounds the same as tracked material.
+_Avoid_: Runtime, anonymous, plain (for this meaning)
+
 **Playback origin path**:
 The authored provenance chain connecting a playback material to the source atom responsible for an event, tracing through any intermediate pattern references.
 

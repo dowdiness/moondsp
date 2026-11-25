@@ -10,7 +10,7 @@ control side.
 ## Intended flow
 
 ```text
-Mini PatternDoc / PatternSnapshot
+Mini PatternDoc / UntrackedPatternSnapshot
   -> scheduler events: ScoreEvent (Sound + ControlMap)
   -> template registry
   -> ControlBindingMap for the selected AnalyzedGraph (targets and units)

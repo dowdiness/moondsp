@@ -9,7 +9,7 @@ fn allocation_bench_snapshot(dense : Bool) -> PlaybackSnapshot raise {
     ]),
   )
   if !dense {
-    return PlaybackSnapshot::pattern(note.lower())
+    return PlaybackSnapshot::untracked_pattern(note.lower())
   }
   let motif = note.fast(
     id=@identity.PatternNodeId::from_string("bench-fast"),
@@ -46,7 +46,7 @@ fn allocation_bench_snapshot(dense : Bool) -> PlaybackSnapshot raise {
     id=@identity.PatternNodeId::from_string("bench-chord-fast"),
     factor=@pattern.Rational::from_int(16),
   )
-  PlaybackSnapshot::pattern(
+  PlaybackSnapshot::untracked_pattern(
     @pattern.PatternDoc::stack(
       id=@identity.PatternNodeId::from_string("bench-root"),
       docs=[

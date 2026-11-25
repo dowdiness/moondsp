@@ -325,7 +325,8 @@ test "edit orchestration stages a replacement and reconciles active voices" {
   assert_eq(outcome.detached_note_count, 1)
   assert_true(sched.accepted_snapshot() is Some(_))
   assert_true(
-    sched.queued_snapshot() is Some(@scheduler.PlaybackSnapshot::Pattern(_)),
+    sched.queued_snapshot()
+    is Some(@scheduler.PlaybackSnapshot::UntrackedPattern(_)),
   )
   assert_eq(sched.active_note_count(), 0)
 }
