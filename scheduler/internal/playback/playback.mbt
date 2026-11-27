@@ -69,12 +69,12 @@ pub struct PlaybackSnapshot {
 }
 
 ///|
-/// A pattern that plays forever. A plain pattern has revision zero.
+/// A pattern that plays forever.
 pub fn PlaybackSnapshot::pattern(
   pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
   {
-    revision: pattern.revision().unwrap_or(@identity.Revision::zero()),
+    revision: pattern.revision(),
     layout_revision: None,
     period: None,
     specs: pattern_entry_specs(pattern),

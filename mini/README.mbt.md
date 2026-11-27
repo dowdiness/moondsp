@@ -43,7 +43,7 @@ surface:
 
 | Category | Types / Functions | Key operations |
 |---|---|---|
-| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ScoreEvent]` or `ParsedSong[Pat[ScoreEvent]]` |
+| **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ScoreEvent]` or `ParsedSong[UntrackedPatternSnapshot[ScoreEvent]]` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |

@@ -25,14 +25,14 @@ fn song_doc_test_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.SectionDoc[@pattern.Pat[@score.ScoreEvent]] {
+) -> @song.SectionDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   @song.SectionDoc::single(
     id=song_doc_test_section_id(id),
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
     layer_id=song_doc_test_layer_id("\{id}:main"),
-    body=@score.note(midi),
+    body=section_test_content("\{id}:main", @score.note(midi)),
   ) catch {
     _ => abort("section doc creation failed")
   }
@@ -90,18 +90,25 @@ priv struct SongDocTestEvent {
 
 ///|
 fn song_doc_test_query(
-  slices : Array[
-    @song.SongSlice[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+  entries : ArrayView[
+    @song.SongEntry[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
   ],
+  arc : @pattern.TimeSpan,
 ) -> Array[SongDocTestEvent] {
   let result : Array[SongDocTestEvent] = []
-  for slice in slices {
-    for event in slice.content().query_for_entry(slice.entry(), slice.arc()) {
+  for entry in entries {
+    let span = @pattern.TimeSpan(entry.start(), entry.end_())
+    guard span.intersect(arc) is Some(arc) else { continue }
+    let placement = entry.placement()
+    for
+      event in entry
+      .content()
+      .query_for_entry(entry.content_entry(), placement.local_span(arc)) {
       result.push({
-        origin: slice.origin(),
+        origin: entry.origin(),
         source: event.origin(),
-        event: event.event().placed(slice.placement()),
-        controls: event.controls().placed(slice.placement()),
+        event: event.event().placed(placement),
+        controls: event.controls().placed(placement),
       })
     }
   }
@@ -139,11 +146,10 @@ test "SongSnapshot::query_sourced_events tags occurrence section and layer IDs" 
   ])
   let snapshot = song_doc_test_snapshot(doc)
   let events = song_doc_test_query(
-    snapshot.slices(
-      @pattern.TimeSpan(
-        @pattern.Rational::from_int(0),
-        @pattern.Rational(1L, 100L),
-      ),
+    snapshot.entries(),
+    @pattern.TimeSpan(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational(1L, 100L),
     ),
   )
   @debug.assert_eq(events.length(), 2)
@@ -369,7 +375,10 @@ test "SongDoc same-length section edits reuse layout and unchanged sections" {
     @pattern.Rational::from_int(1),
     60.0,
   )
-  let edited_verse = verse.replace_layer_body(layer_id, body=@score.note(61.0)) catch {
+  let edited_verse = verse.replace_layer_body(
+    layer_id,
+    body=section_test_content(layer_id.value(), @score.note(61.0)),
+  ) catch {
     _ => abort("body edit failed")
   }
   let chorus = song_doc_test_section(
@@ -484,9 +493,7 @@ test "exact Song entry origins survive scoped placement" {
     @pattern.Rational(15L, 4L),
   )
   for index, atom in [c, g] {
-    let events = song_doc_test_query(
-      snapshot.entries()[index].slice(arc).iter().collect(),
-    )
+    let events = song_doc_test_query(snapshot.entries()[index:index + 1], arc)
     @debug.assert_eq(events.length(), 2)
     for event in events {
       assert_true(event.source.atom() == atom)
@@ -561,9 +568,8 @@ test "song events read their buses on the song clock" {
     ]),
   )
   let events = song_doc_test_query(
-    snapshot.slices(
-      @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
-    ),
+    snapshot.entries(),
+    @pattern.TimeSpan(@pattern.Rational(13L, 4L), @pattern.Rational(7L, 2L)),
   )
   @debug.assert_eq(events.length(), 1)
   let reader = events[0].controls.reader(Lpf).unwrap()

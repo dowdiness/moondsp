@@ -77,7 +77,7 @@ observation does not change the counts.
 | tracked pattern | 984,152 | 984,152 | 0 |
 | tracked song | 368,924 | 361,705 | −7,219 (−1.96%) |
 | untracked pattern | 984,152 | 984,152 | 0 |
-| untracked song | 350,485 | 359,783 | +9,298 (+2.65%) |
+| untracked song | 350,485 | 361,705 | +11,220 (+3.20%) |
 
 The first version passed a lambda to `PlaybackPattern::query_for_entry` on
 every query: one closure per entry query (+6,000 for patterns; main's lambda
@@ -86,8 +86,10 @@ query's `Placement` as an argument and a mapper built once per entry — a
 named function for patterns, one closure per song entry — so a query
 constructs no closure. Tracked songs drop because each entry's view and
 section placement are built once, not sliced per query. Untracked songs
-place each event twice (section, then playback origin) where main shifted
-the already-placed occurrence body once.
+now play the same path as tracked ones and construct the same count: their
+sections are untracked snapshots, whose events are built with their node
+paths and placed twice (section, then playback origin), where main queried a
+bare `Pat` occurrence body and shifted it once.
 
 ## Limits
 

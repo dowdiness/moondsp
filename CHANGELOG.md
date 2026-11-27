@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** playback takes one view of a pattern, whatever tracks it
   (ADR-0031). `@pattern.PlaybackPattern` comes from an untracked or tracked
-  snapshot's `playback()` or `Pat::playback()`; `@scheduler.PlaybackSnapshot`
+  snapshot's `playback()`; `@scheduler.PlaybackSnapshot`
   is opaque, built by `pattern(PlaybackPattern)` or
   `song(SongSnapshot[C], repeat?)` for any `SongContent`, which gains
   `playback()`. `SongMaterial`, the `PlaybackSnapshot` variants,
@@ -46,7 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `queue_pattern_snapshot` and `queue_song_snapshot` are removed; use
   `queue_playback_snapshot`. The `*_snapshot_effect_result` functions take a
   `PlaybackSnapshot`. `SongEntry` gains `content`, `content_entry` and
-  `placement`; `Placement` gains `origin()`.
+  `placement`; `SongSlice`, `SongEntry::slice` and `SongSnapshot::slices`
+  are removed. Untracked songs hold `UntrackedPatternSnapshot` sections:
+  `SongContent` is no longer implemented for `Pat`, and `parse_song` returns
+  `ParsedSong[UntrackedPatternSnapshot[ScoreEvent]]`.
 - **Breaking:** tracked and untracked material are named alike everywhere
   (see `CONTEXT.md`). `PatternSnapshotWithOrigins` is `TrackedPatternSnapshot`
   and `PatternSnapshot` is `UntrackedPatternSnapshot`;

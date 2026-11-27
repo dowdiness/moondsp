@@ -9,7 +9,7 @@ pub struct PlaybackSnapshot {
 
 ///|
 /// A pattern that plays forever: an untracked or tracked snapshot's
-/// `playback()`, or a plain pattern's.
+/// `playback()`.
 pub fn PlaybackSnapshot::pattern(
   pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> PlaybackSnapshot {

@@ -22,66 +22,47 @@ fn pattern_content(
 ) -> EntryContent {
   {
     entered: delay => {
-      pattern
-      .entered(delay)
-      .map(pattern => {
-        (pattern.entries()[index], pattern_content(pattern, index))
-      })
+      let pattern = pattern.entered(delay)
+      Some((pattern.entries()[index], pattern_content(pattern, index)))
     },
     query_sourced: (_, origin, arc) => {
       pattern.query_for_entry(
         index,
         arc,
-        @pattern.Placement(origin~),
-        place_pattern_event,
+        at=@pattern.Placement(origin~),
+        pattern_event,
       )
     },
   }
 }
 
 ///|
-/// A pattern event on the playback clock. A named function, not a lambda, so
-/// a query constructs no closure.
-fn place_pattern_event(
-  placement : @pattern.Placement,
+/// A named function, not a lambda, so a query constructs no closure.
+fn pattern_event(
   event : @pattern.Event[@score.ScoreEvent],
-  path : @pattern.PatternNodePath?,
+  path : @pattern.PatternNodePath,
   controls : @pattern.Controls,
   source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
 ) -> PlaybackSourcedEvent {
-  {
-    event: event.placed(placement),
-    origin: match path {
-      Some(path) => @model.VoiceOrigin::Pattern(path)
-      None => @model.VoiceOrigin::Anonymous
-    },
-    source,
-    controls: controls.on_playback_clock(placement.origin()),
-  }
+  { event, origin: @model.VoiceOrigin::Pattern(path), source, controls, }
 }
 
 ///|
 /// A song occurrence keeps its one-shot signals on its section's clock, so
-/// entering changes nothing. The event mapper is built once per entry.
+/// entering changes nothing. Its event mapper is built once per entry.
 fn[C] song_content(
   entry : @song.SongEntry[C],
   content : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> EntryContent {
   let index = entry.content_entry()
   let section = entry.placement()
-  let song_origin = @model.VoiceOrigin::Song(entry.origin())
+  let origin = @model.VoiceOrigin::Song(entry.origin())
   let each = (
-    placement : @pattern.Placement,
     event : @pattern.Event[@score.ScoreEvent],
-    _ : @pattern.PatternNodePath?,
+    _ : @pattern.PatternNodePath,
     controls : @pattern.Controls,
     source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
-  ) => PlaybackSourcedEvent::{
-    event: event.placed(section).placed(placement),
-    origin: song_origin,
-    source,
-    controls: controls.placed(section).on_playback_clock(placement.origin()),
-  }
+  ) => PlaybackSourcedEvent::{ event, origin, source, controls, }
   {
     entered: _ => None,
     // Entry segments already clip `arc` to the occurrence.
@@ -92,7 +73,8 @@ fn[C] song_content(
       content.query_for_entry(
         index,
         content_arc,
-        @pattern.Placement(origin=origin - spec.start),
+        at=@pattern.Placement(origin=origin - spec.start),
+        within=section,
         each,
       )
     },

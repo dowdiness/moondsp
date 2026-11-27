@@ -244,14 +244,14 @@ fn scheduler_section_doc(
   id_value : String,
   name : String,
   midi : Double,
-) -> @song.SectionDoc[@pattern.Pat[@score.ScoreEvent]] {
+) -> @song.SectionDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   @song.SectionDoc::single(
     id=sid(id_value),
     name~,
     length_cycles=@pattern.Rational::from_int(1),
     scope=@song.TimeScope::identity(),
     layer_id=lid("\{id_value}:main"),
-    body=@score.note(midi),
+    body=note_snapshot("\{id_value}:main", midi),
   ) catch {
     _ => abort("expected section doc")
   }
@@ -259,8 +259,12 @@ fn scheduler_section_doc(
 
 ///|
 fn scheduler_song_doc(
-  occurrences : Array[@song.SongOccurrenceDoc[@pattern.Pat[@score.ScoreEvent]]],
-) -> @song.SongDoc[@pattern.Pat[@score.ScoreEvent]] {
+  occurrences : Array[
+    @song.SongOccurrenceDoc[
+      @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+    ],
+  ],
+) -> @song.SongDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   @song.SongDoc(parts=occurrences) catch {
     _ => abort("expected song doc")
   }
@@ -268,8 +272,8 @@ fn scheduler_song_doc(
 
 ///|
 fn song_snapshot(
-  doc : @song.SongDoc[@pattern.Pat[@score.ScoreEvent]],
-) -> @song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]] {
+  doc : @song.SongDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+) -> @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   doc.lower() catch {
     _ => abort("expected song snapshot")
   }
@@ -569,7 +573,14 @@ test "Song layer selection does not cross section boundaries" {
       layer_id=layer,
       length_cycles=@pattern.Rational::from_int(1),
       scope=@song.TimeScope::identity(),
-      body=@score.note(if name == "selected" { 60.0 } else { 72.0 }),
+      body=note_snapshot(
+        "\{name}:main",
+        if name == "selected" {
+          60.0
+        } else {
+          72.0
+        },
+      ),
     )
   })
   let doc = scheduler_song_doc(
@@ -775,7 +786,7 @@ test "render_block: same-layout song edit commits without layout boundary change
   sched.render_block(left, right)
   let edited_section = section.replace_layer_body(
     layer_id,
-    body=@score.note(62.0),
+    body=note_snapshot(layer_id.value(), 62.0),
   )
   let edited = doc.replace_occurrence_section(main_id, section=edited_section)
   assert_true(edited.revision() != doc.revision())
@@ -946,7 +957,10 @@ test "process_section_block: identity section matches pattern scheduling" {
   let (pattern_pool, pattern_sched, pattern_left, pattern_right) = make_test_sched()
   let (section_pool, section_sched, section_left, section_right) = make_test_sched()
   let pat = @score.note(60.0)
-  let section = @song.Section::single(name="main", body=pat)
+  let section = @song.Section::single(
+    name="main",
+    body=note_snapshot("process-section:main", 60.0),
+  )
   pattern_sched.process_block(pat, pattern_left, pattern_right)
   section_sched.process_section_block(section, section_left, section_right)
   @debug.assert_eq(
@@ -967,8 +981,10 @@ test "process_section_block: identity section matches pattern scheduling" {
 test "process_song_block: one-section song matches section scheduling" {
   let (section_pool, section_sched, section_left, section_right) = make_test_sched()
   let (song_pool, song_sched, song_left, song_right) = make_test_sched()
-  let pat = @score.note(60.0)
-  let section = @song.Section::single(name="main", body=pat)
+  let section = @song.Section::single(
+    name="main",
+    body=note_snapshot("process-song:main", 60.0),
+  )
   let song = @song.Song(parts=[@song.SongPart(name="main", section~)])
   section_sched.process_section_block(section, section_left, section_right)
   song_sched.process_song_block(song, song_left, song_right)
@@ -1339,8 +1355,16 @@ test "deferred song replacement preserves selected layer provenance" {
     length_cycles=@pattern.Rational::from_int(4),
     scope=@song.TimeScope::identity(),
     body=@song.SectionDocBody::layers([
-      @song.SectionLayerDoc(id=lead_id, name="Lead", body=@score.note(60.0)),
-      @song.SectionLayerDoc(id=pad_id, name="Pad", body=@score.note(72.0)),
+      @song.SectionLayerDoc(
+        id=lead_id,
+        name="Lead",
+        body=note_snapshot(lead_id.value(), 60.0),
+      ),
+      @song.SectionLayerDoc(
+        id=pad_id,
+        name="Pad",
+        body=note_snapshot(pad_id.value(), 72.0),
+      ),
     ]),
   )
   let initial = scheduler_song_doc([
@@ -1348,7 +1372,12 @@ test "deferred song replacement preserves selected layer provenance" {
   ])
   let edited_section = section.replace_layer_body(
     lead_id,
-    body=@score.note(64.0).fast(@pattern.Rational::from_int(2)),
+    body=@pattern.PatternDoc::from_pattern(
+      id=pid(lead_id.value()),
+      pat=@score.note(64.0).fast(@pattern.Rational::from_int(2)),
+    ).lower() catch {
+      _ => abort("edited layer snapshot creation failed")
+    },
   )
   let replacement = initial.replace_occurrence_section(
     occurrence,

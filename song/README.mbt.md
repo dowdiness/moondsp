@@ -37,21 +37,24 @@ between pattern queries and the scheduler:
 | **Section & Layers** | `Section[C]`, `SectionBody[C]`, `SectionLayer[C]` | `Section::layer`, `Section::get_layer`, `Section::body`, `Section::query`, `Section::apply_patch` |
 | **Timeline & Occurrence** | `Song[C]`, `SectionOccurrence[C]` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
 | **Time Scopes** | `TimeScope` | `TimeScope::TimeScope`, `TimeScope::identity`, `TimeScope::at_rate`, `TimeScope::fast`, `TimeScope::slow` |
-| **Live Editing & Documents** | `SongDoc[C]`, `SectionDoc[C]`, `SongSnapshot[C]`, `SongSlice[C]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::entries`, `SongEntry::slice`, `SongSnapshot::slices` |
+| **Live Editing & Documents** | `SongDoc[C]`, `SectionDoc[C]`, `SongSnapshot[C]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::entries`, `SongEntry::content`, `SongEntry::placement` |
 | **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
 
 ## Build a section
 
 `Section[C]` gives content a name, duration in cycles, and local `TimeScope`.
 Structure never looks inside `C`; querying a section as a pattern requires
-`C : SongContent`, which untracked patterns (`Pat[ScoreEvent]`) and tracked
-snapshots (`TrackedPatternSnapshot[ScoreEvent]`) implement (ADR-0021).
+`C : SongContent`, which untracked snapshots (`UntrackedPatternSnapshot[ScoreEvent]`) and
+tracked snapshots (`TrackedPatternSnapshot[ScoreEvent]`) implement (ADR-0021).
 `single` is the concise one-cycle constructor.
 
 ```mbt check
 ///|
 test "wrap a pattern as a section" {
-  let section = @song.Section::single(name="verse", body=@score.note(60.0))
+  let section = @song.Section::single(
+    name="verse",
+    body=section_test_content("readme:verse", @score.note(60.0)),
+  )
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -82,8 +85,14 @@ of adding a duplicate.
 test "combine named section layers" {
   let section = @song.Section::single(
     name="groove",
-    body=@score.hit(@score.Drum::parse("bd").unwrap()),
-  ).layer(name="bass", body=@score.note(36.0))
+    body=section_test_content(
+      "readme:groove:main",
+      @score.hit(@score.Drum::parse("bd").unwrap()),
+    ),
+  ).layer(
+    name="bass",
+    body=section_test_content("readme:groove:bass", @score.note(36.0)),
+  )
   let events = section.query(
     @pattern.TimeSpan(
       @pattern.Rational::from_int(0),
@@ -114,9 +123,14 @@ test "arrange sections sequentially" {
     name="intro",
     length_cycles=@pattern.Rational::from_int(2),
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(@score.note(60.0)),
+    body=@song.SectionBody::single(
+      section_test_content("readme:intro", @score.note(60.0)),
+    ),
   )
-  let chorus = @song.Section::single(name="chorus", body=@score.note(67.0))
+  let chorus = @song.Section::single(
+    name="chorus",
+    body=section_test_content("readme:chorus", @score.note(67.0)),
+  )
   let arrangement = @song.Song::from_sections([intro, chorus])
   let events = arrangement.query(
     @pattern.TimeSpan(
@@ -144,8 +158,14 @@ gaps or overlap; `Song::query` preserves all overlapping events.
 ```mbt check
 ///|
 test "query explicitly placed occurrences" {
-  let a = @song.Section::single(name="a", body=@score.note(60.0))
-  let b = @song.Section::single(name="b", body=@score.note(64.0))
+  let a = @song.Section::single(
+    name="a",
+    body=section_test_content("readme:explicit:a", @score.note(60.0)),
+  )
+  let b = @song.Section::single(
+    name="b",
+    body=section_test_content("readme:explicit:b", @score.note(64.0)),
+  )
   let arrangement = @song.Song::Song(parts=[
     @song.SongPart::at(
       start=@pattern.Rational::from_int(0),
@@ -191,10 +211,10 @@ Interactive editors should use:
 Content revision and layout revision are separate. Renaming an occurrence
 changes authored content without moving it; inserting, moving, removing, or
 resizing an occurrence changes layout. `entries()` lists the canonical playback
-entries; `SongEntry::slice` and `slices` return a `SongSlice` per entry: the
-content, its entry index, the content-local arc, the placement back to the song
-clock, and the occurrence, section, and layer identity used for selective live
-updates.
+entries. Each `SongEntry` has its content, the content entry it plays
+(`content_entry`), the placement of content time on the song clock
+(`placement`), its occurrence span, and the occurrence, section, and layer
+identity used for selective live updates.
 
 Document edit methods return new values and reject duplicate identities, names,
 invalid indices, and removal of the final occurrence.

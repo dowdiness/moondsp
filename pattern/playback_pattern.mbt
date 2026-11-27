@@ -1,8 +1,8 @@
 ///|
-/// What a player plays of one pattern, whether or not its events carry event
-/// origins. An untracked snapshot, a tracked snapshot and a plain `Pat` all
-/// become one, so playback has one path whose events carry an origin when
-/// their material has one.
+/// What a player plays of one pattern snapshot, whether or not its events
+/// carry event origins. Untracked and tracked snapshots both become one, so
+/// playback has one path whose events carry an origin when their material
+/// has one.
 pub struct PlaybackPattern[A] {
   priv material : PlaybackMaterial[A]
 }
@@ -11,8 +11,6 @@ pub struct PlaybackPattern[A] {
 priv enum PlaybackMaterial[A] {
   Untracked(UntrackedPatternSnapshot[A])
   Tracked(TrackedPatternSnapshot[A])
-  /// A plain pattern's canonical entries, computed once.
-  Plain(Array[Pat[A]])
 }
 
 ///|
@@ -30,20 +28,12 @@ pub fn[A] TrackedPatternSnapshot::playback(
 }
 
 ///|
-/// A pattern with no snapshot: no revision, no node paths, no origins.
-pub fn[A] Pat::playback(self : Pat[A]) -> PlaybackPattern[A] {
-  { material: Plain(self.entries()), }
-}
-
-///|
-/// The snapshot's revision; a plain pattern has none.
 pub fn[A] PlaybackPattern::revision(
   self : PlaybackPattern[A],
-) -> @identity.Revision? {
+) -> @identity.Revision {
   match self.material {
-    Untracked(snapshot) => Some(snapshot.revision())
-    Tracked(snapshot) => Some(snapshot.revision())
-    Plain(_) => None
+    Untracked(snapshot) => snapshot.revision()
+    Tracked(snapshot) => snapshot.revision()
   }
 }
 
@@ -54,78 +44,83 @@ pub fn[A] PlaybackPattern::entries(self : PlaybackPattern[A]) -> Array[Pat[A]] {
   match self.material {
     Untracked(snapshot) => snapshot.pat().entries()
     Tracked(snapshot) => snapshot.pat().entries()
-    Plain(entries) => entries
   }
 }
 
 ///|
-/// This pattern for material that entered `delay` after its origin
-/// (ADR-0025), or `None` when entering changes nothing.
+/// This pattern for material that entered `delay` after its origin: its
+/// one-shot signals start there (ADR-0025).
 pub fn[A : WithControls] PlaybackPattern::entered(
   self : PlaybackPattern[A],
   delay : Rational,
-) -> PlaybackPattern[A]? {
+) -> PlaybackPattern[A] {
   match self.material {
-    Untracked(snapshot) =>
-      Some({ material: Untracked(snapshot.entered(delay)), })
-    Tracked(snapshot) => Some({ material: Tracked(snapshot.entered(delay)), })
-    Plain(_) => None
+    Untracked(snapshot) => { material: Untracked(snapshot.entered(delay)), }
+    Tracked(snapshot) => { material: Tracked(snapshot.entered(delay)), }
   }
 }
 
 ///|
-/// Entry `index`'s events over `arc`, each passed to `each` with `placement`, its node
-/// path and its event origin when the material has them. Invalid indexes
-/// return an empty result.
+/// Entry `index`'s events over `arc`, on the playback clock: content time
+/// placed by `within` (a song section's placement, when there is one), then
+/// by `at`, the material's placement on the playback clock. Each event is
+/// handed to `each` with its node path, its controls, and its event origin
+/// when the material is tracked. Invalid indexes return an empty result.
 pub fn[A : WithControls, B] PlaybackPattern::query_for_entry(
   self : PlaybackPattern[A],
   index : Int32,
   arc : TimeSpan,
-  placement : Placement,
-  each : (Placement, Event[A], PatternNodePath?, Controls, EventWithOrigin[A]?) -> B,
+  at~ : Placement,
+  within? : Placement,
+  each : (Event[A], PatternNodePath, Controls, EventWithOrigin[A]?) -> B,
 ) -> Array[B] {
-  let result : Array[B] = []
   match self.material {
-    Untracked(snapshot) => {
-      let events = snapshot.query_sourced_events_for_entry(index, arc)
-      for i = 0; i < events.length(); i = i + 1 {
-        let event = events[i]
-        result.push(
-          each(placement, event.event, Some(event.path), event.controls, None),
+    Untracked(snapshot) =>
+      snapshot
+      .query_sourced_events_for_entry(index, arc)
+      .map(event => {
+        each(
+          on_playback_clock(event.event, within, at),
+          event.path,
+          controls_on_playback_clock(event.controls, within, at),
+          None,
         )
-      }
-    }
-    Tracked(snapshot) => {
-      let events = snapshot.query_for_entry(index, arc)
-      for i = 0; i < events.length(); i = i + 1 {
-        let event = events[i]
-        result.push(
-          each(
-            placement,
-            event.event,
-            Some(event.scope),
-            event.controls,
-            Some(event),
-          ),
+      })
+    Tracked(snapshot) =>
+      snapshot
+      .query_for_entry(index, arc)
+      .map(event => {
+        each(
+          on_playback_clock(event.event, within, at),
+          event.scope,
+          controls_on_playback_clock(event.controls, within, at),
+          Some(event),
         )
-      }
-    }
-    Plain(entries) =>
-      if entries.get(index) is Some(entry) {
-        let events = entry.query(arc)
-        for i = 0; i < events.length(); i = i + 1 {
-          let event = events[i]
-          result.push(
-            each(
-              placement,
-              event,
-              None,
-              Controls::fixed(event.value.controls()),
-              None,
-            ),
-          )
-        }
-      }
+      })
   }
-  result
+}
+
+///|
+fn[A] on_playback_clock(
+  event : Event[A],
+  within : Placement?,
+  at : Placement,
+) -> Event[A] {
+  match within {
+    Some(within) => event.placed(within).placed(at)
+    None => event.placed(at)
+  }
+}
+
+///|
+fn controls_on_playback_clock(
+  controls : Controls,
+  within : Placement?,
+  at : Placement,
+) -> Controls {
+  let placed = match within {
+    Some(within) => controls.placed(within)
+    None => controls
+  }
+  placed.on_playback_clock(at.origin)
 }

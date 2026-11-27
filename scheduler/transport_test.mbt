@@ -55,15 +55,19 @@ fn single_span(
   begin : @pattern.Rational,
   end_ : @pattern.Rational,
   control~ : @pattern.ControlMap = @pattern.ControlMap::empty(),
-) -> @song.Song[@pattern.Pat[@score.ScoreEvent]] raise {
+) -> @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
   let duration = end_ - begin
+  let body = @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string("transport:note"),
+    pat=@pattern.Pat::pure(played(control)).slow(duration),
+  ).lower() catch {
+    _ => abort("transport pattern snapshot creation failed")
+  }
   let section = @song.Section::Section(
     name="note",
     length_cycles=duration,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(
-      @pattern.Pat::pure(played(control)).slow(duration),
-    ),
+    body=@song.SectionBody::single(body),
   )
   @song.Song::Song(parts=[
     @song.SongPart::at(start=begin, name="once", section~),
