@@ -1,6 +1,6 @@
 # ADR-0032: WAV reading and writing belong to an offline leaf, `codec/wav`, outside the engine
 
-- **Status:** Proposed
+- **Status:** Accepted 2026-11-27
 - **Date:** 2026-11-27
 - **Source:** [PR #287](https://github.com/dowdiness/moondsp/pull/287) by
   e780671166-netizen (commit `2db8138`); extraction in
@@ -32,38 +32,28 @@ that sits outside them and imports no moondsp package.
    `scripts/check-architecture-boundaries.sh` rejects such an import, on top
    of its per-package allowlists.
 
-3. **The public API is `decode` and `encode` and what they need:**
-
-   ```moonbit
-   pub fn decode(Bytes) -> WaveFile raise WavError
-   pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int, channels~ : Int, samples~ : ArrayView[Double]) -> Bytes raise WavError
-   ```
-
-   - `WaveFile` has private fields, and only `decode` builds one. It reads
-     back as `sample_rate`, `channels`, `frame_count`, `source_format`, and
-     `samples`. `samples` is a `ReadOnlyArray`, so a caller cannot change
-     the frame count behind `WaveFile`'s back.
-   - `samples` are finite Doubles with nominal full scale ±1, interleaved by
-     channel, at the file's own sample rate. PCM samples lie in [-1, 1);
-     float samples are not clamped and may exceed ±1. NaN and ±Inf are not
-     signal values: `encode` rejects them (and float32 overflow), and
-     `decode` rejects float files holding them, both with
-     `NonFiniteSample(index~)`. So whatever `decode` returns, `encode`
-     accepts, and callers never sanitize.
-   - PCM rounds to the nearest step, ties to even. It is symmetric in sign,
-     has no bias at the ties that bit-depth reduction makes common, and
-     matches ffmpeg's float-to-PCM conversion bit for bit. Dither belongs to
-     the caller, because it needs random state. Mixing down to mono, converting to
-     `Float`, and resampling for the sample store (ADR-0026 Decision 7)
-     are the loader's job, not the codec's.
-   - `WavError` is `pub`: callers match its cases but cannot construct them.
-     `UnsupportedFormat` carries the format tag and bit depth; the other
-     payloads are messages for people.
-   - `encode` rejects any value its header cannot hold (a 16-bit
-     `block_align`, a 32-bit byte rate) instead of writing a wrong header.
-   - `WavSampleFormat` is `pub(all)`, because callers pass it to `encode`.
-     One enum serves both directions: every format `decode` reads, `encode`
-     can also write.
+3. **The package's contract rests on these principles.** The exact API is
+   in `codec/wav/pkg.generated.mbti`, and the exact rules are the properties
+   in `codec/wav/wav_spec_test.mbt` and the prose in
+   [`docs/audio-codec.md`](../audio-codec.md); they may change without
+   changing this decision.
+   - **Whole files in, whole files out.** The public surface is one `decode`
+     and one `encode`. Only `decode` builds a decoded file, and callers can
+     read it but not change it, so it is always consistent.
+   - **Samples are finite reals.** They are interleaved by channel, at the
+     file's own sample rate, with nominal full scale ±1. NaN and ±Inf are
+     not signal values, so both directions reject them. Whatever `decode`
+     returns, `encode` accepts, and callers never sanitize.
+   - **Each format stores what it can.** PCM quantizes to its steps,
+     symmetrically in sign and without bias, matching common tools such as
+     ffmpeg. Float formats are not clamped and may hold values past ±1.
+   - **A file never misdescribes its input.** `encode` rejects any value its
+     header or format cannot hold instead of writing something else.
+   - **Failures are values.** Every defect, in input bytes or arguments, is
+     a `WavError` that callers can match but not construct; nothing panics.
+   - **Conversions for a consumer are the consumer's job.** Mixing down,
+     converting to `Float`, resampling for the sample store (ADR-0026
+     Decision 7), and dither are done by the caller, not the codec.
 
 4. **Out of scope:** FLAC, `decode_any`, and `codec/render`, which PR #287
    also proposes. Each needs its own decision.
