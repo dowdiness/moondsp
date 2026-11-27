@@ -1,0 +1,9 @@
+import {
+  "dowdiness/moondsp",
+  "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/player",
+  "dowdiness/moondsp/score",
+  "moonbitlang/core/math",
+}
+
+pkgtype(kind: "executable")
