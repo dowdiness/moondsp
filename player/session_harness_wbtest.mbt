@@ -80,7 +80,7 @@ fn pause(player : Player) -> Error? {
 
 ///|
 fn set_tempo(player : Player, bpm : Double) -> Error? {
-  raised(() => player.set_tempo(tempo(bpm)))
+  raised(() => player.set_tempo(Tempo(bpm)))
 }
 
 ///|

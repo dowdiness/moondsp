@@ -54,11 +54,11 @@ fn Score::finite_end(self : Score) -> @pattern.Rational? {
 /// A pattern that plays forever at `tempo`; its events carry no event origin.
 pub fn Score::pattern(
   snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
-  tempo~ : @scheduler.Tempo,
+  tempo~ : Tempo,
 ) -> Score {
   {
     admitted: None,
-    tempo,
+    tempo: tempo.value,
     layout: PatternLayout,
     snapshot: @scheduler.PlaybackSnapshot::untracked_pattern(snapshot),
     span: Continuous,
@@ -69,11 +69,11 @@ pub fn Score::pattern(
 /// A pattern that plays forever at `tempo`, each event with its event origin.
 pub fn Score::tracked_pattern(
   snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
-  tempo~ : @scheduler.Tempo,
+  tempo~ : Tempo,
 ) -> Score {
   {
     admitted: None,
-    tempo,
+    tempo: tempo.value,
     layout: PatternLayout,
     snapshot: @scheduler.PlaybackSnapshot::tracked_pattern(snapshot),
     span: Continuous,
@@ -85,20 +85,25 @@ pub fn Score::tracked_pattern(
 /// when `repeat` is true; its events carry no event origin.
 pub fn Score::song(
   song : @song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]],
-  tempo~ : @scheduler.Tempo,
+  tempo~ : Tempo,
   repeat~ : Bool = false,
 ) -> Score raise ScoreError {
-  arrangement(song, tempo, repeat, @scheduler.SongMaterial::Untracked(song))
+  arrangement(
+    song,
+    tempo.value,
+    repeat,
+    @scheduler.SongMaterial::Untracked(song),
+  )
 }
 
 ///|
 /// `Score::song` whose events each carry their event origin.
 pub fn Score::tracked_song(
   song : @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
-  tempo~ : @scheduler.Tempo,
+  tempo~ : Tempo,
   repeat~ : Bool = false,
 ) -> Score raise ScoreError {
-  arrangement(song, tempo, repeat, @scheduler.SongMaterial::Tracked(song))
+  arrangement(song, tempo.value, repeat, @scheduler.SongMaterial::Tracked(song))
 }
 
 ///|
@@ -140,12 +145,23 @@ fn[C : @song.SongContent] lowered_song(
 }
 
 ///|
-/// `bpm` beats per minute as a tempo a player can play.
-pub fn tempo(bpm : Double) -> @scheduler.Tempo raise TempoOutOfRange {
-  guard @scheduler.Tempo::from_bpm(bpm) is Ok(tempo) else {
+/// A tempo a player can play: 0.001..1000 BPM.
+pub struct Tempo {
+  priv value : @scheduler.Tempo
+}
+
+///|
+/// `bpm` beats per minute, or `TempoOutOfRange` outside 0.001..1000.
+pub fn Tempo::Tempo(bpm : Double) -> Tempo raise TempoOutOfRange {
+  guard @scheduler.Tempo::from_bpm(bpm) is Ok(value) else {
     raise TempoOutOfRange
   }
-  tempo
+  { value, }
+}
+
+///|
+pub fn Tempo::bpm(self : Tempo) -> Double {
+  self.value.bpm()
 }
 
 ///|

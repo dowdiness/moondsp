@@ -51,8 +51,8 @@ range".
    the text the browser shows.
    - `ScoreError`, from `compile` and the song constructors: Mini's refusal,
      pattern or song lowering, an empty song, and the score's tempo.
-   - `TempoOutOfRange`, from `tempo(bpm)`, which makes the `Tempo` every
-     constructor and `set_tempo` take; `ScoreError::Tempo` wraps it for a
+   - `TempoOutOfRange`, from `Tempo(bpm)`, the player's own tempo type,
+     which every constructor and `set_tempo` take; `ScoreError::Tempo` wraps it for a
      source's tempo, a genuine subset. Pattern constructors cannot fail.
    - `UnsupportedFormat`, from `Player(ctx, sounds)` only.
    - `PlayerError`, from accepting, Play, Pause, tempo changes and

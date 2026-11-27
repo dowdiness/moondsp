@@ -187,7 +187,7 @@ pub fn set_scheduler_bpm(bpm : Double) -> Int32 {
   guard player.val is Some(owner) else {
     return set_scheduler_parse_error("Player is not initialized")
   }
-  let tempo = @player.tempo(bpm) catch {
+  let tempo = @player.Tempo(bpm) catch {
     error => return set_scheduler_parse_error(error.message())
   }
   owner.set_tempo(tempo) catch {

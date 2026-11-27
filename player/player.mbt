@@ -260,8 +260,8 @@ pub fn Player::compile(
 
 ///|
 /// A score's tempo from the BPM its source declares.
-fn score_tempo(bpm : Double) -> @scheduler.Tempo raise ScoreError {
-  tempo(bpm) catch {
+fn score_tempo(bpm : Double) -> Tempo raise ScoreError {
+  Tempo(bpm) catch {
     error => raise Tempo(error)
   }
 }
@@ -468,8 +468,9 @@ pub fn Player::process(
 /// position. A change the accepted song cannot take changes nothing.
 pub fn Player::set_tempo(
   self : Player,
-  tempo : @scheduler.Tempo,
+  tempo : Tempo,
 ) -> Unit raise PlayerError {
+  let tempo = tempo.value
   if self.session.score() is Some(score) {
     self.check_fits(score, tempo)
   }

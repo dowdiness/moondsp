@@ -13,7 +13,6 @@ import {
 }
 
 // Values
-pub fn tempo(Double) -> @scheduler.Tempo raise TempoOutOfRange
 
 // Errors
 #derive(Eq, @debug.Debug)
@@ -101,7 +100,7 @@ pub fn Player::reclaim_samples(Self) -> Unit
 pub fn Player::restart(Self, Score) -> Unit raise PlayerError
 pub fn Player::sample_position(Self) -> Double
 pub fn Player::set_gain(Self, Double) -> Unit
-pub fn Player::set_tempo(Self, @scheduler.Tempo) -> Unit raise PlayerError
+pub fn Player::set_tempo(Self, Tempo) -> Unit raise PlayerError
 pub fn Player::signals(Self) -> @scheduler.SignalBuffer
 pub fn Player::skipped_materials(Self) -> Int32
 pub fn Player::state(Self) -> PlayState
@@ -121,10 +120,10 @@ pub(all) struct SamplerVoice {
 pub struct Score {
   // private fields
 }
-pub fn Score::pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], tempo~ : @scheduler.Tempo) -> Self
-pub fn Score::song(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]], tempo~ : @scheduler.Tempo, repeat? : Bool) -> Self raise ScoreError
-pub fn Score::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], tempo~ : @scheduler.Tempo) -> Self
-pub fn Score::tracked_song(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], tempo~ : @scheduler.Tempo, repeat? : Bool) -> Self raise ScoreError
+pub fn Score::pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
+pub fn Score::song(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
+pub fn Score::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
+pub fn Score::tracked_song(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
 
 #derive(Eq, @debug.Debug)
 pub enum ScoreKind {
@@ -140,6 +139,12 @@ pub(all) struct Sounds {
   instrument : (@score.Instrument) -> NoteVoice
   sampler : SamplerVoice
 }
+
+pub struct Tempo {
+  // private fields
+}
+pub fn Tempo::Tempo(Double) -> Self raise TempoOutOfRange
+pub fn Tempo::bpm(Self) -> Double
 
 // Type aliases
 
