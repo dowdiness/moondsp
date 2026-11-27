@@ -265,6 +265,19 @@ test("completion offers each position's names from the vocabulary", () => {
   }
 });
 
+test("completion inside a sound string continues across underscores and digits", () => {
+  const language = { vocabulary: vocabulary(), methodsAfter };
+  for (const source of ['s("piano_c|', 's("bd mbira_fs|', 'note("C4").s("kalimba_cs5|']) {
+    const pos = source.indexOf("|");
+    const state = EditorState.create({ doc: source.replace("|", ""), extensions: [miniliveLanguage] });
+    ensureSyntaxTree(state, state.doc.length, 5000);
+    const result = scoreCompletion(language)(new CompletionContext(state, pos, false)) as CompletionResult | null;
+    const word = source.slice(0, pos).match(/[a-z][a-z0-9_]*$/)![0];
+    expect(result?.from, source).toBe(pos - word.length);
+    expect(result?.validFor instanceof RegExp && result.validFor.test(`${word}x`), source).toBe(true);
+  }
+});
+
 test("before the score tools load, completion offers only bindings, let, and $:", () => {
   for (const [source, expected] of [
     ["|", ["let", "$:"]],

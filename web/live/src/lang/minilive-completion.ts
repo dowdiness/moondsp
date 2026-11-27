@@ -173,9 +173,10 @@ export function scoreCompletion(language: ScoreLanguage | null) {
     if (string) {
       const kind = string.parent?.name === "Args" ? argumentAt(string.parent, string.from)?.kind : null;
       if (kind !== "drums" && kind !== "instruments") return null;
-      const word = context.matchBefore(/[a-z]+$/);
+      // Sound names hold digits and underscores, as in `piano_c4`.
+      const word = context.matchBefore(/[a-z][a-z0-9_]*$/);
       if (!word && !context.explicit) return null;
-      return result(word ? word.from : pos, kind === "drums" ? options.drums : options.instruments, /^[a-z]*$/);
+      return result(word ? word.from : pos, kind === "drums" ? options.drums : options.instruments, /^[a-z][a-z0-9_]*$|^$/);
     }
     if (ancestorOfType(tree.resolveInner(pos, -1), "String")) return null;
 
