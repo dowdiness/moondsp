@@ -1,9 +1,15 @@
-// The built-in sample bank's material, generated in code at the context's
-// sample rate. It stands in for recordings until ones with an approved
-// licence replace it (ADR-0026). Each entry is what a decoded, resampled,
-// mono file would be: a name from `@score.Sample` and its samples. The engine
-// knows each bank sample's root pitch (`@score.Sample::root_pitch`): ping is
-// A4 (69), so its tone is 440 Hz; burst is unpitched and sits at C4 (60).
+// The built-in sample bank (ADR-0026). `ping` and `burst` are generated in
+// code at the context's sample rate. The others are recordings, served as
+// 48 kHz mono FLAC files under /samples/vcsl/ (see SOURCE.md there), which
+// `decodeAudioData` decodes and resamples to the context's rate. Each name is
+// one from `@score.Sample`; the engine knows each sample's root pitch
+// (`@score.Sample::root_pitch`).
+
+/** The recorded bank samples, each served as `/samples/vcsl/<name>.flac`. */
+const RECORDINGS = [
+  "piano_c2", "piano_c4", "piano_c6", "upright_a4",
+  "mbira_e3", "mbira_b4", "mbira_fs5", "kalimba_cs5", "kalimba_g5",
+];
 
 /** A decaying 440 Hz sine with a little second harmonic, 1.5 s long. */
 function ping(sampleRate) {
@@ -28,13 +34,30 @@ function burst(sampleRate) {
   return data;
 }
 
+/** One recording, fetched and decoded in `ctx`, as a `sample-load` message. */
+async function recording(ctx, name, signal) {
+  const url = `/samples/vcsl/${name}.flac`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`fetch ${url}: ${response.status}`);
+  const decoded = await ctx.decodeAudioData(await response.arrayBuffer());
+  const data = new Float32Array(decoded.length);
+  decoded.copyFromChannel(data, 0);
+  return { type: "sample-load", name, data };
+}
+
 /**
- * The bank at `sampleRate`, as `sample-load` messages for the scheduler
- * worklet. Send each with its `data.buffer` in the transfer list.
+ * Sends the bank to the scheduler worklet's `port`. The generated samples go
+ * at once. Each recording is first announced as `sample-pending`, so the
+ * status channel shows it loading while it downloads and decodes, then sent
+ * as `sample-load`, or as `sample-failed` with the reason. Resolves once every
+ * recording is sent or has failed. Aborting `signal` stops the downloads.
  */
-export function sampleBank(sampleRate) {
-  return [
-    { type: "sample-load", name: "ping", data: ping(sampleRate) },
-    { type: "sample-load", name: "burst", data: burst(sampleRate) },
-  ];
+export function sendSampleBank(ctx, port, signal) {
+  const post = load => port.postMessage(load, [load.data.buffer]);
+  post({ type: "sample-load", name: "ping", data: ping(ctx.sampleRate) });
+  post({ type: "sample-load", name: "burst", data: burst(ctx.sampleRate) });
+  for (const name of RECORDINGS) port.postMessage({ type: "sample-pending", name });
+  return Promise.all(RECORDINGS.map(name => recording(ctx, name, signal).then(post, error => {
+    port.postMessage({ type: "sample-failed", name, reason: error instanceof Error ? error.message : String(error) });
+  })));
 }

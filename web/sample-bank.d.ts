@@ -1,2 +1,1 @@
-export type SampleLoad = { type: "sample-load"; name: string; data: Float32Array<ArrayBuffer> };
-export function sampleBank(sampleRate: number): SampleLoad[];
+export function sendSampleBank(ctx: BaseAudioContext, port: MessagePort, signal?: AbortSignal): Promise<void[]>;

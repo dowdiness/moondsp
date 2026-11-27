@@ -1,6 +1,7 @@
 # ADR-0026: Scores play recorded samples
 
-- **Status:** Accepted 2026-11-24. Stages 3 to 5 are implemented.
+- **Status:** Accepted 2026-11-24. Stages 3 to 5 are implemented; the
+  built-in bank holds recordings since 2026-11-27.
 - **Date:** 2026-11-24
 - **Source:** [Amp thread T-01a20be3](https://ampcode.com/threads/T-01a20be3-8157-751b-b637-37a8a4bda36b)
 - **Related:** [ADR-0019 automatic control buses](0019-automatic-control-buses.md),
@@ -236,7 +237,10 @@ no voices can still read the store.
   while rendering. The registration API is host-neutral, so the browser and
   CLAP both use it.
 - **Browser loading:** `decodeAudioData` and resampling run on the main
-  thread. The `Float32Array` is transferred to the AudioWorklet. The worklet
+  thread. `decodeAudioData` resamples to the context's rate itself, so the
+  bank's 48 kHz files load unchanged into a 44.1 kHz context, measured in
+  Chromium, Firefox, WebKit and Safari
+  ([record](../performance/2026-11-27-bank-decoding.md)). The `Float32Array` is transferred to the AudioWorklet. The worklet
   queues it and copies **16,384 samples per `process()` call** before
   rendering. It does not copy in the message handler, because a 10 s sample
   copied there in one go takes about 3 ms and makes the next block late.
@@ -301,6 +305,18 @@ used as names in `mini`, `control`, or `score` today.
    The editor's vocabulary lists the samples, so completion offers them in
    both strings. A replaced waveform's memory is free again once no player
    reads it (see Replacing a sounding sample).
+   On 2026-11-27 the bank gained nine recordings from the Versilian Community
+   Sample Library (CC0 1.0), beside the generated `ping` and `burst`:
+   `piano_c2`, `piano_c4`, `piano_c6`, `upright_a4`, `mbira_e3`,
+   `mbira_b4`, `mbira_fs5`, `kalimba_cs5` and `kalimba_g5`, each named for
+   its instrument and measured root. They are 48 kHz mono 16-bit FLAC files,
+   47 s and 2,256,000 samples together, under `web/live/public/samples/vcsl/`,
+   whose `SOURCE.md` records their sources, processing and measured roots.
+   `scripts/bench-sample-copy/bank-check.cjs` checks in a real browser that
+   each plays unshifted through `s("…")` and transposes from its registered
+   root through `note("…").s("…")`, and that a failed download shows on the
+   status channel. That each recording sounds at its root is the
+   measurement in `SOURCE.md`.
 5. `begin`, `end`, and `speed`, and the `follows` rule. Done. `DspNode`
    gains `value4` and `GraphParamSlot` gains `Value4`: the player takes
    speed on `Value2`, begin on `Value3` and end on `Value4`. `Value5` was not

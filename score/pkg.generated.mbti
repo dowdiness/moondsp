@@ -51,6 +51,15 @@ pub fn Instrument::to_repr(Self) -> @debug.Repr
 pub enum Sample {
   Ping
   Burst
+  PianoC2
+  PianoC4
+  PianoC6
+  UprightA4
+  MbiraE3
+  MbiraB4
+  MbiraFs5
+  KalimbaCs5
+  KalimbaG5
 }
 pub fn Sample::all() -> Array[Self]
 pub fn Sample::description(Self) -> String

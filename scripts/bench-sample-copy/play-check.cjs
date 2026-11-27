@@ -88,7 +88,7 @@ server.listen(0, '127.0.0.1', async () => {
       const source = (await (await fetch('/scheduler-processor.js')).text())
         .replace(/from "\.\/([a-z-]+\.js)"/g, (_, file) => `from "${base}/${file}"`);
       const url = URL.createObjectURL(new Blob([source + subclass], { type: 'text/javascript' }));
-      const { sampleBank } = await import('/sample-bank.js');
+      const { sendSampleBank } = await import('/sample-bank.js');
       const wasmModule = await WebAssembly.compile(await (await fetch('/moonbit_dsp.wasm')).arrayBuffer());
       const ctx = new AudioContext({ sampleRate: 48000 });
       await ctx.audioWorklet.addModule(url);
@@ -114,8 +114,9 @@ server.listen(0, '127.0.0.1', async () => {
       node.connect(ctx.destination);
       await ctx.resume();
       await ready;
-      for (const load of sampleBank(ctx.sampleRate)) node.port.postMessage(load, [load.data.buffer]);
-      await wait(d => d.type === 'sample-status' && d.loading.length === 0);
+      const loaded = wait(d => d.type === 'sample-status' && d.loading.length === 0);
+      await sendSampleBank(ctx, node.port);
+      await loaded;
       const energies = {};
       const heads = {};
       let id = 0;

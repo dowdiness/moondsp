@@ -3,6 +3,7 @@ dist
 dist-e2e
 public/*
 !public/_headers
+!public/samples/
 *.log
 .vite
 playwright-report

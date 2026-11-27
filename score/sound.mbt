@@ -114,12 +114,22 @@ pub fn Instrument::parse(name : String) -> Instrument? {
 
 ///|
 /// A recorded sample of the built-in bank (ADR-0026). Constructed only by
-/// `all`, as for `Drum`. The bank's material is generated in code until
-/// recordings with an approved licence replace it.
+/// `all`, as for `Drum`. `ping` and `burst` are generated in code; the others
+/// are recordings from the Versilian Community Sample Library (CC0), named
+/// after their instrument and their measured root (`fs5` is F#5).
 #derive(Eq, Debug)
 pub enum Sample {
   Ping
   Burst
+  PianoC2
+  PianoC4
+  PianoC6
+  UprightA4
+  MbiraE3
+  MbiraB4
+  MbiraFs5
+  KalimbaCs5
+  KalimbaG5
 }
 
 ///|
@@ -133,7 +143,19 @@ pub extend Sample with Debug::{to_repr}
 /// waveform under its position here. Keep this the only expression in the
 /// package that constructs a `Sample`.
 pub fn Sample::all() -> Array[Sample] {
-  [Ping, Burst]
+  [
+    Ping,
+    Burst,
+    PianoC2,
+    PianoC4,
+    PianoC6,
+    UprightA4,
+    MbiraE3,
+    MbiraB4,
+    MbiraFs5,
+    KalimbaCs5,
+    KalimbaG5,
+  ]
 }
 
 ///|
@@ -141,6 +163,15 @@ pub fn Sample::name(self : Sample) -> String {
   match self {
     Ping => "ping"
     Burst => "burst"
+    PianoC2 => "piano_c2"
+    PianoC4 => "piano_c4"
+    PianoC6 => "piano_c6"
+    UprightA4 => "upright_a4"
+    MbiraE3 => "mbira_e3"
+    MbiraB4 => "mbira_b4"
+    MbiraFs5 => "mbira_fs5"
+    KalimbaCs5 => "kalimba_cs5"
+    KalimbaG5 => "kalimba_g5"
   }
 }
 
@@ -150,6 +181,15 @@ pub fn Sample::description(self : Sample) -> String {
   match self {
     Ping => "decaying sine ping"
     Burst => "short noise burst"
+    PianoC2 => "grand piano, C2"
+    PianoC4 => "grand piano, C4"
+    PianoC6 => "grand piano, C6"
+    UprightA4 => "upright piano, A4"
+    MbiraE3 => "mbira, E3"
+    MbiraB4 => "mbira, B4"
+    MbiraFs5 => "mbira, F#5"
+    KalimbaCs5 => "kalimba, C#5"
+    KalimbaG5 => "kalimba, G5"
   }
 }
 
@@ -160,6 +200,15 @@ pub fn Sample::number(self : Sample) -> Int32 {
   match self {
     Ping => 0
     Burst => 1
+    PianoC2 => 2
+    PianoC4 => 3
+    PianoC6 => 4
+    UprightA4 => 5
+    MbiraE3 => 6
+    MbiraB4 => 7
+    MbiraFs5 => 8
+    KalimbaCs5 => 9
+    KalimbaG5 => 10
   }
 }
 
@@ -170,6 +219,15 @@ pub fn Sample::root_pitch(self : Sample) -> Double {
   match self {
     Ping => 69.0
     Burst => 60.0
+    PianoC2 => 36.0
+    PianoC4 => 60.0
+    PianoC6 => 84.0
+    UprightA4 => 69.0
+    MbiraE3 => 52.0
+    MbiraB4 => 71.0
+    MbiraFs5 => 78.0
+    KalimbaCs5 => 73.0
+    KalimbaG5 => 79.0
   }
 }
 

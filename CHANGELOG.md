@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The built-in sample bank holds nine recordings from the Versilian Community
+  Sample Library (CC0), named after their instrument and measured root:
+  `piano_c2`, `piano_c4`, `piano_c6`, `upright_a4`, `mbira_e3`, `mbira_b4`,
+  `mbira_fs5`, `kalimba_cs5`, and `kalimba_g5`. They play through `s("…")` at
+  their root and through `note("…").s("…")` at each note. The browser
+  downloads them as 48 kHz mono FLAC (1.19 MB) when audio starts, and the
+  status line names samples still loading and any that failed. The sample
+  status gains `failed`, which names recordings the page could not fetch or
+  decode.
 - `ramp` is a signal that rises from 0 to 1 once and then keeps 1.
   `.fadeIn(n)` fades a pattern up from silence over n cycles, and
   `.fadeOut(n)` fades it to silence and keeps it silent. In a song all three

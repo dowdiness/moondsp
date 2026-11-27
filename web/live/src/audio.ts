@@ -4,7 +4,7 @@ import { decodeWorkletMessage, type AudioFormat } from "./playback-protocol";
 import type { PlaybackInput } from "./authoring";
 import type { PlayerReceipt, PlayerSnapshot, RequestId, SampleStatus } from "./playback-protocol";
 import { ONSET_BYTES, OnsetRing, SIGNAL_BYTES, SignalRing, type OnsetStatistics } from "../../playback-observations.js";
-import { sampleBank } from "../../sample-bank.js";
+import { sendSampleBank } from "../../sample-bank.js";
 
 function abortError(): DOMException {
   return new DOMException("Audio initialization cancelled", "AbortError");
@@ -329,7 +329,9 @@ export class AudioEngine {
       node.connect(gain);
       const format = await ready;
       // The worklet copies the bank into its store a block's share at a time.
-      for (const load of sampleBank(ctx.sampleRate)) node.port.postMessage(load, [load.data.buffer]);
+      // Recordings download and decode meanwhile; the status channel shows them loading.
+      // A start that fails or is cancelled stops downloading them.
+      void sendSampleBank(ctx, node.port, signal);
       await abortable(() => running, signal);
       return { ctx, node, gain, analyser, onsets, signals, format };
     } catch (error) {

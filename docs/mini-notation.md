@@ -39,6 +39,25 @@ in the browser bundle.
 <p class="cheat-note">Notes: <code>C4</code> = MIDI 60. Use <code>#</code> or <code>b</code> for accidentals; octave defaults to 4.</p>
 <p class="cheat-note">Chords: <code>C</code> major, <code>Cm</code> minor; also <code>7</code>, <code>maj7</code>, <code>m7</code>, <code>dim</code>, <code>aug</code>, <code>sus2</code>, <code>sus4</code>, <code>6</code>, <code>add9</code>, <code>maj9</code>, <code>m9</code>. Write an exact pitch set as <code>{60,63,68}</code>: braces contain one or more unique MIDI integers from 0 through 127 in strictly ascending order, with no spaces. In <code>chord("C+7")</code>, the quoted <code>+</code> is part of the chord name, not an overlay.</p>
 
+<h2 id="samples">Samples</h2>
+<dl>
+  <dt>s("piano_c4")</dt><dd>a recorded sample at the pitch it was recorded at</dd>
+  <dt>note("C4 E4").s("piano_c4")</dt><dd>a sample at each note's pitch, transposed by playing it faster or slower</dd>
+  <dt>piano_c2 piano_c4 piano_c6</dt><dd>grand piano</dd>
+  <dt>upright_a4</dt><dd>upright piano</dd>
+  <dt>mbira_e3 mbira_b4 mbira_fs5</dt><dd>mbira</dd>
+  <dt>kalimba_cs5 kalimba_g5</dt><dd>kalimba</dd>
+  <dt>ping burst</dt><dd>a decaying sine ping (A4) and a short noise burst</dd>
+</dl>
+<p class="cheat-note">Each name ends in the note the sample plays as recorded; <code>s</code> is a sharp, so <code>mbira_fs5</code> is F#5. A note far from that root sounds less like the instrument, so pick the sample nearest your notes. Both <code>s("…")</code> and <code>.s("…")</code> take sample names. The recordings come from the Versilian Community Sample Library (CC0). A sample plays silence until it has loaded; the status line below the editor names samples still loading and any that failed.</p>
+<dl>
+  <dt>.begin(n)</dt><dd>start at fraction n of the sample, 0–1 (default 0)</dd>
+  <dt>.end(n)</dt><dd>stop at fraction n of the sample, 0–1 (default 1)</dd>
+  <dt>.speed(n)</dt><dd>playback rate; 2 is twice as fast and an octave up, and a negative rate plays backwards (default 1)</dd>
+</dl>
+<p><code>s("piano_c4*4").begin("0 0.25 0.5 0.75").end(0.5)<br>s("kalimba_cs5").speed(-1)<br>note("C4").s("mbira_b4").speed(sine.range(0.5, 2))</code></p>
+<p class="cheat-note">Each takes a number, a pattern, or a signal. <code>begin</code> and <code>end</code> are fixed when a sample starts; <code>speed</code> follows its value while the sample sounds. When <code>begin</code> is not below <code>end</code>, the sample plays nothing. Backwards playback starts at the end of the slice. <code>speed</code> multiplies the note's transposition.</p>
+
 <h2 id="method-chains">Sound shape</h2>
 <p class="cheat-note">Shape browser notes and chords with filters: LPF softens high frequencies, while HPF clears low frequencies. Add the optional second argument to emphasize the cutoff frequency.</p>
 <dl>

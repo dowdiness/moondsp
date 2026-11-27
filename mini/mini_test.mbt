@@ -2209,6 +2209,21 @@ test "s plays drums and samples at the sample's root; .s plays notes on samples"
     ),
     content="ping:48",
   )
+  // Recorded sample names hold an underscore and end in a digit.
+  inspect(
+    sound_names(
+      query_one_cycle(
+        unwrap_ok(@mini.parse("s(\"piano_c2 mbira_fs5 kalimba_cs5\")")),
+      ),
+    ),
+    content="piano_c2:36 mbira_fs5:78 kalimba_cs5:73",
+  )
+  inspect(
+    sound_names(
+      query_one_cycle(unwrap_ok(@mini.parse("note(\"62\").s(\"upright_a4\")"))),
+    ),
+    content="upright_a4:62",
+  )
 }
 
 ///|
