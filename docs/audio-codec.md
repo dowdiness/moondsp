@@ -35,8 +35,23 @@ so `decode(encode(x))` is idempotent; float32/64 are stored bit for bit. NaN bec
 
 ## Tests
 
-- `codec/wav`: 24 tests (idempotent round trips, RIFX, EXTENSIBLE, LIST skipping, structured errors,
-  12k fuzz inputs with zero panics, 400 quickcheck property cases, sample-by-sample ffmpeg cross-check of five formats)
+The contract of `codec/wav` is written as QuickCheck properties in
+[`codec/wav/wav_spec_test.mbt`](../codec/wav/wav_spec_test.mbt). Each states one rule:
+
+1. `encode` accepts exactly the inputs a WAV header can describe.
+2. `encode` lays out RIFF, fmt, and data chunks as the format defines.
+3. `decode(encode(x))` keeps the sample rate, channels, frames, and format.
+4. Each sample comes back as the format stores it: PCM rounded to the nearest step
+   (clamped, NaN as 0), float32 rounded to `Float`, float64 bit for bit.
+5. PCM quantization keeps order.
+6. `encode(decode(encode(x))) == encode(x)`.
+7. Byte order (RIFF/RIFX) and unknown chunks do not change decoded samples.
+8. `decode` is total: any bytes either raise `WavError` or give a consistent `WaveFile`.
+
+Expected values come from the format itself, not from the code under test, and the
+generators favor full scale, half steps, values past ±1, non-finite input, and header
+fields at their limits. `wav_test.mbt` keeps hand-built examples, and
+`ffmpeg_crosscheck_test.mbt` compares five formats sample by sample against ffmpeg.
 
 ## License and sources
 
