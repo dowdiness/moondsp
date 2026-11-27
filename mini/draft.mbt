@@ -668,34 +668,32 @@ pub fn PlaybackInput::compile(
   self : PlaybackInput,
   query_window? : @pattern.QueryWindow,
 ) -> CompiledPlayback raise SourceProblem {
-  let source = match self.payload {
-    Text =>
-      match parse_play_source(self.input, query_window?) {
-        Ok(source) => source
-        Err(problem) => raise problem
+  match self.payload {
+    Text => {
+      let source = parse_untracked_source(self.input, query_window)
+      let material : CompiledMaterial = match source.body() {
+        Pattern(doc) =>
+          UntrackedPattern(doc.lower() catch { error => raise lowering(error) })
+        Arrangement(song, repeat) => UntrackedSong(song, repeat)
       }
-    Song(_, origins) | Pattern(_, origins) =>
-      parse_play_source_with_origins(
-        self.input,
-        query_window,
-        origins=Some(origins),
-        syntax_depth_limit=Some(32),
-      )
+      { material, bpm: source.bpm(), }
+    }
+    // The wire decoder already checked that the text is the kind the payload
+    // names, so the parse decides the shape.
+    Pattern(_, origins) | Song(_, origins) => {
+      let source = parse_tracked_source(self.input, query_window, origins)
+      let material : CompiledMaterial = match source.body() {
+        Pattern(doc) =>
+          TrackedPattern(
+            doc.lower_tracked() catch {
+              error => raise lowering(error)
+            },
+          )
+        Arrangement(song, repeat) => TrackedSong(song, repeat)
+      }
+      { material, bpm: source.bpm(), }
+    }
   }
-  let material : CompiledMaterial = match (self.payload, source.body()) {
-    (Pattern(_, _), Pattern(doc)) =>
-      TrackedPattern(
-        doc.lower_tracked() catch {
-          error => raise lowering(error)
-        },
-      )
-    (Text, Pattern(doc)) =>
-      UntrackedPattern(doc.lower() catch { error => raise lowering(error) })
-    (Song(_, _), TrackedArrangement(song, repeat)) => TrackedSong(song, repeat)
-    (Text, UntrackedArrangement(song, repeat)) => UntrackedSong(song, repeat)
-    _ => raise Internal("compiled input changed source mode")
-  }
-  { material, bpm: source.bpm(), }
 }
 
 ///|
@@ -731,7 +729,10 @@ pub struct Draft {
 ///|
 priv enum DraftAnalysis {
   /// It parses and fits the player's window when that is known.
-  Playable(PlaySource, PlaybackPayload)
+  Playable(
+    PlaySource[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    PlaybackPayload,
+  )
   Rejected(DraftDiagnostic)
 }
 
@@ -783,12 +784,7 @@ fn draft_analysis(
     TrackingUnavailable =>
       return Rejected(DraftDiagnostic(at, OverLimit(Length)))
   }
-  let source = parse_play_source_with_origins(
-    input,
-    query_window,
-    origins=Some(sources),
-    syntax_depth_limit=Some(32),
-  ) catch {
+  let source = parse_tracked_source(input, query_window, sources) catch {
     problem => return Rejected(DraftDiagnostic(at, problem))
   }
   Playable(source, payload)

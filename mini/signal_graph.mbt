@@ -110,9 +110,7 @@ pub fn Draft::signal_graphs(
         })
       })
     }
-    // A tracked Draft lowers every song section with origins.
-    UntrackedArrangement(_, _) => []
-    TrackedArrangement(snapshot, _) => {
+    Arrangement(snapshot, _) => {
       let song = snapshot.song()
       let window = song.duration()
       signals.filter_map(signal => {

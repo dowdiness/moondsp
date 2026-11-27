@@ -38,12 +38,12 @@ test "play source parses arrangement declaration and repeat marker" {
   let parsed = parse_play_source(source).unwrap()
   assert_eq(parsed.bpm(), 96.0)
   match parsed.body() {
-    UntrackedArrangement(_, repeats) => assert_true(repeats)
+    Arrangement(_, repeats) => assert_true(repeats)
     _ => fail("expected arrangement")
   }
   let finite = parse_play_source(play_source_song()).unwrap()
   match finite.body() {
-    UntrackedArrangement(_, repeats) => assert_false(repeats)
+    Arrangement(_, repeats) => assert_false(repeats)
     _ => fail("expected arrangement")
   }
 }
@@ -197,5 +197,21 @@ fn pitch_of(event : @score.ScoreEvent) -> Double? {
   match event.sound {
     Note(_, pitch~) | Play(_, pitch~) => Some(pitch)
     Hit(_) => None
+  }
+}
+
+///|
+/// `input` parsed as untracked text, as a result.
+fn parse_play_source(
+  input : String,
+  query_window? : @pattern.QueryWindow,
+) -> Result[
+  PlaySource[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  SourceProblem,
+] {
+  try parse_untracked_source(input, query_window) catch {
+    problem => Err(problem)
+  } noraise {
+    source => Ok(source)
   }
 }
