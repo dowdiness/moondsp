@@ -32,9 +32,7 @@ pub(all) enum WavSampleFormat {
   IeeeF32
   IeeeF64
 }
-pub fn WavSampleFormat::bytes_per_sample(Self) -> Int32
 pub fn WavSampleFormat::equal(Self, Self) -> Bool
-pub fn WavSampleFormat::is_pcm(Self) -> Bool
 pub fn WavSampleFormat::not_equal(Self, Self) -> Bool
 pub fn WavSampleFormat::to_repr(Self) -> @debug.Repr
 
@@ -42,9 +40,7 @@ pub fn WavSampleFormat::to_repr(Self) -> @debug.Repr
 pub struct WaveFile {
   // private fields
 }
-pub fn WaveFile::WaveFile(sample_rate~ : Int32, channels~ : Int32, samples~ : Array[Double], source_format~ : WavSampleFormat) -> Self raise WavError
 pub fn WaveFile::channels(Self) -> Int32
-pub fn WaveFile::duration_seconds(Self) -> Double
 pub fn WaveFile::frame_count(Self) -> Int32
 pub fn WaveFile::sample_rate(Self) -> Int32
 pub fn WaveFile::samples(Self) -> Array[Double]

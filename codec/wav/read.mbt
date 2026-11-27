@@ -205,10 +205,5 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   for i = 0; i < n; i = i + 1 {
     samples[i] = decode_sample_at(bytes, data_off + i * bps, format, big)
   }
-  WaveFile::WaveFile(
-    sample_rate=rate,
-    channels=n_channels,
-    samples~,
-    source_format=format,
-  )
+  { sample_rate: rate, channels: n_channels, samples, source_format: format, }
 }

@@ -57,32 +57,6 @@ pub struct WaveFile {
 }
 
 ///|
-/// Builds and validates: channel count and sample rate are positive, and the sample count is aligned to whole frames.
-pub fn WaveFile::WaveFile(
-  sample_rate~ : Int32,
-  channels~ : Int32,
-  samples~ : Array[Double],
-  source_format~ : WavSampleFormat,
-) -> WaveFile raise WavError {
-  guard sample_rate > 0 else {
-    raise InvalidFormat("sample rate = " + sample_rate.to_string())
-  }
-  guard channels > 0 else {
-    raise InvalidFormat("channels = " + channels.to_string())
-  }
-  guard samples.length() % channels == 0 else {
-    raise InvalidFormat(
-      "sample count " +
-      samples.length().to_string() +
-      " not aligned to " +
-      channels.to_string() +
-      " channels",
-    )
-  }
-  { sample_rate, channels, samples, source_format, }
-}
-
-///|
 /// Sample rate in Hz.
 pub fn WaveFile::sample_rate(self : WaveFile) -> Int32 {
   self.sample_rate
@@ -113,16 +87,8 @@ pub fn WaveFile::frame_count(self : WaveFile) -> Int32 {
 }
 
 ///|
-/// Duration in seconds.
-pub fn WaveFile::duration_seconds(self : WaveFile) -> Double {
-  self.samples.length().to_double() /
-  self.channels.to_double() /
-  self.sample_rate.to_double()
-}
-
-///|
 /// Bytes per sample.
-pub fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int32 {
+fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int32 {
   match self {
     PcmU8 => 1
     PcmI16 => 2
@@ -130,15 +96,6 @@ pub fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int32 {
     PcmI32 => 4
     IeeeF32 => 4
     IeeeF64 => 8
-  }
-}
-
-///|
-/// Whether this is an integer PCM format.
-pub fn WavSampleFormat::is_pcm(self : WavSampleFormat) -> Bool {
-  match self {
-    PcmU8 | PcmI16 | PcmI24 | PcmI32 => true
-    IeeeF32 | IeeeF64 => false
   }
 }
 

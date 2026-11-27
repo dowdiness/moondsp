@@ -195,7 +195,6 @@ test "decode hand-built i16 stereo" {
   assert_true(s[5] == 0.0)
   assert_true(s[6] == -1.0)
   assert_true(s[7] == 0.0)
-  assert_true(f.duration_seconds() == 4.0 / 44100.0)
 }
 
 ///|
@@ -405,7 +404,6 @@ test "decode empty data is valid" {
   let wav = build_wav(fmt=fmt_pcm16(1, 8000), data=[])
   let f = @wav.decode(wav)
   assert_true(f.frame_count() == 0)
-  assert_true(f.duration_seconds() == 0.0)
 }
 
 ///|
@@ -553,18 +551,6 @@ test "encode rejects invalid parameters" {
       let _ = @wav.encode(format=@wav.PcmI16, sample_rate=8000, channels=2, samples=[
         0.0, 0.0, 0.0,
       ])
-    })
-    is Some(@wav.WavError::InvalidFormat(_)),
-  )
-  // The WaveFile constructor validates the same way
-  assert_true(
-    err_of(() => {
-      let _ = @wav.WaveFile::WaveFile(
-        sample_rate=8000,
-        channels=2,
-        samples=[0.0, 0.0, 0.0],
-        source_format=@wav.PcmI16,
-      )
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
