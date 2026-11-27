@@ -175,7 +175,9 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   }
   let n = data_len / bps
   let samples = ReadOnlyArray::makei(n, i => {
-    decode_sample_at(bytes, data_off + i * bps, format, big)
+    let x = decode_sample_at(bytes, data_off + i * bps, format, big)
+    guard !x.is_nan() && !x.is_inf() else { raise NonFiniteSample(index=i) }
+    x
   })
   { sample_rate: rate, channels: n_channels, samples, source_format: format, }
 }

@@ -303,16 +303,66 @@ test "encode pcm i16 quantization spot values" {
 }
 
 ///|
-test "encode sanitizes nan and infinity" {
-  let encoded = @wav.encode(format=@wav.PcmI16, sample_rate=8000, channels=1, samples=[
-    0.0 / 0.0,
-    1.0 / 0.0,
-    -1.0 / 0.0,
-  ])
-  let s = @wav.decode(encoded).samples()
-  assert_true(s[0] == 0.0)
-  assert_true(s[1] == 32767.0 / 32768.0)
-  assert_true(s[2] == -1.0)
+test "encode rounds pcm half steps to even, as ffmpeg does" {
+  // ffmpeg -c:a pcm_s16le gives these from the same float32 input
+  let half_steps : Array[Double] = [0.5, 1.5, 2.5, -0.5, -1.5, -2.5, 3.5, -3.5]
+  let encoded = @wav.encode(
+    format=@wav.PcmI16,
+    sample_rate=8000,
+    channels=1,
+    samples=half_steps.map(v => v / 32768.0),
+  )
+  let steps = @wav.decode(encoded).samples().map(x => x * 32768.0)
+  assert_true(
+    steps ==
+    ReadOnlyArray::from_array([0.0, 2.0, 2.0, 0.0, -2.0, -2.0, 4.0, -4.0]),
+  )
+}
+
+///|
+test "encode and decode reject non-finite samples" {
+  let encodes = (format, x : Double) => {
+    err_of(() => {
+      let _ = @wav.encode(format~, sample_rate=8000, channels=1, samples=[
+        0.0, x,
+      ])
+    })
+  }
+  for format in [@wav.PcmI16, @wav.IeeeF32, @wav.IeeeF64] {
+    for x in [0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0] {
+      assert_true(
+        encodes(format, x) is Some(@wav.WavError::NonFiniteSample(index=1)),
+      )
+    }
+  }
+  // Finite as a Double, but infinite as float32
+  assert_true(
+    encodes(@wav.IeeeF32, 1.0e39)
+    is Some(@wav.WavError::NonFiniteSample(index=1)),
+  )
+  assert_true(encodes(@wav.IeeeF64, 1.0e39) is None)
+  assert_true(encodes(@wav.PcmI16, 1.0e39) is None)
+  // A float file holding NaN or Inf (from another writer) does not decode
+  let nan_f32 = build_wav(
+    fmt=fmt_tag(3, 1, 8000, 32),
+    data=[..le32(0), ..le32(0x7FC00000)],
+  )
+  assert_true(
+    err_of(() => {
+      let _ = @wav.decode(nan_f32)
+    })
+    is Some(@wav.WavError::NonFiniteSample(index=1)),
+  )
+  let inf_f64 = build_wav(
+    fmt=fmt_tag(3, 1, 8000, 64),
+    data=f64_bytes(-1.0 / 0.0),
+  )
+  assert_true(
+    err_of(() => {
+      let _ = @wav.decode(inf_f64)
+    })
+    is Some(@wav.WavError::NonFiniteSample(index=0)),
+  )
 }
 
 ///|

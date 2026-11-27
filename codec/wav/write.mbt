@@ -23,28 +23,46 @@ fn put_tag(fa : FixedArray[Byte], off : Int32, tag : String) -> Unit {
 }
 
 ///|
-/// Float in [-1, 1] → integer sample: scale by `scale`, round, and clamp to [lo, hi].
-/// NaN becomes 0 and ±Inf becomes full scale. With the 2^(bits-1) decode scale, decode∘encode is idempotent.
-fn quantize(x : Double, scale : Double, lo : Int32, hi : Int32) -> Int32 {
-  if x.is_nan() {
-    return 0
+/// Rounds to the nearest integer, ties to even (IEEE 754 roundTiesToEven), as
+/// ffmpeg does when it converts float to PCM.
+fn round_ties_even(v : Double) -> Double {
+  let r = v.floor()
+  let frac = v - r
+  if frac > 0.5 || (frac == 0.5 && r % 2.0 != 0.0) {
+    r + 1.0
+  } else {
+    r
   }
-  let v = x * scale
-  if v.is_inf() {
-    return if v > 0.0 { hi } else { lo }
-  }
-  let r = v.round()
-  if r > hi.to_double() {
-    return hi
-  }
-  if r < lo.to_double() {
-    return lo
-  }
-  r.to_int()
 }
 
 ///|
-/// Encodes one sample: Double in [-1, 1] → byte offset (little-endian).
+/// Finite float → integer sample: scale by `scale`, round ties to even, and
+/// clamp to [lo, hi]. With the 2^(bits-1) decode scale, decode∘encode is idempotent.
+fn quantize(x : Double, scale : Double, lo : Int32, hi : Int32) -> Int32 {
+  let r = round_ties_even(x * scale)
+  if r > hi.to_double() {
+    hi
+  } else if r < lo.to_double() {
+    lo
+  } else {
+    r.to_int()
+  }
+}
+
+///|
+/// Whether `x` stays finite when stored in `format`: float32 overflows past
+/// about 3.4e38.
+fn stores_finite(x : Double, format : WavSampleFormat) -> Bool {
+  let stored = if format is IeeeF32 {
+    Float::from_double(x).to_double()
+  } else {
+    x
+  }
+  !stored.is_nan() && !stored.is_inf()
+}
+
+///|
+/// Encodes one finite sample at a byte offset (little-endian).
 fn encode_sample_at(
   fa : FixedArray[Byte],
   off : Int32,
@@ -92,7 +110,9 @@ fn channel_mask(n : Int32) -> Int32 {
 /// Encodes interleaved samples as a WAV (RIFF, little-endian) byte stream.
 ///
 /// - The length of `samples` must be a multiple of `channels` (frame-aligned)
-/// - PCM quantization: scale 2^(bits-1), round, and clamp; `decode(encode(x))` is idempotent
+/// - Every sample must stay finite in `format`; otherwise `NonFiniteSample` names the first one
+/// - PCM quantization: scale 2^(bits-1), round ties to even, and clamp; `decode(encode(x))` is idempotent
+/// - Float formats keep values past ±1
 /// - More than 2 channels writes WAVE_FORMAT_EXTENSIBLE
 /// - An odd-length data chunk is padded with a zero byte
 pub fn encode(
@@ -166,6 +186,9 @@ pub fn encode(
   put_u32le(fa, data_hdr + 4, data_size)
   let body = data_hdr + 8
   for i = 0; i < n; i = i + 1 {
+    guard stores_finite(samples[i], format) else {
+      raise NonFiniteSample(index=i)
+    }
     encode_sample_at(fa, body + i * bps, samples[i], format)
   }
   // Odd-length data chunk: RIFF requires even alignment, so one zero pad byte follows (already counted in total)

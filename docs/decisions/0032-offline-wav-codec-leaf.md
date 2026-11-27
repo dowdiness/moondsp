@@ -43,8 +43,17 @@ that sits outside them and imports no moondsp package.
      back as `sample_rate`, `channels`, `frame_count`, `source_format`, and
      `samples`. `samples` is a `ReadOnlyArray`, so a caller cannot change
      the frame count behind `WaveFile`'s back.
-   - `samples` are Doubles normalized to [-1, 1] and interleaved by channel,
-     at the file's own sample rate. Mixing down to mono, converting to
+   - `samples` are finite Doubles with nominal full scale ±1, interleaved by
+     channel, at the file's own sample rate. PCM samples lie in [-1, 1);
+     float samples are not clamped and may exceed ±1. NaN and ±Inf are not
+     signal values: `encode` rejects them (and float32 overflow), and
+     `decode` rejects float files holding them, both with
+     `NonFiniteSample(index~)`. So whatever `decode` returns, `encode`
+     accepts, and callers never sanitize.
+   - PCM rounds to the nearest step, ties to even. It is symmetric in sign,
+     has no bias at the ties that bit-depth reduction makes common, and
+     matches ffmpeg's float-to-PCM conversion bit for bit. Dither belongs to
+     the caller, because it needs random state. Mixing down to mono, converting to
      `Float`, and resampling for the sample store (ADR-0026 Decision 7)
      are the loader's job, not the codec's.
    - `WavError` is `pub`: callers match its cases but cannot construct them.

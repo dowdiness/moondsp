@@ -18,6 +18,7 @@ pub suberror WavError {
   Truncated(String)
   InvalidFormat(String)
   UnsupportedFormat(tag~ : Int32, bits~ : Int32)
+  NonFiniteSample(index~ : Int32)
   DataTooLarge
 }
 

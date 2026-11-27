@@ -6,16 +6,18 @@
 // codecs break: full scale, half-LSB points, values past ±1, non-finite input,
 // and header fields at their 16- and 32-bit limits.
 //
-// 1. encode accepts exactly the inputs a WAV header can describe.
+// 1. encode accepts exactly the inputs a WAV file can describe: header fields
+//    that fit, and samples that stay finite in the chosen format.
 // 2. encode lays out RIFF, fmt, and data chunks as the format defines.
 // 3. decode(encode(x)) keeps the sample rate, channels, frames, and format.
 // 4. Each sample comes back as the format stores it: PCM rounded to the
-//    nearest step (clamped, NaN as 0), float32 rounded to Float, float64 exact.
-// 5. PCM quantization keeps order.
+//    nearest step with ties to even and clamped, float32 rounded to Float,
+//    float64 exact.
+// 5. PCM quantization keeps order and is symmetric in sign.
 // 6. encode(decode(encode(x))) == encode(x).
 // 7. Byte order (RIFF/RIFX) and unknown chunks do not change decoded samples.
 // 8. decode is total: any bytes either raise WavError or give a consistent
-//    WaveFile.
+//    WaveFile, whose samples are all finite.
 
 ///|
 #derive(Debug)
@@ -41,6 +43,24 @@ fn bits_of(format : @wav.WavSampleFormat) -> Int32 {
 ///|
 fn is_pcm(format : @wav.WavSampleFormat) -> Bool {
   !(format is (IeeeF32 | IeeeF64))
+}
+
+///|
+/// Whether `x` stays finite when stored in `format`.
+fn finite_in(format : @wav.WavSampleFormat, x : Double) -> Bool {
+  let stored = if format is IeeeF32 {
+    Float::from_double(x).to_double()
+  } else {
+    x
+  }
+  !stored.is_nan() && !stored.is_inf()
+}
+
+///|
+/// The largest PCM sample, 1 - 2^-(bits-1).
+fn pcm_top(format : @wav.WavSampleFormat) -> Double {
+  let full = (1L << (bits_of(format) - 1)).to_double()
+  (full - 1.0) / full
 }
 
 ///|
@@ -113,14 +133,19 @@ fn gen_sample() -> @cqc.Generator[Double] {
     -1.5 / 32768.0,
     0.5 / 128.0,
     -0.5 / 128.0,
+    // Finite, but past the float32 range
     1.0e300,
     -1.0e300,
     5.0e-324,
-    0.0 / 0.0,
-    1.0 / 0.0,
-    -1.0 / 0.0,
   ])
-  @cqc.frequency([(4, unit), (3, half_steps), (2, special), (1, wide)])
+  let non_finite = @cqc.elements([0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])
+  @cqc.frequency([
+    (4, unit),
+    (3, half_steps),
+    (2, special),
+    (1, wide),
+    (1, non_finite),
+  ])
 }
 
 ///|
@@ -138,6 +163,7 @@ fn gen_case() -> @cqc.Generator[Case] {
       gen_rate.flat_map(sample_rate => {
         @cqc.int_range(0, 24).flat_map(frames => {
           gen_sample()
+          .map(x => if finite_in(format, x) { x } else { 0.0 })
           .array_with_size(frames * channels)
           .map(samples => { format, sample_rate, channels, samples, })
         })
@@ -179,7 +205,7 @@ fn check_case(f : (Case) -> Bool) -> Unit raise {
 // Properties
 
 ///|
-test "spec 1: encode accepts exactly the inputs a WAV header can describe" {
+test "spec 1: encode accepts exactly the inputs a WAV file can describe" {
   let gen_rate = @cqc.elements([
     -2147483648, -1, 0, 1, 44100, 268435455, 268435456, 536870911, 2147483647,
   ])
@@ -192,10 +218,12 @@ test "spec 1: encode accepts exactly the inputs a WAV header can describe" {
     gen_rate.flat_map(sample_rate => {
       gen_channels.flat_map(channels => {
         @cqc.int_range(0, 1).flat_map(frames => {
-          @cqc.int_range(0, 3).map(extra => {
-            let n = (if channels > 0 { channels } else { 1 }) * frames +
-              (if extra == 0 { 1 } else { 0 })
-            { format, sample_rate, channels, samples: Array::make(n, 0.25), }
+          @cqc.int_range(0, 3).flat_map(extra => {
+            gen_sample().map(x => {
+              let n = (if channels > 0 { channels } else { 1 }) * frames +
+                (if extra == 0 { 1 } else { 0 })
+              { format, sample_rate, channels, samples: Array::make(n, x), }
+            })
           })
         })
       })
@@ -209,8 +237,44 @@ test "spec 1: encode accepts exactly the inputs a WAV header can describe" {
         c.channels > 0 &&
         c.samples.length() % c.channels == 0 &&
         block_align <= 0xFFFFL &&
-        c.sample_rate.to_int64() * block_align <= 0xFFFFFFFFL
+        c.sample_rate.to_int64() * block_align <= 0xFFFFFFFFL &&
+        c.samples.all(x => finite_in(c.format, x))
       (encode_case(c) is Some(_)) == describable
+    }),
+    max_success=1000,
+  )
+  // Samples: accepted exactly when each one stays finite in the format
+  let gen_value = @cqc.frequency([
+    (3, gen_sample()),
+    (
+      2,
+      @cqc.elements([
+        0.0 / 0.0,
+        1.0 / 0.0,
+        -1.0 / 0.0,
+        3.4028234663852886e38,
+        -3.4028234663852886e38,
+        1.0e39,
+        -1.0e39,
+      ]),
+    ),
+  ])
+  let gen_samples = gen_format().flat_map(format => {
+    @cqc.int_range(0, 6).flat_map(n => {
+      gen_value.array_with_size(n).map(samples => (format, samples))
+    })
+  })
+  @qc.quick_check(
+    @qc.forall(gen_samples, t => {
+      let (format, samples) = t
+      let accepted = encode_case({
+          format,
+          sample_rate: 8000,
+          channels: 1,
+          samples,
+        })
+        is Some(_)
+      accepted == samples.all(x => finite_in(format, x))
     }),
     max_success=1000,
   )
@@ -277,22 +341,15 @@ fn sample_survives(
       }
     }
     _ => {
-      // PCM: a whole step of 2^-(bits-1) inside [-1, 1 - step], at most half a
-      // step from x clamped to that range; NaN is silence
+      // PCM: a whole step of 2^-(bits-1) inside [-1, 1 - step], nearest to x
+      // clamped to that range; at exactly half a step, the even step
       let full = (1L << (bits_of(format) - 1)).to_double()
-      let top = (full - 1.0) / full
+      let top = pcm_top(format)
       let steps = d * full
       let on_grid = steps == steps.floor() && d >= -1.0 && d <= top
-      let target = if x.is_nan() {
-        0.0
-      } else if x > top {
-        top
-      } else if x < -1.0 {
-        -1.0
-      } else {
-        x
-      }
-      on_grid && (d - target).abs() <= 0.5 / full
+      let target = if x > top { top } else if x < -1.0 { -1.0 } else { x }
+      let off_by = (steps - target * full).abs()
+      on_grid && (off_by < 0.5 || (off_by == 0.5 && steps % 2.0 == 0.0))
     }
   }
 }
@@ -314,8 +371,14 @@ test "spec 4: each sample comes back as its format stores it" {
 }
 
 ///|
-test "spec 5: PCM quantization keeps order" {
-  let finite = gen_sample().map(x => if x.is_nan() { 0.0 } else { x })
+test "spec 5: PCM quantization keeps order and is symmetric in sign" {
+  let finite = gen_sample().map(x => {
+    if x.is_nan() || x.is_inf() {
+      0.0
+    } else {
+      x
+    }
+  })
   let gen = gen_pcm_format().flat_map(format => {
     finite.zip(finite).map(pair => (format, pair.0, pair.1))
   })
@@ -327,13 +390,18 @@ test "spec 5: PCM quantization keeps order" {
           format,
           sample_rate: 8000,
           channels: 1,
-          samples: [lo, hi],
+          samples: [lo, -lo, hi, -hi],
         })
         is Some(w) &&
         decode_or_none(w) is Some(f) else {
         return false
       }
-      f.samples()[0] <= f.samples()[1]
+      let s = f.samples()
+      // Only -1 has no positive mirror, so symmetry holds up to the top step
+      let mirrored = (x : Double, i : Int32) => {
+        x.abs() > pcm_top(format) || s[i] == -s[i + 1]
+      }
+      s[0] <= s[2] && mirrored(lo, 0) && mirrored(hi, 2)
     }),
     max_success=1000,
   )
@@ -410,6 +478,7 @@ fn consistent(f : @wav.WaveFile) -> Bool {
   f.channels() > 0 &&
   f.sample_rate() > 0 &&
   f.samples().length() == f.frame_count() * f.channels() &&
+  f.samples().all(x => !x.is_nan() && !x.is_inf()) &&
   (!is_pcm(f.source_format()) || f.samples().all(x => x >= -1.0 && x < 1.0))
 }
 
@@ -474,5 +543,39 @@ test "spec 8: decode raises WavError or gives a consistent file, for any bytes" 
       }
     }),
     max_success=3000,
+  )
+  // Float data from other writers: decoded exactly when every sample is finite
+  let gen_value = @cqc.frequency([
+    (3, @cqc.Generator((_, rs) => rs.next_double() * 4.0 - 2.0)),
+    (1, @cqc.elements([0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0])),
+  ])
+  let gen_float_data = @cqc.elements([32, 64]).flat_map(bits => {
+    @cqc.int_range(0, 6).flat_map(n => {
+      gen_value.array_with_size(n).map(values => (bits, values))
+    })
+  })
+  @qc.quick_check(
+    @qc.forall(gen_float_data, t => {
+      let (bits, values) = t
+      let data : Array[Byte] = []
+      for x in values {
+        data.append(
+          if bits == 32 {
+            le32(
+              Float::from_double(x).reinterpret_as_uint().reinterpret_as_int(),
+            )
+          } else {
+            f64_bytes(x)
+          },
+        )
+      }
+      let wav = build_wav(fmt=fmt_tag(3, 1, 8000, bits), data~)
+      let finite = values.all(x => !x.is_nan() && !x.is_inf())
+      match decode_or_none(wav) {
+        Some(f) => finite && consistent(f)
+        None => !finite
+      }
+    }),
+    max_success=1000,
   )
 }

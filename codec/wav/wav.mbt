@@ -5,8 +5,11 @@
 /// WAVE_FORMAT_EXTENSIBLE (0xFFFE). Unknown chunks (such as LIST/INFO) are skipped, honoring even-byte padding.
 /// Encoding supports all six sample formats; more than 2 channels writes WAVE_FORMAT_EXTENSIBLE.
 ///
-/// Samples are always interleaved Doubles normalized to [-1, 1]. PCM scales by 2^(bits-1)
-/// (an exact dyadic fraction), so `decode(encode(x))` is idempotent: decoding yields the quantized value, and encoding it again yields the same bytes.
+/// Samples are interleaved, finite Doubles with nominal full scale ±1: PCM samples lie in
+/// [-1, 1), and float samples may exceed ±1. Neither `decode` nor `encode` accepts NaN or ±Inf.
+/// PCM scales by 2^(bits-1) (an exact dyadic fraction) and rounds to the nearest step, ties to
+/// even, so `decode(encode(x))` is idempotent: decoding yields the quantized value, and encoding
+/// it again yields the same bytes.
 ///
 /// Design reference: the WAV codec in yabaobao070510/moonvoice (Apache-2.0).
 
@@ -31,11 +34,12 @@ pub suberror WavError {
   Truncated(String)
   InvalidFormat(String)
   UnsupportedFormat(tag~ : Int32, bits~ : Int32)
+  NonFiniteSample(index~ : Int32)
   DataTooLarge
 }
 
 ///|
-/// Decoded WAV content: interleaved samples normalized to [-1, 1].
+/// Decoded WAV content: interleaved finite samples, in [-1, 1) when the source is PCM.
 #derive(Debug)
 pub struct WaveFile {
   priv sample_rate : Int32
@@ -57,7 +61,7 @@ pub fn WaveFile::channels(self : WaveFile) -> Int32 {
 }
 
 ///|
-/// Interleaved normalized samples; length = frame count × channel count.
+/// Interleaved finite samples; length = frame count × channel count.
 pub fn WaveFile::samples(self : WaveFile) -> ReadOnlyArray[Double] {
   self.samples
 }
