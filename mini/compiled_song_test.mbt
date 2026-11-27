@@ -84,3 +84,29 @@ test "a section name outside the identity alphabet compiles and stays distinct" 
   assert_eq(entries.length(), 2)
   assert_true(entries[0].origin().section() != entries[1].origin().section())
 }
+
+///|
+test "part names and fill prefixes outside the identity alphabet compile" {
+  let snapshot = compiled_song(
+    "song(section(\"a\",1,note(\"60\")),section(\"rest\",1,note(\"62\")),part(\"my part\",\"a\"),part(\"my.part\",\"a\",2),fill(\"gap fill\",\"rest\"))",
+  )
+  let names = snapshot.song().occurrences().map(o => o.name())
+  assert_eq(names, ["my part", "my.part", "gap fill:0"])
+  let ids = snapshot.song().occurrences().map(o => o.id().value())
+  // Distinct names keep distinct identities.
+  assert_true(ids[0] != ids[1])
+}
+
+///|
+test "a part name repeated by another part is reported where it repeats" {
+  let source = "song(section(\"a\",1,note(\"60\")),part(\"my part\",\"a\"),part(\"my part\",\"a\",1))"
+  let problem = try @mini.PlaybackInput::text(source).compile() catch {
+    problem => Some(problem)
+  } noraise {
+    _ => None
+  }
+  guard problem is Some(Mistake(at, "duplicate song part 'my part'")) else {
+    fail("expected a duplicate part mistake")
+  }
+  assert_true(source[at:].to_owned().has_prefix("part(\"my part\",\"a\",1)"))
+}

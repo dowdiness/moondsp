@@ -135,7 +135,10 @@ fn[C : @song.SongContent] Parser::parse_song_body(
       let name = "\{fill.prefix}:\{index}"
       filled.push(
         @song.SongOccurrenceDoc::at(
-          id=parse_occurrence_id(name, fill.at),
+          id=parse_occurrence_id(
+            "\{identity_text(fill.prefix)}:\{index}",
+            fill.at,
+          ),
           start=gap.begin,
           name~,
           section=resized_section(section, gap.duration()),
@@ -408,7 +411,7 @@ fn[C] SongPartSpec::to_doc(
   // A part without an id is identified by its name.
   let id = match self.id {
     Some(id) => id
-    None => parse_occurrence_id(self.name, self.at)
+    None => parse_occurrence_id(identity_text(self.name), self.at)
   }
   match self.start {
     Some(start) =>
@@ -429,16 +432,19 @@ fn[C] song_doc(
       raise song_mistake(DuplicateOccurrence(name), specs, at~)
     // A part without an id takes its name as its id, so a repeated name
     // surfaces as a repeated id.
-    DuplicateSongDocOccurrenceId(id) =>
+    DuplicateSongDocOccurrenceId(id) => {
+      let named = specs.filter(spec => {
+        spec.id is None && identity_text(spec.name) == id
+      })
       raise song_mistake(
-        if specs.any(spec => spec.id is None && spec.name == id) {
-          DuplicateOccurrence(id)
-        } else {
-          DuplicateOccurrenceId(id)
+        match named.get(0) {
+          Some(spec) => DuplicateOccurrence(spec.name)
+          None => DuplicateOccurrenceId(id)
         },
         specs,
         at~,
       )
+    }
   }
 }
 
@@ -479,12 +485,19 @@ fn main_layer() -> @identity.SectionLayerId {
 }
 
 ///|
-/// A section's identity is its name. Code units outside the identity alphabet,
-/// and `.` itself, are written `.xxxx.` in hex, so distinct names stay
-/// distinct.
+/// A section's identity is its name.
 fn song_section_id(name : String) -> @identity.SectionId {
+  @identity.SectionId::from_string("section:" + identity_text(name)) catch {
+    _ => abort("encoded section names are valid identities")
+  }
+}
+
+///|
+/// `name` in the identity alphabet: code units outside it, and `.` itself,
+/// are written `.xxxx.` in hex, so distinct names stay distinct and a name
+/// already in the alphabet without `.` is unchanged.
+fn identity_text(name : String) -> String {
   let encoded = StringBuilder()
-  encoded.write_string("section:")
   for index in 0..<name.length() {
     let code = name[index].to_int()
     let plain = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
@@ -499,9 +512,7 @@ fn song_section_id(name : String) -> @identity.SectionId {
       encoded.write_string(".\{code.to_string(radix=16)}.")
     }
   }
-  @identity.SectionId::from_string(encoded.to_string()) catch {
-    _ => abort("encoded section names are valid identities")
-  }
+  encoded.to_string()
 }
 
 ///|

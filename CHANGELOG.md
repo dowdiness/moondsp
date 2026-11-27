@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name), and its section's name, encoded into the identity alphabet so any
   name works. `parse_song` returns `ParsedSong::snapshot()` instead of
   `song()`, and `player` no longer rebuilds songs from names;
-  `parse_play_source`, `PlaySource` and `PlayBody` are private; `ScoreError::InvalidSource` carries the
+  `parse_play_source`, `PlaySource` and `PlayBody` are private. A part
+  without `part_id` and a `fill` prefix may be any name: their identities
+  are encoded like section names; `ScoreError::InvalidSource` carries the
   `SourceProblem`, and `PatternLowering` and `SongLowering` are removed: a
   lowering failure is Mini's `Internal` problem.
 - **Breaking:** playback takes one view of a pattern, whatever tracks it

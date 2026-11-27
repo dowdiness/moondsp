@@ -15,6 +15,24 @@ uses explicit causal transactions and frozen playback inputs with the existing
 grammar. This owner replacement is not a Loom parser promotion or browser
 transport change; the original runtime decision is retained below.
 
+**Surface update (2026-11-27):** the frozen signatures in Decision 1 no
+longer exist; what stays frozen is that Mini keeps public text entry points.
+They are now:
+
+- `@mini.parse(String) -> Result[Pat[ScoreEvent], String]` — the payload
+  became `ScoreEvent` with
+  [ADR-0022](0022-score-events-carry-their-sound.md).
+- `@mini.parse_song(String) -> Result[ParsedSong[UntrackedPatternSnapshot[ScoreEvent]], String]`,
+  with `ParsedSong::snapshot()` (the song lowered with the identities its
+  source declares) and `bpm()`. `parse_song` replaced `parse_song_with_bpm`
+  (see CHANGELOG); `snapshot()` replaced `song()` with issue #293.
+
+Playback enters through `PlaybackInput::compile`, not through these. The
+`specs/loom-mini-cst` prototype still names the earlier surface
+(`parse_song_with_bpm`, `PreparedPlayback`) and does not build with the
+current toolchain; a revived loom campaign starts by porting its oracle to the
+surface above.
+
 ## Context
 
 ADR-0004 shipped the hand-written recursive-descent runtime parser because
