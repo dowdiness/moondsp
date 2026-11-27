@@ -121,12 +121,7 @@ pub fn encode(
   channels~ : Int32,
   samples~ : ArrayView[Double],
 ) -> Bytes raise WavError {
-  guard sample_rate > 0 else {
-    raise InvalidFormat("sample rate = " + sample_rate.to_string())
-  }
-  guard channels > 0 else {
-    raise InvalidFormat("channels = " + channels.to_string())
-  }
+  let block_align = format.block_align(sample_rate~, channels~)
   guard samples.length() % channels == 0 else {
     raise InvalidFormat(
       "sample count " +
@@ -137,22 +132,16 @@ pub fn encode(
     )
   }
   let bps = format.bytes_per_sample()
-  // block_align is a 16-bit field and the byte rate a 32-bit one
-  let block_align = channels * bps
-  guard block_align <= 0xFFFF else {
-    raise InvalidFormat("channels = " + channels.to_string())
-  }
-  let byte_rate = sample_rate.to_int64() * block_align.to_int64()
-  guard byte_rate <= 0xFFFFFFFFL else {
-    raise InvalidFormat("sample rate = " + sample_rate.to_string())
-  }
   let n = samples.length()
-  let data_size = n * bps
-  // Leave room for the 44-byte header so the RIFF size cannot overflow Int/UInt32
-  guard data_size < 2147483603 else { raise DataTooLarge }
   let extensible = channels > 2
   let fmt_size = if extensible { 40 } else { 16 }
-  let total = 12 + 8 + fmt_size + 8 + data_size + data_size % 2
+  // Sizes in Int64, so a huge input raises DataTooLarge instead of wrapping;
+  // the whole file must fit one Int-indexed array
+  let data_size_l = n.to_int64() * bps.to_int64()
+  let total_l = (20 + fmt_size + 8).to_int64() + data_size_l + data_size_l % 2L
+  guard total_l <= 0x7FFFFFFFL else { raise DataTooLarge }
+  let data_size = data_size_l.to_int()
+  let total = total_l.to_int()
   let fa : FixedArray[Byte] = FixedArray::make(total, b'\x00')
   // RIFF header
   put_tag(fa, 0, "RIFF")
@@ -165,7 +154,7 @@ pub fn encode(
   put_u16le(fa, 20, if extensible { 0xFFFE } else { tag })
   put_u16le(fa, 22, channels)
   put_u32le(fa, 24, sample_rate)
-  put_u32le(fa, 28, byte_rate.to_int())
+  put_u32le(fa, 28, sample_rate * block_align)
   put_u16le(fa, 32, block_align)
   put_u16le(fa, 34, bps * 8)
   if extensible {

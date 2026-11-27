@@ -28,9 +28,12 @@ that sits outside them and imports no moondsp package.
 
 2. **It is for offline use only.** `decode` and `encode` allocate their
    results, so the audio path must never call them. dsp, graph, voice,
-   scheduler, engine, and browser packages do not import `codec/wav`;
-   `scripts/check-architecture-boundaries.sh` rejects such an import, on top
-   of its per-package allowlists.
+   scheduler, engine, browser, and the CLAP packages (clap_engine,
+   clap_host, clap_plugin) do not import `codec/wav` in their production
+   code; `scripts/check-architecture-boundaries.sh` rejects such an import,
+   on top of its per-package allowlists. Their tests are not under this
+   rule: a test that compares rendered audio with a file may import it once
+   that package's allowlist admits the edge.
 
 3. **The package's contract rests on these principles.** The exact API is
    in `codec/wav/pkg.generated.mbti`, and the exact rules are the properties

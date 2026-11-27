@@ -92,6 +92,28 @@ fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int32 {
 }
 
 ///|
+/// The fmt chunk's block_align (bytes per frame) for `channels` channels,
+/// checking that the header can hold it: block_align is a 16-bit field and the
+/// byte rate (sample_rate × block_align) a 32-bit one. `decode` and `encode`
+/// share this check, so every file `decode` returns, `encode` can write.
+fn WavSampleFormat::block_align(
+  self : WavSampleFormat,
+  sample_rate~ : Int32,
+  channels~ : Int32,
+) -> Int32 raise WavError {
+  let bps = self.bytes_per_sample()
+  guard channels > 0 && channels <= 0xFFFF / bps else {
+    raise InvalidFormat("channels = " + channels.to_string())
+  }
+  let block_align = channels * bps
+  guard sample_rate > 0 &&
+    sample_rate.to_int64() * block_align.to_int64() <= 0xFFFFFFFFL else {
+    raise InvalidFormat("sample rate = " + sample_rate.to_string())
+  }
+  block_align
+}
+
+///|
 /// The format tag in the fmt chunk (PCM = 1, IEEE float = 3).
 fn WavSampleFormat::format_tag(self : WavSampleFormat) -> Int32 {
   match self {

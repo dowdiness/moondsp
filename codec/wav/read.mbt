@@ -69,7 +69,7 @@ fn f64_at(b : Bytes, off : Int32, big : Bool) -> Double {
 }
 
 ///|
-/// Decodes one sample: byte offset → Double in [-1, 1].
+/// Decodes one sample at a byte offset: PCM into [-1, 1), float as stored.
 /// PCM scales by 2^(bits-1) (u8 centers on 128): an exact dyadic fraction, so decode∘encode is idempotent.
 fn decode_sample_at(
   b : Bytes,
@@ -112,6 +112,7 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   let mut fmt : WavSampleFormat? = None
   let mut n_channels = 0
   let mut rate = 0
+  let mut declared_align = 0
   let mut data_off = -1
   let mut data_len = 0
   while pos + 8 <= total {
@@ -123,12 +124,14 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
     }
     let size = size_u.reinterpret_as_int()
     if id == "fmt " {
+      guard fmt is None else { raise InvalidFormat("duplicate fmt chunk") }
       if size < 16 {
         raise InvalidFormat("fmt chunk too small: " + size.to_string())
       }
       let mut tag = u16_at(bytes, body, big)
       n_channels = u16_at(bytes, body + 2, big)
       let rate_u = u32_uint_at(bytes, body + 4, big)
+      declared_align = u16_at(bytes, body + 12, big)
       let bits = u16_at(bytes, body + 14, big)
       if tag == 0xFFFE {
         // WAVE_FORMAT_EXTENSIBLE: the real format is in the first two bytes of the SubFormat GUID
@@ -139,18 +142,13 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
         }
         tag = u16_at(bytes, body + 24, big)
       }
-      if n_channels <= 0 {
-        raise InvalidFormat("channels = " + n_channels.to_string())
-      }
-      if rate_u == 0 || rate_u > 0x7FFFFFFFU {
-        raise InvalidFormat("sample rate out of range")
-      }
       rate = rate_u.reinterpret_as_int()
       fmt = match WavSampleFormat::from_tag_bits(tag, bits) {
         Some(f) => Some(f)
         None => raise UnsupportedFormat(tag~, bits~)
       }
     } else if id == "data" {
+      guard data_off < 0 else { raise InvalidFormat("duplicate data chunk") }
       data_off = body
       data_len = size
     }
@@ -163,7 +161,16 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   }
   guard data_off >= 0 else { raise InvalidFormat("no data chunk") }
   let bps = format.bytes_per_sample()
-  let frame_bytes = bps * n_channels
+  let frame_bytes = format.block_align(sample_rate=rate, channels=n_channels)
+  guard declared_align == frame_bytes else {
+    raise InvalidFormat(
+      "block_align " +
+      declared_align.to_string() +
+      " is not channels × bytes per sample (" +
+      frame_bytes.to_string() +
+      ")",
+    )
+  }
   guard data_len % frame_bytes == 0 else {
     raise InvalidFormat(
       "data size " +

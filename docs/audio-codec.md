@@ -9,8 +9,12 @@
 ## WAV (`codec/wav`)
 
 Decoding supports RIFF (little-endian) and RIFX (big-endian) containers; PCM u8/i16/i24/i32 and IEEE
-float32/64; WAVE_FORMAT_EXTENSIBLE (0xFFFE, including the SubFormat GUID). Unknown chunks
-(LIST/INFO and others) are skipped, honoring even-byte padding. Every structural defect returns a structured error instead of panicking.
+float32/64; WAVE_FORMAT_EXTENSIBLE (0xFFFE, taking the format tag from the first two bytes of the
+SubFormat GUID). Unknown chunks (LIST/INFO and others) are skipped, honoring even-byte padding.
+`decode` rejects a second fmt or data chunk, a `block_align` other than channels × bytes per
+sample, and any header `encode` could not write, so every decoded file can be encoded again.
+Every structural defect, in `decode`'s bytes or `encode`'s arguments and sizes, returns a
+structured error instead of panicking.
 
 ```moonbit
 // Decode: interleaved finite Double samples (PCM in [-1, 1))
@@ -51,12 +55,12 @@ The contract of `codec/wav` is written as QuickCheck properties in
 6. `encode(decode(encode(x))) == encode(x)`.
 7. Byte order (RIFF/RIFX) and unknown chunks do not change decoded samples.
 8. `decode` is total: any bytes either raise `WavError` or give a consistent `WaveFile`, whose
-   samples are all finite; float data decodes exactly when every sample is finite.
+   samples are all finite and which `encode` accepts; float data decodes exactly when every sample is finite.
 
 Expected values come from the format itself, not from the code under test, and the
 generators favor full scale, half steps, values past ±1, non-finite input, and header
 fields at their limits. `wav_test.mbt` keeps hand-built examples, and
-`ffmpeg_crosscheck_test.mbt` compares five formats sample by sample against ffmpeg.
+`ffmpeg_crosscheck_test.mbt` compares five ffmpeg fixtures (s16, s24, and f32) sample by sample.
 
 ## License and sources
 

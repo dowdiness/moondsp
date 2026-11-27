@@ -17,7 +17,7 @@
 // 6. encode(decode(encode(x))) == encode(x).
 // 7. Byte order (RIFF/RIFX) and unknown chunks do not change decoded samples.
 // 8. decode is total: any bytes either raise WavError or give a consistent
-//    WaveFile, whose samples are all finite.
+//    WaveFile, whose samples are all finite and which encode accepts.
 
 ///|
 #derive(Debug)
@@ -149,6 +149,23 @@ fn gen_sample() -> @cqc.Generator[Double] {
 }
 
 ///|
+/// Exact half steps of `format`'s PCM grid, (k + 0.5) / 2^(bits-1), across its
+/// whole range; for float formats, plain samples.
+fn gen_tie(format : @wav.WavSampleFormat) -> @cqc.Generator[Double] {
+  guard is_pcm(format) else { return gen_sample() }
+  let full = (1L << (bits_of(format) - 1)).to_double()
+  @cqc.Generator((_, rs) => {
+    ((rs.next_double() * 2.0 - 1.0) * full).floor() / full + 0.5 / full
+  })
+}
+
+///|
+/// Samples for `format`: the shared edge cases plus its own exact half steps.
+fn gen_sample_for(format : @wav.WavSampleFormat) -> @cqc.Generator[Double] {
+  @cqc.frequency([(5, gen_sample()), (2, gen_tie(format))])
+}
+
+///|
 fn gen_case() -> @cqc.Generator[Case] {
   let gen_channels = @cqc.frequency([
     (8, @cqc.int_range(1, 4)),
@@ -162,7 +179,7 @@ fn gen_case() -> @cqc.Generator[Case] {
     gen_channels.flat_map(channels => {
       gen_rate.flat_map(sample_rate => {
         @cqc.int_range(0, 24).flat_map(frames => {
-          gen_sample()
+          gen_sample_for(format)
           .map(x => if finite_in(format, x) { x } else { 0.0 })
           .array_with_size(frames * channels)
           .map(samples => { format, sample_rate, channels, samples, })
@@ -212,7 +229,7 @@ test "spec 1: encode accepts exactly the inputs a WAV file can describe" {
   // Around the 16-bit block_align limit for 1, 2, 3, 4, and 8 bytes per sample
   let gen_channels = @cqc.elements([
     -1, 0, 1, 2, 3, 18, 19, 8191, 8192, 16383, 16384, 21845, 21846, 32767, 32768,
-    65535, 65536,
+    65535, 65536, 536870912, 1073741825,
   ])
   let gen_params = gen_format().flat_map(format => {
     gen_rate.flat_map(sample_rate => {
@@ -220,6 +237,8 @@ test "spec 1: encode accepts exactly the inputs a WAV file can describe" {
         @cqc.int_range(0, 1).flat_map(frames => {
           @cqc.int_range(0, 3).flat_map(extra => {
             gen_sample().map(x => {
+              // Huge channel counts only with no frames, to stay small
+              let frames = if channels > 65536 { 0 } else { frames }
               let n = (if channels > 0 { channels } else { 1 }) * frames +
                 (if extra == 0 { 1 } else { 0 })
               { format, sample_rate, channels, samples: Array::make(n, x), }
@@ -372,14 +391,14 @@ test "spec 4: each sample comes back as its format stores it" {
 
 ///|
 test "spec 5: PCM quantization keeps order and is symmetric in sign" {
-  let finite = gen_sample().map(x => {
-    if x.is_nan() || x.is_inf() {
-      0.0
-    } else {
-      x
-    }
-  })
   let gen = gen_pcm_format().flat_map(format => {
+    let finite = gen_sample_for(format).map(x => {
+      if x.is_nan() || x.is_inf() {
+        0.0
+      } else {
+        x
+      }
+    })
     finite.zip(finite).map(pair => (format, pair.0, pair.1))
   })
   @qc.quick_check(
@@ -473,8 +492,15 @@ test "spec 7: byte order and unknown chunks do not change decoded samples" {
 }
 
 ///|
-/// A decoded file that is consistent with itself.
+/// A decoded file that is consistent with itself, and that encode accepts.
 fn consistent(f : @wav.WaveFile) -> Bool {
+  encode_case({
+    format: f.source_format(),
+    sample_rate: f.sample_rate(),
+    channels: f.channels(),
+    samples: f.samples().iter().to_array(),
+  })
+  is Some(_) &&
   f.channels() > 0 &&
   f.sample_rate() > 0 &&
   f.samples().length() == f.frame_count() * f.channels() &&
@@ -502,8 +528,11 @@ test "spec 8: decode raises WavError or gives a consistent file, for any bytes" 
       let (c, edits, cut) = t
       guard encode_case(c) is Some(w) else { return false }
       let damaged = FixedArray::makei(w.length(), i => w[i])
+      // Half the edits land in the header (at most 76 bytes), where sizes live
+      let header = if damaged.length() < 76 { damaged.length() } else { 76 }
       for edit in edits {
-        damaged[edit.0 % damaged.length()] = edit.1.to_byte()
+        let at = if edit.0 % 2 == 0 { header } else { damaged.length() }
+        damaged[edit.0 / 2 % at] = edit.1.to_byte()
       }
       let keep = if cut % 3 == 0 {
         cut % (damaged.length() + 1)
@@ -571,8 +600,18 @@ test "spec 8: decode raises WavError or gives a consistent file, for any bytes" 
       }
       let wav = build_wav(fmt=fmt_tag(3, 1, 8000, bits), data~)
       let finite = values.all(x => !x.is_nan() && !x.is_inf())
+      let stored = values.map(x => {
+        if bits == 32 {
+          Float::from_double(x).to_double()
+        } else {
+          x
+        }
+      })
       match decode_or_none(wav) {
-        Some(f) => finite && consistent(f)
+        Some(f) =>
+          finite &&
+          consistent(f) &&
+          f.samples() == ReadOnlyArray::from_array(stored)
         None => !finite
       }
     }),

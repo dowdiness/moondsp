@@ -617,3 +617,59 @@ test "encode rejects values its header fields cannot hold" {
   )
   assert_true(wav[40] == b'\x00' && wav[41] == b'\x00' && wav[42] == b'\x00')
 }
+
+///|
+test "decode rejects what encode cannot write" {
+  let decodes = (wav : Bytes) => {
+    err_of(() => {
+      let _ = @wav.decode(wav)
+    })
+  }
+  // block_align (65535 × 8) does not fit 16 bits
+  assert_true(
+    decodes(build_wav(fmt=fmt_tag(3, 65535, 8000, 64), data=[]))
+    is Some(@wav.WavError::InvalidFormat(_)),
+  )
+  // The byte rate (2^31 - 1 × 8) does not fit 32 bits
+  assert_true(
+    decodes(build_wav(fmt=fmt_tag(3, 1, 0x7FFFFFFF, 64), data=[]))
+    is Some(@wav.WavError::InvalidFormat(_)),
+  )
+  // block_align that is not channels × bytes per sample
+  let lying = fmt_pcm16(1, 8000)
+  lying[12] = b(7)
+  assert_true(
+    decodes(build_wav(fmt=lying, data=[b(0), b(0)]))
+    is Some(@wav.WavError::InvalidFormat(_)),
+  )
+  // A second fmt or data chunk
+  assert_true(
+    decodes(
+      build_wav(fmt=fmt_pcm16(1, 8000), data=[b(0), b(0)], extras=[
+        ("fmt ", fmt_pcm16(1, 44100)),
+      ]),
+    )
+    is Some(@wav.WavError::InvalidFormat("duplicate fmt chunk")),
+  )
+  assert_true(
+    decodes(
+      build_wav(fmt=fmt_pcm16(1, 8000), data=[b(0), b(0)], extras=[
+        ("data", [b(0), b(0)]),
+      ]),
+    )
+    is Some(@wav.WavError::InvalidFormat("duplicate data chunk")),
+  )
+}
+
+///|
+test "encode rejects channel counts whose block_align wraps in Int" {
+  // 536870912 × 8 = 2^32 and 1073741825 × 4 = 2^32 + 4 wrap to 0 and 4
+  for pair in [(@wav.IeeeF64, 536870912), (@wav.PcmI32, 1073741825)] {
+    assert_true(
+      err_of(() => {
+        let _ = @wav.encode(format=pair.0, sample_rate=8000, channels=pair.1, samples=[])
+      })
+      is Some(@wav.WavError::InvalidFormat(_)),
+    )
+  }
+}
