@@ -223,8 +223,11 @@ pub struct SongEntry[C] {
   // private fields
 }
 pub fn[C] SongEntry::body(Self[C]) -> @pattern.Pat[@score.ScoreEvent]
+pub fn[C] SongEntry::content(Self[C]) -> C
+pub fn[C] SongEntry::content_entry(Self[C]) -> Int32
 pub fn[C] SongEntry::end_(Self[C]) -> @pattern.Rational
 pub fn[C] SongEntry::origin(Self[C]) -> SongEventOrigin
+pub fn[C] SongEntry::placement(Self[C]) -> @pattern.Placement
 pub fn[C] SongEntry::slice(Self[C], @pattern.TimeSpan) -> SongSlice[C]?
 pub fn[C] SongEntry::start(Self[C]) -> @pattern.Rational
 
@@ -301,6 +304,7 @@ pub fn TimeScope::slow(factor~ : @pattern.Rational) -> Self raise TimeScopeBuild
 // Traits
 pub trait SongContent {
   fn pat(Self) -> @pattern.Pat[@score.ScoreEvent]
+  fn playback(Self) -> @pattern.PlaybackPattern[@score.ScoreEvent]
 }
 pub impl SongContent for @pattern.Pat[@score.ScoreEvent]
 pub impl SongContent for @pattern.TrackedPatternSnapshot[@score.ScoreEvent]

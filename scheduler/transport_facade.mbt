@@ -287,7 +287,7 @@ pub fn PatternScheduler::accept_playback(
     Ok(now) => now
   }
   guard self.playback_state.prepare_acceptance(
-      snapshot.raw(),
+      snapshot.raw,
       now,
       material_limit~,
       restart~,

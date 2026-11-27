@@ -86,11 +86,9 @@ pub fn[C : @song.SongContent] PatternScheduler::process_section_block(Self, @son
 pub fn[C : @song.SongContent] PatternScheduler::process_song_block(Self, @song.Song[C], @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::push_active_note(Self, Int32, @voice.VoiceHandle, @pattern.Rational) -> Result[Unit, ActiveNoteError]
 pub fn PatternScheduler::push_active_note_until(Self, Int32, @voice.VoiceHandle, PerformanceTime) -> Result[Unit, ActiveNoteError]
-pub fn PatternScheduler::queue_pattern_snapshot(Self, @pattern.UntrackedPatternSnapshot[@score.ScoreEvent]) -> Unit
-pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, @pattern.UntrackedPatternSnapshot[@score.ScoreEvent], PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, PlaybackSnapshot, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
-pub fn PatternScheduler::queue_song_snapshot(Self, SongMaterial) -> Unit
-pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, SongMaterial, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
+pub fn PatternScheduler::queue_song_snapshot_effect_result(Self, PlaybackSnapshot, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queued_snapshot(Self) -> PlaybackSnapshot?
 pub fn PatternScheduler::render_block(Self, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
 pub fn PatternScheduler::render_block_with_send(Self, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer, @dsp.AudioBuffer) -> Unit
@@ -121,20 +119,15 @@ pub(all) enum PlaybackAdmissionError {
   Transport(@transport.TransportError)
 }
 
-pub enum PlaybackSnapshot {
-  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
-  Song(SongMaterial)
-  RepeatSong(SongMaterial)
+pub struct PlaybackSnapshot {
+  // private fields
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
+pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
-pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
-pub fn PlaybackSnapshot::song(SongMaterial) -> Self
+pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.SongSnapshot[C], repeat? : Bool) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
-pub fn PlaybackSnapshot::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent]) -> Self
-pub fn PlaybackSnapshot::untracked_pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]) -> Self
 
 pub struct SignalBuffer {
   // private fields
@@ -145,11 +138,6 @@ pub fn SignalBuffer::count(Self) -> Int32
 pub fn SignalBuffer::dropped(Self) -> Double
 pub fn SignalBuffer::enable(Self, Bool) -> Unit
 pub fn SignalBuffer::field(Self, Int32, Int32) -> Double
-
-pub(all) enum SongMaterial {
-  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Tracked(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]])
-}
 
 #derive(Eq, @debug.Debug)
 pub struct SongVoiceScope {

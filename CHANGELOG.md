@@ -27,9 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at its onset, and the browser host takes its sounds with
   `init_scheduler_graph_with_sounds(drum~, instrument~)`.
 - `player` is a platform-free player of one score (ADR-0029, ADR-0030):
-  `Player::compile` turns Mini input into a `Score`, and `Score::pattern`,
-  `tracked_pattern`, `song` and `tracked_song` build one from content with
-  no source text. `Player` accepts scores with `update` and `restart`, plays,
+  `Player::compile` turns Mini input into a `Score`, and `Score::pattern`
+  and `Score::song` build one from content with no source text. `Player` accepts scores with `update` and `restart`, plays,
   pauses and ends them, and `process(left, right)` renders each block into
   the caller's buffers, so offline rendering can drive the same performance
   as the browser. The browser host is its adapter; the browser ABI is
@@ -37,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** playback takes one view of a pattern, whatever tracks it
+  (ADR-0031). `@pattern.PlaybackPattern` comes from an untracked or tracked
+  snapshot's `playback()` or `Pat::playback()`; `@scheduler.PlaybackSnapshot`
+  is opaque, built by `pattern(PlaybackPattern)` or
+  `song(SongSnapshot[C], repeat?)` for any `SongContent`, which gains
+  `playback()`. `SongMaterial`, the `PlaybackSnapshot` variants,
+  `untracked_pattern`, `tracked_pattern`, `repeat_song`,
+  `queue_pattern_snapshot` and `queue_song_snapshot` are removed; use
+  `queue_playback_snapshot`. The `*_snapshot_effect_result` functions take a
+  `PlaybackSnapshot`. `SongEntry` gains `content`, `content_entry` and
+  `placement`; `Placement` gains `origin()`.
 - **Breaking:** tracked and untracked material are named alike everywhere
   (see `CONTEXT.md`). `PatternSnapshotWithOrigins` is `TrackedPatternSnapshot`
   and `PatternSnapshot` is `UntrackedPatternSnapshot`;

@@ -16,105 +16,85 @@ priv struct EntryContent {
 }
 
 ///|
-fn untracked_pattern_content(
-  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+fn pattern_content(
+  pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
   index : Int32,
 ) -> EntryContent {
   {
     entered: delay => {
-      let snapshot = snapshot.entered(delay)
-      Some(
-        (
-          snapshot.pat().entries()[index],
-          untracked_pattern_content(snapshot, index),
-        ),
-      )
+      pattern
+      .entered(delay)
+      .map(pattern => {
+        (pattern.entries()[index], pattern_content(pattern, index))
+      })
     },
     query_sourced: (_, origin, arc) => {
-      let placement = @pattern.Placement(origin~)
-      snapshot
-      .query_sourced_events_for_entry(index, arc)
-      .map(event => {
-        event: event.event().placed(placement),
-        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source: None,
-        controls: event.controls().on_playback_clock(origin),
-      })
+      pattern.query_for_entry(
+        index,
+        arc,
+        @pattern.Placement(origin~),
+        place_pattern_event,
+      )
     },
   }
 }
 
 ///|
-fn tracked_pattern_content(
-  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
-  index : Int32,
-) -> EntryContent {
+/// A pattern event on the playback clock. A named function, not a lambda, so
+/// a query constructs no closure.
+fn place_pattern_event(
+  placement : @pattern.Placement,
+  event : @pattern.Event[@score.ScoreEvent],
+  path : @pattern.PatternNodePath?,
+  controls : @pattern.Controls,
+  source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
+) -> PlaybackSourcedEvent {
   {
-    entered: delay => {
-      let snapshot = snapshot.entered(delay)
-      Some(
-        (
-          snapshot.pat().entries()[index],
-          tracked_pattern_content(snapshot, index),
-        ),
-      )
+    event: event.placed(placement),
+    origin: match path {
+      Some(path) => @model.VoiceOrigin::Pattern(path)
+      None => @model.VoiceOrigin::Anonymous
     },
-    query_sourced: (_, origin, arc) => {
-      let placement = @pattern.Placement(origin~)
-      snapshot
-      .query_for_entry(index, arc)
-      .map(event => {
-        event: event.event().placed(placement),
-        origin: @model.VoiceOrigin::Pattern(event.pattern_node_path()),
-        source: Some(event),
-        controls: event.controls().on_playback_clock(origin),
-      })
-    },
+    source,
+    controls: controls.on_playback_clock(placement.origin()),
   }
 }
 
 ///|
 /// A song occurrence keeps its one-shot signals on its section's clock, so
-/// entering changes nothing.
-fn untracked_song_content(song_origin : @song.SongEventOrigin) -> EntryContent {
-  {
-    entered: _ => None,
-    query_sourced: (spec, origin, arc) => {
-      query_entry(spec, origin, arc).map(event => {
-        event,
-        origin: @model.VoiceOrigin::Song(song_origin),
-        source: None,
-        controls: @pattern.Controls::fixed(event.value.controls),
-      })
-    },
-  }
-}
-
-///|
-fn tracked_song_content(
-  entry : @song.SongEntry[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+/// entering changes nothing. The event mapper is built once per entry.
+fn[C] song_content(
+  entry : @song.SongEntry[C],
+  content : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> EntryContent {
+  let index = entry.content_entry()
+  let section = entry.placement()
+  let song_origin = @model.VoiceOrigin::Song(entry.origin())
+  let each = (
+    placement : @pattern.Placement,
+    event : @pattern.Event[@score.ScoreEvent],
+    _ : @pattern.PatternNodePath?,
+    controls : @pattern.Controls,
+    source : @pattern.EventWithOrigin[@score.ScoreEvent]?,
+  ) => PlaybackSourcedEvent::{
+    event: event.placed(section).placed(placement),
+    origin: song_origin,
+    source,
+    controls: controls.placed(section).on_playback_clock(placement.origin()),
+  }
   {
     entered: _ => None,
+    // Entry segments already clip `arc` to the occurrence.
     query_sourced: (spec, origin, arc) => {
-      let source_arc = @pattern.TimeSpan(
-        arc.begin + spec.start,
-        arc.end_ + spec.start,
+      let content_arc = section.local_span(
+        @pattern.TimeSpan(arc.begin + spec.start, arc.end_ + spec.start),
       )
-      guard entry.slice(source_arc) is Some(slice) else { return [] }
-      let placement = @pattern.Placement(origin=origin - spec.start)
-      slice
-      .content()
-      .query_for_entry(slice.entry(), slice.arc())
-      .map(event => {
-        event: event.event().placed(slice.placement()).placed(placement),
-        origin: @model.VoiceOrigin::Song(slice.origin()),
-        source: Some(event),
-        controls: event
-        .controls()
-        .placed(slice.placement())
-        .on_playback_clock(origin - spec.start),
-      })
+      content.query_for_entry(
+        index,
+        content_arc,
+        @pattern.Placement(origin=origin - spec.start),
+        each,
+      )
     },
   }
 }
@@ -223,38 +203,19 @@ fn EntryState::material(self : EntryState) -> EntrySpec {
 }
 
 ///|
-fn PlaybackSnapshot::entries(self : PlaybackSnapshot) -> Array[EntrySpec] {
-  match self {
-    UntrackedPattern(snapshot) =>
-      pattern_entry_specs(snapshot.pat(), index => {
-        untracked_pattern_content(snapshot, index)
-      })
-    TrackedPattern(snapshot) =>
-      pattern_entry_specs(snapshot.pat(), index => {
-        tracked_pattern_content(snapshot, index)
-      })
-    Song(Untracked(snapshot)) | RepeatSong(Untracked(snapshot)) =>
-      song_entry_specs(snapshot, entry => untracked_song_content(entry.origin()))
-    Song(Tracked(snapshot)) | RepeatSong(Tracked(snapshot)) =>
-      song_entry_specs(snapshot, entry => tracked_song_content(entry))
-  }
-}
-
-///|
 /// One spec per canonical entry of a pattern, in `Pat::entries` order.
 fn pattern_entry_specs(
-  pat : @pattern.Pat[@score.ScoreEvent],
-  content : (Int32) -> EntryContent,
+  pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> Array[EntrySpec] {
   let result : Array[EntrySpec] = []
-  for index, body in pat.entries() {
+  for index, body in pattern.entries() {
     result.push(
       EntrySpec(
         id=body.entry_key(),
         body~,
         start=@pattern.Rational::from_int(0),
         end_=None,
-        source=content(index),
+        source=pattern_content(pattern, index),
       ),
     )
   }
@@ -262,10 +223,10 @@ fn pattern_entry_specs(
 }
 
 ///|
-/// One spec per canonical song entry, in the snapshot's entry order.
-fn[C] song_entry_specs(
+/// One spec per canonical song entry, in the snapshot's entry order. Each
+/// section content becomes a playback pattern once, not per query.
+fn[C : @song.SongContent] song_entry_specs(
   snapshot : @song.SongSnapshot[C],
-  source : (@song.SongEntry[C]) -> EntryContent,
 ) -> Array[EntrySpec] {
   snapshot
   .entries()
@@ -279,7 +240,7 @@ fn[C] song_entry_specs(
       body=entry.body(),
       start=entry.start(),
       end_=Some(entry.end_()),
-      source=source(entry),
+      source=song_content(entry, entry.content().playback()),
     )
   })
 }
@@ -418,7 +379,7 @@ fn entry_for_update(spec : EntrySpec, now : @pattern.Rational) -> EntryState {
 fn PlaybackSnapshot::start_entries(
   self : PlaybackSnapshot,
 ) -> Array[EntryState] {
-  self.entries().map(spec => Current(spec, spec.start))
+  self.specs.map(spec => Current(spec, spec.start))
 }
 
 ///|
@@ -429,7 +390,7 @@ fn PlaybackSnapshot::reconcile_entries(
   current : Array[EntryState],
   now : @pattern.Rational,
 ) -> Array[EntryState] {
-  let next = self.entries()
+  let next = self.specs
   let remaining : Map[String, EntrySpec] = Map([])
   for spec in next {
     remaining[spec.id] = spec

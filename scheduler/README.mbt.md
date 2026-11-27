@@ -311,11 +311,13 @@ test "edit orchestration stages a replacement and reconciles active voices" {
   let replacement = try! replacement_doc.lower()
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
-  sched.queue_pattern_snapshot(active_snapshot)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(active_snapshot.playback()),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .queue_pattern_snapshot_effect_result(
-      replacement,
+      @scheduler.PlaybackSnapshot::pattern(replacement.playback()),
       @scheduler.PatternVoiceScope::node(edited),
       @scheduler.ActiveVoiceEffect::Release,
     )
@@ -325,8 +327,8 @@ test "edit orchestration stages a replacement and reconciles active voices" {
   assert_eq(outcome.detached_note_count, 1)
   assert_true(sched.accepted_snapshot() is Some(_))
   assert_true(
-    sched.queued_snapshot()
-    is Some(@scheduler.PlaybackSnapshot::UntrackedPattern(_)),
+    sched.queued_snapshot().map(snapshot => snapshot.song_layout_revision())
+    is Some(None),
   )
   assert_eq(sched.active_note_count(), 0)
 }

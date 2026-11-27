@@ -53,6 +53,12 @@ pub fn Placement::Placement(
 }
 
 ///|
+/// Where local time zero sits on the outer clock.
+pub fn Placement::origin(self : Placement) -> Rational {
+  self.origin
+}
+
+///|
 fn Placement::is_identity(self : Placement) -> Bool {
   self.origin.num == 0L && self.rate == Rational::from_int(1)
 }

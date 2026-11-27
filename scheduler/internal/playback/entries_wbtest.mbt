@@ -31,11 +31,13 @@ fn material(
 fn score(
   parts : Array[@pattern.Pat[@score.ScoreEvent]],
 ) -> PlaybackSnapshot raise {
-  PlaybackSnapshot::untracked_pattern(
+  PlaybackSnapshot::pattern(
     @pattern.PatternDoc::from_pattern(
       id=@identity.PatternNodeId::from_string("test"),
       pat=@pattern.stack(parts),
-    ).lower(),
+    )
+    .lower()
+    .playback(),
   )
 }
 
@@ -134,16 +136,14 @@ test "finite phrase keeps its current content until a new playback" {
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      Untracked(
-        @song.SongDoc(parts=[
-          @song.SongOccurrenceDoc::at(
-            id=@identity.OccurrenceId::from_string("once"),
-            start=@pattern.Rational::from_int(0),
-            name="once",
-            section~,
-          ),
-        ]).lower(),
-      ),
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("once"),
+          start=@pattern.Rational::from_int(0),
+          name="once",
+          section~,
+        ),
+      ]).lower(),
     )
   }
   let state = PlaybackState()
@@ -170,16 +170,14 @@ test "settling after an old finite end retains its already entered replacement" 
       body=material("a", note, 3),
     )
     PlaybackSnapshot::song(
-      Untracked(
-        @song.SongDoc(parts=[
-          @song.SongOccurrenceDoc::at(
-            id=@identity.OccurrenceId::from_string("once"),
-            start=@pattern.Rational::from_int(0),
-            name="phrase",
-            section~,
-          ),
-        ]).lower(),
-      ),
+      @song.SongDoc(parts=[
+        @song.SongOccurrenceDoc::at(
+          id=@identity.OccurrenceId::from_string("once"),
+          start=@pattern.Rational::from_int(0),
+          name="phrase",
+          section~,
+        ),
+      ]).lower(),
     )
   }
   let state = PlaybackState()
@@ -312,7 +310,7 @@ fn finite_occurrence_score(lead_start : Int32?) -> PlaybackSnapshot raise {
       ),
     )
   }
-  PlaybackSnapshot::song(Untracked(@song.SongDoc(parts~).lower()))
+  PlaybackSnapshot::song(@song.SongDoc(parts~).lower())
 }
 
 ///|
@@ -364,16 +362,14 @@ fn finite_single_score(start : Int32, note : Int32) -> PlaybackSnapshot raise {
     body=material("moving", note, 3),
   )
   PlaybackSnapshot::song(
-    Untracked(
-      @song.SongDoc(parts=[
-        @song.SongOccurrenceDoc::at(
-          id=@identity.OccurrenceId::from_string("moving-occurrence"),
-          start=@pattern.Rational::from_int(start),
-          name="moving",
-          section~,
-        ),
-      ]).lower(),
-    ),
+    @song.SongDoc(parts=[
+      @song.SongOccurrenceDoc::at(
+        id=@identity.OccurrenceId::from_string("moving-occurrence"),
+        start=@pattern.Rational::from_int(start),
+        name="moving",
+        section~,
+      ),
+    ]).lower(),
   )
 }
 
@@ -397,10 +393,16 @@ test "moving current material finishes old content and skips incoming occurrence
 
 ///|
 fn repeated(snapshot : PlaybackSnapshot) -> PlaybackSnapshot {
-  match snapshot {
-    Song(song) => PlaybackSnapshot::repeat_song(song)
-    other => other
-  }
+  let duration = snapshot.specs.fold(init=@pattern.Rational::from_int(0), (
+    end_,
+    spec,
+  ) => {
+    match spec.end_ {
+      Some(spec_end) if spec_end > end_ => spec_end
+      _ => end_
+    }
+  })
+  { ..snapshot, period: Some(duration), }
 }
 
 ///|
@@ -491,7 +493,7 @@ test "exact pattern origins survive admission and active queries" {
     source_atom=@identity.SourceAtomId::SourceAtomId(epoch, 1L),
     value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
   )
-  let snapshot = PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
+  let snapshot = PlaybackSnapshot::pattern(doc.lower_tracked().playback())
   let state = PlaybackState()
   state.queue(snapshot)
   state.commit_pending(@pattern.Rational::from_int(0))
@@ -517,7 +519,7 @@ test "origin-only edits update retained material provenance" {
       source_atom=@identity.SourceAtomId::SourceAtomId(epoch, serial),
       value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
     )
-    PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
+    PlaybackSnapshot::pattern(doc.lower_tracked().playback())
   }
   let epoch = @identity.SourceEpoch::SourceEpoch(1L)
   let state = PlaybackState()
@@ -550,7 +552,7 @@ test "pending material retains old exact origins until its musical boundary" {
       id=@identity.PatternNodeId::from_string("phrase"),
       factor=@pattern.Rational::from_int(3),
     )
-    PlaybackSnapshot::tracked_pattern(doc.lower_tracked())
+    PlaybackSnapshot::pattern(doc.lower_tracked().playback())
   }
   let state = PlaybackState()
   state.queue(exact(1L, 60.0))
@@ -628,7 +630,7 @@ fn accept_layers(
       docs=layers,
     )
   }
-  state.queue(PlaybackSnapshot::untracked_pattern(doc.lower()))
+  state.queue(PlaybackSnapshot::pattern(doc.lower().playback()))
   state.commit_pending(at)
 }
 
@@ -691,4 +693,26 @@ test "a layer added while playing starts its fade where it enters" {
   assert_eq(gains(state, 5), [(60, 1.0, 1.0)])
   assert_eq(gains(state, 6), [(60, 1.0, 1.0), (70, 1.0, 0.875)])
   assert_eq(gains(state, 8), [(60, 1.0, 1.0), (70, 0.5, 0.375)])
+}
+
+///|
+test "a plain pattern plays with anonymous voices and updates at its next entry" {
+  let state = PlaybackState()
+  let plain = PlaybackSnapshot::pattern(@score.note(60.0).playback())
+  assert_eq(plain.revision(), @identity.Revision::zero())
+  state.queue(plain)
+  state.commit_pending(@pattern.Rational::from_int(0))
+  assert_eq(notes(state, 0, 1), [60])
+  let arc = @pattern.TimeSpan(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational::from_int(1),
+  )
+  let sourced = state.query_active_sourced_events(arc)
+  assert_true(sourced[0].origin() is Anonymous)
+  assert_true(sourced[0].source() is None)
+  // An edit half a cycle in keeps the old note until the next cycle.
+  state.queue(PlaybackSnapshot::pattern(@score.note(67.0).playback()))
+  state.commit_pending(@pattern.Rational(1L, 2L))
+  assert_eq(notes(state, 0, 1), [60])
+  assert_eq(notes(state, 1, 2), [67])
 }

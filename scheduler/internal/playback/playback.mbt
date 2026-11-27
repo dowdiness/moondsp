@@ -56,121 +56,68 @@ pub fn PlaybackSourcedEvent::origin(
 }
 
 ///|
-pub enum PlaybackSnapshot {
-  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
-  Song(SongMaterial)
-  RepeatSong(SongMaterial)
+/// Playback material built once from a pattern or a lowered song: its
+/// revisions, its repetition period, and one entry per canonical material.
+/// Whether events carry event origins is the material's own business
+/// (`@pattern.PlaybackPattern`); nothing here branches on it.
+pub struct PlaybackSnapshot {
+  priv revision : @identity.Revision
+  priv layout_revision : @identity.Revision?
+  /// How long one repetition of a repeating song lasts.
+  priv period : @pattern.Rational?
+  priv specs : Array[EntrySpec]
 }
 
 ///|
-/// A lowered song the scheduler can play. Its sections hold either untracked
-/// patterns or tracked pattern snapshots (ADR-0021).
-pub(all) enum SongMaterial {
-  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Tracked(
-    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
-  )
-}
-
-///|
-fn SongMaterial::revision(self : SongMaterial) -> @identity.Revision {
-  match self {
-    Untracked(snapshot) => snapshot.revision()
-    Tracked(snapshot) => snapshot.revision()
-  }
-}
-
-///|
-fn SongMaterial::layout_revision(self : SongMaterial) -> @identity.Revision {
-  match self {
-    Untracked(snapshot) => snapshot.layout_revision()
-    Tracked(snapshot) => snapshot.layout_revision()
-  }
-}
-
-///|
-fn SongMaterial::duration(self : SongMaterial) -> @pattern.Rational {
-  match self {
-    Untracked(snapshot) => snapshot.song().duration()
-    Tracked(snapshot) => snapshot.song().duration()
-  }
-}
-
-///|
-fn SongMaterial::entry_count(self : SongMaterial) -> Int32 {
-  match self {
-    Untracked(snapshot) => snapshot.entries().length()
-    Tracked(snapshot) => snapshot.entries().length()
-  }
-}
-
-///|
-fn SongMaterial::query(
-  self : SongMaterial,
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  match self {
-    Untracked(snapshot) => snapshot.song().query(arc)
-    Tracked(snapshot) => snapshot.song().query(arc)
-  }
-}
-
-///|
-pub fn PlaybackSnapshot::tracked_pattern(
-  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
+/// A pattern that plays forever. A plain pattern has revision zero.
+pub fn PlaybackSnapshot::pattern(
+  pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  TrackedPattern(snapshot)
+  {
+    revision: pattern.revision().unwrap_or(@identity.Revision::zero()),
+    layout_revision: None,
+    period: None,
+    specs: pattern_entry_specs(pattern),
+  }
 }
 
 ///|
-pub fn PlaybackSnapshot::untracked_pattern(
-  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+/// A lowered song that ends after its last occurrence, or repeats without
+/// resetting the transport when `repeat` is true.
+pub fn[C : @song.SongContent] PlaybackSnapshot::song(
+  snapshot : @song.SongSnapshot[C],
+  repeat~ : Bool = false,
 ) -> PlaybackSnapshot {
-  UntrackedPattern(snapshot)
-}
-
-///|
-pub fn PlaybackSnapshot::song(snapshot : SongMaterial) -> PlaybackSnapshot {
-  Song(snapshot)
-}
-
-///|
-pub fn PlaybackSnapshot::repeat_song(
-  snapshot : SongMaterial,
-) -> PlaybackSnapshot {
-  RepeatSong(snapshot)
+  {
+    revision: snapshot.revision(),
+    layout_revision: Some(snapshot.layout_revision()),
+    period: if repeat {
+      Some(snapshot.song().duration())
+    } else {
+      None
+    },
+    specs: song_entry_specs(snapshot),
+  }
 }
 
 ///|
 pub fn PlaybackSnapshot::revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision {
-  match self {
-    UntrackedPattern(snapshot) => snapshot.revision()
-    TrackedPattern(snapshot) => snapshot.revision()
-    Song(song) | RepeatSong(song) => song.revision()
-  }
+  self.revision
 }
 
 ///|
 pub fn PlaybackSnapshot::song_layout_revision(
   self : PlaybackSnapshot,
 ) -> @identity.Revision? {
-  match self {
-    UntrackedPattern(_) | TrackedPattern(_) => None
-    Song(song) | RepeatSong(song) => Some(song.layout_revision())
-  }
+  self.layout_revision
 }
 
 ///|
 /// Count source entries independently of the current play position.
 pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
-  match self {
-    UntrackedPattern(snapshot) => snapshot.pat().entries().length()
-    TrackedPattern(snapshot) => snapshot.pat().entries().length()
-    Song(song) | RepeatSong(song) => song.entry_count()
-  }
+  self.specs.length()
 }
 
 ///|
@@ -178,9 +125,9 @@ fn PlaybackSnapshot::cycle_at(
   self : PlaybackSnapshot,
   now : @pattern.Rational,
 ) -> Int64 {
-  match self {
-    RepeatSong(song) if song.duration() > @pattern.Rational::from_int(0) =>
-      (now / song.duration()).floor()
+  match self.period {
+    Some(period) if period > @pattern.Rational::from_int(0) =>
+      (now / period).floor()
     _ => 0L
   }
 }
@@ -190,9 +137,9 @@ fn PlaybackSnapshot::offset_at(
   self : PlaybackSnapshot,
   cycle : Int64,
 ) -> @pattern.Rational {
-  match self {
-    RepeatSong(song) => song.duration() * @pattern.Rational(cycle, 1L)
-    _ => @pattern.Rational::from_int(0)
+  match self.period {
+    Some(period) => period * @pattern.Rational(cycle, 1L)
+    None => @pattern.Rational::from_int(0)
   }
 }
 
@@ -351,10 +298,9 @@ fn[A] PlaybackRun::query(
   query : (Array[EntryState], @pattern.TimeSpan) -> Array[A],
   shift : (A, @pattern.Rational) -> A,
 ) -> Array[A] {
-  guard self.snapshot is RepeatSong(song) else {
+  guard self.snapshot.period is Some(duration) else {
     return query(self.entries, arc)
   }
-  let duration = song.duration()
   guard duration > @pattern.Rational::from_int(0) else { return [] }
   let result : Array[A] = []
   let mut cursor = arc.begin
@@ -417,15 +363,9 @@ pub fn PlaybackSnapshot::query_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  match self {
-    UntrackedPattern(snapshot) => snapshot.query(arc)
-    TrackedPattern(snapshot) => snapshot.query(arc).map(event => event.event())
-    Song(song) => song.query(arc)
-    RepeatSong(_) =>
-      PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(
-        arc,
-        query_entries,
-        (event, offset) => event.shift(offset),
-      )
-  }
+  PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(
+    arc,
+    query_entries,
+    (event, offset) => event.shift(offset),
+  )
 }

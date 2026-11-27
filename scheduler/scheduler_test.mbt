@@ -158,8 +158,7 @@ fn assert_first_pattern_queued(
   sched : @scheduler.PatternScheduler,
 ) -> Unit raise {
   assert_true(sched.accepted_snapshot() is None)
-  guard queued_snapshot(sched)
-    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
+  guard queued_snapshot(sched).song_layout_revision() is None else {
     fail("expected a queued first Pattern snapshot")
   }
 }
@@ -167,22 +166,21 @@ fn assert_first_pattern_queued(
 ///|
 fn assert_first_song_queued(sched : @scheduler.PatternScheduler) -> Unit raise {
   assert_true(sched.accepted_snapshot() is None)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+  guard queued_snapshot(sched).song_layout_revision() is Some(_) else {
     fail("expected a queued first Song snapshot")
   }
 }
 
 ///|
 fn assert_pattern_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
-  guard accepted_snapshot(sched)
-    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
+  guard accepted_snapshot(sched).song_layout_revision() is None else {
     fail("expected an accepted Pattern snapshot")
   }
 }
 
 ///|
 fn assert_song_accepted(sched : @scheduler.PatternScheduler) -> Unit raise {
-  guard accepted_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+  guard accepted_snapshot(sched).song_layout_revision() is Some(_) else {
     fail("expected an accepted Song snapshot")
   }
 }
@@ -271,8 +269,8 @@ fn scheduler_song_doc(
 ///|
 fn song_snapshot(
   doc : @song.SongDoc[@pattern.Pat[@score.ScoreEvent]],
-) -> @scheduler.SongMaterial {
-  Untracked(doc.lower()) catch {
+) -> @song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]] {
+  doc.lower() catch {
     _ => abort("expected song snapshot")
   }
 }
@@ -365,7 +363,11 @@ test "process_block: note(60) triggers one voice" {
 ///|
 test "render_block: pending snapshot commits at block boundary" {
   let (pool, sched, left, right) = make_test_sched()
-  sched.queue_pattern_snapshot(note_snapshot("snapshot_note", 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("snapshot_note", 60.0).playback(),
+    ),
+  )
   assert_first_pattern_queued(sched)
   @debug.assert_eq(pool.active_voice_count(), 0)
   sched.render_block(left, right)
@@ -379,7 +381,11 @@ test "render_block: pending snapshot commits at block boundary" {
 test "Release detaches the note while its tail finishes sounding" {
   let (_, sched, left, right) = make_test_sched()
   let root = pid("release")
-  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot(root.value(), 60.0).playback(),
+    ),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .apply_pattern_voice_effect_result(
@@ -399,7 +405,11 @@ test "Release detaches the note while its tail finishes sounding" {
 test "Kill detaches the note and silences it immediately" {
   let (_, sched, left, right) = make_test_sched()
   let root = pid("kill")
-  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot(root.value(), 60.0).playback(),
+    ),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .apply_pattern_voice_effect_result(
@@ -417,7 +427,11 @@ test "Kill detaches the note and silences it immediately" {
 test "Retune changes the sounding voice without detaching its note" {
   let (pool, sched, left, right) = make_test_sched()
   let root = pid("retune")
-  sched.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot(root.value(), 60.0).playback(),
+    ),
+  )
   sched.render_block(left, right)
   assert_true(buffer_abs_sum(left) > 0.0)
   // Mute the envelope gain rather than asserting oscillator sample values.
@@ -445,13 +459,21 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   let (_, reference, expected_left, expected_right) = make_test_sched()
   let root = pid("rejected-retune")
   let playing = note_snapshot(root.value(), 60.0)
-  sched.queue_pattern_snapshot(playing)
-  reference.queue_pattern_snapshot(playing)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(playing.playback()),
+  )
+  reference.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(playing.playback()),
+  )
   sched.render_block(left, right)
   reference.render_block(expected_left, expected_right)
   let pending = silence_snapshot("already-queued")
-  sched.queue_pattern_snapshot(pending)
-  reference.queue_pattern_snapshot(pending)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(pending.playback()),
+  )
+  reference.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(pending.playback()),
+  )
   // A valid mutation followed by an invalid one must not partially apply.
   let invalid = @scheduler.VoiceControlBatch(
     instrument=0,
@@ -466,7 +488,9 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   )
   assert_true(
     sched.queue_pattern_snapshot_effect_result(
-      note_snapshot("rejected-replacement", 72.0),
+      @scheduler.PlaybackSnapshot::pattern(
+        note_snapshot("rejected-replacement", 72.0).playback(),
+      ),
       @scheduler.PatternVoiceScope::node(root),
       @scheduler.ActiveVoiceEffect::Retune(invalid),
     )
@@ -474,8 +498,7 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
   )
   assert_pattern_accepted(sched)
   assert_true(accepted_snapshot(sched).revision() == playing.revision())
-  guard queued_snapshot(sched)
-    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
+  guard queued_snapshot(sched).song_layout_revision() is None else {
     fail("expected the previously queued Pattern snapshot")
   }
   assert_true(queued_snapshot(sched).revision() == pending.revision())
@@ -497,13 +520,19 @@ test "Rejected retune preserves audio and the previously queued snapshot" {
 test "Pattern selection kills the selected child but leaves its sibling sounding" {
   let (_, sched, left, right) = make_test_sched()
   let (_, reference, expected_left, expected_right) = make_test_sched()
-  reference.queue_pattern_snapshot(note_snapshot("sibling", 72.0))
+  reference.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("sibling", 72.0).playback(),
+    ),
+  )
   reference.render_block(expected_left, expected_right)
   let doc = @pattern.PatternDoc::stack(id=pid("mix"), docs=[
     @pattern.PatternDoc::from_pattern(id=pid("selected"), pat=@score.note(60.0)),
     @pattern.PatternDoc::from_pattern(id=pid("sibling"), pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(doc.lower())
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(doc.lower().playback()),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .apply_pattern_voice_effect_result(
@@ -526,7 +555,11 @@ test "Pattern selection kills the selected child but leaves its sibling sounding
 test "Song layer selection does not cross section boundaries" {
   let (_, sched, left, right) = make_test_sched()
   let (_, reference, expected_left, expected_right) = make_test_sched()
-  reference.queue_pattern_snapshot(note_snapshot("unrelated", 72.0))
+  reference.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("unrelated", 72.0).playback(),
+    ),
+  )
   reference.render_block(expected_left, expected_right)
   let layer = lid("shared-layer")
   let sections = ["selected", "unrelated"].map(name => {
@@ -549,7 +582,9 @@ test "Song layer selection does not cross section boundaries" {
       )
     }),
   )
-  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .apply_song_voice_effect_result(
@@ -575,7 +610,11 @@ test "Retune preflights later voices before mutating the first voice" {
   let root = pid("mixed-templates")
   for pair in [(pool, sched), (reference_pool, reference)] {
     let (p, s) = pair
-    s.queue_pattern_snapshot(note_snapshot(root.value(), 60.0))
+    s.queue_playback_snapshot(
+      @scheduler.PlaybackSnapshot::pattern(
+        note_snapshot(root.value(), 60.0).playback(),
+      ),
+    )
     s.render_block(left, right)
     // Old voices keep ADSR at index 1; new voices have an oscillator there.
     p
@@ -605,7 +644,9 @@ test "Retune preflights later voices before mutating the first voice" {
         pat=@score.note(60.0).fast(@pattern.Rational::from_int(400)),
       ),
     ])
-    s.queue_pattern_snapshot(quick.lower())
+    s.queue_playback_snapshot(
+      @scheduler.PlaybackSnapshot::pattern(quick.lower().playback()),
+    )
     s.render_block(left, right)
   }
   @debug.assert_eq(sched.active_note_count(), 2)
@@ -636,7 +677,11 @@ test "render_block: queued snapshot does not backfill past onsets" {
   let (pool, sched, left, right) = make_test_sched()
   sched.render_block(left, right)
   @debug.assert_eq(sched.sample_counter(), 128L)
-  sched.queue_pattern_snapshot(note_snapshot("late_snapshot_note", 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("late_snapshot_note", 60.0).playback(),
+    ),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -646,11 +691,19 @@ test "render_block: queued snapshot does not backfill past onsets" {
 ///|
 test "render_block: silent edit lets active note ring" {
   let (pool, sched, left, right) = make_test_sched()
-  sched.queue_pattern_snapshot(note_snapshot("ring_note", 60.0))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("ring_note", 60.0).playback(),
+    ),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
-  sched.queue_pattern_snapshot(silence_snapshot("ring_silence"))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      silence_snapshot("ring_silence").playback(),
+    ),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -659,8 +712,16 @@ test "render_block: silent edit lets active note ring" {
 ///|
 test "render_block: multiple pending snapshots keep the latest" {
   let (pool, sched, left, right) = make_test_sched()
-  sched.queue_pattern_snapshot(note_snapshot("coalesced_note", 60.0))
-  sched.queue_pattern_snapshot(silence_snapshot("coalesced_silence"))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      note_snapshot("coalesced_note", 60.0).playback(),
+    ),
+  )
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      silence_snapshot("coalesced_silence").playback(),
+    ),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -676,7 +737,9 @@ test "render_block: pending song snapshot commits at block boundary" {
   let doc = scheduler_song_doc([
     @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
   ])
-  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
+  )
   assert_first_song_queued(sched)
   sched.render_block(left, right)
   assert_song_accepted(sched)
@@ -706,7 +769,9 @@ test "render_block: same-layout song edit commits without layout boundary change
   let doc = scheduler_song_doc([
     @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
   ])
-  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
+  )
   sched.render_block(left, right)
   let edited_section = section.replace_layer_body(
     layer_id,
@@ -715,7 +780,9 @@ test "render_block: same-layout song edit commits without layout boundary change
   let edited = doc.replace_occurrence_section(main_id, section=edited_section)
   assert_true(edited.revision() != doc.revision())
   assert_true(edited.layout_revision() == doc.layout_revision())
-  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
+  )
   sched.render_block(left, right)
   assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
@@ -738,7 +805,9 @@ test "render_block: layout edit does not backfill past onsets" {
       section~,
     ),
   ])
-  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   let edited = doc.set_occurrence_start(
@@ -746,7 +815,9 @@ test "render_block: layout edit does not backfill past onsets" {
     start=@pattern.Rational::from_int(0),
   )
   assert_true(edited.layout_revision() != doc.layout_revision())
-  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
+  )
   sched.render_block(left, right)
   assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
@@ -766,7 +837,9 @@ test "render_block: layout replacement lets active note ring" {
   let doc = scheduler_song_doc([
     @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
   ])
-  sched.queue_song_snapshot(song_snapshot(doc))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -774,7 +847,9 @@ test "render_block: layout replacement lets active note ring" {
     main_id,
     start=@pattern.Rational::from_int(2),
   )
-  sched.queue_song_snapshot(song_snapshot(edited))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
+  )
   sched.render_block(left, right)
   assert_true(accepted_snapshot(sched).revision() == edited.revision())
   assert_true(
@@ -797,8 +872,12 @@ test "render_block: multiple pending song snapshots keep the latest" {
     main_id,
     start=@pattern.Rational::from_int(2),
   )
-  sched.queue_song_snapshot(song_snapshot(first))
-  sched.queue_song_snapshot(song_snapshot(latest))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(first)),
+  )
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(latest)),
+  )
   sched.render_block(left, right)
   assert_song_accepted(sched)
   assert_true(accepted_snapshot(sched).revision() == latest.revision())
@@ -825,13 +904,13 @@ test "render_block: pattern and song snapshots share one pending slot" {
     ),
   ])
   sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+    @scheduler.PlaybackSnapshot::pattern(pattern.playback()),
   )
   sched.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
   )
   assert_true(sched.accepted_snapshot() is None)
-  guard queued_snapshot(sched) is @scheduler.PlaybackSnapshot::Song(_) else {
+  guard queued_snapshot(sched).song_layout_revision() is Some(_) else {
     fail("expected the latest queued Song snapshot")
   }
   assert_true(queued_snapshot(sched).revision() == song_doc.revision())
@@ -849,11 +928,10 @@ test "render_block: pattern and song snapshots share one pending slot" {
   assert_true(sched.queued_snapshot() is None)
   @debug.assert_eq(pool.active_voice_count(), 0)
   sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::untracked_pattern(pattern),
+    @scheduler.PlaybackSnapshot::pattern(pattern.playback()),
   )
   assert_song_accepted(sched)
-  guard queued_snapshot(sched)
-    is @scheduler.PlaybackSnapshot::UntrackedPattern(_) else {
+  guard queued_snapshot(sched).song_layout_revision() is None else {
     fail("expected a queued Pattern replacement")
   }
   assert_true(queued_snapshot(sched).revision() == pattern.revision())
@@ -1144,8 +1222,12 @@ test "Switching send output leaves dry playback and transport unchanged" {
       played(@pattern.ControlMap::single(Note, 60.0).set(Room, 0.5)),
     ),
   ).lower()
-  sched.queue_pattern_snapshot(snapshot)
-  dry_sched.queue_pattern_snapshot(snapshot)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
+  dry_sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let send_left = @moondsp.AudioBuffer::filled(left.length())
   let send_right = @moondsp.AudioBuffer::filled(right.length())
   for enabled in [true, false, true] {
@@ -1183,7 +1265,9 @@ test "Room scales each post-pan send channel and overwrites previous audio" {
       ),
     ),
   ).lower()
-  sched.queue_pattern_snapshot(snapshot)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let send_left = @moondsp.AudioBuffer::filled(left.length(), init=1.0)
   let send_right = @moondsp.AudioBuffer::filled(right.length(), init=-1.0)
   sched.render_block_with_send(left, right, send_left, send_right)
@@ -1212,10 +1296,14 @@ test "deferred pattern replacement preserves selected voice provenance" {
     ),
     @pattern.PatternDoc::from_pattern(id=sibling, pat=@score.note(72.0)),
   ])
-  sched.queue_pattern_snapshot(initial.lower())
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(initial.lower().playback()),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(sched.active_note_count(), 2)
-  sched.queue_pattern_snapshot(replacement.lower())
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(replacement.lower().playback()),
+  )
   let old_outcome = sched
     .apply_pattern_voice_effect_result(
       @scheduler.PatternVoiceScope::node(selected),
@@ -1266,10 +1354,14 @@ test "deferred song replacement preserves selected layer provenance" {
     occurrence,
     section=edited_section,
   )
-  sched.queue_song_snapshot(song_snapshot(initial))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(initial)),
+  )
   sched.render_block(left, right)
   @debug.assert_eq(sched.active_note_count(), 2)
-  sched.queue_song_snapshot(song_snapshot(replacement))
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::song(song_snapshot(replacement)),
+  )
   let old_outcome = sched
     .apply_song_voice_effect_result(
       @scheduler.SongVoiceScope::layer(section_id, lead_id),
@@ -1322,7 +1414,9 @@ test "Retune changes only its instrument's voices" {
       pat=@score.note(62.0),
     ),
   ])
-  sched.queue_pattern_snapshot(doc.lower())
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(doc.lower().playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
   sched.render_block(left, right)

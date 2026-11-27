@@ -66,6 +66,29 @@ builds to name it.
 Tracked and untracked patterns construct the same number of objects at the
 baseline.
 
+## Playback view (ADR-0031)
+
+2026-11-27, `a197a31` (main) against the ADR-0031 branch, same method and
+cases. PCM hashes and onset rows are identical in every case; onset
+observation does not change the counts.
+
+| Case | main | ADR-0031 | Change |
+|---|---:|---:|---:|
+| tracked pattern | 984,152 | 984,152 | 0 |
+| tracked song | 368,924 | 361,705 | −7,219 (−1.96%) |
+| untracked pattern | 984,152 | 984,152 | 0 |
+| untracked song | 350,485 | 359,783 | +9,298 (+2.65%) |
+
+The first version passed a lambda to `PlaybackPattern::query_for_entry` on
+every query: one closure per entry query (+6,000 for patterns; main's lambda
+went to `Array::map` and was inlined). `query_for_entry` now takes the
+query's `Placement` as an argument and a mapper built once per entry — a
+named function for patterns, one closure per song entry — so a query
+constructs no closure. Tracked songs drop because each entry's view and
+section placement are built once, not sliced per query. Untracked songs
+place each event twice (section, then playback origin) where main shifted
+the already-placed occurrence body once.
+
 ## Limits
 
 Constructions only, not bytes. One run per build; the counts are deterministic.

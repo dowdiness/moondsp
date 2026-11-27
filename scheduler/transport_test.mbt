@@ -286,11 +286,13 @@ test "material admission rejects before retiming and restart recovers capacity" 
     name : String,
     note : Double,
   ) -> @scheduler.PlaybackSnapshot raise {
-    @scheduler.PlaybackSnapshot::untracked_pattern(
+    @scheduler.PlaybackSnapshot::pattern(
       @pattern.PatternDoc::from_pattern(
         id=@identity.PatternNodeId::from_string(name),
         pat=@score.note(note).slow(@pattern.Rational::from_int(1000)).material(),
-      ).lower(),
+      )
+      .lower()
+      .playback(),
     )
   }
   let (second, _, left, right) = transport_fixture(sample_rate=128.0)

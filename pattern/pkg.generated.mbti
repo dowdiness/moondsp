@@ -141,6 +141,7 @@ pub fn[A] Pat::from_query((TimeSpan) -> Array[Event[A]]) -> Self[A]
 pub fn[A] Pat::gate(Self[A], Rational) -> Self[A]
 pub fn[A : WithControls] Pat::jux(Self[A], (Self[A]) -> Self[A]) -> Self[A]
 pub fn[A] Pat::material(Self[A]) -> Self[A]
+pub fn[A] Pat::playback(Self[A]) -> PlaybackPattern[A]
 pub fn[A] Pat::pure(A, content? : String) -> Self[A]
 pub fn[A] Pat::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A] Pat::rev(Self[A]) -> Self[A]
@@ -229,6 +230,15 @@ pub struct Placement {
 }
 pub fn Placement::Placement(origin? : Rational, rate? : Rational) -> Self
 pub fn Placement::local_span(Self, TimeSpan) -> TimeSpan
+pub fn Placement::origin(Self) -> Rational
+
+pub struct PlaybackPattern[A] {
+  // private fields
+}
+pub fn[A : WithControls] PlaybackPattern::entered(Self[A], Rational) -> Self[A]?
+pub fn[A] PlaybackPattern::entries(Self[A]) -> Array[Pat[A]]
+pub fn[A : WithControls, B] PlaybackPattern::query_for_entry(Self[A], Int32, TimeSpan, Placement, (Placement, Event[A], PatternNodePath?, Controls, EventWithOrigin[A]?) -> B) -> Array[B]
+pub fn[A] PlaybackPattern::revision(Self[A]) -> @identity.Revision?
 
 pub struct QueryWindow {
   // private fields
@@ -317,6 +327,7 @@ pub fn[A] TrackedPatternSnapshot::as_snapshot(Self[A]) -> UntrackedPatternSnapsh
 pub fn[A] TrackedPatternSnapshot::control_traces(Self[A], @identity.SourceAtomId) -> Array[ControlTrace]
 pub fn[A : WithControls] TrackedPatternSnapshot::entered(Self[A], Rational) -> Self[A]
 pub fn[A] TrackedPatternSnapshot::pat(Self[A]) -> Pat[A]
+pub fn[A] TrackedPatternSnapshot::playback(Self[A]) -> PlaybackPattern[A]
 pub fn[A : WithControls] TrackedPatternSnapshot::query(Self[A], TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A : WithControls] TrackedPatternSnapshot::query_for_entry(Self[A], Int32, TimeSpan) -> Array[EventWithOrigin[A]]
 pub fn[A] TrackedPatternSnapshot::revision(Self[A]) -> @identity.Revision
@@ -327,6 +338,7 @@ pub struct UntrackedPatternSnapshot[A] {
 }
 pub fn[A : WithControls] UntrackedPatternSnapshot::entered(Self[A], Rational) -> Self[A]
 pub fn[A] UntrackedPatternSnapshot::pat(Self[A]) -> Pat[A]
+pub fn[A] UntrackedPatternSnapshot::playback(Self[A]) -> PlaybackPattern[A]
 pub fn[A] UntrackedPatternSnapshot::query(Self[A], TimeSpan) -> Array[Event[A]]
 pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events(Self[A], TimeSpan) -> Array[PatternSnapshotEvent[A]]
 pub fn[A : WithControls] UntrackedPatternSnapshot::query_sourced_events_for_entry(Self[A], Int32, TimeSpan) -> Array[PatternSnapshotEvent[A]]

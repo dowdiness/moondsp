@@ -20,9 +20,8 @@ range".
 ## Decision
 
 1. **A `Score` is the value a player accepts.** It holds the lowered
-   material, its tempo, its layout and how long it plays. `Score::pattern`,
-   `tracked_pattern`, `song` and `tracked_song` build one from content with
-   no player; `Player::compile` builds one from Mini input, because the work
+   material, its tempo, its layout and how long it plays. `Score::pattern` and
+   `song` build one from content with no player (ADR-0031); `Player::compile` builds one from Mini input, because the work
    Mini admits depends on the player's query window, and records that
    window in the score. A player in Fault compiles nothing.
 2. **The player checks its own limits when it accepts.** `update` and

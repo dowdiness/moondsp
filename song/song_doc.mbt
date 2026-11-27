@@ -301,6 +301,28 @@ pub struct SongEntry[C] {
 }
 
 ///|
+/// The section content this entry plays.
+pub fn[C] SongEntry::content(self : SongEntry[C]) -> C {
+  self.content
+}
+
+///|
+/// Which of the content's canonical entries this entry plays.
+pub fn[C] SongEntry::content_entry(self : SongEntry[C]) -> Int32 {
+  self.index
+}
+
+///|
+/// Where the content's time sits in song time: the occurrence's start and
+/// its section's rate.
+pub fn[C] SongEntry::placement(self : SongEntry[C]) -> @pattern.Placement {
+  @pattern.Placement(
+    origin=self.occurrence.start(),
+    rate=self.occurrence.section().scope().rate(),
+  )
+}
+
+///|
 pub fn[C] SongEntry::origin(self : SongEntry[C]) -> SongEventOrigin {
   self.origin
 }
@@ -332,10 +354,7 @@ pub fn[C] SongEntry::slice(
   arc : @pattern.TimeSpan,
 ) -> SongSlice[C]? {
   guard self.occurrence.span().intersect(arc) is Some(arc) else { return None }
-  let placement = @pattern.Placement(
-    origin=self.occurrence.start(),
-    rate=self.occurrence.section().scope().rate(),
-  )
+  let placement = self.placement()
   Some({
     content: self.content,
     entry: self.index,

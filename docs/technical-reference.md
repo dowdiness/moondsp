@@ -1008,8 +1008,8 @@ Current semantics:
   `.hold(s)` remains a physical-duration envelope override and does not use the
   event-derived gate endpoint.
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
-  block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
-  stage a lowered `PlaybackSnapshot` without changing playback immediately;
+  block-processing loop. `queue_playback_snapshot`
+  stages a lowered `PlaybackSnapshot` without changing playback immediately;
   `render_block` and `render_block_with_send` accept the latest queued snapshot
   at block start through one shared implementation. The former writes dry
   stereo; the latter also writes a post-pan, pre-master-gain stereo send using

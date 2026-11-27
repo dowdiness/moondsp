@@ -120,10 +120,8 @@ pub(all) struct SamplerVoice {
 pub struct Score {
   // private fields
 }
-pub fn Score::pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
-pub fn Score::song(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
-pub fn Score::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
-pub fn Score::tracked_song(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
+pub fn Score::pattern(@pattern.PlaybackPattern[@score.ScoreEvent], tempo~ : Tempo) -> Self
+pub fn[C : @song.SongContent] Score::song(@song.SongSnapshot[C], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
 
 #derive(Eq, @debug.Debug)
 pub enum ScoreKind {

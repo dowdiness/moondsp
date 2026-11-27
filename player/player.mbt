@@ -238,7 +238,7 @@ pub fn Player::compile(
   }
   let score = match prepared {
     @mini.PreparedPlayback::TrackedPattern(snapshot, bpm) =>
-      Score::tracked_pattern(snapshot, tempo=score_tempo(bpm))
+      Score::pattern(snapshot.playback(), tempo=score_tempo(bpm))
     @mini.PreparedPlayback::Source(parsed) => {
       let tempo = score_tempo(parsed.bpm())
       match parsed.body() {
@@ -246,12 +246,12 @@ pub fn Player::compile(
           let snapshot = doc.lower() catch {
             error => raise PatternLowering(error)
           }
-          Score::pattern(snapshot, tempo~)
+          Score::pattern(snapshot.playback(), tempo~)
         }
         UntrackedArrangement(song, repeat) =>
           Score::song(lowered_song(song), tempo~, repeat~)
         TrackedArrangement(song, repeat) =>
-          Score::tracked_song(lowered_song(song), tempo~, repeat~)
+          Score::song(lowered_song(song), tempo~, repeat~)
       }
     }
   }

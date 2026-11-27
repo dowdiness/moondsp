@@ -26,10 +26,10 @@ test "regrouping overlay keeps material clocks and publishes current provenance"
   let control = PlaybackState()
   let edited = PlaybackState()
   for state in [control, edited] {
-    state.queue(PlaybackSnapshot::untracked_pattern(before))
+    state.queue(PlaybackSnapshot::pattern(before.playback()))
     state.commit_pending(@pattern.Rational::from_int(0))
   }
-  edited.queue(PlaybackSnapshot::untracked_pattern(after))
+  edited.queue(PlaybackSnapshot::pattern(after.playback()))
   edited.commit_pending(@pattern.Rational::from_int(1))
   assert_false(edited.has_pending())
   assert_eq(notes(edited, 1, 8), notes(control, 1, 8))
