@@ -110,3 +110,15 @@ test "a part name repeated by another part is reported where it repeats" {
   }
   assert_true(source[at:].to_owned().has_prefix("part(\"my part\",\"a\",1)"))
 }
+
+///|
+test "a part with an empty name is a mistake at that part" {
+  let source = "song(section(\"a\",1,note(\"60\")),part(\"\",\"a\"))"
+  let problem = try @mini.PlaybackInput::text(source).compile() catch {
+    problem => Some(problem)
+  } noraise {
+    _ => None
+  }
+  guard problem is Some(Mistake(at, _)) else { fail("expected a mistake") }
+  assert_true(source[at:].to_owned().has_prefix("part(\"\""))
+}
