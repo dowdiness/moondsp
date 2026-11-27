@@ -87,6 +87,7 @@ test "song section entries keep their binding addresses across reordering" {
         "),part(\"p\",\"s\"))",
       )
       .unwrap()
+      .snapshot()
       .song()
     song.occurrences()[0].section().body().entries().map(e => e.entry_key())
   }

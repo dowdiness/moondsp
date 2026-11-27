@@ -74,3 +74,13 @@ test "parts of one section share its identity in the compiled song" {
     entries[0].origin().occurrence() != entries[1].origin().occurrence(),
   )
 }
+
+///|
+test "a section name outside the identity alphabet compiles and stays distinct" {
+  let snapshot = compiled_song(
+    "song(section(\"my verse\",1,note(\"60\")),section(\"my.verse\",1,note(\"62\")),part(\"a1\",\"my verse\"),part(\"a2\",\"my.verse\"))",
+  )
+  let entries = snapshot.entries()
+  assert_eq(entries.length(), 2)
+  assert_true(entries[0].origin().section() != entries[1].origin().section())
+}

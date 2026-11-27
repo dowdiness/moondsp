@@ -302,7 +302,7 @@ an intended method-call API with explicit declarations such as
 `pub extend Revision with Debug::{to_repr}`; the trait implementations remain
 the source of behavior. The cookbook parser's identity, pattern, and song
 dependencies use this form so its `--deny-warn` check stays strict.
-Black-box tests must qualify package calls, for example `@mini.parse_play_source`.
+Black-box tests must qualify package calls, for example `@mini.parse_song`.
 
 ## Git & PR Workflow
 

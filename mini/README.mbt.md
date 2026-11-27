@@ -48,7 +48,7 @@ surface:
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
 | **Frozen Playback Input** | `PlaybackInput`, `CompiledPlayback`, `CompiledMaterial` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::new`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
-| **Song & Utilities** | `ParsedSong[C]` | `ParsedSong::song`, `ParsedSong::bpm` |
+| **Song & Utilities** | `ParsedSong[C]` | `ParsedSong::snapshot`, `ParsedSong::bpm` |
 
 ## Choose an entry point
 
@@ -140,8 +140,8 @@ its captured text/version/source witnesses; subsequent edits or disposal do not
 change it. `compile()` returns a `CompiledPlayback`: its `bpm()` and its lowered
 `material()`, a `CompiledMaterial` that is a tracked or untracked pattern
 snapshot or song snapshot. A song snapshot carries the identities its source
-declares: each part's occurrence id, its section's name and each layer's
-name. `compile()` raises a `SourceProblem`.
+declares: each part's id (or its name) and its section's name; the song parser
+builds a `SongDoc` and lowers it once. `compile()` raises a `SourceProblem`.
 `PlaybackInput::text(text)` explicitly selects untracked programmatic input.
 A tracked compilation failure never falls back to untracked playback.
 
@@ -203,7 +203,9 @@ test "parse song layout and tempo" {
   }
 
   assert_true(parsed.bpm() == Some(96.0))
-  assert_true(parsed.song().duration() == @pattern.Rational::from_int(4))
+  assert_true(
+    parsed.snapshot().song().duration() == @pattern.Rational::from_int(4),
+  )
 }
 ```
 

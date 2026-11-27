@@ -691,10 +691,8 @@ pub fn PlaybackInput::compile(
       )
     (Text, Pattern(doc)) =>
       UntrackedPattern(doc.lower() catch { error => raise lowering(error) })
-    (Song(_, _), TrackedArrangement(song, repeat)) =>
-      TrackedSong(song_snapshot(song), repeat)
-    (Text, UntrackedArrangement(song, repeat)) =>
-      UntrackedSong(song_snapshot(song), repeat)
+    (Song(_, _), TrackedArrangement(song, repeat)) => TrackedSong(song, repeat)
+    (Text, UntrackedArrangement(song, repeat)) => UntrackedSong(song, repeat)
     _ => raise Internal("compiled input changed source mode")
   }
   { material, bpm: source.bpm(), }
@@ -714,62 +712,6 @@ fn lowering(error : @pattern.PatternDocError) -> SourceProblem {
     UnsupportedControl(id) => "unsupported control provider \{id.value()}"
   }
   Internal("lowering: \{message}")
-}
-
-///|
-/// `song` lowered with the identities its source declares: each part's
-/// occurrence id, its section's name, and each layer's name.
-fn[C : @song.SongContent] song_snapshot(
-  song : @song.Song[C],
-) -> @song.SongSnapshot[C] raise SourceProblem {
-  let parts = song
-    .occurrences()
-    .map(occurrence => {
-      let section = occurrence.section()
-      @song.SongOccurrenceDoc::at(
-        id=occurrence.id(),
-        start=occurrence.start(),
-        name=occurrence.name(),
-        section=@song.SectionDoc(
-          id=@identity.SectionId::from_string("section:" + section.name()),
-          name=section.name(),
-          length_cycles=section.length_cycles(),
-          scope=section.scope(),
-          body=section_doc_body(section.section_body()),
-        ) catch {
-          error => raise Internal("song section: \{error}")
-        },
-      )
-    })
-  @song.SongDoc(parts~).lower() catch {
-    error => raise Internal("song lowering: \{error}")
-  }
-}
-
-///|
-fn[C] section_doc_body(
-  body : @song.SectionBody[C],
-) -> @song.SectionDocBody[C] raise {
-  match body {
-    Single(content) =>
-      @song.SectionDocBody::single(
-        @song.SectionLayerDoc(
-          id=@identity.SectionLayerId::from_string("layer:main"),
-          name="main",
-          body=content,
-        ),
-      )
-    Layers(layers) =>
-      @song.SectionDocBody::layers(
-        layers.map(layer => {
-          @song.SectionLayerDoc(
-            id=@identity.SectionLayerId::from_string("layer:" + layer.name()),
-            name=layer.name(),
-            body=layer.body(),
-          )
-        }),
-      )
-  }
 }
 
 ///|

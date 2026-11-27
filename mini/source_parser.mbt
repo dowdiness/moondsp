@@ -1,16 +1,16 @@
 ///|
 /// The source accepted by the player, after pattern bindings and declarations
 /// have been separated from the playable body.
-/// A song's sections are lowered while parsing: to tracked snapshots when the
-/// source is tracked, to untracked patterns otherwise.
-pub enum PlayBody {
+/// A song is lowered while parsing, with tracked section snapshots when the
+/// source is tracked and untracked ones otherwise.
+priv enum PlayBody {
   Pattern(ScoreDoc)
   UntrackedArrangement(
-    @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
   )
   TrackedArrangement(
-    @song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
   )
 }
@@ -20,18 +20,18 @@ pub enum PlayBody {
 pub const DEFAULT_BPM : Double = 120.0
 
 ///|
-pub struct PlaySource {
-  priv body : PlayBody
-  priv bpm : Double
+priv struct PlaySource {
+  body : PlayBody
+  bpm : Double
 }
 
 ///|
-pub fn PlaySource::body(self : PlaySource) -> PlayBody {
+fn PlaySource::body(self : PlaySource) -> PlayBody {
   self.body
 }
 
 ///|
-pub fn PlaySource::bpm(self : PlaySource) -> Double {
+fn PlaySource::bpm(self : PlaySource) -> Double {
   self.bpm
 }
 
@@ -64,7 +64,7 @@ fn Parser::parse_bpm_statement(
 /// Supplying `query_window` enables conservative browser playback admission.
 /// It bounds source construction and every query up to that window,
 /// including future conditional branches; no pattern queries are executed.
-pub fn parse_play_source(
+fn parse_play_source(
   input : String,
   query_window? : @pattern.QueryWindow,
 ) -> Result[PlaySource, SourceProblem] {
@@ -170,14 +170,14 @@ fn parse_play_source_with_origins(
 ///|
 /// Parse the `song(` body opened at `song_at`, from after its `(`, and its
 /// optional `.repeat()`, returning the song, whether it repeats, and its tempo.
-fn[C] Parser::parse_play_song(
+fn[C : @song.SongContent] Parser::parse_play_song(
   self : Parser,
   song_at : Int32,
   builder : MiniDocBuilder,
   admission : PlaybackAdmission?,
   authored_bpm : (Int32, Double)?,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
-) -> (@song.Song[C], Bool, Double) raise SourceProblem {
+) -> (@song.SongSnapshot[C], Bool, Double) raise SourceProblem {
   let parsed = self.parse_song_body(song_at, builder, lower~)
   self.skip_whitespace()
   let before_method = self.pos
@@ -211,7 +211,7 @@ fn[C] Parser::parse_play_song(
     None => parsed.bpm().unwrap_or(DEFAULT_BPM)
   }
   if admission is Some(admission) {
-    admission.arrangement(parsed.song(), repeating)
+    admission.arrangement(parsed.snapshot().song(), repeating)
   }
-  (parsed.song(), repeating, bpm)
+  (parsed.snapshot(), repeating, bpm)
 }

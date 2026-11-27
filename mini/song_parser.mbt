@@ -17,15 +17,16 @@ priv struct SongFillSpec {
 }
 
 ///|
-/// Song parse result with optional playback metadata.
+/// Song parse result with optional playback metadata: the song lowered with
+/// the identities its source declares (see `song_section_id`).
 pub struct ParsedSong[C] {
-  song : @song.Song[C]
+  snapshot : @song.SongSnapshot[C]
   bpm : Double?
 }
 
 ///|
-pub fn[C] ParsedSong::song(self : ParsedSong[C]) -> @song.Song[C] {
-  self.song
+pub fn[C] ParsedSong::snapshot(self : ParsedSong[C]) -> @song.SongSnapshot[C] {
+  self.snapshot
 }
 
 ///|
@@ -80,7 +81,7 @@ pub fn parse_song(
 ///|
 /// The items of the `song(` opened at `song_start`, from after its `(`.
 /// `lower` turns each section's compiled document into the song's content.
-fn[C] Parser::parse_song_body(
+fn[C : @song.SongContent] Parser::parse_song_body(
   self : Parser,
   song_start : Int32,
   builder : MiniDocBuilder,
@@ -90,7 +91,7 @@ fn[C] Parser::parse_song_body(
   guard !self.at_end() && self.input[self.pos] != ')' else {
     raise Mistake(song_start, "song() requires at least one item")
   }
-  let sections : Map[String, @song.Section[C]] = Map([])
+  let sections : Map[String, @song.SectionDoc[C]] = Map([])
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
@@ -117,32 +118,42 @@ fn[C] Parser::parse_song_body(
     self.skip_whitespace()
   }
   self.expect_char(')')
-  let mut song = build_song(part_specs, sections, at=song_start)
+  let parts = [ for spec in part_specs => spec.to_doc(sections) ]
+  let mut doc = song_doc(parts, part_specs, at=song_start)
   for fill in fill_specs {
     let section = resolve_song_section(
       sections,
       fill.section_name,
       at=fill.section_at,
     )
-    if self.admission is Some(_) &&
-      song.occurrences().length() + song.gap_spans().length() > 128 {
+    let gaps = song_of(doc, at=fill.at).gap_spans()
+    if self.admission is Some(_) && doc.occurrence_count() + gaps.length() > 128 {
       raise OverLimit(Occurrences)
     }
-    song = song.fill_gaps(prefix=fill.prefix, section~) catch {
-      error => raise song_mistake(error, [], at=fill.at)
+    let filled = doc.occurrences()
+    for index, gap in gaps {
+      let name = "\{fill.prefix}:\{index}"
+      filled.push(
+        @song.SongOccurrenceDoc::at(
+          id=parse_occurrence_id(name, fill.at),
+          start=gap.begin,
+          name~,
+          section=resized_section(section, gap.duration()),
+        ),
+      )
     }
+    doc = song_doc(filled, [], at=fill.at)
   }
-  let bpm = match bpm_values.get(0) {
-    Some(value) => Some(value)
-    None => None
+  let snapshot = doc.lower() catch {
+    error => raise song_mistake(error, part_specs, at=song_start)
   }
-  { song, bpm, }
+  { snapshot, bpm: bpm_values.get(0), }
 }
 
 ///|
 fn[C] Parser::parse_song_item(
   self : Parser,
-  sections : Map[String, @song.Section[C]],
+  sections : Map[String, @song.SectionDoc[C]],
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
@@ -199,7 +210,7 @@ fn[C] Parser::parse_song_section(
   item_start : Int32,
   builder~ : MiniDocBuilder,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
-) -> @song.Section[C] raise SourceProblem {
+) -> @song.SectionDoc[C] raise SourceProblem {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -220,11 +231,13 @@ fn[C] Parser::parse_song_section(
     "section '\{name}' requires a positive length",
   )
   let content = lower(doc) catch { _ => raise compile_error }
-  @song.Section(
+  @song.SectionDoc::single(
+    id=song_section_id(name),
     name~,
     length_cycles~,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(content),
+    layer_id=main_layer(),
+    body=content,
   ) catch {
     _ => raise length_error
   }
@@ -372,10 +385,10 @@ fn parse_occurrence_id(
 
 ///|
 fn[C] resolve_song_section(
-  sections : Map[String, @song.Section[C]],
+  sections : Map[String, @song.SectionDoc[C]],
   name : String,
   at~ : Int32,
-) -> @song.Section[C] raise SourceProblem {
+) -> @song.SectionDoc[C] raise SourceProblem {
   match sections.get(name) {
     Some(section) => section
     None => raise Mistake(at, "unknown song section '\{name}'")
@@ -383,33 +396,111 @@ fn[C] resolve_song_section(
 }
 
 ///|
-fn[C] SongPartSpec::to_part(
+fn[C] SongPartSpec::to_doc(
   self : SongPartSpec,
-  sections : Map[String, @song.Section[C]],
-) -> @song.SongPart[C] raise SourceProblem {
+  sections : Map[String, @song.SectionDoc[C]],
+) -> @song.SongOccurrenceDoc[C] raise SourceProblem {
   let section = resolve_song_section(
     sections,
     self.section_name,
     at=self.section_at,
   )
-  match (self.id, self.start) {
-    (Some(id), Some(start)) =>
-      @song.SongPart::with_id_at(id~, start~, name=self.name, section~)
-    (Some(id), None) => @song.SongPart::with_id(id~, name=self.name, section~)
-    (None, Some(start)) => @song.SongPart::at(start~, name=self.name, section~)
-    (None, None) => @song.SongPart(name=self.name, section~)
+  // A part without an id is identified by its name.
+  let id = match self.id {
+    Some(id) => id
+    None => parse_occurrence_id(self.name, self.at)
+  }
+  match self.start {
+    Some(start) =>
+      @song.SongOccurrenceDoc::at(id~, start~, name=self.name, section~)
+    None => @song.SongOccurrenceDoc(id~, name=self.name, section~)
   }
 }
 
 ///|
-fn[C] build_song(
+fn[C] song_doc(
+  parts : Array[@song.SongOccurrenceDoc[C]],
   specs : Array[SongPartSpec],
-  sections : Map[String, @song.Section[C]],
+  at~ : Int32,
+) -> @song.SongDoc[C] raise SourceProblem {
+  @song.SongDoc(parts~) catch {
+    EmptySongDoc => raise Mistake(at, "song() requires at least one part")
+    DuplicateSongDocOccurrenceName(name) =>
+      raise song_mistake(DuplicateOccurrence(name), specs, at~)
+    // A part without an id takes its name as its id, so a repeated name
+    // surfaces as a repeated id.
+    DuplicateSongDocOccurrenceId(id) =>
+      raise song_mistake(
+        if specs.any(spec => spec.id is None && spec.name == id) {
+          DuplicateOccurrence(id)
+        } else {
+          DuplicateOccurrenceId(id)
+        },
+        specs,
+        at~,
+      )
+  }
+}
+
+///|
+/// The arrangement `doc` lays out.
+fn[C] song_of(
+  doc : @song.SongDoc[C],
   at~ : Int32,
 ) -> @song.Song[C] raise SourceProblem {
-  let parts = [ for spec in specs => spec.to_part(sections) ]
-  @song.Song(parts~) catch {
-    error => raise song_mistake(error, specs, at~)
+  doc.to_song() catch {
+    error => raise song_mistake(error, [], at~)
+  }
+}
+
+///|
+/// `section` lasting `length` cycles, as a fill occurrence plays it.
+fn[C] resized_section(
+  section : @song.SectionDoc[C],
+  length : @pattern.Rational,
+) -> @song.SectionDoc[C] raise SourceProblem {
+  @song.SectionDoc(
+    id=section.id(),
+    name=section.name(),
+    length_cycles=length,
+    scope=section.scope(),
+    body=section.body(),
+  ) catch {
+    _ => raise Internal("fill of section '\{section.name()}'")
+  }
+}
+
+///|
+/// The one layer of a Mini section.
+fn main_layer() -> @identity.SectionLayerId {
+  @identity.SectionLayerId::from_string("main") catch {
+    _ => abort("valid layer id")
+  }
+}
+
+///|
+/// A section's identity is its name. Code units outside the identity alphabet,
+/// and `.` itself, are written `.xxxx.` in hex, so distinct names stay
+/// distinct.
+fn song_section_id(name : String) -> @identity.SectionId {
+  let encoded = StringBuilder()
+  encoded.write_string("section:")
+  for index in 0..<name.length() {
+    let code = name[index].to_int()
+    let plain = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
+      (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
+      (code >= '0'.to_int() && code <= '9'.to_int()) ||
+      code == '_'.to_int() ||
+      code == '-'.to_int() ||
+      code == ':'.to_int()
+    if plain {
+      encoded.write_char(name[index].unsafe_to_char())
+    } else {
+      encoded.write_string(".\{code.to_string(radix=16)}.")
+    }
+  }
+  @identity.SectionId::from_string(encoded.to_string()) catch {
+    _ => abort("encoded section names are valid identities")
   }
 }
 

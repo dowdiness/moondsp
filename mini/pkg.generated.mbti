@@ -20,8 +20,6 @@ pub fn parse(String) -> Result[@pattern.Pat[@score.ScoreEvent], String]
 
 pub fn parse_doc(String) -> Result[@pattern.PatternDoc[@score.ScoreEvent], String]
 
-pub fn parse_play_source(String, query_window? : @pattern.QueryWindow) -> Result[PlaySource, SourceProblem]
-
 pub fn parse_snapshot(String) -> Result[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], String]
 
 pub fn parse_song(String) -> Result[ParsedSong[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], String]
@@ -198,23 +196,11 @@ pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
 pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
 
 pub struct ParsedSong[C] {
-  song : @song.Song[C]
+  snapshot : @song.SongSnapshot[C]
   bpm : Double?
 }
 pub fn[C] ParsedSong::bpm(Self[C]) -> Double?
-pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
-
-pub enum PlayBody {
-  Pattern(@pattern.PatternDoc[@score.ScoreEvent])
-  UntrackedArrangement(@song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], Bool)
-  TrackedArrangement(@song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
-}
-
-pub struct PlaySource {
-  // private fields
-}
-pub fn PlaySource::body(Self) -> PlayBody
-pub fn PlaySource::bpm(Self) -> Double
+pub fn[C] ParsedSong::snapshot(Self[C]) -> @song.SongSnapshot[C]
 
 pub struct PlaybackInput {
   // private fields

@@ -39,9 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `@mini.PlaybackInput::compile` returns one shape, a
   `CompiledPlayback` of lowered `CompiledMaterial` (tracked or untracked
   pattern or song snapshot) and its `bpm()`, and raises `SourceProblem`.
-  `PreparedPlayback` is removed. Mini lowers songs with the identities their
-  source declares (part ids, section names, layer names), so `player` no
-  longer rebuilds them from names; `ScoreError::InvalidSource` carries the
+  `PreparedPlayback` is removed. Mini's song parser builds a `SongDoc` with
+  the identities its source declares and lowers it once: a part's id (or its
+  name), and its section's name, encoded into the identity alphabet so any
+  name works. `parse_song` returns `ParsedSong::snapshot()` instead of
+  `song()`, and `player` no longer rebuilds songs from names;
+  `parse_play_source`, `PlaySource` and `PlayBody` are private; `ScoreError::InvalidSource` carries the
   `SourceProblem`, and `PatternLowering` and `SongLowering` are removed: a
   lowering failure is Mini's `Internal` problem.
 - **Breaking:** playback takes one view of a pattern, whatever tracks it

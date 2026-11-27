@@ -6,7 +6,7 @@ fn unwrap_parsed_song(
   ],
 ) -> @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   match result {
-    Ok(parsed) => parsed.song()
+    Ok(parsed) => parsed.snapshot().song()
     Err(msg) => abort("expected parsed song, got Err(\{msg})")
   }
 }
@@ -66,7 +66,7 @@ test "parse_song captures optional tempo metadata" {
     Err(msg) => abort("expected parsed song with bpm, got Err(\{msg})")
   }
   assert_true(parsed.bpm() == Some(72.0))
-  @debug.assert_eq(parsed.song().occurrence_count(), 1)
+  @debug.assert_eq(parsed.snapshot().song().occurrence_count(), 1)
 }
 
 ///|
