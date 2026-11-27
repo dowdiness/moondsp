@@ -1,129 +1,110 @@
-// Drives one test player the way the browser host's exports do, so the
-// session tests read like the host's while asserting on the scheduler itself.
-// Sources are untracked text, as the host's `kind: "text"` wire sends them.
+// Helpers that call a test player directly and return what it raised, so the
+// tests assert on the player's states and errors.
 
 ///|
-let player : Ref[Player?] = Ref(None)
+/// The block the last `render_blocks` rendered.
+let out_left : @moondsp.AudioBuffer = @moondsp.AudioBuffer::filled(128)
 
 ///|
-let last_error : Ref[String] = Ref("")
+let out_right : @moondsp.AudioBuffer = @moondsp.AudioBuffer::filled(128)
 
 ///|
-fn init_scheduler_graph_for_test(
-  sample_rate~ : Double = 48000.0,
-  block_size~ : Int32 = 128,
-) -> Bool {
-  player.val = Some(test_player(sample_rate~, block_size~)) catch {
-    _ => {
-      player.val = None
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// 0 on success, 2 when the layout needs a restart, otherwise 1, as the
-/// host's commands return.
-fn command(f : (Player) -> Unit raise PlayerError) -> Int32 {
-  guard player.val is Some(owner) else { return 1 }
-  f(owner) catch {
-    error => {
-      last_error.val = error.message()
-      return if error is RestartRequired { 2 } else { 1 }
-    }
-  }
-  0
-}
-
-///|
-fn submit_for_test(text : String, restart~ : Bool = true) -> Int32 {
-  let input = @mini.PlaybackInput::text(text)
-  command(owner => {
-    if restart {
-      owner.restart(input)
-    } else {
-      owner.update(input)
-    }
-  })
-}
-
-///|
-fn render_for_test(count : Int32) -> Unit raise {
+fn render_blocks(player : Player, count : Int32) -> Unit raise {
   for _ in 0..<count {
-    guard player.val.unwrap().process() else {
+    guard player.process(out_left, out_right) is None else {
       fail("expected a rendered block")
     }
   }
 }
 
 ///|
+/// Energy of the left channel of the last rendered block.
 fn output_energy() -> Double {
-  block_energy(player.val.unwrap())
+  let mut energy = 0.0
+  for i in 0..<out_left.length() {
+    energy += out_left.get(i).abs()
+  }
+  energy
 }
 
 ///|
-fn scheduler_left_sample(index : Int32) -> Double {
-  player.val.unwrap().left.get(index)
-}
-
-///|
-fn player_play() -> Int32 {
-  command(owner => owner.play())
-}
-
-///|
-fn player_pause() -> Int32 {
-  command(owner => owner.pause())
-}
-
-///|
-fn set_scheduler_bpm(bpm : Double) -> Int32 {
-  command(owner => owner.set_tempo(bpm))
-}
-
-///|
-fn player_state() -> Int32 {
-  match player.val.unwrap().state() {
-    Empty => 0
-    Ready => 1
-    Playing => 2
-    Paused => 3
-    Ended => 4
-    Fault => 5
+/// What `f` raised, if it raised.
+fn raised(f : () -> Unit raise PlayerError) -> PlayerError? {
+  try {
+    f()
+    None
+  } catch {
+    error => Some(error)
   }
 }
 
 ///|
-fn player_mode() -> PlaybackMode {
-  player.val.unwrap().mode()
+/// Compile untracked `text`, as the host's `kind: "text"` wire sends it, and
+/// accept it by restart or update.
+fn submit(
+  player : Player,
+  text : String,
+  restart~ : Bool = true,
+) -> PlayerError? {
+  raised(() => {
+    let score = player.compile(@mini.PlaybackInput::text(text))
+    compiled[text] = score
+    if restart {
+      player.restart(score)
+    } else {
+      player.update(score)
+    }
+  })
 }
 
 ///|
-fn player_pending_count() -> Int32 {
-  player.val.unwrap().view().pending_materials
+/// The score each text compiled to last, so a test can tell which one the
+/// player holds.
+let compiled : Map[String, Score] = Map([])
+
+///|
+/// The player holds the score `text` compiled to last.
+fn assert_accepted(player : Player, text : String) -> Unit raise {
+  guard player.session.score() is Some(accepted) &&
+    compiled.get(text) is Some(score) &&
+    physical_equal(accepted, score) else {
+    fail("expected the accepted score to be \{text}")
+  }
 }
 
 ///|
-fn scheduler_cycle_position() -> Double {
-  player.val.unwrap().cycle_position()
+fn play(player : Player) -> PlayerError? {
+  raised(() => player.play())
 }
 
 ///|
-fn scheduler_sample_position() -> Double {
-  player.val.unwrap().view().sample_position
+fn pause(player : Player) -> PlayerError? {
+  raised(() => player.pause())
+}
+
+///|
+fn set_tempo(player : Player, bpm : Double) -> PlayerError? {
+  raised(() => player.set_tempo(bpm))
+}
+
+///|
+/// The player refused, for any reason but a layout that needs a restart.
+fn assert_rejected(error : PlayerError?) -> Unit raise {
+  guard error is Some(error) && !(error is RestartRequired) else {
+    fail("expected a refusal, got \{Repr(error)}")
+  }
 }
 
 ///|
 /// The scheduler's own sample clock, in every state.
-fn assert_position(position : Int32) -> Unit raise {
-  assert_eq(player.val.unwrap().scheduler.sample_counter(), position.to_int64())
+fn assert_position(player : Player, position : Int32) -> Unit raise {
+  assert_eq(player.scheduler.sample_counter(), position.to_int64())
 }
 
 ///|
 /// The tempo the scheduler runs at, not the tempo the session reports.
-fn assert_tempo(bpm : Double) -> Unit raise {
-  assert_eq(player.val.unwrap().scheduler.bpm(), bpm)
+fn assert_tempo(player : Player, bpm : Double) -> Unit raise {
+  assert_eq(player.scheduler.bpm(), bpm)
 }
 
 ///|

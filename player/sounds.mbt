@@ -201,23 +201,32 @@ fn make_sample_pool(
 }
 
 ///|
-/// A scheduler with a voice pool for every drum and instrument, built from
-/// `drum` and `instrument`, and one for every sample, built from `sampler`.
-/// Pools read samples from `ctx`'s sample store. `None` when a pool or the
-/// scheduler refuses `ctx`'s format.
+/// How a player's drums, instruments and samples sound. The browser host and
+/// an offline renderer that must sound alike share one.
+pub(all) struct Sounds {
+  /// The graph each drum plays.
+  drum : (@score.Drum) -> @moondsp.AnalyzedGraph
+  /// The voice each instrument plays notes on.
+  instrument : (@score.Instrument) -> NoteVoice
+  /// The voice every sample plays on.
+  sampler : SamplerVoice
+}
+
+///|
+/// A scheduler with a voice pool for every drum and instrument and one for
+/// every sample, as `sounds` says. Pools read samples from `ctx`'s sample
+/// store. `None` when a pool or the scheduler refuses `ctx`'s format.
 fn scheduler_with_sounds(
   ctx : @moondsp.DspContext,
-  drum : (@score.Drum) -> @moondsp.AnalyzedGraph,
-  instrument : (@score.Instrument) -> NoteVoice,
-  sampler : SamplerVoice,
+  sounds : Sounds,
 ) -> (@scheduler.PatternScheduler, @moondsp.BoundVoicePool)? {
   let drums = @score.Drum::all()
   let instruments = @score.Instrument::all()
   // Every sample plays on the sampler pool, the last.
   let candidates = [
-    ..drums.map(d => make_drum_pool(drum(d), ctx)),
-    ..instruments.map(i => make_note_pool(instrument(i), ctx)),
-    make_sample_pool(sampler, ctx),
+    ..drums.map(d => make_drum_pool((sounds.drum)(d), ctx)),
+    ..instruments.map(i => make_note_pool((sounds.instrument)(i), ctx)),
+    make_sample_pool(sounds.sampler, ctx),
   ]
   let pools : Array[@moondsp.BoundVoicePool] = []
   for candidate in candidates {

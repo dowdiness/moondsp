@@ -41,41 +41,30 @@ fn test_player(
   block_size~ : Int32 = 128,
 ) -> Player raise PlayerError {
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
-  Player(ctx, drum=test_drum, instrument=test_voice, sampler={
-    attack_ms: 0.0,
-    decay_ms: 0.0,
-    sustain: 1.0,
-    release_ms: 10.0,
-    lpf_hz: 8000.0,
-    lpf_q: 0.707,
-    amount: 1.0,
-    voices: 4,
+  Player(ctx, {
+    drum: test_drum,
+    instrument: test_voice,
+    sampler: {
+      attack_ms: 0.0,
+      decay_ms: 0.0,
+      sustain: 1.0,
+      release_ms: 10.0,
+      lpf_hz: 8000.0,
+      lpf_q: 0.707,
+      amount: 1.0,
+      voices: 4,
+    },
   })
 }
 
 ///|
-/// The tracked input a draft of `text` prepares, as the editor sends it.
-fn draft_input(text : String) -> @mini.PlaybackInput raise {
+/// The score `player` compiles from the tracked input a draft of `text`
+/// prepares, as the editor sends it.
+fn tracked(player : Player, text : String) -> Score raise {
   guard @mini.Draft(text).prepare_playback() is Ok(input) else {
     fail("expected \{text} to prepare")
   }
-  input
-}
-
-///|
-fn render_blocks(player : Player, count : Int32) -> Unit raise {
-  for _ in 0..<count {
-    guard player.process() else { fail("expected a rendered block") }
-  }
-}
-
-///|
-fn block_energy(player : Player) -> Double {
-  let mut energy = 0.0
-  for i in 0..<player.left.length() {
-    energy += player.left.get(i).abs()
-  }
-  energy
+  player.compile(input)
 }
 
 ///|
@@ -91,23 +80,23 @@ fn wet_energy(player : Player) -> Double {
 test "offline rendering plays a finite song to its end and keeps its tails" {
   let player = test_player()
   let song = "bpm(240); song(section(\"a\",1,note(\"60 64\")),part(\"a1\",\"a\"))"
-  player.restart(draft_input(song))
+  player.restart(tracked(player, song))
   // One cycle at 240 BPM is one second: 375 blocks of 128 frames at 48 kHz.
   let mut blocks = 0
   let mut energy = 0.0
   while player.state() is Playing && blocks < 1000 {
     render_blocks(player, 1)
-    energy += block_energy(player)
+    energy += output_energy()
     blocks += 1
   }
   assert_eq(player.state(), Ended)
   assert_eq(blocks, 375)
   assert_true(energy > 0.01)
-  assert_eq(player.view().sample_position, 48000.0)
+  assert_eq(player.sample_position(), 48000.0)
   // The last note ends with the song; its release still sounds.
   render_blocks(player, 1)
   assert_eq(player.state(), Ended)
-  assert_true(block_energy(player) > 0.0)
+  assert_true(output_energy() > 0.0)
 }
 
 ///|
@@ -116,9 +105,9 @@ test "source tempo commits at unchanged musical position" {
   let song = fn(bpm : Int32) {
     "song(bpm(\{bpm}),section(\"a\",8,note(\"60\")),part(\"a1\",\"a\"))"
   }
-  player.restart(draft_input(song(120)))
+  player.restart(tracked(player, song(120)))
   render_blocks(player, 4)
-  player.update(draft_input(song(90)))
+  player.update(tracked(player, song(90)))
   assert_eq(player.scheduler.sample_counter(), 512L)
   assert_eq(player.scheduler.bpm(), 90.0)
   render_blocks(player, 1)
@@ -133,15 +122,15 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
   let before = "song(section(\"a\",4,s(\"bd\").slow(8).room(1)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
   let after = "song(section(\"a\",4,s(\"bd\").slow(8).gain(0)),section(\"b\",4,s(\"sd\").slow(8)),part(\"a1\",\"a\",0),part(\"b1\",\"b\",0))"
   let player = test_player()
-  player.restart(draft_input(before))
+  player.restart(tracked(player, before))
   render_blocks(player, 30)
   assert_true(wet_energy(player) > 0.0)
-  player.update(draft_input(after))
+  player.update(tracked(player, after))
   render_blocks(player, 1)
   assert_true(wet_energy(player) > 0.0)
   assert_true(player.scheduler.active_note_count() > 0)
-  assert_true(block_energy(player) > 0.0)
-  player.restart(draft_input(after))
+  assert_true(output_energy() > 0.0)
+  player.restart(tracked(player, after))
   render_blocks(player, 1)
   assert_eq(wet_energy(player), 0.0)
   assert_true(player.scheduler.active_note_count() > 0)
@@ -150,14 +139,15 @@ test "shared room tail survives a two-part continue edit and restart clears it" 
 ///|
 test "room send leaves dry playback dry and adds one wet return" {
   let dry = test_player()
-  dry.restart(draft_input("s(\"bd\").slow(8)"))
+  dry.restart(tracked(dry, "s(\"bd\").slow(8)"))
   render_blocks(dry, 30)
   assert_eq(wet_energy(dry), 0.0)
+  let dry_output = output_energy()
   let wet = test_player()
-  wet.restart(draft_input("s(\"bd\").slow(8).room(1)"))
+  wet.restart(tracked(wet, "s(\"bd\").slow(8).room(1)"))
   render_blocks(wet, 30)
   assert_true(wet_energy(wet) > 0.0)
-  assert_true((block_energy(wet) - block_energy(dry)).abs() > 0.000001)
+  assert_true((output_energy() - dry_output).abs() > 0.000001)
 }
 
 ///|
@@ -244,4 +234,44 @@ test "the sampler pool is silent until its sample loads, then lpf and gain shape
   assert_true(open > 1.0)
   assert_true(filtered < open * 0.2)
   assert_true((quieter / open - 0.25).abs() < 0.01)
+}
+
+///|
+test "a score with no source text plays and reports no source" {
+  let player = test_player()
+  let doc = @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string("generated"),
+    pat=@pattern.sequence([@score.note(60.0), @score.note(67.0)]),
+  )
+  player.restart(Score::pattern(doc.lower(), bpm=120.0))
+  assert_eq(player.mode(), Some(Pattern))
+  render_blocks(player, 1)
+  assert_true(output_energy() > 0.01)
+}
+
+///|
+test "process refuses buffers that do not hold one block" {
+  let player = test_player()
+  player.restart(tracked(player, "note(\"60\")"))
+  let short = @moondsp.AudioBuffer::filled(64)
+  guard player.process(short, out_right)
+    is Some(BufferSizeMismatch(expected=128, actual=64)) else {
+    fail("expected a buffer size mismatch")
+  }
+  assert_eq(player.scheduler.sample_counter(), 0L)
+}
+
+///|
+test "a score compiled for shorter blocks is refused, and for the same blocks accepted" {
+  let short_blocks = test_player(block_size=64)
+  let score = short_blocks.compile(@mini.PlaybackInput::text("note(\"60\")"))
+  let long_blocks = test_player(block_size=128)
+  guard raised(() => long_blocks.restart(score))
+    is Some(CompiledForShorterBlocks) else {
+    fail("expected a score compiled for 64-frame blocks to be refused")
+  }
+  assert_eq(long_blocks.state(), Empty)
+  let same_blocks = test_player(block_size=64)
+  same_blocks.restart(score)
+  assert_eq(same_blocks.state(), Playing)
 }

@@ -1,6 +1,7 @@
 # ADR-0029: The player is platform-free, below the browser host
 
-- **Status:** Accepted
+- **Status:** Accepted. Its `Player` interface is refined by
+  [ADR-0030](0030-players-accept-scores.md).
 - **Date:** 2026-11-25
 - **Refines:** [ADR-0015](0015-graph-internal-boundaries-and-maintainability.md)
   (browser shape: `browser/internal/playback_host`)

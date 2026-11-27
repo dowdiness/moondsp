@@ -89,8 +89,8 @@ pub fn player_state() -> Int32 {
 pub fn player_mode() -> PlaybackMode {
   match @playback_host.player_mode() {
     None => None
-    Pattern => Pattern
-    Song => Song
+    Some(Pattern) => Pattern
+    Some(Song) => Song
   }
 }
 

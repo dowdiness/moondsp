@@ -3,6 +3,18 @@
 let player : @ref.Ref[@player.Player?] = Ref(None)
 
 ///|
+/// The block the player last rendered, which the Worklet reads sample by
+/// sample. Empty while there is no player.
+let output_left : @ref.Ref[@moondsp.AudioBuffer] = Ref(
+  @moondsp.AudioBuffer::filled(0),
+)
+
+///|
+let output_right : @ref.Ref[@moondsp.AudioBuffer] = Ref(
+  @moondsp.AudioBuffer::filled(0),
+)
+
+///|
 /// Give every drum and instrument a voice pool, built from `drum` and
 /// `instrument`, and the samples one pool, built from `sampler`. Pools read
 /// samples from the store `init_sample_store` made, if it made one.
@@ -15,18 +27,20 @@ pub fn init_scheduler_graph_with_sounds(
 ) -> Bool {
   // The scheduler and its voice pools refuse any format they cannot run.
   let ctx = sample_context(sample_rate, block_size)
-  let owner = @player.Player(
-    ctx,
-    drum=d => @moondsp.AnalyzedGraph::analyze(drum(d)),
-    instrument~,
-    sampler~,
-  ) catch {
+  let sounds : @player.Sounds = {
+    drum: d => @moondsp.AnalyzedGraph::analyze(drum(d)),
+    instrument,
+    sampler,
+  }
+  let owner = @player.Player(ctx, sounds) catch {
     _ => {
       reset_scheduler_graph()
       return false
     }
   }
   player.val = Some(owner)
+  output_left.val = @moondsp.AudioBuffer::filled(block_size)
+  output_right.val = @moondsp.AudioBuffer::filled(block_size)
   playback_input_chars.clear()
   true
 }
@@ -34,6 +48,8 @@ pub fn init_scheduler_graph_with_sounds(
 ///|
 pub fn reset_scheduler_graph() -> Unit {
   player.val = None
+  output_left.val = @moondsp.AudioBuffer::filled(0)
+  output_right.val = @moondsp.AudioBuffer::filled(0)
   playback_input_chars.clear()
 }
 
@@ -45,18 +61,12 @@ fn checked_sample(index : Int32, buffer : @moondsp.AudioBuffer) -> Double {
 
 ///|
 pub fn scheduler_left_sample(index : Int32) -> Double {
-  match player.val {
-    Some(owner) => checked_sample(index, owner.left())
-    None => 0.0
-  }
+  checked_sample(index, output_left.val)
 }
 
 ///|
 pub fn scheduler_right_sample(index : Int32) -> Double {
-  match player.val {
-    Some(owner) => checked_sample(index, owner.right())
-    None => 0.0
-  }
+  checked_sample(index, output_right.val)
 }
 
 ///|
@@ -65,13 +75,13 @@ pub fn process_scheduler_block() -> Bool {
     ignore(set_scheduler_parse_error("Player is not initialized"))
     return false
   }
-  if owner.process() {
-    return true
+  match owner.process(output_left.val, output_right.val) {
+    None => true
+    Some(error) => {
+      ignore(set_scheduler_parse_error(error.message()))
+      false
+    }
   }
-  if owner.fault() is Some(message) {
-    ignore(set_scheduler_parse_error(message))
-  }
-  false
 }
 
 ///|

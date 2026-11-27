@@ -35,7 +35,7 @@ fn take_playback_input() -> Result[@mini.PlaybackInput, String] {
 pub fn player_update_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
-    Ok(input) => player_command(owner => owner.update(input))
+    Ok(input) => player_command(owner => owner.update(owner.compile(input)))
   }
 }
 
@@ -43,7 +43,7 @@ pub fn player_update_input() -> Int32 {
 pub fn player_restart_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
-    Ok(input) => player_command(owner => owner.restart(input))
+    Ok(input) => player_command(owner => owner.restart(owner.compile(input)))
   }
 }
 
@@ -74,7 +74,7 @@ pub fn player_state() -> Int32 {
 }
 
 ///|
-pub fn player_mode() -> @player.PlaybackMode {
+pub fn player_mode() -> @player.ScoreKind? {
   match player.val {
     Some(owner) => owner.mode()
     None => None
@@ -92,7 +92,7 @@ pub fn scheduler_cycle_position() -> Double {
 ///|
 pub fn player_pending_count() -> Int32 {
   match player.val {
-    Some(owner) => owner.view().pending_materials
+    Some(owner) => owner.pending_materials()
     None => 0
   }
 }
@@ -100,7 +100,7 @@ pub fn player_pending_count() -> Int32 {
 ///|
 pub fn player_skipped_count() -> Int32 {
   match player.val {
-    Some(owner) => owner.view().skipped_materials
+    Some(owner) => owner.skipped_materials()
     None => 0
   }
 }
@@ -108,7 +108,7 @@ pub fn player_skipped_count() -> Int32 {
 ///|
 pub fn scheduler_bpm() -> Double {
   match player.val {
-    Some(owner) => owner.view().bpm
+    Some(owner) => owner.bpm()
     None => 0.0
   }
 }
@@ -116,7 +116,7 @@ pub fn scheduler_bpm() -> Double {
 ///|
 pub fn scheduler_sample_position() -> Double {
   match player.val {
-    Some(owner) => owner.view().sample_position
+    Some(owner) => owner.sample_position()
     None => 0.0
   }
 }

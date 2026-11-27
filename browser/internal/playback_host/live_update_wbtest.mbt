@@ -45,7 +45,6 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   }
   stage(input.encode_wire())
   assert_eq(player_restart_input(), 0)
-  assert_eq(player.val.unwrap().view().source, Some(original))
   render_for_test(8)
   let next = "note(\"72\").slow(8)"
   let next_draft = @mini.Draft(next)
@@ -64,7 +63,6 @@ test "exact wire rejects broken witnesses atomically and accepts UTF16 source sp
   sources["atoms"] = []
   stage(json.stringify())
   assert_eq(player_restart_input(), 1)
-  assert_eq(player.val.unwrap().view().source, Some(next))
   assert_eq(player_pending_count(), pending)
   assert_position(1024)
   clear_playback_input()
@@ -86,7 +84,7 @@ test "exports map player states, modes and errors to their codes" {
   assert_true(player_mode() is None)
   assert_eq(submit_for_test(HELD_NOTE, restart=false), 0)
   assert_eq(player_state(), 1)
-  assert_true(player_mode() is Pattern)
+  assert_true(player_mode() is Some(Pattern))
   assert_eq(player_play(), 0)
   assert_eq(player_state(), 2)
   assert_eq(player_pause(), 0)
@@ -94,7 +92,7 @@ test "exports map player states, modes and errors to their codes" {
   let song = "song(section(\"a\",8,note(\"60\")),part(\"a1\",\"a\"))"
   assert_eq(submit_for_test(song), 0)
   assert_eq(player_state(), 2)
-  assert_true(player_mode() is Song)
+  assert_true(player_mode() is Some(Song))
   let longer = "song(section(\"a\",9,note(\"60\")),part(\"a1\",\"a\"))"
   assert_eq(submit_for_test(longer, restart=false), 2)
   assert_eq(get_playback_error(), "song layout changed; restart required")
