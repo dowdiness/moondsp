@@ -113,12 +113,49 @@ test "a part name repeated by another part is reported where it repeats" {
 
 ///|
 test "a part with an empty name is a mistake at that part" {
-  let source = "song(section(\"a\",1,note(\"60\")),part(\"\",\"a\"))"
+  let (message, at) = song_mistake_of(
+    "song(section(\"a\",1,note(\"60\")),part(\"\",\"a\"))",
+  )
+  assert_eq(message, "song part requires a name")
+  assert_true(at.has_prefix("part(\"\""))
+}
+
+///|
+/// The mistake compiling `source` reports, and the source from its position.
+fn song_mistake_of(source : String) -> (String, String) raise {
   let problem = try @mini.PlaybackInput::text(source).compile() catch {
     problem => Some(problem)
   } noraise {
     _ => None
   }
-  guard problem is Some(Mistake(at, _)) else { fail("expected a mistake") }
-  assert_true(source[at:].to_owned().has_prefix("part(\"\""))
+  guard problem is Some(Mistake(at, message)) else {
+    fail("expected a mistake")
+  }
+  (message, source[at:].to_owned())
+}
+
+///|
+test "a written part id and an encoded part name do not collide" {
+  let snapshot = compiled_song(
+    "song(section(\"s\",1,note(\"60\")),part(\"a.b\",\"s\"),part_id(\"a.2e.b\",\"X\",\"s\",1))",
+  )
+  assert_eq(snapshot.song().occurrences().length(), 2)
+}
+
+///|
+test "repeated part identities name what the author repeated, where" {
+  let (message, at) = song_mistake_of(
+    "song(section(\"s\",1,note(\"60\")),part_id(\"a\",\"X\",\"s\"),part(\"a\",\"s\",1))",
+  )
+  assert_eq(message, "duplicate song part id 'a'")
+  assert_true(at.has_prefix("part(\"a\""))
+  let (message, at) = song_mistake_of(
+    "song(section(\"s\",1,note(\"60\")),part(\"my fill:0\",\"s\",2),fill(\"my fill\",\"s\"))",
+  )
+  assert_eq(message, "duplicate song part 'my fill:0'")
+  assert_true(at.has_prefix("fill("))
+  let (message, _) = song_mistake_of(
+    "song(section(\"s\",1,note(\"60\")),part_id(\"\",\"X\",\"s\"))",
+  )
+  assert_eq(message, "song part id cannot be empty")
 }

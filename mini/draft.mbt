@@ -678,8 +678,8 @@ pub fn PlaybackInput::compile(
       }
       { material, bpm: source.bpm(), }
     }
-    // The wire decoder already checked that the text is the kind the payload
-    // names, so the parse decides the shape.
+    // The parse decides the shape: the payload's kind only selects tracked
+    // parsing, whether the Draft or the wire decoder set it.
     Pattern(_, origins) | Song(_, origins) => {
       let source = parse_tracked_source(self.input, query_window, origins)
       let material : CompiledMaterial = match source.body() {

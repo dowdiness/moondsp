@@ -1,7 +1,8 @@
 ///|
 priv struct SongPartSpec {
   at : Int32
-  id : @identity.OccurrenceId?
+  /// The id written with `part_id`, if any.
+  id : String?
   name : String
   section_name : String
   section_at : Int32
@@ -118,6 +119,7 @@ fn[C : @song.SongContent] Parser::parse_song_body(
     self.skip_whitespace()
   }
   self.expect_char(')')
+  check_part_identities(part_specs)
   let parts = [ for spec in part_specs => spec.to_doc(sections) ]
   let mut doc = song_doc(parts, part_specs, at=song_start)
   for fill in fill_specs {
@@ -131,14 +133,27 @@ fn[C : @song.SongContent] Parser::parse_song_body(
       raise OverLimit(Occurrences)
     }
     let filled = doc.occurrences()
+    // Names by identity, so a fill that repeats a part says which.
+    let taken : Map[String, String] = Map([])
+    for occurrence in filled {
+      taken[occurrence.id().value()] = occurrence.name()
+    }
     for index, gap in gaps {
       let name = "\{fill.prefix}:\{index}"
+      let identity = identity_text(name)
+      if taken.get(identity) is Some(existing) {
+        raise Mistake(
+          fill.at,
+          if existing == name {
+            "duplicate song part '\{name}'"
+          } else {
+            "duplicate song part id '\{name}'"
+          },
+        )
+      }
       filled.push(
         @song.SongOccurrenceDoc::at(
-          id=parse_occurrence_id(
-            "\{identity_text(fill.prefix)}:\{index}",
-            fill.at,
-          ),
+          id=occurrence_id(identity),
           start=gap.begin,
           name~,
           section=resized_section(section, gap.duration()),
@@ -267,8 +282,7 @@ fn Parser::parse_song_part_with_id(
   item_start : Int32,
 ) -> SongPartSpec raise SourceProblem {
   self.skip_whitespace()
-  let id_value = self.read_quoted_string()
-  let id = parse_occurrence_id(id_value, item_start)
+  let id = self.read_quoted_string()
   self.expect_comma()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -377,12 +391,50 @@ fn Parser::read_song_int(
 }
 
 ///|
-fn parse_occurrence_id(
-  value : String,
-  pos : Int32,
-) -> @identity.OccurrenceId raise SourceProblem {
-  @identity.OccurrenceId::from_string(value) catch {
-    _ => raise Mistake(pos, "invalid occurrence id '\{value}'")
+/// `identity`, already in the identity alphabet and checked non-empty.
+fn occurrence_id(identity : String) -> @identity.OccurrenceId {
+  @identity.OccurrenceId::from_string(identity) catch {
+    _ => abort("encoded part names are valid identities")
+  }
+}
+
+///|
+/// The identity a part declares: its `part_id`, otherwise its name.
+fn SongPartSpec::identity(self : SongPartSpec) -> String {
+  identity_text(self.id.unwrap_or(self.name))
+}
+
+///|
+/// Every part has an identity, and no two parts share one. A repeat is
+/// reported where it repeats: as a repeated name when neither part wrote a
+/// `part_id`, otherwise as a repeated id.
+fn check_part_identities(
+  specs : Array[SongPartSpec],
+) -> Unit raise SourceProblem {
+  let seen : Map[String, SongPartSpec] = Map([])
+  for spec in specs {
+    let identity = spec.identity()
+    guard !identity.is_empty() else {
+      raise Mistake(
+        spec.at,
+        if spec.id is Some(_) {
+          "song part id cannot be empty"
+        } else {
+          "song part requires a name"
+        },
+      )
+    }
+    if seen.get(identity) is Some(first) {
+      raise Mistake(
+        spec.at,
+        if first.id is None && spec.id is None {
+          "duplicate song part '\{spec.name}'"
+        } else {
+          "duplicate song part id '\{spec.id.unwrap_or(spec.name)}'"
+        },
+      )
+    }
+    seen[identity] = spec
   }
 }
 
@@ -408,11 +460,7 @@ fn[C] SongPartSpec::to_doc(
     self.section_name,
     at=self.section_at,
   )
-  // A part without an id is identified by its name.
-  let id = match self.id {
-    Some(id) => id
-    None => parse_occurrence_id(identity_text(self.name), self.at)
-  }
+  let id = occurrence_id(self.identity())
   match self.start {
     Some(start) =>
       @song.SongOccurrenceDoc::at(id~, start~, name=self.name, section~)
@@ -430,21 +478,8 @@ fn[C] song_doc(
     EmptySongDoc => raise Mistake(at, "song() requires at least one part")
     DuplicateSongDocOccurrenceName(name) =>
       raise song_mistake(DuplicateOccurrence(name), specs, at~)
-    // A part without an id takes its name as its id, so a repeated name
-    // surfaces as a repeated id.
-    DuplicateSongDocOccurrenceId(id) => {
-      let named = specs.filter(spec => {
-        spec.id is None && identity_text(spec.name) == id
-      })
-      raise song_mistake(
-        match named.get(0) {
-          Some(spec) => DuplicateOccurrence(spec.name)
-          None => DuplicateOccurrenceId(id)
-        },
-        specs,
-        at~,
-      )
-    }
+    DuplicateSongDocOccurrenceId(id) =>
+      raise Internal("song part '\{id}' was not checked for repeats")
   }
 }
 
@@ -494,7 +529,7 @@ fn song_section_id(name : String) -> @identity.SectionId {
 
 ///|
 /// `name` in the identity alphabet: code units outside it, and `.` itself,
-/// are written `.xxxx.` in hex, so distinct names stay distinct and a name
+/// are written as unpadded lowercase hex between dots (`.e9.`), so distinct names stay distinct and a name
 /// already in the alphabet without `.` is unchanged.
 fn identity_text(name : String) -> String {
   let encoded = StringBuilder()
@@ -545,7 +580,7 @@ fn song_mistake(
       )
     DuplicateOccurrenceId(id) =>
       Mistake(
-        repeated(spec => spec.id is Some(own) && own.value() == id),
+        repeated(spec => spec.id is Some(own) && own == id),
         "duplicate song part id '\{id}'",
       )
     InvalidOccurrenceId(id) => Mistake(at, "invalid song part id '\{id}'")

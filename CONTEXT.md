@@ -59,6 +59,10 @@ The persistent identity of an unchanged notation literal's complete content. It 
 **Named pattern definition**:
 A particular authored declaration of a reusable pattern. Its identity is distinct from both its name's spelling and the current contents of its body.
 
+**Song section identity**:
+The identity of a section declared in Mini song source: its name. Unlike a named pattern definition, nothing tracks a section declaration across edits, so renaming a section declares a new one. A part's identity is its `part_id` when written, otherwise its name (ADR-0032).
+_Avoid_: Treating a section's position in the song or its occurrence as its identity
+
 **Pattern reference**:
 A particular occurrence of a pattern name used as an expression. Two references to the same definition are distinct occurrences.
 
