@@ -1,0 +1,4 @@
+import {
+  "moonbitlang/core/quickcheck" @cqc,
+  "moonbitlang/quickcheck" @qc,
+} for "test"

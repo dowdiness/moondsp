@@ -112,6 +112,7 @@ check_manifest \
 check_manifest "trig/moon.pkg" '^$'
 check_manifest "dsp/moon.pkg" '^(dowdiness/moondsp/trig)$'
 check_manifest "identity/moon.pkg" '^$'
+check_manifest "codec/wav/moon.pkg" '^$'
 check_manifest "control/moon.pkg" '^$'
 check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/(control|identity))$'
 check_manifest "score/moon.pkg" '^(dowdiness/moondsp/pattern)$'
@@ -156,6 +157,15 @@ check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(score|player))$'
 # The browser adapter of the player: globals, wire decoding, diagnostics, samples.
 check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|player|score))$'
+
+# ADR-0032: codec/wav allocates and is offline only. No audio-path package may
+# import it in production code, even if one of the allowlists above is later
+# widened; their tests may.
+while IFS= read -r manifest; do
+  if manifest_imports "$manifest" | grep -qx 'prod dowdiness/moondsp/codec/wav'; then
+    violations+=("$manifest imports dowdiness/moondsp/codec/wav, which is offline only (ADR-0032)")
+  fi
+done < <(find dsp graph voice scheduler engine browser clap_engine clap_host clap_plugin -name moon.pkg)
 
 # Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
 # mention @dsp types, but it must not publicly re-export DSP package types,
