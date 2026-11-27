@@ -36,7 +36,10 @@ export type AudioFormat = Readonly<{ sampleRate: number; blockSize: number }>;
 
 /** Bank samples still copying into the worklet, and loads it refused (ADR-0026 Decision 5). */
 export type SampleStatus = Readonly<{
+  /** Samples the page is fetching or decoding, or the worklet is copying. */
   loading: readonly string[];
+  /** Samples the page could not fetch or decode, and why. */
+  failed: readonly Readonly<{ name: string; reason: string }>[];
   overLimit: readonly Readonly<{ name: string; limit: string }>[];
   unknown: readonly string[];
 }>;
@@ -74,14 +77,19 @@ function names(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(name => typeof name === "string");
 }
 function sampleStatus(value: Record<string, unknown>): SampleStatus | null {
-  const { loading, overLimit, unknown } = value;
-  if (!names(loading) || !names(unknown) || !Array.isArray(overLimit)) return null;
+  const { loading, failed, overLimit, unknown } = value;
+  if (!names(loading) || !names(unknown) || !Array.isArray(failed) || !Array.isArray(overLimit)) return null;
+  const broken: { name: string; reason: string }[] = [];
+  for (const entry of failed) {
+    if (!record(entry) || typeof entry.name !== "string" || typeof entry.reason !== "string") return null;
+    broken.push({ name: entry.name, reason: entry.reason });
+  }
   const refused: { name: string; limit: string }[] = [];
   for (const entry of overLimit) {
     if (!record(entry) || typeof entry.name !== "string" || typeof entry.limit !== "string") return null;
     refused.push({ name: entry.name, limit: entry.limit });
   }
-  return { loading: [...loading], overLimit: refused, unknown: [...unknown] };
+  return { loading: [...loading], failed: broken, overLimit: refused, unknown: [...unknown] };
 }
 function snapshot(value: Record<string, unknown>): PlayerSnapshot | null {
   if (!playState(value.state) || !mode(value.mode) || !cyclePosition(value.cyclePosition) || !count(value.samplePosition) ||

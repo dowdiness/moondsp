@@ -2,6 +2,9 @@ import { PlaybackController } from "./playback-controller.js";
 import { OnsetRing, SignalRing } from "./playback-observations.js";
 import { SampleLoader } from "./sample-loader.js";
 
+/** Messages about bank samples, which the sample loader takes. */
+const SAMPLE_MESSAGES = new Set(["sample-pending", "sample-load", "sample-failed", "sample-report"]);
+
 class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
@@ -26,8 +29,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       // The store exists from construction, so samples queue at once.
-      if (data.type === "sample-load" && this.samples) {
-        this.samples.enqueue(data);
+      if (SAMPLE_MESSAGES.has(data.type) && this.samples) {
+        this.samples.receive(data);
         return;
       }
       if (!this.wasm || !this.graphInitialized) {
@@ -51,8 +54,8 @@ class MoonDspSchedulerProcessor extends AudioWorkletProcessor {
       this.wasm.player_signal_clear();
     }
     if (data.type === "observe-onsets") return;
-    if (data.type === "sample-load") {
-      this.samples.enqueue(data);
+    if (SAMPLE_MESSAGES.has(data.type)) {
+      this.samples.receive(data);
       return;
     }
     if (data.type === "player-update" || data.type === "player-restart" ||

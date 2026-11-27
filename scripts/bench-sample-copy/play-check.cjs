@@ -163,7 +163,7 @@ server.listen(0, '127.0.0.1', async () => {
       emptySliceSilent: e['s("ping").begin(0.5).end(0.25)'] === 0,
     };
     console.log(JSON.stringify({ browser: browserName, ua: result.ua, energies: e, heads: result.heads, checks,
-      statuses: result.statuses.map(s => ({ loading: s.loading, overLimit: s.overLimit, unknown: s.unknown })) }));
+      statuses: result.statuses.map(s => ({ loading: s.loading, failed: s.failed, overLimit: s.overLimit, unknown: s.unknown })) }));
     if (!Object.values(checks).every(Boolean)) process.exitCode = 1;
   } finally {
     await browser.close();

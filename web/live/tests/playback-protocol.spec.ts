@@ -43,12 +43,15 @@ test("status requires semantic mode/state strings and finite nonnegative musical
   }
 });
 
-test("sample status names what is loading and which loads a limit refused", () => {
-  const status = { type: "sample-status", loading: ["ping"], overLimit: [{ name: "burst", limit: "memory" }], unknown: [] };
+test("sample status names what is loading, which loads failed, and which a limit refused", () => {
+  const status = { type: "sample-status", loading: ["ping"], failed: [{ name: "piano_c4", reason: "fetch: 404" }],
+    overLimit: [{ name: "burst", limit: "memory" }], unknown: [] };
   expect(decodeWorkletMessage(status)).toEqual({
-    kind: "samples", loading: ["ping"], overLimit: [{ name: "burst", limit: "memory" }], unknown: [],
+    kind: "samples", loading: ["ping"], failed: [{ name: "piano_c4", reason: "fetch: 404" }],
+    overLimit: [{ name: "burst", limit: "memory" }], unknown: [],
   });
-  for (const broken of [{ loading: "ping" }, { loading: [1] }, { overLimit: [{ name: "burst" }] }, { unknown: undefined }]) {
+  for (const broken of [{ loading: "ping" }, { loading: [1] }, { failed: undefined }, { failed: [{ name: "piano_c4" }] },
+    { overLimit: [{ name: "burst" }] }, { unknown: undefined }]) {
     expect(decodeWorkletMessage({ ...status, ...broken }).kind).toBe("protocol-error");
   }
 });
