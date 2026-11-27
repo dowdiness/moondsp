@@ -1,0 +1,26 @@
+bpm(84);
+
+let kal = note("C#5 E5 G#5 B5 A5 G#5 E5 F#5").s("kalimba_cs5").gain(0.5).room(0.3);
+let mbira = note("[B4 F#5] E5 [C#5 B4] F#5").s("mbira_b4 mbira_fs5").gain(0.45).pan(sine.range(-0.5, 0.5)).room(0.25);
+let low = note("E3 ~ B2 ~").slow(2).s("mbira_e3").gain(0.55);
+let keys = chord("A E F#m C#m").slow(8).s("piano_c4").gain(0.18).room(0.4);
+let bassline = note("A1 E2 F#1 C#2").slow(8).s("piano_c2").gain(0.4);
+let sparkle = note("E6 ~ G#6 ~ B6 ~ C#7 ~").fast(2).s("piano_c6").gain(0.1).room(0.5);
+let chop = s("upright_a4*8").begin("0 0.125 0.25 0.375 0.5 0.625 0.75 0.875").end(0.6).gain(0.22);
+let rewind = s("kalimba_g5(3,8)").speed(-1).gain(0.35);
+let beat = stack(s("bd ~ ~ bd ~ ~ bd ~").gain(0.35), s("~ hh ~ hh").gain(0.06), s("~ ~ cp ~").gain(0.12));
+
+song(
+  section("seed", 4, stack(kal, low)),
+  section("grove", 8, stack(kal, mbira, low, keys)),
+  section("ground", 8, stack(kal, mbira, keys, bassline, beat)),
+  section("chops", 8, stack(chop, rewind, keys, bassline, beat, sparkle)),
+  section("bloom", 8, stack(kal, mbira, keys, bassline, beat, sparkle, chop.gain(0.12))),
+  section("fade", 4, stack(kal.slow(2), keys, sparkle).fadeOut(4)),
+  part("p1", "seed"),
+  part("p2", "grove"),
+  part("p3", "ground"),
+  part("p4", "chops"),
+  part("p5", "bloom"),
+  part("p6", "fade")
+)

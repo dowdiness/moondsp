@@ -6,6 +6,7 @@ import roomOfLight from "../../../examples/room-of-light.mini?raw";
 import lightOrbit from "../../../examples/light-orbit.mini?raw";
 import sharedRoomComparison from "../../../examples/shared-room-comparison.mini?raw";
 import sharedRoomAfterglow from "../../../examples/shared-room-afterglow.mini?raw";
+import kalimbaGarden from "../../../examples/kalimba-garden.mini?raw";
 import overlayGroove from "../../../examples/overlay-groove.mini?raw";
 import overlayGrouping from "../../../examples/overlay-grouping.mini?raw";
 import restsAndGates from "../../../examples/rests-and-gates.mini?raw";
@@ -81,6 +82,8 @@ $: chord("Cm9").gain(0.3).lpf(saw.range(300, 3000), 2).pan(sine.range(-0.5, 0.5)
     source: sharedRoomComparison },
   { label: "Shared Room Afterglow", note: "Dry low end, drifting polyrhythms, a sparse room break, and one shared tail. 60 seconds.",
     source: sharedRoomAfterglow },
+  { label: "Kalimba Garden — recorded samples", note: "Kalimba, mbira, and piano recordings: notes on samples, sliced upright piano, and a kalimba played backwards. About 2 minutes.",
+    source: kalimbaGarden },
   { label: "Drifting notes — long envelopes", note: "Each note lasts 13 seconds. Try changing release(8).",
     source: `note("E4 G4 D4").slow(10.5).attack(2).hold(3).release(8)` },
   { label: "Independent entries — 3 and 4 cycles", note: "Change E4 to F4 and D5 to C5 while playing.", more: true,

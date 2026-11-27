@@ -304,3 +304,6 @@ for Update, Play, Pause, and Restart behavior.
 - [`room-of-light.mini`](../../examples/room-of-light.mini) — a short song.
 - [`shared-room-afterglow.mini`](../../examples/shared-room-afterglow.mini) —
   a longer song with shared reverb.
+- [`kalimba-garden.mini`](../../examples/kalimba-garden.mini) — a song on the
+  recorded samples: kalimba, mbira, and piano, with `begin`, `end`, and
+  `speed`.
