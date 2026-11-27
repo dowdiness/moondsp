@@ -49,6 +49,19 @@ cannot name `ScoreEvent`.
    `queue_song_snapshot` are gone; callers use `queue_playback_snapshot`.
 5. **`@player.Score` has two constructors**, `pattern` and `song`, for the
    same reason.
+6. **The scheduler plays one way.** Material enters only as a
+   `PlaybackSnapshot` through `queue_playback_snapshot` or
+   `accept_playback_snapshot` and plays through `render_block`, and it is
+   queried only with its sources. The parallel paths that played a bare
+   `Pat`, `Section` or `Song` per block (`process_block`,
+   `process_section_block`, `process_song_block`), injected events
+   (`process_events`), pushed external voices (`push_active_note`,
+   `push_active_note_until`, `ActiveNoteError`), or queried without sources
+   (internal `query_active_events`) are removed, and with them
+   `VoiceOrigin::Anonymous`: every voice comes from a pattern node or a song
+   entry. Segment splitting is no longer generic over two query paths.
+   `accepted_snapshot` and `queued_snapshot` are removed: the scheduler is
+   observed through what it plays and its pending and skipped counts.
 
 ## Considered options
 
@@ -70,9 +83,10 @@ cannot name `ScoreEvent`.
 - Adding a kind of pattern means one `PlaybackPattern` constructor; the
   scheduler, the player and the browser host do not change.
 - `query_for_entry` takes the query's `Placement` and a mapper built once
-  per entry, so a query constructs no closure. Patterns construct as many
-  objects as before; tracked songs 1.96% fewer, since their view and
-  placement are built once. Untracked songs, which no production input sends
-  (#296), construct 3.20% more, the same count as tracked songs: their
+  per entry, so a query constructs no closure. With one query path, segment
+  splitting is no longer generic over a callback. Patterns construct 0.30%
+  fewer objects; tracked songs 2.77% fewer, since their view and placement
+  are built once. Untracked songs, which no production input sends (#296),
+  construct 2.35% more, the same count as tracked songs: their
   snapshot sections build events with node paths and place them twice,
   where main shifted a bare `Pat` once. PCM is identical.

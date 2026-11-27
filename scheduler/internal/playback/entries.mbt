@@ -524,16 +524,6 @@ fn EntryState::is_skipped(self : EntryState) -> Bool {
 }
 
 ///|
-/// Both query paths consume entry-local arcs and return events on the playback clock.
-fn query_entry(
-  spec : EntrySpec,
-  origin : @pattern.Rational,
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  spec.body.query(arc).map(event => event.shift(origin))
-}
-
-///|
 fn EntrySpec::query_sourced(
   self : EntrySpec,
   origin : @pattern.Rational,
@@ -543,28 +533,11 @@ fn EntrySpec::query_sourced(
 }
 
 ///|
-fn query_entries(
-  entries : Array[EntryState],
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  query_entry_segments(entries, arc, query_entry)
-}
-
-///|
-fn query_sourced_entries(
-  entries : Array[EntryState],
-  arc : @pattern.TimeSpan,
-) -> Array[PlaybackSourcedEvent] {
-  query_entry_segments(entries, arc, EntrySpec::query_sourced)
-}
-
-///|
-fn[A] append_entry_segment(
-  result : Array[A],
+fn append_entry_segment(
+  result : Array[PlaybackSourcedEvent],
   spec : EntrySpec,
   origin : @pattern.Rational,
   arc : @pattern.TimeSpan,
-  query : (EntrySpec, @pattern.Rational, @pattern.TimeSpan) -> Array[A],
 ) -> Unit {
   let begin = if arc.begin < spec.start { spec.start } else { arc.begin }
   let end_ = match spec.end_ {
@@ -573,17 +546,16 @@ fn[A] append_entry_segment(
   }
   guard begin < end_ else { return }
   let local_arc = @pattern.TimeSpan(begin - origin, end_ - origin)
-  result.append(query(spec, origin, local_arc))
+  result.append(spec.query_sourced(origin, local_arc))
 }
 
 ///|
-fn[A] append_replacement_segment(
-  result : Array[A],
+fn append_replacement_segment(
+  result : Array[PlaybackSourcedEvent],
   current : EntrySpec,
   origin : @pattern.Rational,
   edit : EntryEdit,
   arc : @pattern.TimeSpan,
-  query : (EntrySpec, @pattern.Rational, @pattern.TimeSpan) -> Array[A],
 ) -> Unit {
   let due = edit.due()
   guard due < arc.end_ else { return }
@@ -593,24 +565,21 @@ fn[A] append_replacement_segment(
       spec,
       replacement_origin(current, origin, spec, due),
       @pattern.TimeSpan(if due > arc.begin { due } else { arc.begin }, arc.end_),
-      query,
     )
   }
 }
 
 ///|
-/// Split proven transition boundaries once for both query paths, without
-/// allocating segment arrays. Skipped occurrences have no query behavior.
-fn[A] query_entry_segments(
+/// Split proven transition boundaries without allocating segment arrays. Skipped occurrences have no query behavior.
+fn query_sourced_entries(
   entries : Array[EntryState],
   arc : @pattern.TimeSpan,
-  query : (EntrySpec, @pattern.Rational, @pattern.TimeSpan) -> Array[A],
-) -> Array[A] {
-  let result : Array[A] = []
+) -> Array[PlaybackSourcedEvent] {
+  let result : Array[PlaybackSourcedEvent] = []
   for entry in entries {
     match entry {
       Current(material, origin) | Retained(material, origin, _) =>
-        append_entry_segment(result, material, origin, arc, query)
+        append_entry_segment(result, material, origin, arc)
       Entering(material, origin, due) =>
         if due < arc.end_ {
           append_entry_segment(
@@ -625,7 +594,6 @@ fn[A] query_entry_segments(
               },
               arc.end_,
             ),
-            query,
           )
         }
       Switching(material, origin, edit) => {
@@ -637,12 +605,11 @@ fn[A] query_entry_segments(
               material,
               origin,
               @pattern.TimeSpan(arc.begin, due),
-              query,
             )
           }
-          append_replacement_segment(result, material, origin, edit, arc, query)
+          append_replacement_segment(result, material, origin, edit, arc)
         } else {
-          append_entry_segment(result, material, origin, arc, query)
+          append_entry_segment(result, material, origin, arc)
         }
       }
       Stopping(material, origin, due) =>
@@ -659,7 +626,6 @@ fn[A] query_entry_segments(
                 arc.end_
               },
             ),
-            query,
           )
         }
       Finishing(material, origin, due, _) =>
@@ -676,7 +642,6 @@ fn[A] query_entry_segments(
                 arc.end_
               },
             ),
-            query,
           )
         }
       Skipped(_) => ()

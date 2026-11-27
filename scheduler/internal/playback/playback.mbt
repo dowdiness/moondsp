@@ -13,18 +13,6 @@ pub struct PlaybackSourcedEvent {
 }
 
 ///|
-pub fn PlaybackSourcedEvent::anonymous(
-  event : @pattern.Event[@score.ScoreEvent],
-) -> PlaybackSourcedEvent {
-  {
-    event,
-    origin: @model.VoiceOrigin::Anonymous,
-    source: None,
-    controls: @pattern.Controls::fixed(event.value.controls),
-  }
-}
-
-///|
 /// This event's controls, on the playback clock.
 pub fn PlaybackSourcedEvent::controls(
   self : PlaybackSourcedEvent,
@@ -172,14 +160,6 @@ pub fn PlaybackState::PlaybackState() -> PlaybackState {
 }
 
 ///|
-pub(all) struct PlaybackInspection {
-  current : PlaybackSnapshot?
-  staged : PlaybackSnapshot?
-  pending_materials : Int32
-  skipped_materials : Int32
-}
-
-///|
 pub fn PlaybackState::queue(
   self : PlaybackState,
   snapshot : PlaybackSnapshot,
@@ -275,16 +255,11 @@ pub fn PlaybackState::skipped_entry_count(self : PlaybackState) -> Int32 {
 }
 
 ///|
-pub fn PlaybackState::inspect(self : PlaybackState) -> PlaybackInspection {
-  {
-    current: self.running.map(run => run.snapshot),
-    staged: self.pending,
-    pending_materials: match self.running {
-      None => 0
-      Some(run) =>
-        run.entries.iter().filter(entry => entry.has_pending()).count()
-    },
-    skipped_materials: self.skipped_entry_count(),
+/// Accepted material changes still waiting for a reserved entry boundary.
+pub fn PlaybackState::pending_entry_count(self : PlaybackState) -> Int32 {
+  match self.running {
+    None => 0
+    Some(run) => run.entries.iter().filter(entry => entry.has_pending()).count()
   }
 }
 
@@ -292,17 +267,15 @@ pub fn PlaybackState::inspect(self : PlaybackState) -> PlaybackInspection {
 /// Split at repetition boundaries, rebuilding the next repetition from the
 /// latest accepted snapshot even if the boundary falls inside an audio block.
 /// Queries never mutate the owner; a subsequent query of the same span agrees.
-fn[A] PlaybackRun::query(
+fn PlaybackRun::query(
   self : PlaybackRun,
   arc : @pattern.TimeSpan,
-  query : (Array[EntryState], @pattern.TimeSpan) -> Array[A],
-  shift : (A, @pattern.Rational) -> A,
-) -> Array[A] {
+) -> Array[PlaybackSourcedEvent] {
   guard self.snapshot.period is Some(duration) else {
-    return query(self.entries, arc)
+    return query_sourced_entries(self.entries, arc)
   }
   guard duration > @pattern.Rational::from_int(0) else { return [] }
-  let result : Array[A] = []
+  let result : Array[PlaybackSourcedEvent] = []
   let mut cursor = arc.begin
   while cursor < arc.end_ {
     let cycle = self.snapshot.cycle_at(cursor)
@@ -318,24 +291,18 @@ fn[A] PlaybackRun::query(
       self.snapshot.start_entries()
     }
     let local_arc = @pattern.TimeSpan(cursor - offset, end_ - offset)
-    for event in query(entries, local_arc) {
-      result.push(shift(event, offset))
+    let placement = @pattern.Placement(origin=offset)
+    for event in query_sourced_entries(entries, local_arc) {
+      result.push({
+        event: event.event.placed(placement),
+        origin: event.origin,
+        source: event.source,
+        controls: event.controls.placed(placement),
+      })
     }
     cursor = end_
   }
   result
-}
-
-///|
-pub fn PlaybackState::query_active_events(
-  self : PlaybackState,
-  arc : @pattern.TimeSpan,
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  match self.running {
-    None => []
-    Some(run) =>
-      run.query(arc, query_entries, (event, offset) => event.shift(offset))
-  }
 }
 
 ///|
@@ -345,16 +312,7 @@ pub fn PlaybackState::query_active_sourced_events(
 ) -> Array[PlaybackSourcedEvent] {
   match self.running {
     None => []
-    Some(run) =>
-      run.query(arc, query_sourced_entries, (sourced, offset) => {
-        let placement = @pattern.Placement(origin=offset)
-        {
-          event: sourced.event.placed(placement),
-          origin: sourced.origin,
-          source: sourced.source,
-          controls: sourced.controls.placed(placement),
-        }
-      })
+    Some(run) => run.query(arc)
   }
 }
 
@@ -363,9 +321,7 @@ pub fn PlaybackSnapshot::query_events(
   self : PlaybackSnapshot,
   arc : @pattern.TimeSpan,
 ) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin)).query(
-    arc,
-    query_entries,
-    (event, offset) => event.shift(offset),
-  )
+  PlaybackRun(self, self.start_entries(), self.cycle_at(arc.begin))
+  .query(arc)
+  .map(event => event.event)
 }

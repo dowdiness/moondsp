@@ -41,7 +41,6 @@ pub extend SongVoiceScope with @moonbitlang/core/debug.Debug::{to_repr}
 ///|
 #derive(Eq, Debug)
 pub(all) enum VoiceOrigin {
-  Anonymous
   Pattern(@pattern.PatternNodePath)
   Song(@song.SongEventOrigin)
 }
@@ -59,7 +58,7 @@ pub fn VoiceOrigin::matches_pattern_scope(
 ) -> Bool {
   match self {
     Pattern(path) => path.nodes().contains(scope.node())
-    Anonymous | Song(_) => false
+    Song(_) => false
   }
 }
 
@@ -76,6 +75,6 @@ pub fn VoiceOrigin::matches_song_scope(
         Layer(section, layer) =>
           origin.section() == section && origin.layer() == layer
       }
-    Anonymous | Pattern(_) => false
+    Pattern(_) => false
   }
 }

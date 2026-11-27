@@ -21,29 +21,11 @@ pub fn PatternScheduler::accept_playback_snapshot(
 }
 
 ///|
-/// The snapshot accepted by an explicit owner operation or render-block commit.
-///
-/// Its changed materials may still be waiting for their own entry boundaries.
-pub fn PatternScheduler::accepted_snapshot(
-  self : PatternScheduler,
-) -> PlaybackSnapshot? {
-  self.playback_state.inspect().current.map(raw => { raw, })
-}
-
-///|
-/// The latest snapshot queued for acceptance at the next render-block boundary.
-pub fn PatternScheduler::queued_snapshot(
-  self : PatternScheduler,
-) -> PlaybackSnapshot? {
-  self.playback_state.inspect().staged.map(raw => { raw, })
-}
-
-///|
 /// Accepted material changes still waiting for a reserved entry boundary.
 pub fn PatternScheduler::pending_material_change_count(
   self : PatternScheduler,
 ) -> Int32 {
-  self.playback_state.inspect().pending_materials
+  self.playback_state.pending_entry_count()
 }
 
 ///|
@@ -51,7 +33,7 @@ pub fn PatternScheduler::pending_material_change_count(
 pub fn PatternScheduler::skipped_material_change_count(
   self : PatternScheduler,
 ) -> Int32 {
-  self.playback_state.inspect().skipped_materials
+  self.playback_state.skipped_entry_count()
 }
 
 ///|

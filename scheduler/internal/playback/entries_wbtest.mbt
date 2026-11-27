@@ -64,27 +64,15 @@ fn accept(
 }
 
 ///|
-fn notes(
-  state : PlaybackState,
-  begin : Int32,
-  end_ : Int32,
-) -> Array[Int32] raise {
+fn notes(state : PlaybackState, begin : Int32, end_ : Int32) -> Array[Int32] {
   let arc = @pattern.TimeSpan(
     @pattern.Rational::from_int(begin),
     @pattern.Rational::from_int(end_),
   )
-  let raw = state.query_active_events(arc)
-  let sourced = state.query_active_sourced_events(arc)
-  assert_eq(raw.length(), sourced.length())
-  for i, event in raw {
-    let actual = sourced[i].event()
-    assert_true(event.whole == actual.whole)
-    assert_true(event.part == actual.part)
-    assert_true(
-      event.value.controls.entries() == actual.value.controls.entries(),
-    )
-  }
-  let events = raw.filter(e => e.whole is Some(w) && arc.contains(w.begin))
+  let events = state
+    .query_active_sourced_events(arc)
+    .map(sourced => sourced.event())
+    .filter(e => e.whole is Some(w) && arc.contains(w.begin))
   events.sort_by((a, b) => {
     a.whole.unwrap().begin.compare(b.whole.unwrap().begin)
   })

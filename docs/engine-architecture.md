@@ -29,7 +29,7 @@ Pattern Engine (Human Time)           DSP Engine (Audio Time)
   Array[Event[ControlMap]]             BoundVoicePool.process(ctx, L, R)
        |                                      ^
        +-- { note: 60, lpf: 1800, hpf: 80 } --+
-           PatternScheduler.process_block (48 kHz / 128 samples per block)
+           PatternScheduler.render_block (48 kHz / 128 samples per block)
 ```
 
 1. **Pattern Layer (`pattern/`)**:

@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are removed. Untracked songs hold `UntrackedPatternSnapshot` sections:
   `SongContent` is no longer implemented for `Pat`, and `parse_song` returns
   `ParsedSong[UntrackedPatternSnapshot[ScoreEvent]]`.
+  The scheduler plays one way, snapshots through `render_block`:
+  `process_block`, `process_section_block`, `process_song_block`,
+  `process_events`, `push_active_note`, `push_active_note_until`,
+  `ActiveNoteError`, `accepted_snapshot`, `queued_snapshot` and
+  `VoiceOrigin::Anonymous` are removed.
 - **Breaking:** tracked and untracked material are named alike everywhere
   (see `CONTEXT.md`). `PatternSnapshotWithOrigins` is `TrackedPatternSnapshot`
   and `PatternSnapshot` is `UntrackedPatternSnapshot`;

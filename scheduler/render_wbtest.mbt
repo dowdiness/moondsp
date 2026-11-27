@@ -41,8 +41,5 @@ test "Unrepresentable render frame silences dry and send without accepting queue
   }
   assert_true(sched.last_transport_error() is Some(TimeOutOfRange))
   assert_eq(sched.sample_counter(), before)
-  assert_true(sched.accepted_snapshot() is None)
-  assert_true(
-    sched.queued_snapshot().unwrap().revision() == snapshot.revision(),
-  )
+  assert_eq(sched.active_note_count(), 0)
 }

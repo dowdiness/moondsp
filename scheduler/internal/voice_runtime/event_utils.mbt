@@ -1,11 +1,4 @@
 ///|
-pub fn copy_control_events(
-  events : Array[@pattern.Event[@score.ScoreEvent]],
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  events.copy()
-}
-
-///|
 /// Sort note-on capable events before continuous/no-whole events.
 pub fn compare_event_onset(
   a : @pattern.Event[@score.ScoreEvent],
