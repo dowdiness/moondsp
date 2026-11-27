@@ -12,6 +12,7 @@
 
 ///|
 /// WAV fmt 块声明的样本存储格式。
+#derive(Debug, Eq)
 pub(all) enum WavSampleFormat {
   PcmU8
   PcmI16
@@ -19,10 +20,11 @@ pub(all) enum WavSampleFormat {
   PcmI32
   IeeeF32
   IeeeF64
-} derive(Debug, Eq)
+}
 
 ///|
 /// WAV 编解码的可恢复失败。所有结构损坏都返回该错误,不 panic。
+#derive(Debug)
 pub suberror WavError {
   NotRiff
   NotWave
@@ -30,7 +32,7 @@ pub suberror WavError {
   InvalidFormat(String)
   UnsupportedFormat(String)
   DataTooLarge
-} derive(Debug)
+}
 
 ///|
 pub extend WavError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -46,18 +48,19 @@ pub extend WaveFile with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 /// 解码得到的 WAV 内容:交错样本,统一归一化到 [-1, 1]。
+#derive(Debug)
 pub struct WaveFile {
-  priv sample_rate : Int
-  priv channels : Int
+  priv sample_rate : Int32
+  priv channels : Int32
   priv samples : Array[Double]
   priv source_format : WavSampleFormat
-} derive(Debug)
+}
 
 ///|
 /// 构造并校验:声道数、采样率为正,样本数按声道帧对齐。
 pub fn WaveFile::WaveFile(
-  sample_rate~ : Int,
-  channels~ : Int,
+  sample_rate~ : Int32,
+  channels~ : Int32,
   samples~ : Array[Double],
   source_format~ : WavSampleFormat,
 ) -> WaveFile raise WavError {
@@ -81,13 +84,13 @@ pub fn WaveFile::WaveFile(
 
 ///|
 /// 采样率(Hz)。
-pub fn WaveFile::sample_rate(self : WaveFile) -> Int {
+pub fn WaveFile::sample_rate(self : WaveFile) -> Int32 {
   self.sample_rate
 }
 
 ///|
 /// 声道数。样本按声道交错排列。
-pub fn WaveFile::channels(self : WaveFile) -> Int {
+pub fn WaveFile::channels(self : WaveFile) -> Int32 {
   self.channels
 }
 
@@ -105,7 +108,7 @@ pub fn WaveFile::source_format(self : WaveFile) -> WavSampleFormat {
 
 ///|
 /// 帧数(每声道的样本数)。
-pub fn WaveFile::frame_count(self : WaveFile) -> Int {
+pub fn WaveFile::frame_count(self : WaveFile) -> Int32 {
   self.samples.length() / self.channels
 }
 
@@ -119,7 +122,7 @@ pub fn WaveFile::duration_seconds(self : WaveFile) -> Double {
 
 ///|
 /// 每样本字节数。
-pub fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int {
+pub fn WavSampleFormat::bytes_per_sample(self : WavSampleFormat) -> Int32 {
   match self {
     PcmU8 => 1
     PcmI16 => 2
@@ -141,7 +144,7 @@ pub fn WavSampleFormat::is_pcm(self : WavSampleFormat) -> Bool {
 
 ///|
 /// fmt 块中的 format tag(PCM=1,IEEE float=3)。
-fn WavSampleFormat::format_tag(self : WavSampleFormat) -> Int {
+fn WavSampleFormat::format_tag(self : WavSampleFormat) -> Int32 {
   match self {
     PcmU8 | PcmI16 | PcmI24 | PcmI32 => 1
     IeeeF32 | IeeeF64 => 3
@@ -150,7 +153,10 @@ fn WavSampleFormat::format_tag(self : WavSampleFormat) -> Int {
 
 ///|
 /// (format tag, 位深) → 存储格式;不认识的组合返回 None。
-fn WavSampleFormat::from_tag_bits(tag : Int, bits : Int) -> WavSampleFormat? {
+fn WavSampleFormat::from_tag_bits(
+  tag : Int32,
+  bits : Int32,
+) -> WavSampleFormat? {
   if tag == 1 {
     match bits {
       8 => Some(PcmU8)

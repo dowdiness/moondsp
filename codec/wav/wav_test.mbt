@@ -2,27 +2,27 @@
 // 与被测代码互为校验;fuzz 与错误路径共用同一批构造器。
 
 ///|
-fn b(v : Int) -> Byte {
+fn b(v : Int32) -> Byte {
   v.to_byte()
 }
 
 ///|
-fn le16(v : Int) -> Array[Byte] {
+fn le16(v : Int32) -> Array[Byte] {
   [b(v & 0xFF), b((v >> 8) & 0xFF)]
 }
 
 ///|
-fn le32(v : Int) -> Array[Byte] {
+fn le32(v : Int32) -> Array[Byte] {
   [b(v & 0xFF), b((v >> 8) & 0xFF), b((v >> 16) & 0xFF), b((v >> 24) & 0xFF)]
 }
 
 ///|
-fn be16(v : Int) -> Array[Byte] {
+fn be16(v : Int32) -> Array[Byte] {
   [b((v >> 8) & 0xFF), b(v & 0xFF)]
 }
 
 ///|
-fn be32(v : Int) -> Array[Byte] {
+fn be32(v : Int32) -> Array[Byte] {
   [b((v >> 24) & 0xFF), b((v >> 16) & 0xFF), b((v >> 8) & 0xFF), b(v & 0xFF)]
 }
 
@@ -55,10 +55,10 @@ fn bytes_of(parts : Array[Array[Byte]]) -> Bytes {
 ///|
 /// 构造最小合法 WAV:RIFF/RIFX + fmt + (额外块) + data。额外块插在 fmt 与 data 之间。
 fn build_wav(
-  le? : Bool = true,
+  le~ : Bool = true,
   fmt~ : Array[Byte],
   data~ : Array[Byte],
-  extras? : Array[(String, Array[Byte])] = [],
+  extras~ : Array[(String, Array[Byte])] = [],
 ) -> Bytes {
   let mut riff_size = 4 +
     8 +
@@ -96,13 +96,13 @@ fn build_wav(
 
 ///|
 /// 16 位 PCM 的 fmt 块(小端)。
-fn fmt_pcm16(ch : Int, rate : Int) -> Array[Byte] {
+fn fmt_pcm16(ch : Int32, rate : Int32) -> Array[Byte] {
   fmt_tag(1, ch, rate, 16)
 }
 
 ///|
 /// 任意 (tag, bits) 的 fmt 块(小端布局)。
-fn fmt_tag(tag : Int, ch : Int, rate : Int, bits : Int) -> Array[Byte] {
+fn fmt_tag(tag : Int32, ch : Int32, rate : Int32, bits : Int32) -> Array[Byte] {
   let align = ch * (bits / 8)
   let out : Array[Byte] = []
   out.append(le16(tag))
@@ -116,7 +116,7 @@ fn fmt_tag(tag : Int, ch : Int, rate : Int, bits : Int) -> Array[Byte] {
 
 ///|
 /// RIFX(大端)布局的 16 位 PCM fmt 块。
-fn fmt_pcm16_be(ch : Int, rate : Int) -> Array[Byte] {
+fn fmt_pcm16_be(ch : Int32, rate : Int32) -> Array[Byte] {
   let align = ch * 2
   let out : Array[Byte] = []
   out.append(be16(1))
@@ -151,16 +151,16 @@ fn err_of(f : () -> Unit raise @wav.WavError) -> @wav.WavError? {
 ///|
 /// 确定性 LCG,fuzz 可复现。
 priv struct TestRng {
-  mut state : Int
+  mut state : Int32
 }
 
 ///|
-fn TestRng::new(seed : Int) -> TestRng {
+fn TestRng::new(seed : Int32) -> TestRng {
   { state: seed, }
 }
 
 ///|
-fn TestRng::next(self : TestRng, mask : Int) -> Int {
+fn TestRng::next(self : TestRng, mask : Int32) -> Int32 {
   self.state = self.state * 25173 + 13849
   if self.state < 0 {
     self.state = self.state & 0x7FFFFFFF

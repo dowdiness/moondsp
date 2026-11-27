@@ -112,6 +112,7 @@ check_manifest \
 check_manifest "trig/moon.pkg" '^$'
 check_manifest "dsp/moon.pkg" '^(dowdiness/moondsp/trig)$'
 check_manifest "identity/moon.pkg" '^$'
+check_manifest "codec/wav/moon.pkg" '^$'
 check_manifest "control/moon.pkg" '^$'
 check_manifest "pattern/moon.pkg" '^(dowdiness/moondsp/(control|identity))$'
 check_manifest "score/moon.pkg" '^(dowdiness/moondsp/pattern)$'

@@ -1,20 +1,20 @@
 ///|
 /// 由 Int 构造 Byte。不写字节字面量:moonc v0.10.14 对 `b'\xNN'` 字面量存在
 /// 编译期 ICE,统一走 `to_byte()` 规避(与 moonvoice 的处理一致)。
-fn byte_of(v : Int) -> Byte {
+fn byte_of(v : Int32) -> Byte {
   v.to_byte()
 }
 
 ///|
 /// 写小端 16 位。
-fn put_u16le(fa : FixedArray[Byte], off : Int, v : Int) -> Unit {
+fn put_u16le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
   fa[off] = (v & 0xFF).to_byte()
   fa[off + 1] = ((v >> 8) & 0xFF).to_byte()
 }
 
 ///|
 /// 写小端 32 位(负数按补码掩码,位模式不变)。
-fn put_u32le(fa : FixedArray[Byte], off : Int, v : Int) -> Unit {
+fn put_u32le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
   fa[off] = (v & 0xFF).to_byte()
   fa[off + 1] = ((v >> 8) & 0xFF).to_byte()
   fa[off + 2] = ((v >> 16) & 0xFF).to_byte()
@@ -23,7 +23,7 @@ fn put_u32le(fa : FixedArray[Byte], off : Int, v : Int) -> Unit {
 
 ///|
 /// 写四字节 ASCII 块 ID(不足补空格)。
-fn put_tag(fa : FixedArray[Byte], off : Int, tag : String) -> Unit {
+fn put_tag(fa : FixedArray[Byte], off : Int32, tag : String) -> Unit {
   for i = 0; i < 4; i = i + 1 {
     fa[off + i] = if i < tag.length() {
       byte_of(tag.get_char(i).unwrap().to_int())
@@ -36,7 +36,7 @@ fn put_tag(fa : FixedArray[Byte], off : Int, tag : String) -> Unit {
 ///|
 /// [-1, 1] 浮点 → 整数样本:比例 scale,四舍五入,钳位到 [lo, hi]。
 /// NaN 归 0,±Inf 取满幅。配合 2^(bits-1) 的解码比例,decode∘encode 幂等。
-fn quantize(x : Double, scale : Double, lo : Int, hi : Int) -> Int {
+fn quantize(x : Double, scale : Double, lo : Int32, hi : Int32) -> Int32 {
   if x.is_nan() {
     return 0
   }
@@ -58,7 +58,7 @@ fn quantize(x : Double, scale : Double, lo : Int, hi : Int) -> Int {
 /// 单样本编码:[-1, 1] Double → 字节偏移(小端)。
 fn encode_sample_at(
   fa : FixedArray[Byte],
-  off : Int,
+  off : Int32,
   x : Double,
   fmt : WavSampleFormat,
 ) -> Unit {
@@ -89,7 +89,7 @@ fn encode_sample_at(
 
 ///|
 /// 常见声道布局掩码(EXTENSIBLE 用):1=前中,2=前左+前右,其余低位全 1。
-fn default_channel_mask(n : Int) -> Int {
+fn default_channel_mask(n : Int32) -> Int32 {
   if n == 1 {
     0x4
   } else if n == 2 {
@@ -108,8 +108,8 @@ fn default_channel_mask(n : Int) -> Int {
 /// - data 块奇数长度自动补零对齐
 pub fn encode(
   format~ : WavSampleFormat,
-  sample_rate~ : Int,
-  channels~ : Int,
+  sample_rate~ : Int32,
+  channels~ : Int32,
   samples~ : Array[Double],
 ) -> Bytes raise WavError {
   guard sample_rate > 0 else {

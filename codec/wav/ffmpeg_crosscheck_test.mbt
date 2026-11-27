@@ -2,7 +2,7 @@
 // fixture 由 ffmpeg 产生,期望值来自 ffmpeg 导出的原始 PCM;逐样本字节级对比。
 
 ///|
-fn hex_byte(v : Int) -> Byte {
+fn hex_byte(v : Int32) -> Byte {
   v.to_byte()
 }
 
@@ -21,7 +21,7 @@ fn bytes_of_hex(hex : String) -> Bytes {
 
 ///|
 /// 十六进制字符 → 0..15。
-fn hex_val(c : Char) -> Int {
+fn hex_val(c : Char) -> Int32 {
   let v = c.to_int()
   if v >= 0x30 && v <= 0x39 {
     v - 0x30
@@ -38,7 +38,7 @@ fn fixture_s16_mono() -> String {
 }
 
 ///|
-fn expected_s16_mono() -> Array[Int] {
+fn expected_s16_mono() -> Array[Int32] {
   [
     0, 1387, 2610, 3525, 4022, 4045, 3589, 2708, 1508, 129, -1265, -2509, -3457,
     -3996, -4063, -3649, -2804, -1626, -257, 1142, 2406, 3387, 3966, 4077, 3706,
@@ -94,7 +94,7 @@ fn fixture_s16_stereo() -> String {
 }
 
 ///|
-fn expected_s16_stereo() -> Array[Int] {
+fn expected_s16_stereo() -> Array[Int32] {
   [
     0, 0, 981, 981, 1846, 1846, 2493, 2493, 2844, 2844, 2860, 2860, 2538, 2538, 1915,
     1915, 1066, 1066, 91, 91, -894, -894, -1774, -1774, -2444, -2444, -2826, -2826,
@@ -180,7 +180,7 @@ fn fixture_s24_mono() -> String {
 }
 
 ///|
-fn expected_s24_mono() -> Array[Int] {
+fn expected_s24_mono() -> Array[Int32] {
   [
     0, 355072, 668160, 902400, 1029632, 1035520, 918784, 693248, 386048, 33024, -323840,
     -642304, -884992, -1022976, -1040128, -934144, -717824, -416256, -65792, 292352,
@@ -247,7 +247,7 @@ fn fixture_f32_stereo() -> String {
 }
 
 ///|
-fn expected_f32_stereo() -> Array[UInt] {
+fn expected_f32_stereo() -> Array[UInt32] {
   [
     0, 0, 1022701684, 1022701684, 1030140303, 1030140303, 1033619666, 1033619666,
     1035059132, 1035059132, 1035125747, 1035125747, 1033805030, 1033805030, 1030707979,
@@ -384,7 +384,7 @@ fn fixture_s16_meta() -> String {
 }
 
 ///|
-fn expected_s16_meta() -> Array[Int] {
+fn expected_s16_meta() -> Array[Int32] {
   [
     0, 0, 981, 981, 1846, 1846, 2493, 2493, 2844, 2844, 2860, 2860, 2538, 2538, 1915,
     1915, 1066, 1066, 91, 91, -894, -894, -1774, -1774, -2444, -2444, -2826, -2826,

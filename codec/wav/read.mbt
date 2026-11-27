@@ -1,7 +1,7 @@
 ///|
 /// 读四字节块 ID 为可打印字符串:ASCII 原样,控制字符转义为 \xNN,
 /// 保证错误消息里不出现原始控制字节。
-fn tag_at(b : Bytes, off : Int) -> String {
+fn tag_at(b : Bytes, off : Int32) -> String {
   let hex = "0123456789ABCDEF"
   let buf = StringBuilder()
   for i = 0; i < 4; i = i + 1 {
@@ -19,7 +19,7 @@ fn tag_at(b : Bytes, off : Int) -> String {
 
 ///|
 /// 读无符号 16 位,按容器字节序。
-fn u16_at(b : Bytes, off : Int, big : Bool) -> Int {
+fn u16_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
   if big {
     b[off].to_int() * 256 + b[off + 1].to_int()
   } else {
@@ -29,7 +29,7 @@ fn u16_at(b : Bytes, off : Int, big : Bool) -> Int {
 
 ///|
 /// 读无符号 32 位为 UInt,按容器字节序(供浮点位模式重组)。
-fn u32_uint_at(b : Bytes, off : Int, big : Bool) -> UInt {
+fn u32_uint_at(b : Bytes, off : Int32, big : Bool) -> UInt32 {
   if big {
     (b[off].to_uint() << 24) |
     (b[off + 1].to_uint() << 16) |
@@ -45,7 +45,7 @@ fn u32_uint_at(b : Bytes, off : Int, big : Bool) -> UInt {
 
 ///|
 /// 读无符号 32 位为 Double:块大小可达 4 GiB,Double 累加规避 Int 32 位溢出。
-fn u32_at(b : Bytes, off : Int, big : Bool) -> Double {
+fn u32_at(b : Bytes, off : Int32, big : Bool) -> Double {
   if big {
     b[off].to_double() * 16777216.0 +
     b[off + 1].to_double() * 65536.0 +
@@ -61,7 +61,7 @@ fn u32_at(b : Bytes, off : Int, big : Bool) -> Double {
 
 ///|
 /// 读无符号 24 位,按容器字节序。
-fn u24_at(b : Bytes, off : Int, big : Bool) -> Int {
+fn u24_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
   if big {
     b[off].to_int() * 65536 + b[off + 1].to_int() * 256 + b[off + 2].to_int()
   } else {
@@ -71,13 +71,13 @@ fn u24_at(b : Bytes, off : Int, big : Bool) -> Int {
 
 ///|
 /// 读 32 位 IEEE 浮点(按位重组,无 FFI)。
-fn f32_at(b : Bytes, off : Int, big : Bool) -> Double {
+fn f32_at(b : Bytes, off : Int32, big : Bool) -> Double {
   Float::reinterpret_from_uint(u32_uint_at(b, off, big)).to_double()
 }
 
 ///|
 /// 读 64 位 IEEE 浮点(按位重组,无 FFI)。
-fn f64_at(b : Bytes, off : Int, big : Bool) -> Double {
+fn f64_at(b : Bytes, off : Int32, big : Bool) -> Double {
   let first = u32_uint_at(b, off, big).to_uint64()
   let second = u32_uint_at(b, off + 4, big).to_uint64()
   let u = if big { (first << 32) | second } else { (second << 32) | first }
@@ -89,7 +89,7 @@ fn f64_at(b : Bytes, off : Int, big : Bool) -> Double {
 /// PCM 比例取 2^(bits-1)(u8 中心 128):精确的二进分数,decode∘encode 幂等。
 fn decode_sample_at(
   b : Bytes,
-  off : Int,
+  off : Int32,
   fmt : WavSampleFormat,
   big : Bool,
 ) -> Double {
