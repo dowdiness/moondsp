@@ -500,7 +500,7 @@ test "structured errors for malformed inputs" {
     err_of(() => {
       let _ = @wav.decode(weird)
     })
-    is Some(@wav.WavError::UnsupportedFormat(_)),
+    is Some(@wav.WavError::UnsupportedFormat(tag=7, bits=16)),
   )
   // Zero channels
   let zero_ch = build_wav(fmt=fmt_tag(1, 0, 8000, 16), data=[b(0), b(0)])
@@ -554,6 +554,38 @@ test "encode rejects invalid parameters" {
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
+}
+
+///|
+test "encode rejects values its header fields cannot hold" {
+  let encodes = (format, sample_rate, channels) => {
+    err_of(() => {
+      let _ = @wav.encode(
+        format~,
+        sample_rate~,
+        channels~,
+        samples=Array::make(channels, 0.0),
+      )
+    })
+  }
+  // block_align (channels × bytes per sample) is a 16-bit field
+  assert_true(encodes(@wav.PcmI16, 8000, 32767) is None)
+  assert_true(
+    encodes(@wav.PcmI16, 8000, 32768) is Some(@wav.WavError::InvalidFormat(_)),
+  )
+  // The byte rate (sample rate × block_align) is a 32-bit field
+  assert_true(encodes(@wav.IeeeF64, 268435455, 2) is None)
+  assert_true(
+    encodes(@wav.IeeeF64, 268435456, 2) is Some(@wav.WavError::InvalidFormat(_)),
+  )
+  // Past the 18 defined speaker positions, the channel mask is 0
+  let wav = @wav.encode(
+    format=@wav.PcmU8,
+    sample_rate=8000,
+    channels=19,
+    samples=Array::make(19, 0.0),
+  )
+  assert_true(wav[40] == b'\x00' && wav[41] == b'\x00' && wav[42] == b'\x00')
 }
 
 ///|

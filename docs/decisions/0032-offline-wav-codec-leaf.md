@@ -16,7 +16,7 @@ moondsp has no way to read or write audio files. PR #287 adds WAV and FLAC
 codecs, a format-sniffing `decode_any`, offline rendering of Mini scores to
 WAV, and unrelated fixes, in one commit of about 5,000 lines on an old base.
 We take only its WAV part, which stands alone: the `codec/wav` package
-imports nothing from moondsp and only `moonbitlang/core/debug` from outside.
+imports nothing from moondsp and only `moonbitlang/core` from outside.
 
 ADR-0001 sets the package layers, and ADR-0027 is the precedent for a leaf
 that sits outside them and imports no moondsp package.
@@ -36,17 +36,22 @@ that sits outside them and imports no moondsp package.
 
    ```moonbit
    pub fn decode(Bytes) -> WaveFile raise WavError
-   pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int, channels~ : Int, samples~ : Array[Double]) -> Bytes raise WavError
+   pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int, channels~ : Int, samples~ : ArrayView[Double]) -> Bytes raise WavError
    ```
 
    - `WaveFile` has private fields, and only `decode` builds one. It reads
      back as `sample_rate`, `channels`, `frame_count`, `source_format`, and
-     `samples`.
+     `samples`. `samples` is a `ReadOnlyArray`, so a caller cannot change
+     the frame count behind `WaveFile`'s back.
    - `samples` are Doubles normalized to [-1, 1] and interleaved by channel,
      at the file's own sample rate. Mixing down to mono, converting to
      `Float`, and resampling for the sample store (ADR-0026 Decision 7)
      are the loader's job, not the codec's.
    - `WavError` is `pub`: callers match its cases but cannot construct them.
+     `UnsupportedFormat` carries the format tag and bit depth; the other
+     payloads are messages for people.
+   - `encode` rejects any value its header cannot hold (a 16-bit
+     `block_align`, a 32-bit byte rate) instead of writing a wrong header.
    - `WavSampleFormat` is `pub(all)`, because callers pass it to `encode`.
      One enum serves both directions: every format `decode` reads, `encode`
      can also write.

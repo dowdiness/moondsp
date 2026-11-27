@@ -44,22 +44,6 @@ fn u32_uint_at(b : Bytes, off : Int32, big : Bool) -> UInt32 {
 }
 
 ///|
-/// Reads an unsigned 32-bit value as Double: chunk sizes reach 4 GiB, and summing in Double avoids 32-bit Int overflow.
-fn u32_at(b : Bytes, off : Int32, big : Bool) -> Double {
-  if big {
-    b[off].to_double() * 16777216.0 +
-    b[off + 1].to_double() * 65536.0 +
-    b[off + 2].to_double() * 256.0 +
-    b[off + 3].to_double()
-  } else {
-    b[off].to_double() +
-    b[off + 1].to_double() * 256.0 +
-    b[off + 2].to_double() * 65536.0 +
-    b[off + 3].to_double() * 16777216.0
-  }
-}
-
-///|
 /// Reads an unsigned 24-bit value in the container's byte order.
 fn u24_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
   if big {
@@ -105,11 +89,8 @@ fn decode_sample_at(
       let s = if u >= 8388608 { u - 16777216 } else { u }
       s.to_double() / 8388608.0
     }
-    PcmI32 => {
-      let u = u32_at(b, off, big)
-      let s = if u >= 2147483648.0 { u - 4294967296.0 } else { u }
-      s / 2147483648.0
-    }
+    PcmI32 =>
+      u32_uint_at(b, off, big).reinterpret_as_int().to_double() / 2147483648.0
     IeeeF32 => f32_at(b, off, big)
     IeeeF64 => f64_at(b, off, big)
   }
@@ -135,20 +116,19 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   let mut data_len = 0
   while pos + 8 <= total {
     let id = tag_at(bytes, pos)
-    let size_d = u32_at(bytes, pos + 4, big)
     let body = pos + 8
-    // A chunk size past the end of the input or beyond the Int range counts as truncation
-    if size_d < 0.0 || body.to_double() + size_d > total.to_double() {
+    let size_u = u32_uint_at(bytes, pos + 4, big)
+    guard size_u <= (total - body).reinterpret_as_uint() else {
       raise Truncated("chunk " + id)
     }
-    let size = size_d.to_int()
+    let size = size_u.reinterpret_as_int()
     if id == "fmt " {
       if size < 16 {
         raise InvalidFormat("fmt chunk too small: " + size.to_string())
       }
       let mut tag = u16_at(bytes, body, big)
       n_channels = u16_at(bytes, body + 2, big)
-      let rate_d = u32_at(bytes, body + 4, big)
+      let rate_u = u32_uint_at(bytes, body + 4, big)
       let bits = u16_at(bytes, body + 14, big)
       if tag == 0xFFFE {
         // WAVE_FORMAT_EXTENSIBLE: the real format is in the first two bytes of the SubFormat GUID
@@ -162,20 +142,13 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
       if n_channels <= 0 {
         raise InvalidFormat("channels = " + n_channels.to_string())
       }
-      if rate_d <= 0.0 || rate_d >= 2147483648.0 {
+      if rate_u == 0 || rate_u > 0x7FFFFFFFU {
         raise InvalidFormat("sample rate out of range")
       }
-      rate = rate_d.to_int()
+      rate = rate_u.reinterpret_as_int()
       fmt = match WavSampleFormat::from_tag_bits(tag, bits) {
         Some(f) => Some(f)
-        None =>
-          raise UnsupportedFormat(
-            "format tag " +
-            tag.to_string() +
-            " with " +
-            bits.to_string() +
-            " bits",
-          )
+        None => raise UnsupportedFormat(tag~, bits~)
       }
     } else if id == "data" {
       data_off = body
@@ -201,9 +174,8 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
     )
   }
   let n = data_len / bps
-  let samples : Array[Double] = Array::make(n, 0.0)
-  for i = 0; i < n; i = i + 1 {
-    samples[i] = decode_sample_at(bytes, data_off + i * bps, format, big)
-  }
+  let samples = ReadOnlyArray::makei(n, i => {
+    decode_sample_at(bytes, data_off + i * bps, format, big)
+  })
   { sample_rate: rate, channels: n_channels, samples, source_format: format, }
 }

@@ -8,7 +8,7 @@ import {
 // Values
 pub fn decode(Bytes) -> WaveFile raise WavError
 
-pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int32, channels~ : Int32, samples~ : Array[Double]) -> Bytes raise WavError
+pub fn encode(format~ : WavSampleFormat, sample_rate~ : Int32, channels~ : Int32, samples~ : ArrayView[Double]) -> Bytes raise WavError
 
 // Errors
 #derive(@debug.Debug)
@@ -17,10 +17,9 @@ pub suberror WavError {
   NotWave
   Truncated(String)
   InvalidFormat(String)
-  UnsupportedFormat(String)
+  UnsupportedFormat(tag~ : Int32, bits~ : Int32)
   DataTooLarge
 }
-pub fn WavError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 #derive(Eq, @debug.Debug)
@@ -32,9 +31,6 @@ pub(all) enum WavSampleFormat {
   IeeeF32
   IeeeF64
 }
-pub fn WavSampleFormat::equal(Self, Self) -> Bool
-pub fn WavSampleFormat::not_equal(Self, Self) -> Bool
-pub fn WavSampleFormat::to_repr(Self) -> @debug.Repr
 
 #derive(@debug.Debug)
 pub struct WaveFile {
@@ -43,9 +39,8 @@ pub struct WaveFile {
 pub fn WaveFile::channels(Self) -> Int32
 pub fn WaveFile::frame_count(Self) -> Int32
 pub fn WaveFile::sample_rate(Self) -> Int32
-pub fn WaveFile::samples(Self) -> Array[Double]
+pub fn WaveFile::samples(Self) -> ReadOnlyArray[Double]
 pub fn WaveFile::source_format(Self) -> WavSampleFormat
-pub fn WaveFile::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

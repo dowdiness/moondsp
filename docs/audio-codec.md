@@ -4,7 +4,7 @@
 
 | Package | Responsibility | Dependencies |
 |---|---|---|
-| `codec/wav` | RIFF/WAVE decoding and encoding | core (debug) |
+| `codec/wav` | RIFF/WAVE decoding and encoding | core only |
 
 ## WAV (`codec/wav`)
 
@@ -17,7 +17,7 @@ float32/64; WAVE_FORMAT_EXTENSIBLE (0xFFFE, including the SubFormat GUID). Unkno
 let file : WaveFile = @wav.decode(bytes)
 file.sample_rate() // Int
 file.channels()    // Int
-file.samples()     // Array[Double] (interleaved by channel)
+file.samples()     // ReadOnlyArray[Double] (interleaved by channel)
 file.source_format() // WavSampleFormat
 
 // Encode: six sample formats; more than 2 channels writes EXTENSIBLE; an odd data chunk is zero-padded
@@ -35,7 +35,7 @@ so `decode(encode(x))` is idempotent; float32/64 are stored bit for bit. NaN bec
 
 ## Tests
 
-- `codec/wav`: 23 tests (idempotent round trips, RIFX, EXTENSIBLE, LIST skipping, structured errors,
+- `codec/wav`: 24 tests (idempotent round trips, RIFX, EXTENSIBLE, LIST skipping, structured errors,
   12k fuzz inputs with zero panics, 400 quickcheck property cases, sample-by-sample ffmpeg cross-check of five formats)
 
 ## License and sources

@@ -1,11 +1,4 @@
 ///|
-/// Builds a Byte from an Int. Byte literals are avoided: moonc v0.10.14 has a
-/// compile-time ICE on `b'\xNN'` literals, so this always goes through `to_byte()` (as moonvoice does).
-fn byte_of(v : Int32) -> Byte {
-  v.to_byte()
-}
-
-///|
 /// Writes a little-endian 16-bit value.
 fn put_u16le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
   fa[off] = (v & 0xFF).to_byte()
@@ -22,14 +15,10 @@ fn put_u32le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
 }
 
 ///|
-/// Writes a four-byte ASCII chunk ID (padded with spaces).
+/// Writes a four-byte ASCII chunk ID.
 fn put_tag(fa : FixedArray[Byte], off : Int32, tag : String) -> Unit {
   for i = 0; i < 4; i = i + 1 {
-    fa[off + i] = if i < tag.length() {
-      byte_of(tag.get_char(i).unwrap().to_int())
-    } else {
-      byte_of(32)
-    }
+    fa[off + i] = tag.get_char(i).unwrap().to_int().to_byte()
   }
 }
 
@@ -63,7 +52,7 @@ fn encode_sample_at(
   fmt : WavSampleFormat,
 ) -> Unit {
   match fmt {
-    PcmU8 => fa[off] = byte_of(quantize(x, 128.0, -128, 127) + 128)
+    PcmU8 => fa[off] = (quantize(x, 128.0, -128, 127) + 128).to_byte()
     PcmI16 => put_u16le(fa, off, quantize(x, 32768.0, -32768, 32767))
     PcmI24 => {
       let v = quantize(x, 8388608.0, -8388608, 8388607)
@@ -88,14 +77,14 @@ fn encode_sample_at(
 }
 
 ///|
-/// Common channel-layout mask (for EXTENSIBLE): 1 = front center, 2 = front left + front right, otherwise all low bits set.
-fn default_channel_mask(n : Int32) -> Int32 {
-  if n == 1 {
-    0x4
-  } else if n == 2 {
-    0x3
-  } else {
+/// Channel mask for WAVE_FORMAT_EXTENSIBLE, which is written only for more than
+/// 2 channels: the first n speaker positions, or 0 (no assignment) past the
+/// 18 positions the format defines.
+fn channel_mask(n : Int32) -> Int32 {
+  if n <= 18 {
     (1 << n) - 1
+  } else {
+    0
   }
 }
 
@@ -110,7 +99,7 @@ pub fn encode(
   format~ : WavSampleFormat,
   sample_rate~ : Int32,
   channels~ : Int32,
-  samples~ : Array[Double],
+  samples~ : ArrayView[Double],
 ) -> Bytes raise WavError {
   guard sample_rate > 0 else {
     raise InvalidFormat("sample rate = " + sample_rate.to_string())
@@ -128,6 +117,15 @@ pub fn encode(
     )
   }
   let bps = format.bytes_per_sample()
+  // block_align is a 16-bit field and the byte rate a 32-bit one
+  let block_align = channels * bps
+  guard block_align <= 0xFFFF else {
+    raise InvalidFormat("channels = " + channels.to_string())
+  }
+  let byte_rate = sample_rate.to_int64() * block_align.to_int64()
+  guard byte_rate <= 0xFFFFFFFFL else {
+    raise InvalidFormat("sample rate = " + sample_rate.to_string())
+  }
   let n = samples.length()
   let data_size = n * bps
   // Leave room for the 44-byte header so the RIFF size cannot overflow Int/UInt32
@@ -135,7 +133,7 @@ pub fn encode(
   let extensible = channels > 2
   let fmt_size = if extensible { 40 } else { 16 }
   let total = 12 + 8 + fmt_size + 8 + data_size + data_size % 2
-  let fa : FixedArray[Byte] = FixedArray::make(total, byte_of(0))
+  let fa : FixedArray[Byte] = FixedArray::make(total, b'\x00')
   // RIFF header
   put_tag(fa, 0, "RIFF")
   put_u32le(fa, 4, total - 8)
@@ -147,30 +145,20 @@ pub fn encode(
   put_u16le(fa, 20, if extensible { 0xFFFE } else { tag })
   put_u16le(fa, 22, channels)
   put_u32le(fa, 24, sample_rate)
-  let block_align = channels * bps
-  put_u32le(fa, 28, sample_rate * block_align)
+  put_u32le(fa, 28, byte_rate.to_int())
   put_u16le(fa, 32, block_align)
   put_u16le(fa, 34, bps * 8)
   if extensible {
     put_u16le(fa, 36, 22)
     put_u16le(fa, 38, bps * 8)
-    put_u32le(fa, 40, default_channel_mask(channels))
+    put_u32le(fa, 40, channel_mask(channels))
     // SubFormat GUID = little-endian layout of KSDATAFORMAT_SUBTYPE_PCM / IEEE_FLOAT:
     // 00000001-0000-0010-8000-00AA00389B71 (Data1 = the real format tag)
     put_u16le(fa, 44, tag)
-    fa[46] = byte_of(0x00)
-    fa[47] = byte_of(0x00)
-    fa[48] = byte_of(0x00)
-    fa[49] = byte_of(0x00)
-    put_u16le(fa, 50, 0x0010)
-    fa[52] = byte_of(0x80)
-    fa[53] = byte_of(0x00)
-    fa[54] = byte_of(0x00)
-    fa[55] = byte_of(0xAA)
-    fa[56] = byte_of(0x00)
-    fa[57] = byte_of(0x38)
-    fa[58] = byte_of(0x9B)
-    fa[59] = byte_of(0x71)
+    let guid_rest = b"\x00\x00\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71"
+    for i = 0; i < guid_rest.length(); i = i + 1 {
+      fa[46 + i] = guid_rest[i]
+    }
   }
   // data chunk
   let data_hdr = 12 + 8 + fmt_size

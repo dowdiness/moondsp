@@ -2,19 +2,14 @@
 // Fixtures were produced by ffmpeg, and expected values come from raw PCM exported by ffmpeg; compared byte-exact, sample by sample.
 
 ///|
-fn hex_byte(v : Int32) -> Byte {
-  v.to_byte()
-}
-
-///|
 /// Hex string → Bytes (test helper).
 fn bytes_of_hex(hex : String) -> Bytes {
   let n = hex.length() / 2
-  let fa : FixedArray[Byte] = FixedArray::make(n, hex_byte(0))
+  let fa : FixedArray[Byte] = FixedArray::make(n, b'\x00')
   for i = 0; i < n; i = i + 1 {
     let hi = hex_val(hex.get_char(i * 2).unwrap())
     let lo = hex_val(hex.get_char(i * 2 + 1).unwrap())
-    fa[i] = hex_byte(hi * 16 + lo)
+    fa[i] = (hi * 16 + lo).to_byte()
   }
   Bytes::from_array(fa)
 }

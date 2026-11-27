@@ -30,21 +30,9 @@ pub suberror WavError {
   NotWave
   Truncated(String)
   InvalidFormat(String)
-  UnsupportedFormat(String)
+  UnsupportedFormat(tag~ : Int32, bits~ : Int32)
   DataTooLarge
 }
-
-///|
-pub extend WavError with @moonbitlang/core/debug.Debug::{to_repr}
-
-///|
-pub extend WavSampleFormat with @moonbitlang/core/debug.Debug::{to_repr}
-
-///|
-pub extend WavSampleFormat with Eq::{equal, not_equal}
-
-///|
-pub extend WaveFile with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 /// Decoded WAV content: interleaved samples normalized to [-1, 1].
@@ -52,7 +40,7 @@ pub extend WaveFile with @moonbitlang/core/debug.Debug::{to_repr}
 pub struct WaveFile {
   priv sample_rate : Int32
   priv channels : Int32
-  priv samples : Array[Double]
+  priv samples : ReadOnlyArray[Double]
   priv source_format : WavSampleFormat
 }
 
@@ -70,7 +58,7 @@ pub fn WaveFile::channels(self : WaveFile) -> Int32 {
 
 ///|
 /// Interleaved normalized samples; length = frame count × channel count.
-pub fn WaveFile::samples(self : WaveFile) -> Array[Double] {
+pub fn WaveFile::samples(self : WaveFile) -> ReadOnlyArray[Double] {
   self.samples
 }
 
