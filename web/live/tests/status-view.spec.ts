@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { statusView, type StatusInput } from "../src/status-view";
+import { sampleNotice, statusView, type StatusInput } from "../src/status-view";
 
 const base: StatusInput = {
   state: "Playing",
@@ -110,5 +110,17 @@ test("accepted code is up to date only once every part has switched", () => {
     playing: false,
     action: "pause",
     headline: "Starting audio…",
+  });
+});
+
+test("the sample notice names what loads and what failed, and is gone when both are empty", () => {
+  const none = { loading: [], failed: [], overLimit: [], unknown: [] };
+  expect(sampleNotice(none)).toBeNull();
+  expect(sampleNotice({ ...none, loading: ["piano_c2", "piano_c4"] }))
+    .toEqual({ text: "Loading samples: piano_c2, piano_c4", tone: "neutral" });
+  expect(sampleNotice({ ...none, loading: ["piano_c2"], failed: [{ name: "kalimba_g5", reason: "fetch /samples/vcsl/kalimba_g5.flac: 404" }],
+    overLimit: [{ name: "upright_a4", limit: "memory" }] })).toEqual({
+    text: "Loading samples: piano_c2 · Samples failed to load: kalimba_g5 (fetch /samples/vcsl/kalimba_g5.flac: 404), upright_a4 (over the memory limit)",
+    tone: "error",
   });
 });

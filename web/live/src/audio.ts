@@ -282,6 +282,8 @@ export class AudioEngine {
     this.state = { kind: "active", run, graph, deliver };
     this.discardOnsets();
     graph.node.port.postMessage({ type: "set-scheduler-gain", gain: 0.6 });
+    // Sample reports before activation, or while suspended, reached no session.
+    graph.node.port.postMessage({ type: "sample-report" });
     const session: AudioSession = {
       format: graph.format,
       fadeIn: () => this.command(run, "fade-in"),

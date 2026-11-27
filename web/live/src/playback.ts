@@ -2,7 +2,7 @@ import type { AudioEngine, AudioEvent, AudioSession, AudioStatus } from "./audio
 import { Draft, PlaybackInput, playerWindow, type DraftState, type PlayerWindow, type SourceProblem } from "./authoring";
 import { sameDraftVersion, type DraftVersion } from "./draft-version";
 import { RequestId } from "./playback-protocol";
-import type { PlayerOperation, PlayerReceipt, PlayerSnapshot } from "./playback-protocol";
+import type { PlayerOperation, PlayerReceipt, PlayerSnapshot, SampleStatus } from "./playback-protocol";
 /** The player's answer that it would not take a draft. */
 type Refusal = Readonly<{ kind: "refused"; message: string }>;
 /** Why the current draft cannot play: its own problem, or the player's refusal of it. */
@@ -29,6 +29,8 @@ export type PlaybackView = Readonly<{
   skippedCount: number;
   /** The error the log shows, if any. */
   feedback: string | null;
+  /** The engine's latest report on its sample bank: what is loading and what failed. */
+  samples: SampleStatus;
   diagnostic: DraftDiagnostic | null;
 }>;
 type Pending = {
@@ -40,6 +42,7 @@ type Pending = {
 /** The engine's latest report, or the empty state before it reports a tempo. */
 type HeldSnapshot = Omit<PlayerSnapshot, "tempo"> & Readonly<{ tempo: number | null }>;
 const EMPTY: HeldSnapshot = { state: "Empty", mode: "none", cyclePosition: 0, tempo: null, samplePosition: 0, pendingCount: 0, skippedCount: 0 };
+const NO_SAMPLES: SampleStatus = { loading: [], failed: [], overLimit: [], unknown: [] };
 
 /** The player's newest answer about one draft version, by receipt order. */
 type Verdict = Readonly<{ version: DraftVersion; receipt: number; refusal: Refusal | null }>;
@@ -51,6 +54,7 @@ type Connection =
 export class Player {
   private connection: Connection = { kind: "closed" };
   private snapshot: HeldSnapshot = EMPTY;
+  private samples: SampleStatus = NO_SAMPLES;
   private readonly draft: Draft;
   private currentSource: string | null = null;
   private acceptedVersion: DraftVersion | null = null;
@@ -118,7 +122,7 @@ export class Player {
     else if (sameDraftVersion(this.acceptedVersion, draftState.version)) draftStatus = "accepted";
     return { ...this.snapshot, state, status, currentSource: this.currentSource,
       draftVersion: draftState.version, acceptedVersion: this.acceptedVersion, inFlightVersions, draftStatus,
-      feedback, diagnostic };
+      feedback, diagnostic, samples: this.samples };
   }
   private render(): void { this.present(this.view()); }
   /**
@@ -253,6 +257,8 @@ export class Player {
     this.connection = { kind: "closed" };
     if (previous.kind === "opening") previous.controller.abort();
     this.rejectPending(reason);
+    // The next session reports its own samples when it becomes active.
+    this.samples = NO_SAMPLES;
     this.currentSource = null;
     this.acceptedVersion = null;
     this.latestAcceptedSourceId = 0;
@@ -362,9 +368,12 @@ export class Player {
   private receive(event: AudioEvent): void {
     if (event.kind === "failed") { this.fail(event.message); return; }
     if (event.kind === "status") { this.snapshot = event; this.render(); return; }
-    // No score plays a sample yet (ADR-0026 stage 4 waits for ADR-0023), so
-    // nothing shows which samples are loading.
-    if (event.kind === "samples") return;
+    if (event.kind === "samples") {
+      const { kind: _, ...samples } = event;
+      this.samples = samples;
+      this.render();
+      return;
+    }
     const receipt = event.receipt;
     const pending = this.pending.get(receipt.id.value);
     if (!pending) return;

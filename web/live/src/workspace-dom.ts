@@ -79,6 +79,7 @@ export function queryWorkspaceDom(doc: Document) {
     share,
     sessionMessage: element("session-message"),
     log: element("log"),
+    sampleStatus: element("sample-status"),
     edit: {
       undo: button("undo"),
       redo: button("redo"),

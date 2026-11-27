@@ -249,6 +249,15 @@ test("a worklet fault rejects outstanding commands and retires late receipts", a
   expect(h.player.view().acceptedVersion).toBeNull();
 });
 
+test("a fault forgets the session's sample status; the next session reports its own", async () => {
+  const h = harness(); await h.start();
+  const loading = { loading: ["piano_c2"], failed: [], overLimit: [], unknown: [] };
+  h.deliver({ kind: "samples", ...loading });
+  expect(h.player.view().samples).toEqual(loading);
+  h.fail();
+  expect(h.player.view().samples).toEqual({ loading: [], failed: [], overLimit: [], unknown: [] });
+});
+
 test("automatic updates retain only the latest unsent draft", async () => {
   const h = harness(); await h.start();
   h.edit('note("62")');

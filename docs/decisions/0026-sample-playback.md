@@ -147,7 +147,13 @@ and then valid with no edit.
 A note on a sample that is not registered yet starts a voice that renders
 silence. That voice reads only an empty store entry. The host reports
 pending samples on its own status channel, next to the source problem and
-not inside it. The editor can show "loading" from that status. Phase 2 can
+not inside it. The editor shows "loading" from that status.
+
+In the browser, a sample is pending from when the page starts to fetch its
+file until the worklet has copied it. The page announces each recording
+before it fetches it, and reports a fetch or decode failure as `failed`,
+with the reason, on the same channel; the sample then renders silence as
+an unregistered one does. Phase 2 can
 check what the text decides, such as an unknown sample name, as a
 `Mistake`.
 

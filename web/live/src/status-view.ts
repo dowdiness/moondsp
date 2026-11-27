@@ -1,5 +1,6 @@
 import type { DraftVersion } from "./draft-version";
 import type { PlaybackView } from "./playback";
+import type { SampleStatus } from "./playback-protocol";
 
 // Functional core for the transport and change status: every word, flag, and
 // data attribute the status surface shows is decided here from the playback
@@ -178,4 +179,18 @@ export function authoringView(phase: AuthoringPhase): AuthoringView {
         unavailable: { transport: "Playback unavailable", draftStatus: "Playback unavailable", draftVersion: "Unavailable" },
       };
   }
+}
+
+/** What the footer says about the sample bank: null while nothing loads or failed. */
+export function sampleNotice(samples: SampleStatus): Readonly<{ text: string; tone: StatusTone }> | null {
+  const problems = [
+    ...samples.failed.map(({ name, reason }) => `${name} (${reason})`),
+    ...samples.overLimit.map(({ name, limit }) => `${name} (over the ${limit} limit)`),
+    ...samples.unknown.map(name => `${name} (not in the bank)`),
+  ];
+  const parts = [
+    ...(samples.loading.length ? [`Loading samples: ${samples.loading.join(", ")}`] : []),
+    ...(problems.length ? [`Samples failed to load: ${problems.join(", ")}`] : []),
+  ];
+  return parts.length ? { text: parts.join(" · "), tone: problems.length ? "error" : "neutral" } : null;
 }

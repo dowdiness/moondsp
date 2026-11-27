@@ -23,7 +23,7 @@ import { mountOutputScope } from "./output-scope";
 import { mountSignalHorizon } from "./signal-horizon";
 import { mountScoreLink } from "./score-link";
 import { queryWorkspaceDom } from "./workspace-dom";
-import { authoringView, statusView, type AuthoringPhase } from "./status-view";
+import { authoringView, sampleNotice, statusView, type AuthoringPhase } from "./status-view";
 import { setText, writeAuthoring, writeStatus } from "./transport-status";
 import { engineOptions } from "./engine-options";
 import { mountNotice } from "./notice";
@@ -192,6 +192,12 @@ function renderPlayback(state: PlaybackView): void {
   tools?.observation.setPlaying(state.state === "Playing");
   if (state.feedback !== renderedPlayback?.feedback) {
     setLog(state.feedback ?? "", state.feedback === null ? "info" : "error");
+  }
+  if (state.samples !== renderedPlayback?.samples) {
+    const notice = sampleNotice(state.samples);
+    dom.sampleStatus.textContent = notice?.text ?? "";
+    dom.sampleStatus.hidden = notice === null;
+    dom.sampleStatus.dataset.tone = notice?.tone ?? "neutral";
   }
   if (state.diagnostic !== renderedPlayback?.diagnostic) {
     adapter.applyPatches([{ type: "SetDiagnostics", diagnostics: editorDiagnostics(state.diagnostic) }]);
