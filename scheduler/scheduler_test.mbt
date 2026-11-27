@@ -771,6 +771,25 @@ test "a later queued snapshot replaces an earlier one in the one pending slot" {
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
   assert_eq(buffer_abs_sum(left) + buffer_abs_sum(right), 0.0)
+  // The pattern queued next replaces the song: it enters at cycle 1, and the
+  // song's occurrence stops at its own start, cycle 2, before it sounds.
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(pattern.playback()),
+  )
+  sched.render_block(left, right)
+  @debug.assert_eq(sched.pending_material_change_count(), 2)
+  // A cycle is 96,000 samples at 120 BPM, 750 blocks.
+  for _ in 1..<751 {
+    sched.render_block(left, right)
+  }
+  @debug.assert_eq(sched.pending_material_change_count(), 1)
+  @debug.assert_eq(sched.active_note_count(), 1)
+  for _ in 751..<1501 {
+    sched.render_block(left, right)
+  }
+  // Only the pattern's cycle-2 note sounds; the song never started.
+  @debug.assert_eq(sched.pending_material_change_count(), 0)
+  @debug.assert_eq(sched.active_note_count(), 1)
 }
 
 ///|
