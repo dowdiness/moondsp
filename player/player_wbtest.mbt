@@ -39,7 +39,7 @@ fn test_voice(_ : @score.Instrument) -> NoteVoice {
 fn test_player(
   sample_rate~ : Double = 48000.0,
   block_size~ : Int32 = 128,
-) -> Player raise PlayerError {
+) -> Player raise UnsupportedFormat {
   let ctx = @moondsp.DspContext(sample_rate~, block_size~)
   Player(ctx, {
     drum: test_drum,
@@ -243,7 +243,7 @@ test "a score with no source text plays and reports no source" {
     id=@identity.PatternNodeId::from_string("generated"),
     pat=@pattern.sequence([@score.note(60.0), @score.note(67.0)]),
   )
-  player.restart(Score::pattern(doc.lower(), bpm=120.0))
+  player.restart(Score::pattern(doc.lower(), tempo=tempo(120.0)))
   assert_eq(player.mode(), Some(Pattern))
   render_blocks(player, 1)
   assert_true(output_energy() > 0.01)

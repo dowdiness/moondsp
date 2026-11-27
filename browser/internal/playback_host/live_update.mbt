@@ -35,7 +35,7 @@ fn take_playback_input() -> Result[@mini.PlaybackInput, String] {
 pub fn player_update_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
-    Ok(input) => player_command(owner => owner.update(owner.compile(input)))
+    Ok(input) => player_accept(input, restart=false)
   }
 }
 
@@ -43,8 +43,27 @@ pub fn player_update_input() -> Int32 {
 pub fn player_restart_input() -> Int32 {
   match take_playback_input() {
     Err(message) => set_scheduler_parse_error(message)
-    Ok(input) => player_command(owner => owner.restart(owner.compile(input)))
+    Ok(input) => player_accept(input, restart=true)
   }
+}
+
+///|
+/// Compile `input` for the player, then accept it by update or restart. A
+/// score the player cannot compile changes nothing and returns 1.
+fn player_accept(input : @mini.PlaybackInput, restart~ : Bool) -> Int32 {
+  guard player.val is Some(owner) else {
+    return set_scheduler_parse_error("Player is not initialized")
+  }
+  let score = owner.compile(input) catch {
+    error => return set_scheduler_parse_error(error.message())
+  }
+  player_command(owner => {
+    if restart {
+      owner.restart(score)
+    } else {
+      owner.update(score)
+    }
+  })
 }
 
 ///|

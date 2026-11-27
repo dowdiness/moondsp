@@ -25,7 +25,7 @@ pub struct Player {
 pub fn Player::Player(
   ctx : @moondsp.DspContext,
   sounds : Sounds,
-) -> Player raise PlayerError {
+) -> Player raise UnsupportedFormat {
   guard scheduler_with_sounds(ctx, sounds) is Some((scheduler, sampler_pool)) else {
     raise UnsupportedFormat
   }
@@ -119,18 +119,58 @@ pub extend PlayState with Eq::{not_equal, equal}
 pub extend PlayState with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
+/// A tempo outside 0.001..1000 BPM.
 #derive(Eq, Debug)
-pub suberror PlayerError {
+pub suberror TempoOutOfRange
+
+///|
+pub fn TempoOutOfRange::message(self : TempoOutOfRange) -> String {
+  ignore(self)
+  "tempo must be 0.001..1000 BPM"
+}
+
+///|
+/// Why a score cannot be built.
+#derive(Eq, Debug)
+pub suberror ScoreError {
   /// Mini refused the input; the message says where and why.
   InvalidSource(String)
   /// A pattern could not be lowered.
   PatternLowering(@pattern.PatternDocError)
   /// A song could not be lowered; the message says why.
   SongLowering(String)
-  /// The tempo is outside 0.001..1000 BPM.
-  TempoOutOfRange
+  /// The score's tempo is out of range.
+  Tempo(TempoOutOfRange)
   /// The song ends at or before its beginning.
   EmptySong
+}
+
+///|
+/// The diagnostic the browser shows for `self`.
+pub fn ScoreError::message(self : ScoreError) -> String {
+  match self {
+    InvalidSource(message) | SongLowering(message) => message
+    PatternLowering(error) => "could not lower source: \{Repr(error)}"
+    Tempo(error) => error.message()
+    EmptySong => "song must end after its beginning"
+  }
+}
+
+///|
+/// A voice pool or the scheduler cannot run the context's format.
+#derive(Eq, Debug)
+pub suberror UnsupportedFormat
+
+///|
+pub fn UnsupportedFormat::message(self : UnsupportedFormat) -> String {
+  ignore(self)
+  "the player cannot run this sample rate and block size"
+}
+
+///|
+/// Why a player refuses a score, a command or a block.
+#derive(Eq, Debug)
+pub suberror PlayerError {
   /// A repeated song lasts less than one block.
   RepeatShorterThanBlock
   /// The score has more materials than a player plays.
@@ -149,26 +189,14 @@ pub suberror PlayerError {
   SongEndOutOfRange
   /// The player is in Fault and accepts nothing.
   Faulted(FaultReason)
-  /// A voice pool or the scheduler cannot run the context's format.
-  UnsupportedFormat
   /// `process` was given buffers of the wrong length.
   BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
 }
 
 ///|
-pub extend PlayerError with Eq::{not_equal, equal}
-
-///|
-pub extend PlayerError with @moonbitlang/core/debug.Debug::{to_repr}
-
-///|
 /// The diagnostic the browser shows for `self`.
 pub fn PlayerError::message(self : PlayerError) -> String {
   match self {
-    InvalidSource(message) | SongLowering(message) => message
-    PatternLowering(error) => "could not lower source: \{Repr(error)}"
-    TempoOutOfRange => "tempo must be 0.001..1000 BPM"
-    EmptySong => "song must end after its beginning"
     RepeatShorterThanBlock => "repeated song must span at least one audio block"
     TooManyMaterials => "playback source exceeds 256 material entries"
     TooManyRetainedMaterials =>
@@ -181,7 +209,6 @@ pub fn PlayerError::message(self : PlayerError) -> String {
     SongEndOutOfRange | Faulted(SongEndUnreachable) =>
       "song end exceeds transport range"
     Faulted(TransportExhausted) => "transport range exhausted"
-    UnsupportedFormat => "the player cannot run this sample rate and block size"
     BufferSizeMismatch(expected~, actual~) =>
       "output buffers hold \{actual} samples, not the block's \{expected}"
   }
@@ -202,7 +229,7 @@ fn Session::score(self : Session) -> Score? {
 pub fn Player::compile(
   self : Player,
   input : @mini.PlaybackInput,
-) -> Score raise PlayerError {
+) -> Score raise ScoreError {
   // Admission covers every supported future tempo, including the demo control.
   let window = self.scheduler.max_query_window()
   let prepared = match input.compile(query_window=window) {
@@ -211,24 +238,32 @@ pub fn Player::compile(
   }
   let score = match prepared {
     @mini.PreparedPlayback::TrackedPattern(snapshot, bpm) =>
-      Score::tracked_pattern(snapshot, bpm~)
+      Score::tracked_pattern(snapshot, tempo=score_tempo(bpm))
     @mini.PreparedPlayback::Source(parsed) => {
-      let bpm = parsed.bpm()
+      let tempo = score_tempo(parsed.bpm())
       match parsed.body() {
         Pattern(doc) => {
           let snapshot = doc.lower() catch {
             error => raise PatternLowering(error)
           }
-          Score::pattern(snapshot, bpm~)
+          Score::pattern(snapshot, tempo~)
         }
         UntrackedArrangement(song, repeat) =>
-          Score::song(lowered_song(song), bpm~, repeat~)
+          Score::song(lowered_song(song), tempo~, repeat~)
         TrackedArrangement(song, repeat) =>
-          Score::tracked_song(lowered_song(song), bpm~, repeat~)
+          Score::tracked_song(lowered_song(song), tempo~, repeat~)
       }
     }
   }
   { ..score, admitted: Some(window), }
+}
+
+///|
+/// A score's tempo from the BPM its source declares.
+fn score_tempo(bpm : Double) -> @scheduler.Tempo raise ScoreError {
+  tempo(bpm) catch {
+    error => raise Tempo(error)
+  }
 }
 
 ///|
@@ -431,8 +466,10 @@ pub fn Player::process(
 ///|
 /// Change the tempo at the next unrendered sample, keeping the musical
 /// position. A change the accepted song cannot take changes nothing.
-pub fn Player::set_tempo(self : Player, bpm : Double) -> Unit raise PlayerError {
-  let tempo = tempo_of(bpm)
+pub fn Player::set_tempo(
+  self : Player,
+  tempo : @scheduler.Tempo,
+) -> Unit raise PlayerError {
   if self.session.score() is Some(score) {
     self.check_fits(score, tempo)
   }

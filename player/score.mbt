@@ -51,14 +51,14 @@ fn Score::finite_end(self : Score) -> @pattern.Rational? {
 }
 
 ///|
-/// A pattern that plays forever at `bpm`; its events carry no event origin.
+/// A pattern that plays forever at `tempo`; its events carry no event origin.
 pub fn Score::pattern(
   snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
-  bpm~ : Double,
-) -> Score raise PlayerError {
+  tempo~ : @scheduler.Tempo,
+) -> Score {
   {
     admitted: None,
-    tempo: tempo_of(bpm),
+    tempo,
     layout: PatternLayout,
     snapshot: @scheduler.PlaybackSnapshot::untracked_pattern(snapshot),
     span: Continuous,
@@ -66,14 +66,14 @@ pub fn Score::pattern(
 }
 
 ///|
-/// A pattern that plays forever at `bpm`, each event with its event origin.
+/// A pattern that plays forever at `tempo`, each event with its event origin.
 pub fn Score::tracked_pattern(
   snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
-  bpm~ : Double,
-) -> Score raise PlayerError {
+  tempo~ : @scheduler.Tempo,
+) -> Score {
   {
     admitted: None,
-    tempo: tempo_of(bpm),
+    tempo,
     layout: PatternLayout,
     snapshot: @scheduler.PlaybackSnapshot::tracked_pattern(snapshot),
     span: Continuous,
@@ -81,34 +81,24 @@ pub fn Score::tracked_pattern(
 }
 
 ///|
-/// A lowered song at `bpm` that ends after its last occurrence, or repeats
+/// A lowered song at `tempo` that ends after its last occurrence, or repeats
 /// when `repeat` is true; its events carry no event origin.
 pub fn Score::song(
   song : @song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]],
-  bpm~ : Double,
+  tempo~ : @scheduler.Tempo,
   repeat~ : Bool = false,
-) -> Score raise PlayerError {
-  arrangement(
-    song,
-    tempo_of(bpm),
-    repeat,
-    @scheduler.SongMaterial::Untracked(song),
-  )
+) -> Score raise ScoreError {
+  arrangement(song, tempo, repeat, @scheduler.SongMaterial::Untracked(song))
 }
 
 ///|
 /// `Score::song` whose events each carry their event origin.
 pub fn Score::tracked_song(
   song : @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
-  bpm~ : Double,
+  tempo~ : @scheduler.Tempo,
   repeat~ : Bool = false,
-) -> Score raise PlayerError {
-  arrangement(
-    song,
-    tempo_of(bpm),
-    repeat,
-    @scheduler.SongMaterial::Tracked(song),
-  )
+) -> Score raise ScoreError {
+  arrangement(song, tempo, repeat, @scheduler.SongMaterial::Tracked(song))
 }
 
 ///|
@@ -117,7 +107,7 @@ fn[C] arrangement(
   tempo : @scheduler.Tempo,
   repeated : Bool,
   material : @scheduler.SongMaterial,
-) -> Score raise PlayerError {
+) -> Score raise ScoreError {
   let song = snapshot.song()
   guard song.duration() > @pattern.Rational::from_int(0) else {
     raise EmptySong
@@ -143,14 +133,15 @@ fn[C] arrangement(
 /// Lower a parsed song for playback.
 fn[C : @song.SongContent] lowered_song(
   song : @song.Song[C],
-) -> @song.SongSnapshot[C] raise PlayerError {
+) -> @song.SongSnapshot[C] raise ScoreError {
   song_update_snapshot(song) catch {
     error => raise SongLowering(error.to_string())
   }
 }
 
 ///|
-fn tempo_of(bpm : Double) -> @scheduler.Tempo raise PlayerError {
+/// `bpm` beats per minute as a tempo a player can play.
+pub fn tempo(bpm : Double) -> @scheduler.Tempo raise TempoOutOfRange {
   guard @scheduler.Tempo::from_bpm(bpm) is Ok(tempo) else {
     raise TempoOutOfRange
   }

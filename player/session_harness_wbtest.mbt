@@ -29,7 +29,7 @@ fn output_energy() -> Double {
 
 ///|
 /// What `f` raised, if it raised.
-fn raised(f : () -> Unit raise PlayerError) -> PlayerError? {
+fn raised(f : () -> Unit raise) -> Error? {
   try {
     f()
     None
@@ -41,11 +41,7 @@ fn raised(f : () -> Unit raise PlayerError) -> PlayerError? {
 ///|
 /// Compile untracked `text`, as the host's `kind: "text"` wire sends it, and
 /// accept it by restart or update.
-fn submit(
-  player : Player,
-  text : String,
-  restart~ : Bool = true,
-) -> PlayerError? {
+fn submit(player : Player, text : String, restart~ : Bool = true) -> Error? {
   raised(() => {
     let score = player.compile(@mini.PlaybackInput::text(text))
     compiled[text] = score
@@ -73,25 +69,25 @@ fn assert_accepted(player : Player, text : String) -> Unit raise {
 }
 
 ///|
-fn play(player : Player) -> PlayerError? {
+fn play(player : Player) -> Error? {
   raised(() => player.play())
 }
 
 ///|
-fn pause(player : Player) -> PlayerError? {
+fn pause(player : Player) -> Error? {
   raised(() => player.pause())
 }
 
 ///|
-fn set_tempo(player : Player, bpm : Double) -> PlayerError? {
-  raised(() => player.set_tempo(bpm))
+fn set_tempo(player : Player, bpm : Double) -> Error? {
+  raised(() => player.set_tempo(tempo(bpm)))
 }
 
 ///|
 /// The player refused, for any reason but a layout that needs a restart.
-fn assert_rejected(error : PlayerError?) -> Unit raise {
+fn assert_rejected(error : Error?) -> Unit raise {
   guard error is Some(error) && !(error is RestartRequired) else {
-    fail("expected a refusal, got \{Repr(error)}")
+    fail("expected a refusal other than RestartRequired")
   }
 }
 

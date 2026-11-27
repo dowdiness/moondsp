@@ -9,24 +9,23 @@ test "mode and cycle status follow transport without sample-rate approximation" 
   let player = test_player()
   assert_true(player.mode() is None)
   assert_eq(player.cycle_position(), 0.0)
-  assert_eq(submit(player, "bpm(120); note(\"60\").slow(8)"), None)
+  assert_true(submit(player, "bpm(120); note(\"60\").slow(8)") is None)
   assert_true(player.mode() is Some(Pattern))
   assert_eq(player.cycle_position(), 0.0)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   render_blocks(player, 4)
   let before_tempo = player.cycle_position()
   assert_true(before_tempo > 0.0)
-  assert_eq(
-    submit(player, "bpm(90); note(\"72\").slow(8)", restart=false),
-    None,
+  assert_true(
+    submit(player, "bpm(90); note(\"72\").slow(8)", restart=false) is None,
   )
   assert_true((player.cycle_position() - before_tempo).abs() < 0.000000000001)
-  assert_eq(pause(player), None)
+  assert_true(pause(player) is None)
   let paused = player.cycle_position()
   render_blocks(player, 20)
   assert_eq(player.cycle_position(), paused)
-  assert_eq(play(player), None)
-  assert_eq(submit(player, "bpm(90); note(\"72\").slow(8)"), None)
+  assert_true(play(player) is None)
+  assert_true(submit(player, "bpm(90); note(\"72\").slow(8)") is None)
   assert_eq(player.cycle_position(), 0.0)
 }
 
@@ -34,17 +33,17 @@ test "mode and cycle status follow transport without sample-rate approximation" 
 test "finite Ended status reports the accepted song endpoint" {
   let player = test_player()
   let first = "song(section(\"a\",1/200,note(\"60\")),part(\"a1\",\"a\"))"
-  assert_eq(submit(player, first), None)
+  assert_true(submit(player, first) is None)
   render_blocks(player, 4)
   assert_eq(player.state(), Ended)
   assert_true(player.mode() is Some(Song))
   assert_eq(player.cycle_position(), 0.005)
-  assert_eq(submit(player, "silence()", restart=false), None)
+  assert_true(submit(player, "silence()", restart=false) is None)
   assert_eq(player.state(), Ended)
   assert_true(player.mode() is Some(Pattern))
   assert_eq(player.cycle_position(), 0.005)
   let second = "song(section(\"a\",1/100,note(\"72\")),part(\"a1\",\"a\"))"
-  assert_eq(submit(player, second, restart=false), None)
+  assert_true(submit(player, second, restart=false) is None)
   assert_eq(player.state(), Ended)
   assert_eq(player.cycle_position(), 0.005)
 }
@@ -52,8 +51,8 @@ test "finite Ended status reports the accepted song endpoint" {
 ///|
 test "update rejection preserves mode and cycle status" {
   let player = test_player()
-  assert_eq(submit(player, "note(\"60\").slow(8)"), None)
-  assert_eq(play(player), None)
+  assert_true(submit(player, "note(\"60\").slow(8)") is None)
+  assert_true(play(player) is None)
   render_blocks(player, 4)
   let before = player.cycle_position()
   assert_rejected(submit(player, "note(", restart=false))
@@ -65,13 +64,13 @@ test "update rejection preserves mode and cycle status" {
 test "update accepts before rendering but does not start Ready" {
   let player = test_player()
   assert_rejected(play(player))
-  assert_eq(submit(player, HELD_NOTE, restart=false), None)
+  assert_true(submit(player, HELD_NOTE, restart=false) is None)
   assert_eq(player.state(), Ready)
   assert_accepted(player, HELD_NOTE)
   render_blocks(player, 8)
   assert_position(player, 0)
   assert_eq(output_energy(), 0.0)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   render_blocks(player, 1)
   assert_position(player, 128)
   assert_true(output_energy() > 0.01)
@@ -80,10 +79,10 @@ test "update accepts before rendering but does not start Ready" {
 ///|
 test "invalid update preserves the last accepted material reservation" {
   let player = test_player()
-  assert_eq(submit(player, "note(\"60\").gain(0)"), None)
+  assert_true(submit(player, "note(\"60\").gain(0)") is None)
   render_blocks(player, 1)
   let next = "note(\"60\").gain(1)"
-  assert_eq(submit(player, next, restart=false), None)
+  assert_true(submit(player, next, restart=false) is None)
   assert_eq(player.pending_materials(), 1)
   assert_accepted(player, next)
   assert_position(player, 128)
@@ -96,14 +95,14 @@ test "invalid update preserves the last accepted material reservation" {
 ///|
 test "invalid Restart cannot reset voices position or Current song" {
   let player = test_player()
-  assert_eq(submit(player, HELD_NOTE), None)
+  assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
   assert_rejected(submit(player, "note("))
   assert_position(player, 1024)
   assert_accepted(player, HELD_NOTE)
   render_blocks(player, 1)
   assert_true(output_energy() > 0.01)
-  assert_eq(submit(player, SILENT_PATTERN), None)
+  assert_true(submit(player, SILENT_PATTERN) is None)
   assert_position(player, 0)
   render_blocks(player, 1)
   assert_eq(output_energy(), 0.0)
@@ -113,15 +112,17 @@ test "invalid Restart cannot reset voices position or Current song" {
 test "Pause freezes voices effects and transport exactly" {
   fn sequence(paused : Bool) -> Array[Double] raise {
     let player = test_player()
-    assert_eq(submit(player, "note(\"60\").slow(8).hold(0.1).room(1)"), None)
+    assert_true(
+      submit(player, "note(\"60\").slow(8).hold(0.1).room(1)") is None,
+    )
     render_blocks(player, 20)
     if paused {
-      assert_eq(pause(player), None)
+      assert_true(pause(player) is None)
       render_blocks(player, 100)
       assert_eq(output_energy(), 0.0)
       assert_position(player, 2560)
       assert_eq(player.state(), Paused)
-      assert_eq(play(player), None)
+      assert_true(play(player) is None)
     }
     let samples : Array[Double] = []
     for _ in 0..<40 {
@@ -138,11 +139,11 @@ test "Pause freezes voices effects and transport exactly" {
 ///|
 test "paused Update commits tempo and Current song without advancing" {
   let player = test_player()
-  assert_eq(submit(player, HELD_NOTE), None)
+  assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
-  assert_eq(pause(player), None)
+  assert_true(pause(player) is None)
   let changed = "bpm(90); note(\"72\").slow(8)"
-  assert_eq(submit(player, changed, restart=false), None)
+  assert_true(submit(player, changed, restart=false) is None)
   assert_accepted(player, changed)
   assert_tempo(player, 90.0)
   assert_position(player, 1024)
@@ -150,7 +151,7 @@ test "paused Update commits tempo and Current song without advancing" {
   render_blocks(player, 10)
   assert_position(player, 1024)
   assert_eq(player.state(), Paused)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   render_blocks(player, 1)
   assert_position(player, 1152)
 }
@@ -160,13 +161,13 @@ test "layout rejection changes neither tempo nor Current song" {
   let player = test_player()
   let original = test_song(length=8, bpm=120)
   let changed = test_song(length=9, bpm=90)
-  assert_eq(submit(player, original), None)
+  assert_true(submit(player, original) is None)
   render_blocks(player, 4)
   assert_true(submit(player, changed, restart=false) is Some(RestartRequired))
   assert_position(player, 512)
   assert_tempo(player, 120.0)
   assert_accepted(player, original)
-  assert_eq(submit(player, changed), None)
+  assert_true(submit(player, changed) is None)
   assert_position(player, 0)
   assert_tempo(player, 90.0)
 }
@@ -175,16 +176,16 @@ test "layout rejection changes neither tempo nor Current song" {
 test "Ended Update leaves tails and position while Play uses newest song" {
   let player = test_player()
   let finite = "song(section(\"a\",1/200,note(\"60\").release(1).room(1)),part(\"a1\",\"a\"))"
-  assert_eq(submit(player, finite), None)
+  assert_true(submit(player, finite) is None)
   render_blocks(player, 4)
   assert_eq(player.state(), Ended)
   assert_eq(player.sample_position(), 480.0)
-  assert_eq(submit(player, "silence()", restart=false), None)
+  assert_true(submit(player, "silence()", restart=false) is None)
   assert_eq(player.state(), Ended)
   render_blocks(player, 10)
   assert_eq(player.sample_position(), 480.0)
   assert_true(output_energy() > 0.0)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   assert_position(player, 0)
   render_blocks(player, 1)
   assert_eq(output_energy(), 0.0)
@@ -193,14 +194,14 @@ test "Ended Update leaves tails and position while Play uses newest song" {
 ///|
 test "finite Play starts from its first onset again" {
   let player = test_player()
-  assert_eq(
-    submit(player, "song(section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))"),
-    None,
+  assert_true(
+    submit(player, "song(section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"))")
+    is None,
   )
   render_blocks(player, 1000)
   assert_eq(player.state(), Ended)
   assert_eq(output_energy(), 0.0)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   render_blocks(player, 2)
   assert_position(player, 256)
   assert_true(output_energy() > 0.01)
@@ -209,18 +210,18 @@ test "finite Play starts from its first onset again" {
 ///|
 test "reverting a routed edit cancels pending material changes" {
   let player = test_player()
-  assert_eq(submit(player, "note(\"60\").slow(3)"), None)
+  assert_true(submit(player, "note(\"60\").slow(3)") is None)
   render_blocks(player, 1)
-  assert_eq(submit(player, "note(\"72\").slow(3)", restart=false), None)
+  assert_true(submit(player, "note(\"72\").slow(3)", restart=false) is None)
   assert_true(player.pending_materials() > 0)
-  assert_eq(submit(player, "note(\"60\").slow(3)", restart=false), None)
+  assert_true(submit(player, "note(\"60\").slow(3)", restart=false) is None)
   assert_eq(player.pending_materials(), 0)
 }
 
 ///|
 test "workload rejection preserves the accepted song voices and all clocks" {
   let player = test_player()
-  assert_eq(submit(player, HELD_NOTE), None)
+  assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 1)
   let rejected = [
     "note(\"60\").fast(100000)", "note(\"60*1000 ~\")", "note(\"60\").every(1000000,fast(100000))",
@@ -243,7 +244,7 @@ test "unrepresentable finite endpoints reject before publication or restart" {
   let invalid = "bpm(0.001); song(section(\"a\",2000000000,silence()),part(\"p\",\"a\"))"
   assert_rejected(submit(player, invalid, restart=false))
   assert_eq(player.state(), Empty)
-  assert_eq(submit(player, HELD_NOTE), None)
+  assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
   assert_rejected(submit(player, invalid))
   assert_position(player, 1024)
@@ -252,7 +253,7 @@ test "unrepresentable finite endpoints reject before publication or restart" {
   render_blocks(player, 1)
   assert_true(output_energy() > 0.01)
   let finite = "song(section(\"a\",1/2000,silence()),part(\"p\",\"a\"))"
-  assert_eq(submit(player, finite), None)
+  assert_true(submit(player, finite) is None)
   render_blocks(player, 2)
   assert_eq(player.state(), Ended)
   assert_rejected(submit(player, invalid, restart=false))
@@ -263,7 +264,7 @@ test "unrepresentable finite endpoints reject before publication or restart" {
 ///|
 test "repeat admission rejects sub-block cycles without replacing music" {
   let player = test_player()
-  assert_eq(submit(player, HELD_NOTE), None)
+  assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
   let too_short = "bpm(1000); song(section(\"a\",1/100000,silence()),part(\"p\",\"a\")).repeat()"
   assert_rejected(submit(player, too_short))
@@ -278,7 +279,7 @@ test "repeat admission rejects sub-block cycles without replacing music" {
 test "one-block repeat is valid but faster source and demo tempos reject" {
   let player = test_player()
   let body = "song(section(\"a\",1/750,note(\"60\")),part(\"p\",\"a\")).repeat()"
-  assert_eq(submit(player, body), None)
+  assert_true(submit(player, body) is None)
   render_blocks(player, 4)
   assert_eq(player.state(), Playing)
   assert_position(player, 512)
@@ -295,7 +296,7 @@ test "one-block repeat is valid but faster source and demo tempos reject" {
 test "unterminated comments cannot publish source tempo or stop sounding voices" {
   let player = test_player()
   let original = "bpm(90); " + HELD_NOTE
-  assert_eq(submit(player, original), None)
+  assert_true(submit(player, original) is None)
   render_blocks(player, 8)
   assert_rejected(submit(player, "bpm(120); note(\"64\") /*", restart=false))
   assert_accepted(player, original)
@@ -308,7 +309,7 @@ test "unterminated comments cannot publish source tempo or stop sounding voices"
 ///|
 test "source material budget rejects future occurrences before publishing Ready" {
   let player = test_player()
-  assert_eq(submit(player, HELD_NOTE, restart=false), None)
+  assert_true(submit(player, HELD_NOTE, restart=false) is None)
   let parts = [ for i in 0..<100 => "part(\"p\{i}\",\"a\")" ]
   let oversized = "song(section(\"a\",1,stack(note(\"60\"),note(\"62\"),note(\"64\")))," +
     parts.join(",") +
@@ -317,7 +318,7 @@ test "source material budget rejects future occurrences before publishing Ready"
   assert_accepted(player, HELD_NOTE)
   assert_eq(player.state(), Ready)
   assert_position(player, 0)
-  assert_eq(play(player), None)
+  assert_true(play(player) is None)
   render_blocks(player, 1)
   assert_true(output_energy() > 0.01)
 }
@@ -345,8 +346,8 @@ fn cycle_energy(
 test "a fade added by a live edit starts where the edit enters" {
   let player = test_player()
   let plain = "bpm(120); note(\"60 64\")"
-  assert_eq(submit(player, plain), None)
-  assert_eq(play(player), None)
+  assert_true(submit(player, plain) is None)
+  assert_true(play(player) is None)
   let rendered = Ref(0)
   let full = cycle_energy(player, rendered, 7)
   assert_true(full > 0.01)
@@ -354,11 +355,11 @@ test "a fade added by a live edit starts where the edit enters" {
   // has played for longer than the fade.
   render_blocks(player, 8 * 750 + 100 - rendered.val)
   rendered.val = 8 * 750 + 100
-  assert_eq(submit(player, plain + ".fadeOut(4)", restart=false), None)
+  assert_true(submit(player, plain + ".fadeOut(4)", restart=false) is None)
   let first = cycle_energy(player, rendered, 9)
   assert_true(first > full * 0.6)
   // Resubmitting the same text keeps the running fade.
-  assert_eq(submit(player, plain + ".fadeOut(4)", restart=false), None)
+  assert_true(submit(player, plain + ".fadeOut(4)", restart=false) is None)
   let middle = cycle_energy(player, rendered, 11)
   assert_true(middle < first * 0.7 && middle > full * 0.1)
   assert_true(cycle_energy(player, rendered, 14) < full * 0.001)

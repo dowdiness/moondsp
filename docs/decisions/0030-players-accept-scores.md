@@ -46,12 +46,21 @@ range".
    text: the editor owns the accepted source.
 6. **`Sounds` is one value** for the drum graphs, instrument voices and
    sampler a player uses, so two adapters can share it.
-7. **Each error names one cause.** `PlayerError` has a variant per cause
-   (tempo range, empty song, repeat shorter than a block, material budget,
-   lowering, a score compiled for shorter blocks, transport and song-end
-   range, Fault with a typed `FaultReason`). Only Mini's own refusal and a
-   song's lowering failure, whose errors are of several types, are strings. `message()` is the one place that turns an error into the text
-   the browser shows.
+7. **Error types follow the call that catches them.** Each names one cause
+   per variant, and `message()` on each is the one place that turns it into
+   the text the browser shows.
+   - `ScoreError`, from `compile` and the song constructors: Mini's refusal,
+     pattern or song lowering, an empty song, and the score's tempo.
+   - `TempoOutOfRange`, from `tempo(bpm)`, which makes the `Tempo` every
+     constructor and `set_tempo` take; `ScoreError::Tempo` wraps it for a
+     source's tempo, a genuine subset. Pattern constructors cannot fail.
+   - `UnsupportedFormat`, from `Player(ctx, sounds)` only.
+   - `PlayerError`, from accepting, Play, Pause, tempo changes and
+     rendering: the player's limits, layout, state, and buffers. Fault
+     carries a `FaultReason`, a plain enum: it is the state's data, and no
+     call fails with it alone.
+   Only Mini's refusal and a song's lowering failure, whose errors are of
+   several types, are strings.
 8. **Whether a score fits a tempo is one check**, used when a score is
    accepted and when the tempo changes. Songs enter as lowered
    `SongSnapshot`s, like patterns.
