@@ -1,5 +1,5 @@
-// FFmpeg 交叉验证测试(自动生成,勿手改:更新需用仓库外脚本重新生成)。
-// fixture 由 ffmpeg 产生,期望值来自 ffmpeg 导出的原始 PCM;逐样本字节级对比。
+// FFmpeg cross-check tests (generated; do not edit by hand: updates need regenerating with a script kept outside this repository).
+// Fixtures were produced by ffmpeg, and expected values come from raw PCM exported by ffmpeg; compared byte-exact, sample by sample.
 
 ///|
 fn hex_byte(v : Int32) -> Byte {
@@ -7,7 +7,7 @@ fn hex_byte(v : Int32) -> Byte {
 }
 
 ///|
-/// 十六进制字符串 → Bytes(测试辅助)。
+/// Hex string → Bytes (test helper).
 fn bytes_of_hex(hex : String) -> Bytes {
   let n = hex.length() / 2
   let fa : FixedArray[Byte] = FixedArray::make(n, hex_byte(0))
@@ -20,7 +20,7 @@ fn bytes_of_hex(hex : String) -> Bytes {
 }
 
 ///|
-/// 十六进制字符 → 0..15。
+/// Hex digit → 0..15.
 fn hex_val(c : Char) -> Int32 {
   let v = c.to_int()
   if v >= 0x30 && v <= 0x39 {

@@ -1,19 +1,19 @@
 ///|
-/// 由 Int 构造 Byte。不写字节字面量:moonc v0.10.14 对 `b'\xNN'` 字面量存在
-/// 编译期 ICE,统一走 `to_byte()` 规避(与 moonvoice 的处理一致)。
+/// Builds a Byte from an Int. Byte literals are avoided: moonc v0.10.14 has a
+/// compile-time ICE on `b'\xNN'` literals, so this always goes through `to_byte()` (as moonvoice does).
 fn byte_of(v : Int32) -> Byte {
   v.to_byte()
 }
 
 ///|
-/// 写小端 16 位。
+/// Writes a little-endian 16-bit value.
 fn put_u16le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
   fa[off] = (v & 0xFF).to_byte()
   fa[off + 1] = ((v >> 8) & 0xFF).to_byte()
 }
 
 ///|
-/// 写小端 32 位(负数按补码掩码,位模式不变)。
+/// Writes a little-endian 32-bit value (negative values are masked as two's complement, keeping the bit pattern).
 fn put_u32le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
   fa[off] = (v & 0xFF).to_byte()
   fa[off + 1] = ((v >> 8) & 0xFF).to_byte()
@@ -22,7 +22,7 @@ fn put_u32le(fa : FixedArray[Byte], off : Int32, v : Int32) -> Unit {
 }
 
 ///|
-/// 写四字节 ASCII 块 ID(不足补空格)。
+/// Writes a four-byte ASCII chunk ID (padded with spaces).
 fn put_tag(fa : FixedArray[Byte], off : Int32, tag : String) -> Unit {
   for i = 0; i < 4; i = i + 1 {
     fa[off + i] = if i < tag.length() {
@@ -34,8 +34,8 @@ fn put_tag(fa : FixedArray[Byte], off : Int32, tag : String) -> Unit {
 }
 
 ///|
-/// [-1, 1] 浮点 → 整数样本:比例 scale,四舍五入,钳位到 [lo, hi]。
-/// NaN 归 0,±Inf 取满幅。配合 2^(bits-1) 的解码比例,decode∘encode 幂等。
+/// Float in [-1, 1] → integer sample: scale by `scale`, round, and clamp to [lo, hi].
+/// NaN becomes 0 and ±Inf becomes full scale. With the 2^(bits-1) decode scale, decode∘encode is idempotent.
 fn quantize(x : Double, scale : Double, lo : Int32, hi : Int32) -> Int32 {
   if x.is_nan() {
     return 0
@@ -55,7 +55,7 @@ fn quantize(x : Double, scale : Double, lo : Int32, hi : Int32) -> Int32 {
 }
 
 ///|
-/// 单样本编码:[-1, 1] Double → 字节偏移(小端)。
+/// Encodes one sample: Double in [-1, 1] → byte offset (little-endian).
 fn encode_sample_at(
   fa : FixedArray[Byte],
   off : Int32,
@@ -88,7 +88,7 @@ fn encode_sample_at(
 }
 
 ///|
-/// 常见声道布局掩码(EXTENSIBLE 用):1=前中,2=前左+前右,其余低位全 1。
+/// Common channel-layout mask (for EXTENSIBLE): 1 = front center, 2 = front left + front right, otherwise all low bits set.
 fn default_channel_mask(n : Int32) -> Int32 {
   if n == 1 {
     0x4
@@ -100,12 +100,12 @@ fn default_channel_mask(n : Int32) -> Int32 {
 }
 
 ///|
-/// 将交错样本编码为 WAV(RIFF,小端)字节流。
+/// Encodes interleaved samples as a WAV (RIFF, little-endian) byte stream.
 ///
-/// - `samples` 长度必须是 `channels` 的整数倍(帧对齐)
-/// - PCM 量化:比例 2^(bits-1),四舍五入并钳位;`decode(encode(x))` 幂等
-/// - 声道数 > 2 自动写 WAVE_FORMAT_EXTENSIBLE
-/// - data 块奇数长度自动补零对齐
+/// - The length of `samples` must be a multiple of `channels` (frame-aligned)
+/// - PCM quantization: scale 2^(bits-1), round, and clamp; `decode(encode(x))` is idempotent
+/// - More than 2 channels writes WAVE_FORMAT_EXTENSIBLE
+/// - An odd-length data chunk is padded with a zero byte
 pub fn encode(
   format~ : WavSampleFormat,
   sample_rate~ : Int32,
@@ -130,17 +130,17 @@ pub fn encode(
   let bps = format.bytes_per_sample()
   let n = samples.length()
   let data_size = n * bps
-  // 留出 44 字节头空间,保证 RIFF 尺寸不溢出 Int/UInt32
+  // Leave room for the 44-byte header so the RIFF size cannot overflow Int/UInt32
   guard data_size < 2147483603 else { raise DataTooLarge }
   let extensible = channels > 2
   let fmt_size = if extensible { 40 } else { 16 }
   let total = 12 + 8 + fmt_size + 8 + data_size + data_size % 2
   let fa : FixedArray[Byte] = FixedArray::make(total, byte_of(0))
-  // RIFF 头
+  // RIFF header
   put_tag(fa, 0, "RIFF")
   put_u32le(fa, 4, total - 8)
   put_tag(fa, 8, "WAVE")
-  // fmt 块
+  // fmt chunk
   put_tag(fa, 12, "fmt ")
   put_u32le(fa, 16, fmt_size)
   let tag = format.format_tag()
@@ -155,8 +155,8 @@ pub fn encode(
     put_u16le(fa, 36, 22)
     put_u16le(fa, 38, bps * 8)
     put_u32le(fa, 40, default_channel_mask(channels))
-    // SubFormat GUID = KSDATAFORMAT_SUBTYPE_PCM / IEEE_FLOAT 的小端布局:
-    // 00000001-0000-0010-8000-00AA00389B71(Data1 = 真实 format tag)
+    // SubFormat GUID = little-endian layout of KSDATAFORMAT_SUBTYPE_PCM / IEEE_FLOAT:
+    // 00000001-0000-0010-8000-00AA00389B71 (Data1 = the real format tag)
     put_u16le(fa, 44, tag)
     fa[46] = byte_of(0x00)
     fa[47] = byte_of(0x00)
@@ -172,7 +172,7 @@ pub fn encode(
     fa[58] = byte_of(0x9B)
     fa[59] = byte_of(0x71)
   }
-  // data 块
+  // data chunk
   let data_hdr = 12 + 8 + fmt_size
   put_tag(fa, data_hdr, "data")
   put_u32le(fa, data_hdr + 4, data_size)
@@ -180,6 +180,6 @@ pub fn encode(
   for i = 0; i < n; i = i + 1 {
     encode_sample_at(fa, body + i * bps, samples[i], format)
   }
-  // data 块奇数长度:RIFF 要求偶对齐,补一个零字节(已在 total 计入)
+  // Odd-length data chunk: RIFF requires even alignment, so one zero pad byte follows (already counted in total)
   Bytes::from_array(fa)
 }

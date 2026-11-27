@@ -1,5 +1,5 @@
-// 黑盒测试:只用 @wav 的公开 API。测试内的字节构造是独立实现,
-// 与被测代码互为校验;fuzz 与错误路径共用同一批构造器。
+// Black-box tests: only @wav's public API. The byte builders here are an independent implementation,
+// so they and the code under test check each other; fuzzing and error paths share the same builders.
 
 ///|
 fn b(v : Int32) -> Byte {
@@ -53,7 +53,7 @@ fn bytes_of(parts : Array[Array[Byte]]) -> Bytes {
 }
 
 ///|
-/// 构造最小合法 WAV:RIFF/RIFX + fmt + (额外块) + data。额外块插在 fmt 与 data 之间。
+/// Builds a minimal valid WAV: RIFF/RIFX + fmt + (extra chunks) + data. Extra chunks go between fmt and data.
 fn build_wav(
   le~ : Bool = true,
   fmt~ : Array[Byte],
@@ -80,7 +80,7 @@ fn build_wav(
     body.push(ascii4(pair.0))
     body.push(if le { le32(pair.1.length()) } else { be32(pair.1.length()) })
     body.push(pair.1)
-    // 奇数长度补零(构造合法输入)
+    // Pad odd lengths with a zero byte (to build valid input)
     if pair.1.length() % 2 == 1 {
       body.push([b(0)])
     }
@@ -95,13 +95,13 @@ fn build_wav(
 }
 
 ///|
-/// 16 位 PCM 的 fmt 块(小端)。
+/// fmt chunk for 16-bit PCM (little-endian).
 fn fmt_pcm16(ch : Int32, rate : Int32) -> Array[Byte] {
   fmt_tag(1, ch, rate, 16)
 }
 
 ///|
-/// 任意 (tag, bits) 的 fmt 块(小端布局)。
+/// fmt chunk for any (tag, bits) (little-endian layout).
 fn fmt_tag(tag : Int32, ch : Int32, rate : Int32, bits : Int32) -> Array[Byte] {
   let align = ch * (bits / 8)
   let out : Array[Byte] = []
@@ -115,7 +115,7 @@ fn fmt_tag(tag : Int32, ch : Int32, rate : Int32, bits : Int32) -> Array[Byte] {
 }
 
 ///|
-/// RIFX(大端)布局的 16 位 PCM fmt 块。
+/// 16-bit PCM fmt chunk in RIFX (big-endian) layout.
 fn fmt_pcm16_be(ch : Int32, rate : Int32) -> Array[Byte] {
   let align = ch * 2
   let out : Array[Byte] = []
@@ -129,7 +129,7 @@ fn fmt_pcm16_be(ch : Int32, rate : Int32) -> Array[Byte] {
 }
 
 ///|
-/// Double 的 8 个小端字节(测试侧独立实现)。
+/// The 8 little-endian bytes of a Double (independent test-side implementation).
 fn f64_bytes(x : Double) -> Array[Byte] {
   let u = Double::reinterpret_as_int64(x).reinterpret_as_uint64()
   let out = le32(u.to_uint().reinterpret_as_int())
@@ -138,7 +138,7 @@ fn f64_bytes(x : Double) -> Array[Byte] {
 }
 
 ///|
-/// 捕获 @wav.WavError;不抛错返回 None。
+/// Catches @wav.WavError; returns None when nothing is raised.
 fn err_of(f : () -> Unit raise @wav.WavError) -> @wav.WavError? {
   try {
     f()
@@ -149,7 +149,7 @@ fn err_of(f : () -> Unit raise @wav.WavError) -> @wav.WavError? {
 }
 
 ///|
-/// 确定性 LCG,fuzz 可复现。
+/// Deterministic LCG, so fuzzing is reproducible.
 priv struct TestRng {
   mut state : Int32
 }
@@ -170,7 +170,7 @@ fn TestRng::next(self : TestRng, mask : Int32) -> Int32 {
 
 ///|
 test "decode hand-built i16 stereo" {
-  // L: [0.5, -0.5, 满幅正, 满幅负]  R: [0, 0, 0, 0]
+  // L: [0.5, -0.5, positive full scale, negative full scale]  R: [0, 0, 0, 0]
   let data : Array[Byte] = []
   data.append(le16(16384))
   data.append(le16(0))
@@ -229,7 +229,7 @@ test "decode i24 and i32 spot values" {
 
 ///|
 test "decode ieee float32 and float64" {
-  // f32: 0.25 精确(位模式 0x3E800000)
+  // f32: 0.25 is exact (bit pattern 0x3E800000)
   let wav32 = build_wav(fmt=fmt_tag(3, 1, 48000, 32), data=[
     b(0x00),
     b(0x00),
@@ -237,10 +237,10 @@ test "decode ieee float32 and float64" {
     b(0x3E),
   ])
   assert_true(@wav.decode(wav32).samples()[0] == 0.25)
-  // f64: 0.1 按位精确还原
+  // f64: 0.1 is restored bit-exact
   let wav64 = build_wav(fmt=fmt_tag(3, 1, 48000, 64), data=f64_bytes(0.1))
   assert_true(@wav.decode(wav64).samples()[0] == 0.1)
-  // f32 存 0.1:解码结果等于 Float(0.1) 的精确值
+  // f32 storing 0.1: the decoded value equals Float(0.1) exactly
   let bits = Float::from_double(0.1).reinterpret_as_uint().reinterpret_as_int()
   let wav32b = build_wav(fmt=fmt_tag(3, 1, 48000, 32), data=[
     b(bits & 0xFF),
@@ -267,7 +267,7 @@ test "round trip through every format is exact or idempotent" {
     @wav.IeeeF64,
   ]
   for fmt in formats {
-    // 双声道交错
+    // Interleaved stereo
     let samples : Array[Double] = []
     for v in base {
       samples.push(v)
@@ -286,18 +286,18 @@ test "round trip through every format is exact or idempotent" {
     let s1 = d1.samples()
     match fmt {
       @wav.IeeeF64 =>
-        // float64 往返精确
+        // float64 round trip is exact
         for i = 0; i < samples.length(); i = i + 1 {
           assert_true(s1[i] == samples[i])
         }
       @wav.IeeeF32 =>
-        // float32 量化误差 ≤ 2^-24,远小于 1e-6
+        // float32 quantization error ≤ 2^-24, far below 1e-6
         for i = 0; i < samples.length(); i = i + 1 {
           assert_true((s1[i] - samples[i]).abs() < 0.000001)
         }
       _ => ()
     }
-    // 幂等:decode(encode(decode(encode(x)))) == decode(encode(x))
+    // Idempotent: decode(encode(decode(encode(x)))) == decode(encode(x))
     let encoded2 = @wav.encode(
       format=fmt,
       sample_rate=48000,
@@ -345,10 +345,10 @@ test "encode more than two channels writes extensible" {
     channels=4,
     samples~,
   )
-  // fmt tag 处应为 0xFFFE(小端:FE FF)
+  // The fmt tag should be 0xFFFE (little-endian: FE FF)
   assert_true(encoded[20].to_int() == 0xFE)
   assert_true(encoded[21].to_int() == 0xFF)
-  // 声道掩码 (1<<4)-1 = 0x0000000F,位于 offset 40(小端首字节)
+  // Channel mask (1<<4)-1 = 0x0000000F at offset 40 (first little-endian byte)
   assert_true(encoded[40].to_int() == 0x0F)
   let f = @wav.decode(encoded)
   assert_true(f.channels() == 4)
@@ -370,7 +370,7 @@ test "encode 24-bit mono odd frame count pads data chunk" {
 
 ///|
 test "decode skips list chunk and honors odd-chunk padding" {
-  // 奇数长度 LIST(3 字节)+ pad,插在 fmt 与 data 之间
+  // Odd-length LIST (3 bytes) + pad, between fmt and data
   let wav = build_wav(
     fmt=fmt_pcm16(1, 8000),
     data=[b(0x01), b(0x00), b(0x00), b(0x80)],
@@ -410,7 +410,7 @@ test "decode empty data is valid" {
 
 ///|
 test "structured errors for malformed inputs" {
-  // 截断:不足 12 字节
+  // Truncated: fewer than 12 bytes
   let empty = bytes_of([])
   assert_true(
     err_of(() => {
@@ -418,7 +418,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::Truncated(_)),
   )
-  // 非法魔数
+  // Invalid magic
   let bad_magic = bytes_of([ascii4("RIFZ"), le32(4), ascii4("WAVE")])
   assert_true(
     err_of(() => {
@@ -426,7 +426,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(NotRiff),
   )
-  // 缺 WAVE 形式类型
+  // Missing WAVE form type
   let no_wave = bytes_of([ascii4("RIFF"), le32(4), ascii4("AVI ")])
   assert_true(
     err_of(() => {
@@ -434,7 +434,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(NotWave),
   )
-  // 只有头,没有块
+  // Header only, no chunks
   let header_only = bytes_of([ascii4("RIFF"), le32(4), ascii4("WAVE")])
   assert_true(
     err_of(() => {
@@ -442,7 +442,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::InvalidFormat("no fmt chunk")),
   )
-  // 有 fmt 没 data
+  // fmt without data
   let fmt_only_parts : Array[Array[Byte]] = [
     ascii4("RIFF"),
     le32(4 + 8 + 16),
@@ -458,7 +458,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::InvalidFormat("no data chunk")),
   )
-  // fmt 块过小
+  // fmt chunk too small
   let tiny_fmt = bytes_of([
     ascii4("RIFF"),
     le32(4 + 8 + 8),
@@ -480,7 +480,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
-  // 块大小超出文件末尾
+  // Chunk size past the end of the file
   let overrun = bytes_of([
     ascii4("RIFF"),
     le32(100),
@@ -496,7 +496,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::Truncated(_)),
   )
-  // 不支持的格式 tag
+  // Unsupported format tag
   let weird = build_wav(fmt=fmt_tag(7, 1, 8000, 16), data=[b(0), b(0)])
   assert_true(
     err_of(() => {
@@ -504,7 +504,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::UnsupportedFormat(_)),
   )
-  // 声道数为 0
+  // Zero channels
   let zero_ch = build_wav(fmt=fmt_tag(1, 0, 8000, 16), data=[b(0), b(0)])
   assert_true(
     err_of(() => {
@@ -512,7 +512,7 @@ test "structured errors for malformed inputs" {
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
-  // data 不是帧对齐(1 声道 16 位,data 只有 3 字节)
+  // data not frame-aligned (1 channel, 16-bit, data is only 3 bytes)
   let unaligned = build_wav(fmt=fmt_pcm16(1, 8000), data=[b(1), b(2), b(3)])
   assert_true(
     err_of(() => {
@@ -547,7 +547,7 @@ test "encode rejects invalid parameters" {
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
-  // 2 声道但样本数不对齐
+  // 2 channels but the sample count is not aligned
   assert_true(
     err_of(() => {
       let _ = @wav.encode(format=@wav.PcmI16, sample_rate=8000, channels=2, samples=[
@@ -556,7 +556,7 @@ test "encode rejects invalid parameters" {
     })
     is Some(@wav.WavError::InvalidFormat(_)),
   )
-  // WaveFile 构造器同样校验
+  // The WaveFile constructor validates the same way
   assert_true(
     err_of(() => {
       let _ = @wav.WaveFile::WaveFile(
@@ -579,7 +579,7 @@ test "fuzz: 10k random byte inputs never panic" {
     for j = 0; j < len; j = j + 1 {
       fa[j] = b(rng.next(0xFF))
     }
-    // 每第 3 组输入偏向合法结构头,以覆盖 fmt/data 深层解析路径
+    // Every third input starts from a valid header, to reach the deeper fmt/data parsing paths
     if i % 3 == 0 && len >= 44 {
       fa[0] = b(0x52)
       fa[1] = b(0x49)

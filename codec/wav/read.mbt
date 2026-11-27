@@ -1,6 +1,6 @@
 ///|
-/// 读四字节块 ID 为可打印字符串:ASCII 原样,控制字符转义为 \xNN,
-/// 保证错误消息里不出现原始控制字节。
+/// Reads a four-byte chunk ID as a printable string: printable ASCII as is, other bytes escaped as \xNN,
+/// so error messages never contain raw control bytes.
 fn tag_at(b : Bytes, off : Int32) -> String {
   let hex = "0123456789ABCDEF"
   let buf = StringBuilder()
@@ -18,7 +18,7 @@ fn tag_at(b : Bytes, off : Int32) -> String {
 }
 
 ///|
-/// 读无符号 16 位,按容器字节序。
+/// Reads an unsigned 16-bit value in the container's byte order.
 fn u16_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
   if big {
     b[off].to_int() * 256 + b[off + 1].to_int()
@@ -28,7 +28,7 @@ fn u16_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
 }
 
 ///|
-/// 读无符号 32 位为 UInt,按容器字节序(供浮点位模式重组)。
+/// Reads an unsigned 32-bit value as UInt in the container's byte order (to rebuild float bit patterns).
 fn u32_uint_at(b : Bytes, off : Int32, big : Bool) -> UInt32 {
   if big {
     (b[off].to_uint() << 24) |
@@ -44,7 +44,7 @@ fn u32_uint_at(b : Bytes, off : Int32, big : Bool) -> UInt32 {
 }
 
 ///|
-/// 读无符号 32 位为 Double:块大小可达 4 GiB,Double 累加规避 Int 32 位溢出。
+/// Reads an unsigned 32-bit value as Double: chunk sizes reach 4 GiB, and summing in Double avoids 32-bit Int overflow.
 fn u32_at(b : Bytes, off : Int32, big : Bool) -> Double {
   if big {
     b[off].to_double() * 16777216.0 +
@@ -60,7 +60,7 @@ fn u32_at(b : Bytes, off : Int32, big : Bool) -> Double {
 }
 
 ///|
-/// 读无符号 24 位,按容器字节序。
+/// Reads an unsigned 24-bit value in the container's byte order.
 fn u24_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
   if big {
     b[off].to_int() * 65536 + b[off + 1].to_int() * 256 + b[off + 2].to_int()
@@ -70,13 +70,13 @@ fn u24_at(b : Bytes, off : Int32, big : Bool) -> Int32 {
 }
 
 ///|
-/// 读 32 位 IEEE 浮点(按位重组,无 FFI)。
+/// Reads a 32-bit IEEE float (rebuilt from bits, no FFI).
 fn f32_at(b : Bytes, off : Int32, big : Bool) -> Double {
   Float::reinterpret_from_uint(u32_uint_at(b, off, big)).to_double()
 }
 
 ///|
-/// 读 64 位 IEEE 浮点(按位重组,无 FFI)。
+/// Reads a 64-bit IEEE float (rebuilt from bits, no FFI).
 fn f64_at(b : Bytes, off : Int32, big : Bool) -> Double {
   let first = u32_uint_at(b, off, big).to_uint64()
   let second = u32_uint_at(b, off + 4, big).to_uint64()
@@ -85,8 +85,8 @@ fn f64_at(b : Bytes, off : Int32, big : Bool) -> Double {
 }
 
 ///|
-/// 单样本解码:字节偏移 → [-1, 1] Double。
-/// PCM 比例取 2^(bits-1)(u8 中心 128):精确的二进分数,decode∘encode 幂等。
+/// Decodes one sample: byte offset → Double in [-1, 1].
+/// PCM scales by 2^(bits-1) (u8 centers on 128): an exact dyadic fraction, so decode∘encode is idempotent.
 fn decode_sample_at(
   b : Bytes,
   off : Int32,
@@ -116,8 +116,8 @@ fn decode_sample_at(
 }
 
 ///|
-/// 解析 WAV(RIFF 或 RIFX)字节流。未知块(如 LIST/INFO)跳过;
-/// 结构损坏一律返回结构化错误,不 panic。
+/// Parses a WAV (RIFF or RIFX) byte stream. Unknown chunks (such as LIST/INFO) are skipped;
+/// every structural defect returns a structured error instead of panicking.
 pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
   let total = bytes.length()
   guard total >= 12 else { raise Truncated("RIFF header") }
@@ -137,7 +137,7 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
     let id = tag_at(bytes, pos)
     let size_d = u32_at(bytes, pos + 4, big)
     let body = pos + 8
-    // 越界或超过 Int 表示范围的块大小都按截断处理
+    // A chunk size past the end of the input or beyond the Int range counts as truncation
     if size_d < 0.0 || body.to_double() + size_d > total.to_double() {
       raise Truncated("chunk " + id)
     }
@@ -151,7 +151,7 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
       let rate_d = u32_at(bytes, body + 4, big)
       let bits = u16_at(bytes, body + 14, big)
       if tag == 0xFFFE {
-        // WAVE_FORMAT_EXTENSIBLE:真实格式在 SubFormat GUID 的前两字节
+        // WAVE_FORMAT_EXTENSIBLE: the real format is in the first two bytes of the SubFormat GUID
         if size < 40 {
           raise InvalidFormat(
             "extensible fmt chunk too small: " + size.to_string(),
@@ -181,7 +181,7 @@ pub fn decode(bytes : Bytes) -> WaveFile raise WavError {
       data_off = body
       data_len = size
     }
-    // 块按偶数字节对齐,奇数长度后有一字节填充
+    // Chunks are even-aligned; an odd-length chunk is followed by one pad byte
     pos = body + size + size % 2
   }
   let format = match fmt {
