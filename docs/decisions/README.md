@@ -47,3 +47,4 @@ shipped plan or spec.
 - [ADR-0027 — Allocation-free trigonometry is a leaf below dsp and Mini](0027-scalar-trig-leaf.md) (Accepted)
 - [ADR-0028 — Tracked and untracked material are told apart where an entry is built](0028-tracked-and-untracked-told-apart-at-the-entry.md) (Accepted)
 - [ADR-0029 — The player is platform-free, below the browser host](0029-platform-free-player.md) (Accepted)
+- [ADR-0030 — Players accept scores, from text or from content](0030-players-accept-scores.md) (Accepted)

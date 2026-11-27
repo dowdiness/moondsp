@@ -26,7 +26,7 @@ pub fn init_sample_store() -> Int32
 
 pub fn init_scheduler_graph_with_sounds(Double, Int32, drum~ : (@score.Drum) -> Array[@graph.DspNode], instrument~ : (@score.Instrument) -> @player.NoteVoice, sampler~ : @player.SamplerVoice) -> Bool
 
-pub fn player_mode() -> @player.PlaybackMode
+pub fn player_mode() -> @player.ScoreKind?
 
 pub fn player_onset_clear() -> Unit
 

@@ -26,10 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PatternDoc::merge_values` gives each event the value another document has
   at its onset, and the browser host takes its sounds with
   `init_scheduler_graph_with_sounds(drum~, instrument~)`.
-- `player` is a platform-free player of one score (ADR-0029): `Player`
-  prepares and accepts Mini input, plays, pauses and ends songs, and renders
-  blocks, so offline rendering can drive the same performance as the browser.
-  The browser host is its adapter; the browser ABI is unchanged.
+- `player` is a platform-free player of one score (ADR-0029, ADR-0030):
+  `Player::compile` turns Mini input into a `Score`, and `Score::pattern`,
+  `tracked_pattern`, `song` and `tracked_song` build one from content with
+  no source text. `Player` accepts scores with `update` and `restart`, plays,
+  pauses and ends them, and `process(left, right)` renders each block into
+  the caller's buffers, so offline rendering can drive the same performance
+  as the browser. The browser host is its adapter; the browser ABI is
+  unchanged.
 
 ### Changed
 

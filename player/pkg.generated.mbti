@@ -5,8 +5,10 @@ import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
   "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler",
   "dowdiness/moondsp/score",
+  "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
 }
 
@@ -15,19 +17,47 @@ import {
 // Errors
 #derive(Eq, @debug.Debug)
 pub suberror PlayerError {
-  InvalidSource(String)
+  RepeatShorterThanBlock
+  TooManyMaterials
+  TooManyRetainedMaterials
+  CompiledForShorterBlocks
   RestartRequired
   NoSong
   TransportRange
-  Failed(String)
-  UnsupportedFormat
+  SongEndOutOfRange
+  Faulted(FaultReason)
+  BufferSizeMismatch(expected~ : Int32, actual~ : Int32)
 }
-pub fn PlayerError::equal(Self, Self) -> Bool
 pub fn PlayerError::message(Self) -> String
-pub fn PlayerError::not_equal(Self, Self) -> Bool
-pub fn PlayerError::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
+pub suberror ScoreError {
+  InvalidSource(String)
+  PatternLowering(@pattern.PatternDocError)
+  SongLowering(String)
+  Tempo(TempoOutOfRange)
+  EmptySong
+}
+pub fn ScoreError::message(Self) -> String
+
+#derive(Eq, @debug.Debug)
+pub suberror TempoOutOfRange
+pub fn TempoOutOfRange::message(Self) -> String
+
+#derive(Eq, @debug.Debug)
+pub suberror UnsupportedFormat
+pub fn UnsupportedFormat::message(Self) -> String
 
 // Types and methods
+#derive(Eq, @debug.Debug)
+pub enum FaultReason {
+  TransportExhausted
+  SongEndUnreachable
+}
+pub fn FaultReason::equal(Self, Self) -> Bool
+pub fn FaultReason::not_equal(Self, Self) -> Bool
+pub fn FaultReason::to_repr(Self) -> @debug.Repr
+
 pub(all) struct NoteVoice {
   waveform : @dsp.Waveform
   attack_ms : Double
@@ -53,46 +83,28 @@ pub fn PlayState::equal(Self, Self) -> Bool
 pub fn PlayState::not_equal(Self, Self) -> Bool
 pub fn PlayState::to_repr(Self) -> @debug.Repr
 
-#derive(Eq, @debug.Debug)
-pub(all) enum PlaybackMode {
-  None
-  Pattern
-  Song
-}
-pub fn PlaybackMode::equal(Self, Self) -> Bool
-pub fn PlaybackMode::not_equal(Self, Self) -> Bool
-pub fn PlaybackMode::to_repr(Self) -> @debug.Repr
-
 pub struct Player {
   // private fields
 }
-pub fn Player::Player(@dsp.DspContext, drum~ : (@score.Drum) -> @graph.AnalyzedGraph, instrument~ : (@score.Instrument) -> NoteVoice, sampler~ : SamplerVoice) -> Self raise PlayerError
+pub fn Player::Player(@dsp.DspContext, Sounds) -> Self raise UnsupportedFormat
+pub fn Player::bpm(Self) -> Double
+pub fn Player::compile(Self, @mini.PlaybackInput) -> Score raise ScoreError
 pub fn Player::cycle_position(Self) -> Double
-pub fn Player::fault(Self) -> String?
-pub fn Player::left(Self) -> @dsp.AudioBuffer
-pub fn Player::mode(Self) -> PlaybackMode
+pub fn Player::mode(Self) -> ScoreKind?
 pub fn Player::onsets(Self) -> @scheduler.OnsetBuffer
 pub fn Player::pause(Self) -> Unit raise PlayerError
+pub fn Player::pending_materials(Self) -> Int32
 pub fn Player::play(Self) -> Unit raise PlayerError
-pub fn Player::process(Self) -> Bool
+pub fn Player::process(Self, @dsp.AudioBuffer, @dsp.AudioBuffer) -> PlayerError?
 pub fn Player::reclaim_samples(Self) -> Unit
-pub fn Player::restart(Self, @mini.PlaybackInput) -> Unit raise PlayerError
-pub fn Player::right(Self) -> @dsp.AudioBuffer
+pub fn Player::restart(Self, Score) -> Unit raise PlayerError
+pub fn Player::sample_position(Self) -> Double
 pub fn Player::set_gain(Self, Double) -> Unit
-pub fn Player::set_tempo(Self, Double) -> Unit raise PlayerError
+pub fn Player::set_tempo(Self, Tempo) -> Unit raise PlayerError
 pub fn Player::signals(Self) -> @scheduler.SignalBuffer
+pub fn Player::skipped_materials(Self) -> Int32
 pub fn Player::state(Self) -> PlayState
-pub fn Player::update(Self, @mini.PlaybackInput) -> Unit raise PlayerError
-pub fn Player::view(Self) -> PlayerView
-
-pub struct PlayerView {
-  state : PlayState
-  source : String?
-  bpm : Double
-  sample_position : Double
-  pending_materials : Int32
-  skipped_materials : Int32
-}
+pub fn Player::update(Self, Score) -> Unit raise PlayerError
 
 pub(all) struct SamplerVoice {
   attack_ms : Double
@@ -104,6 +116,35 @@ pub(all) struct SamplerVoice {
   amount : Double
   voices : Int32
 }
+
+pub struct Score {
+  // private fields
+}
+pub fn Score::pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
+pub fn Score::song(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
+pub fn Score::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], tempo~ : Tempo) -> Self
+pub fn Score::tracked_song(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
+
+#derive(Eq, @debug.Debug)
+pub enum ScoreKind {
+  Pattern
+  Song
+}
+pub fn ScoreKind::equal(Self, Self) -> Bool
+pub fn ScoreKind::not_equal(Self, Self) -> Bool
+pub fn ScoreKind::to_repr(Self) -> @debug.Repr
+
+pub(all) struct Sounds {
+  drum : (@score.Drum) -> @graph.AnalyzedGraph
+  instrument : (@score.Instrument) -> NoteVoice
+  sampler : SamplerVoice
+}
+
+pub struct Tempo {
+  // private fields
+}
+pub fn Tempo::Tempo(Double) -> Self raise TempoOutOfRange
+pub fn Tempo::bpm(Self) -> Double
 
 // Type aliases
 
