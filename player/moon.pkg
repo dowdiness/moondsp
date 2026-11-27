@@ -1,6 +1,5 @@
 import {
   "dowdiness/moondsp",
-  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler",
@@ -8,3 +7,7 @@ import {
   "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
 }
+
+import {
+  "dowdiness/moondsp/identity",
+} for "wbtest"

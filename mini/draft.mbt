@@ -628,73 +628,147 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 }
 
 ///|
-/// A tracked pattern is lowered here; a parsed source (a tracked song or untracked text) is lowered by the player.
-pub(all) enum PreparedPlayback {
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Double)
-  Source(PlaySource)
+/// What a compiled input plays: lowered snapshots, tracked when the input
+/// carries source origins. A repeating song's `Bool` is true.
+pub(all) enum CompiledMaterial {
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedSong(
+    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    Bool,
+  )
+  UntrackedSong(
+    @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    Bool,
+  )
+}
+
+///|
+/// A compiled input: its material and the tempo its source declares.
+pub struct CompiledPlayback {
+  priv material : CompiledMaterial
+  priv bpm : Double
+}
+
+///|
+pub fn CompiledPlayback::material(self : CompiledPlayback) -> CompiledMaterial {
+  self.material
+}
+
+///|
+pub fn CompiledPlayback::bpm(self : CompiledPlayback) -> Double {
+  self.bpm
 }
 
 ///|
 /// Compile this frozen input, independently of any subsequent Draft edits.
-/// A failed tracked compilation never falls back to untracked playback.
+/// Text compiles untracked; a Draft's input compiles tracked and never falls
+/// back to untracked playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
   query_window? : @pattern.QueryWindow,
-) -> Result[PreparedPlayback, String] {
-  match self.payload {
+) -> CompiledPlayback raise SourceProblem {
+  let source = match self.payload {
     Text =>
-      parse_play_source(self.input, query_window?)
-      .map(source => Source(source))
-      .map_err(SourceProblem::to_string)
-    Song(_, origins) => {
-      let source = parse_play_source_with_origins(
+      match parse_play_source(self.input, query_window?) {
+        Ok(source) => source
+        Err(problem) => raise problem
+      }
+    Song(_, origins) | Pattern(_, origins) =>
+      parse_play_source_with_origins(
         self.input,
         query_window,
         origins=Some(origins),
         syntax_depth_limit=Some(32),
-      ) catch {
-        problem => return Err(problem.to_string())
-      }
-      guard source.body() is TrackedArrangement(_, _) else {
-        return Err("song input changed source mode")
-      }
-      Ok(Source(source))
-    }
-    Pattern(_, origins) => {
-      let source = parse_play_source_with_origins(
-        self.input,
-        query_window,
-        origins=Some(origins),
-        syntax_depth_limit=Some(32),
-      ) catch {
-        problem => return Err(problem.to_string())
-      }
-      guard source.body() is Pattern(doc) else {
-        return Err("tracked pattern input changed source mode")
-      }
-      try doc.lower_tracked() catch {
-        error => Err(draft_origin_error(error))
-      } noraise {
-        snapshot => Ok(TrackedPattern(snapshot, source.bpm()))
-      }
-    }
+      )
+  }
+  let material : CompiledMaterial = match (self.payload, source.body()) {
+    (Pattern(_, _), Pattern(doc)) =>
+      TrackedPattern(
+        doc.lower_tracked() catch {
+          error => raise lowering(error)
+        },
+      )
+    (Text, Pattern(doc)) =>
+      UntrackedPattern(doc.lower() catch { error => raise lowering(error) })
+    (Song(_, _), TrackedArrangement(song, repeat)) =>
+      TrackedSong(song_snapshot(song), repeat)
+    (Text, UntrackedArrangement(song, repeat)) =>
+      UntrackedSong(song_snapshot(song), repeat)
+    _ => raise Internal("compiled input changed source mode")
+  }
+  { material, bpm: source.bpm(), }
+}
+
+///|
+/// The parser rejects every source it cannot lower, so a lowering failure is
+/// a compiler bug.
+fn lowering(error : @pattern.PatternDocError) -> SourceProblem {
+  let message = match error {
+    MissingNode(id) => "missing node \{id}"
+    DuplicateNodeId(id) => "duplicate node \{id}"
+    EmptyPatternDocs => "empty document list"
+    InvalidSequenceWeights => "invalid relative sequence weights"
+    MissingAtomOrigin(id) => "missing atom origin \{id.value()}"
+    MissingReferenceBinding(id) => "missing reference binding \{id.value()}"
+    UnsupportedControl(id) => "unsupported control provider \{id.value()}"
+  }
+  Internal("lowering: \{message}")
+}
+
+///|
+/// `song` lowered with the identities its source declares: each part's
+/// occurrence id, its section's name, and each layer's name.
+fn[C : @song.SongContent] song_snapshot(
+  song : @song.Song[C],
+) -> @song.SongSnapshot[C] raise SourceProblem {
+  let parts = song
+    .occurrences()
+    .map(occurrence => {
+      let section = occurrence.section()
+      @song.SongOccurrenceDoc::at(
+        id=occurrence.id(),
+        start=occurrence.start(),
+        name=occurrence.name(),
+        section=@song.SectionDoc(
+          id=@identity.SectionId::from_string("section:" + section.name()),
+          name=section.name(),
+          length_cycles=section.length_cycles(),
+          scope=section.scope(),
+          body=section_doc_body(section.section_body()),
+        ) catch {
+          error => raise Internal("song section: \{error}")
+        },
+      )
+    })
+  @song.SongDoc(parts~).lower() catch {
+    error => raise Internal("song lowering: \{error}")
   }
 }
 
 ///|
-fn draft_origin_error(error : @pattern.PatternDocError) -> String {
-  match error {
-    MissingNode(id) => "tracked compilation: missing node \{id}"
-    DuplicateNodeId(id) => "tracked compilation: duplicate node \{id}"
-    EmptyPatternDocs => "tracked compilation: empty document list"
-    InvalidSequenceWeights =>
-      "tracked compilation: invalid relative sequence weights"
-    MissingAtomOrigin(id) =>
-      "tracked compilation: missing atom origin \{id.value()}"
-    MissingReferenceBinding(id) =>
-      "tracked compilation: missing reference binding \{id.value()}"
-    UnsupportedControl(id) =>
-      "tracked compilation: unsupported control provider \{id.value()}"
+fn[C] section_doc_body(
+  body : @song.SectionBody[C],
+) -> @song.SectionDocBody[C] raise {
+  match body {
+    Single(content) =>
+      @song.SectionDocBody::single(
+        @song.SectionLayerDoc(
+          id=@identity.SectionLayerId::from_string("layer:main"),
+          name="main",
+          body=content,
+        ),
+      )
+    Layers(layers) =>
+      @song.SectionDocBody::layers(
+        layers.map(layer => {
+          @song.SectionLayerDoc(
+            id=@identity.SectionLayerId::from_string("layer:" + layer.name()),
+            name=layer.name(),
+            body=layer.body(),
+          )
+        }),
+      )
   }
 }
 

@@ -46,7 +46,7 @@ surface:
 | **Text Parsing** | `parse`, `parse_song` | Parse string into `Pat[ScoreEvent]` or `ParsedSong[UntrackedPatternSnapshot[ScoreEvent]]` |
 | **Documents** | `parse_doc`, `parse_snapshot` | Parse deterministic graph documents or general snapshots without cross-draft source continuity |
 | **Live Authoring** | `Draft`, `DraftVersion`, `EditTransaction`, `TextEdit` | `Draft(...)`, `state`, `edit`, `reset`, `prepare_playback`, `check_playback_within`, `locate_origin` |
-| **Frozen Playback Input** | `PlaybackInput`, `PreparedPlayback` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
+| **Frozen Playback Input** | `PlaybackInput`, `CompiledPlayback`, `CompiledMaterial` | `PlaybackInput::text`, `source`, `version`, `compile`, `encode_wire`, `decode_wire`; tracked Pattern/Song or explicitly runtime-only text |
 | **Programmatic Doc Building** | `MiniDocBuilder` | `MiniDocBuilder::new`, `sound_atom`, `note_atom`, `sequence`, `fast`, `degrade`, `control`, `every`, `jux` |
 | **Song & Utilities** | `ParsedSong[C]` | `ParsedSong::song`, `ParsedSong::bpm` |
 
@@ -137,9 +137,11 @@ does not revive it.
 `prepare_playback()` returns a frozen `PlaybackInput` or a version-tagged
 `DraftDiagnostic`. Preparing input is **not playback acceptance**. The input owns
 its captured text/version/source witnesses; subsequent edits or disposal do not
-change it. `compile()` returns `PreparedPlayback::TrackedPattern(snapshot, bpm)`
-for a tracked pattern or `PreparedPlayback::Source(play_source)` for a song;
-tracked Song sections retain tracked source snapshots inside that source.
+change it. `compile()` returns a `CompiledPlayback`: its `bpm()` and its lowered
+`material()`, a `CompiledMaterial` that is a tracked or untracked pattern
+snapshot or song snapshot. A song snapshot carries the identities its source
+declares: each part's occurrence id, its section's name and each layer's
+name. `compile()` raises a `SourceProblem`.
 `PlaybackInput::text(text)` explicitly selects untracked programmatic input.
 A tracked compilation failure never falls back to untracked playback.
 

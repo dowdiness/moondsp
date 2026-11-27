@@ -83,6 +83,19 @@ pub struct Call {
 }
 pub impl @json.ToJson for Call
 
+pub(all) enum CompiledMaterial {
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedSong(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
+  UntrackedSong(@song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], Bool)
+}
+
+pub struct CompiledPlayback {
+  // private fields
+}
+pub fn CompiledPlayback::bpm(Self) -> Double
+pub fn CompiledPlayback::material(Self) -> CompiledMaterial
+
 pub struct Draft {
   // private fields
 }
@@ -206,7 +219,7 @@ pub fn PlaySource::bpm(Self) -> Double
 pub struct PlaybackInput {
   // private fields
 }
-pub fn PlaybackInput::compile(Self, query_window? : @pattern.QueryWindow) -> Result[PreparedPlayback, String]
+pub fn PlaybackInput::compile(Self, query_window? : @pattern.QueryWindow) -> CompiledPlayback raise SourceProblem
 pub fn PlaybackInput::decode_wire(String) -> Result[Self, String]
 pub fn PlaybackInput::encode_wire(Self) -> String
 pub fn PlaybackInput::source(Self) -> String
@@ -224,11 +237,6 @@ pub enum Position {
   AfterSignal
 }
 pub impl @json.ToJson for Position
-
-pub(all) enum PreparedPlayback {
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Double)
-  Source(PlaySource)
-}
 
 pub struct SignalCurve {
   // private fields

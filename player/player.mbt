@@ -133,12 +133,8 @@ pub fn TempoOutOfRange::message(self : TempoOutOfRange) -> String {
 /// Why a score cannot be built.
 #derive(Eq, Debug)
 pub suberror ScoreError {
-  /// Mini refused the input; the message says where and why.
-  InvalidSource(String)
-  /// A pattern could not be lowered.
-  PatternLowering(@pattern.PatternDocError)
-  /// A song could not be lowered; the message says why.
-  SongLowering(String)
+  /// Mini refused the input.
+  InvalidSource(@mini.SourceProblem)
   /// The score's tempo is out of range.
   Tempo(TempoOutOfRange)
   /// The song ends at or before its beginning.
@@ -149,8 +145,7 @@ pub suberror ScoreError {
 /// The diagnostic the browser shows for `self`.
 pub fn ScoreError::message(self : ScoreError) -> String {
   match self {
-    InvalidSource(message) | SongLowering(message) => message
-    PatternLowering(error) => "could not lower source: \{Repr(error)}"
+    InvalidSource(problem) => problem.to_string()
     Tempo(error) => error.message()
     EmptySong => "song must end after its beginning"
   }
@@ -232,28 +227,15 @@ pub fn Player::compile(
 ) -> Score raise ScoreError {
   // Admission covers every supported future tempo, including the demo control.
   let window = self.scheduler.max_query_window()
-  let prepared = match input.compile(query_window=window) {
-    Ok(prepared) => prepared
-    Err(message) => raise InvalidSource(message)
+  let compiled = input.compile(query_window=window) catch {
+    problem => raise InvalidSource(problem)
   }
-  let score = match prepared {
-    @mini.PreparedPlayback::TrackedPattern(snapshot, bpm) =>
-      Score::pattern(snapshot.playback(), tempo=score_tempo(bpm))
-    @mini.PreparedPlayback::Source(parsed) => {
-      let tempo = score_tempo(parsed.bpm())
-      match parsed.body() {
-        Pattern(doc) => {
-          let snapshot = doc.lower() catch {
-            error => raise PatternLowering(error)
-          }
-          Score::pattern(snapshot.playback(), tempo~)
-        }
-        UntrackedArrangement(song, repeat) =>
-          Score::song(lowered_song(song), tempo~, repeat~)
-        TrackedArrangement(song, repeat) =>
-          Score::song(lowered_song(song), tempo~, repeat~)
-      }
-    }
+  let tempo = score_tempo(compiled.bpm())
+  let score = match compiled.material() {
+    TrackedPattern(snapshot) => Score::pattern(snapshot.playback(), tempo~)
+    UntrackedPattern(snapshot) => Score::pattern(snapshot.playback(), tempo~)
+    TrackedSong(song, repeat) => Score::song(song, tempo~, repeat~)
+    UntrackedSong(song, repeat) => Score::song(song, tempo~, repeat~)
   }
   { ..score, admitted: Some(window), }
 }

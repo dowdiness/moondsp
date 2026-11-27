@@ -1,4 +1,4 @@
-// Pure musical-time contracts; these tests do not initialize an audio engine.
+// A compiled song keeps section boundaries and deterministic thinning.
 
 ///|
 fn cycle_span(begin : Int32, end : Int32) -> @pattern.TimeSpan {
@@ -9,13 +9,21 @@ fn cycle_span(begin : Int32, end : Int32) -> @pattern.TimeSpan {
 }
 
 ///|
-test "prepared song respects section boundaries differing periods and finite end" {
-  let song = @mini.parse_song(
-      "song(section(\"a\",3,stack(note(\"60\").slow(3),note(\"72 74\").slow(4))),section(\"b\",2,note(\"67\").slow(2)),part(\"a1\",\"a\"),part(\"b1\",\"b\"))",
-    )
-    .unwrap()
-    .song()
-  let snapshot = song_update_snapshot(song)
+fn compiled_song(
+  source : String,
+) -> @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
+  guard @mini.PlaybackInput::text(source).compile().material()
+    is UntrackedSong(snapshot, _) else {
+    fail("expected an untracked song")
+  }
+  snapshot
+}
+
+///|
+test "compiled song respects section boundaries differing periods and finite end" {
+  let snapshot = compiled_song(
+    "song(section(\"a\",3,stack(note(\"60\").slow(3),note(\"72 74\").slow(4))),section(\"b\",2,note(\"67\").slow(2)),part(\"a1\",\"a\"),part(\"b1\",\"b\"))",
+  )
   let span = cycle_span(0, 5)
   let events = snapshot.song().query(span)
   assert_eq(events.map(e => pitch_of(e.value)), [
@@ -37,12 +45,9 @@ test "prepared song respects section boundaries differing periods and finite end
 
 ///|
 test "snapshot thinning is deterministic across query partitions" {
-  let song = @mini.parse_song(
-      "song(section(\"a\",4,note(\"60*8\").degradeBy(0.5)),part(\"a1\",\"a\"))",
-    )
-    .unwrap()
-    .song()
-  let snapshot = song_update_snapshot(song)
+  let snapshot = compiled_song(
+    "song(section(\"a\",4,note(\"60*8\").degradeBy(0.5)),part(\"a1\",\"a\"))",
+  )
   let whole = snapshot.song().query(cycle_span(0, 4))
   let mut count = 0
   for cycle in 0..<4 {
@@ -58,10 +63,14 @@ test "snapshot thinning is deterministic across query partitions" {
 }
 
 ///|
-/// The pitch `event` plays, if it is a note.
-fn pitch_of(event : @score.ScoreEvent) -> Double? {
-  match event.sound {
-    Note(_, pitch~) | Play(_, pitch~) => Some(pitch)
-    Hit(_) => None
-  }
+test "parts of one section share its identity in the compiled song" {
+  let snapshot = compiled_song(
+    "song(section(\"a\",1,note(\"60\")),part(\"a1\",\"a\"),part(\"a2\",\"a\"))",
+  )
+  let entries = snapshot.entries()
+  assert_eq(entries.length(), 2)
+  assert_true(entries[0].origin().section() == entries[1].origin().section())
+  assert_true(
+    entries[0].origin().occurrence() != entries[1].origin().occurrence(),
+  )
 }

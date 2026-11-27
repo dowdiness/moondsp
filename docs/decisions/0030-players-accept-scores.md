@@ -48,8 +48,9 @@ range".
 7. **Error types follow the call that catches them.** Each names one cause
    per variant, and `message()` on each is the one place that turns it into
    the text the browser shows.
-   - `ScoreError`, from `compile` and the song constructors: Mini's refusal,
-     pattern or song lowering, an empty song, and the score's tempo.
+   - `ScoreError`, from `compile` and the song constructors: Mini's refusal
+     (its `SourceProblem`, which also covers lowering, since Mini returns
+     lowered snapshots), an empty song, and the score's tempo.
    - `TempoOutOfRange`, from `Tempo(bpm)`, the player's own tempo type,
      which every constructor and `set_tempo` take; `ScoreError::Tempo` wraps it for a
      source's tempo, a genuine subset. Pattern constructors cannot fail.
@@ -58,8 +59,6 @@ range".
      rendering: the player's limits, layout, state, and buffers. Fault
      carries a `FaultReason`, a plain enum: it is the state's data, and no
      call fails with it alone.
-   Only Mini's refusal and a song's lowering failure, whose errors are of
-   several types, are strings.
 8. **Whether a score fits a tempo is one check**, used when a score is
    accepted and when the tempo changes. Songs enter as lowered
    `SongSnapshot`s, like patterns.

@@ -260,15 +260,15 @@ fn notation_projection_rest_source(
 ///|
 fn notation_projection_events(
   draft : @mini.Draft,
-  compiled : @mini.PreparedPlayback,
+  compiled : @mini.CompiledPlayback,
   span : Int32,
   content_start : Int32,
   content_length : Int32,
   nodes : Array[Json],
   rests_only : Bool,
 ) -> Array[Json] raise EditWireError {
-  match compiled {
-    @mini.PreparedPlayback::TrackedPattern(snapshot, _) => {
+  match compiled.material() {
+    TrackedPattern(snapshot) => {
       let arc = @pattern.TimeSpan(
         @pattern.Rational::from_int(0),
         @pattern.Rational::from_int(span),
@@ -323,7 +323,7 @@ fn notation_projection_events(
       }
       projected
     }
-    @mini.PreparedPlayback::Source(_) =>
+    UntrackedPattern(_) | TrackedSong(_, _) | UntrackedSong(_, _) =>
       raise InvalidEdit("notation did not compile to a tracked pattern")
   }
 }
@@ -341,9 +341,8 @@ fn notation_projection_compile_events(
     Ok(input) => input
     Err(diagnostic) => raise InvalidEdit(diagnostic.problem().to_string())
   }
-  let compiled = match input.compile() {
-    Ok(value) => value
-    Err(message) => raise InvalidEdit(message)
+  let compiled = input.compile() catch {
+    problem => raise InvalidEdit(problem.to_string())
   }
   notation_projection_events(
     draft, compiled, span, content_start, content_length, nodes, rests_only,
