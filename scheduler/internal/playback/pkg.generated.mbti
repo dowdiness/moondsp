@@ -14,32 +14,19 @@ import {
 // Errors
 
 // Types and methods
-pub(all) struct PlaybackInspection {
-  current : PlaybackSnapshot?
-  staged : PlaybackSnapshot?
-  pending_materials : Int32
-  skipped_materials : Int32
-}
-
-pub enum PlaybackSnapshot {
-  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
-  Song(SongMaterial)
-  RepeatSong(SongMaterial)
+pub struct PlaybackSnapshot {
+  // private fields
 }
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
+pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
-pub fn PlaybackSnapshot::repeat_song(SongMaterial) -> Self
 pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
-pub fn PlaybackSnapshot::song(SongMaterial) -> Self
+pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.SongSnapshot[C], repeat? : Bool) -> Self
 pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
-pub fn PlaybackSnapshot::tracked_pattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent]) -> Self
-pub fn PlaybackSnapshot::untracked_pattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]) -> Self
 
 pub struct PlaybackSourcedEvent {
   // private fields
 }
-pub fn PlaybackSourcedEvent::anonymous(@pattern.Event[@score.ScoreEvent]) -> Self
 pub fn PlaybackSourcedEvent::controls(Self) -> @pattern.Controls
 pub fn PlaybackSourcedEvent::event(Self) -> @pattern.Event[@score.ScoreEvent]
 pub fn PlaybackSourcedEvent::origin(Self) -> @model.VoiceOrigin
@@ -51,19 +38,13 @@ pub struct PlaybackState {
 pub fn PlaybackState::PlaybackState() -> Self
 pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
 pub fn PlaybackState::has_pending(Self) -> Bool
-pub fn PlaybackState::inspect(Self) -> PlaybackInspection
 pub fn PlaybackState::install_acceptance(Self, Self) -> Unit
+pub fn PlaybackState::pending_entry_count(Self) -> Int32
 pub fn PlaybackState::prepare_acceptance(Self, PlaybackSnapshot, @pattern.Rational, material_limit~ : Int32, restart~ : Bool) -> Self?
-pub fn PlaybackState::query_active_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Array[PlaybackSourcedEvent]
 pub fn PlaybackState::queue(Self, PlaybackSnapshot) -> Unit
 pub fn PlaybackState::reset(Self) -> Unit
 pub fn PlaybackState::skipped_entry_count(Self) -> Int32
-
-pub(all) enum SongMaterial {
-  Untracked(@song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]])
-  Tracked(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]])
-}
 
 // Type aliases
 

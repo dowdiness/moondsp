@@ -1,11 +1,4 @@
 ///|
-fn copy_control_events(
-  events : Array[@pattern.Event[@score.ScoreEvent]],
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  @voice_runtime.copy_control_events(events)
-}
-
-///|
 /// What a voice reads at note-on: the event's controls, the pitch of a note
 /// or sample as `Note` (ADR-0022), and a sample's number as `SampleNumber`
 /// (ADR-0026 Decision 1).
@@ -124,26 +117,6 @@ pub fn PatternScheduler::expire_notes(
 }
 
 ///|
-/// Process pattern events: sort by onset, trigger note-ons, handle pan.
-///
-/// In the Strudel/Tidal model, each event has a `whole` span (the note's full
-/// intended duration) and a `part` span (the fragment within the query arc).
-/// Onset detection uses `whole.begin` — an event fires when its musical start
-/// time falls within the current block. Events with `whole = None` are
-/// continuous signals (no onset) and are skipped.
-pub fn PatternScheduler::process_events(
-  self : PatternScheduler,
-  events : Array[@pattern.Event[@score.ScoreEvent]],
-  arc : @pattern.TimeSpan,
-) -> Unit {
-  self.process_events_with_origin(
-    copy_control_events(events),
-    arc,
-    @model.VoiceOrigin::Anonymous,
-  )
-}
-
-///|
 fn PatternScheduler::process_single_event(
   self : PatternScheduler,
   event : @pattern.Event[@score.ScoreEvent],
@@ -207,45 +180,6 @@ fn PatternScheduler::process_single_event(
         }
       }
   }
-}
-
-///|
-fn PatternScheduler::process_events_with_origin(
-  self : PatternScheduler,
-  events : Array[@pattern.Event[@score.ScoreEvent]],
-  arc : @pattern.TimeSpan,
-  origin : @model.VoiceOrigin,
-) -> Unit {
-  if events.length() > 1 {
-    events.sort_by(fn(a, b) { @voice_runtime.compare_event_onset(a, b) })
-  }
-  for event in events {
-    self.process_single_event(
-      event,
-      origin,
-      None,
-      @pattern.Controls::fixed(event.value.controls),
-      -1L,
-      arc,
-    )
-  }
-}
-
-///|
-fn PatternScheduler::query_pattern_block(
-  self : PatternScheduler,
-  pat : @pattern.Pat[@score.ScoreEvent],
-  frame : BlockFrame,
-) -> Array[@pattern.Event[@score.ScoreEvent]] {
-  ignore(self)
-  pat.query(frame.logical_arc)
-}
-
-///|
-fn anonymous_playback_events(
-  events : Array[@pattern.Event[@score.ScoreEvent]],
-) -> Array[@playback.PlaybackSourcedEvent] {
-  events.map(event => @playback.PlaybackSourcedEvent::anonymous(event))
 }
 
 ///|
@@ -412,33 +346,6 @@ fn PatternScheduler::process_block_events(
 }
 
 ///|
-/// Main entry point: called once per audio block (128 samples at 48kHz).
-/// Computes the cycle-time arc, expires old notes, queries the pattern for
-/// new events, triggers voices, advances the sample counter, and renders.
-pub fn PatternScheduler::process_block(
-  self : PatternScheduler,
-  pat : @pattern.Pat[@score.ScoreEvent],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let frame = match self.render_frame(left, right) {
-    Some(frame) => frame
-    None => return
-  }
-  self.expire_notes_at(PerformanceTime(frame.sample_begin))
-  let events = self.query_pattern_block(pat, frame)
-  self.process_block_events(
-    anonymous_playback_events(events),
-    frame,
-    left,
-    right,
-    left,
-    right,
-    false,
-  )
-}
-
-///|
 /// Render one dry stereo block from the current playback snapshot.
 /// A queued replacement is accepted at block start before note expiry and
 /// event query. Each successful call advances the transport by one block.
@@ -495,63 +402,6 @@ fn PatternScheduler::render_snapshot_outputs(
   )
   self.process_block_events(
     events, frame, left, right, send_left, send_right, write_send,
-  )
-}
-
-///|
-/// Section entry point with section-local timing semantics.
-///
-/// This intentionally routes through `Section::query` rather than the raw
-/// `Section::body()` pattern so non-identity `TimeScope`s affect event timing
-/// while keeping the scheduler's logical frame unchanged.
-pub fn[C : @song.SongContent] PatternScheduler::process_section_block(
-  self : PatternScheduler,
-  section : @song.Section[C],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let frame = match self.render_frame(left, right) {
-    Some(frame) => frame
-    None => return
-  }
-  self.expire_notes_at(PerformanceTime(frame.sample_begin))
-  let events = section.query(frame.logical_arc)
-  self.process_block_events(
-    anonymous_playback_events(events),
-    frame,
-    left,
-    right,
-    left,
-    right,
-    false,
-  )
-}
-
-///|
-/// Song entry point with song-global layout timing semantics.
-///
-/// The song layer returns events in song-global logical time, matching the
-/// scheduler frame's logical arc.
-pub fn[C : @song.SongContent] PatternScheduler::process_song_block(
-  self : PatternScheduler,
-  song : @song.Song[C],
-  left : @moondsp.AudioBuffer,
-  right : @moondsp.AudioBuffer,
-) -> Unit {
-  let frame = match self.render_frame(left, right) {
-    Some(frame) => frame
-    None => return
-  }
-  self.expire_notes_at(PerformanceTime(frame.sample_begin))
-  let events = song.query(frame.logical_arc)
-  self.process_block_events(
-    anonymous_playback_events(events),
-    frame,
-    left,
-    right,
-    left,
-    right,
-    false,
   )
 }
 

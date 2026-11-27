@@ -974,12 +974,11 @@ Current semantics:
 - `PatternScheduler` stores tempo, sample position, a `DspContext`, and active
   notes that pair each live `VoiceHandle` with a typed `VoiceOrigin`. Pattern
   origins carry a non-empty `PatternNodePath`; song origins always carry
-  occurrence, section, and layer identity. Anonymous origins exist only for
-  direct unsourced playback. The scheduler also owns optional active and pending
+  occurrence, section, and layer identity. The scheduler also owns optional active and pending
   `PlaybackSnapshot` values; it does not duplicate the pool's voice state or
   control bindings.
-- `PatternScheduler::process_block(...)` routes each event to the first
-  instrument pool whose selector matches it, expires old notes, queries the pattern for the current block arc, passes the
+- `PatternScheduler::render_block(...)` routes each event to the first
+  instrument pool whose selector matches it, expires old notes, queries the accepted snapshot for the current block arc, passes the
   event's `@pattern.Controls` to `note_on(...)`, then renders and sums
   every instrument pool. The pool's bindings decide what each key sets: a
   graph parameter, converted by the binding's unit (`MidiToHz`,
@@ -1008,8 +1007,8 @@ Current semantics:
   `.hold(s)` remains a physical-duration envelope override and does not use the
   event-derived gate endpoint.
 - Phase 6 incremental authoring adds a snapshot-swap layer over the same
-  block-processing loop. `queue_pattern_snapshot` / `queue_song_snapshot`
-  stage a lowered `PlaybackSnapshot` without changing playback immediately;
+  block-processing loop. `queue_playback_snapshot`
+  stages a lowered `PlaybackSnapshot` without changing playback immediately;
   `render_block` and `render_block_with_send` accept the latest queued snapshot
   at block start through one shared implementation. The former writes dry
   stereo; the latter also writes a post-pan, pre-master-gain stereo send using
@@ -1037,9 +1036,8 @@ Current semantics:
   behind the transport reclassifies it as skipped. When current material must
   first reach its reserved exit, it finishes at that boundary while the moved
   incoming occurrence remains explicitly skipped; settlement cannot install it.
-- `accepted_snapshot()` exposes the Pattern or Song selected at the most recent
-  render-block boundary, while `queued_snapshot()` exposes the latest snapshot
-  waiting for the next boundary. Both can be present simultaneously.
+- A queued snapshot is accepted at the next render-block boundary; the
+  scheduler exposes no snapshot accessors, only what it plays.
   `pending_material_change_count()` counts accepted changes waiting for a
   reserved entry; `skipped_material_change_count()` counts accepted finite
   changes that cannot enter during this Play. These facts do not imply transport

@@ -22,14 +22,14 @@ pub extend ActiveVoiceEffectOutcome with @moonbitlang/core/debug.Debug::{
 ///|
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
   self : PatternScheduler,
-  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  snapshot : PlaybackSnapshot,
   scope : PatternVoiceScope,
   effect : ActiveVoiceEffect,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
   match self.apply_pattern_voice_effect_result(scope, effect) {
     Err(error) => Err(error)
     Ok(outcome) => {
-      self.queue_pattern_snapshot(snapshot)
+      self.queue_playback_snapshot(snapshot)
       Ok(outcome)
     }
   }
@@ -38,14 +38,14 @@ pub fn PatternScheduler::queue_pattern_snapshot_effect_result(
 ///|
 pub fn PatternScheduler::queue_song_snapshot_effect_result(
   self : PatternScheduler,
-  snapshot : SongMaterial,
+  snapshot : PlaybackSnapshot,
   scope : SongVoiceScope,
   effect : ActiveVoiceEffect,
 ) -> Result[ActiveVoiceEffectOutcome, @moondsp.VoiceControlError] {
   match self.apply_song_voice_effect_result(scope, effect) {
     Err(error) => Err(error)
     Ok(outcome) => {
-      self.queue_song_snapshot(snapshot)
+      self.queue_playback_snapshot(snapshot)
       Ok(outcome)
     }
   }

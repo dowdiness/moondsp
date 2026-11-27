@@ -69,7 +69,8 @@ were accidental:
    `PlayBody::ExactArrangement(Song[PatternSnapshotWithOrigins], Bool)`; an
    untracked one to `Arrangement(Song[Pat[ControlMap]], Bool)`.
    `parse_song` returns `ParsedSong[Pat[ControlMap]]`.
-6. **The scheduler names the two playable kinds.** `@scheduler.SongMaterial`
+6. *(Superseded by [ADR-0031](0031-playback-material-is-one-view.md).)*
+   **The scheduler names the two playable kinds.** `@scheduler.SongMaterial`
    is `Runtime(SongSnapshot[Pat[ControlMap]])` or
    `Exact(SongSnapshot[PatternSnapshotWithOrigins])`, and
    `PlaybackSnapshot::song` / `repeat_song` take it. Exact entries report

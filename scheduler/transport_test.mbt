@@ -51,23 +51,51 @@ fn transport_fixture(
 }
 
 ///|
+fn transport_content(
+  name : String,
+  control : @pattern.ControlMap,
+  duration : @pattern.Rational,
+) -> @song.SectionLayerDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
+  @song.SectionLayerDoc(
+    id=@identity.SectionLayerId::from_string("transport:\{name}"),
+    name~,
+    body=@pattern.PatternDoc::from_pattern(
+      id=@identity.PatternNodeId::from_string("transport:\{name}"),
+      pat=@pattern.Pat::pure(played(control)).slow(duration),
+    ).lower(),
+  )
+}
+
+///|
+/// One note from `begin` to `end_` that plays once; `physical` adds a second
+/// note over the same span whose controls give it a physical gate.
 fn single_span(
   begin : @pattern.Rational,
   end_ : @pattern.Rational,
   control~ : @pattern.ControlMap = @pattern.ControlMap::empty(),
-) -> @song.Song[@pattern.Pat[@score.ScoreEvent]] raise {
+  physical? : @pattern.ControlMap,
+) -> @scheduler.PlaybackSnapshot raise {
   let duration = end_ - begin
-  let section = @song.Section::Section(
+  let layers = [transport_content("note", control, duration)]
+  if physical is Some(physical) {
+    layers.push(transport_content("physical", physical, duration))
+  }
+  let section = @song.SectionDoc(
+    id=@identity.SectionId::from_string("transport:section"),
     name="note",
     length_cycles=duration,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(
-      @pattern.Pat::pure(played(control)).slow(duration),
-    ),
+    body=@song.SectionDocBody::layers(layers),
   )
-  @song.Song::Song(parts=[
-    @song.SongPart::at(start=begin, name="once", section~),
-  ])
+  let song = @song.SongDoc(parts=[
+    @song.SongOccurrenceDoc::at(
+      id=@identity.OccurrenceId::from_string("transport:once"),
+      start=begin,
+      name="once",
+      section~,
+    ),
+  ]).lower()
+  @scheduler.PlaybackSnapshot::song(song)
 }
 
 ///|
@@ -77,7 +105,8 @@ test "audio starts and releases at exact samples within a block" {
     @pattern.Rational(17L, 96000L),
     @pattern.Rational(73L, 96000L),
   )
-  sched.process_song_block(pat, left, right)
+  sched.accept_playback_snapshot(pat)
+  sched.render_block(left, right)
   for i in 0..<128 {
     assert_eq(left.get(i) > 0.0, i >= 17 && i < 73)
   }
@@ -91,53 +120,49 @@ test "fractional onset rounded across a block survives a tempo edit exactly once
     @pattern.Rational(255L, 192000L),
     @pattern.Rational::from_int(1),
   )
-  sched.process_song_block(pat, left, right)
+  sched.accept_playback_snapshot(pat)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   for i in 0..<128 {
     assert_eq(left.get(i), 0.0)
   }
   sched.set_bpm(60.0).unwrap()
-  sched.process_song_block(pat, left, right)
+  sched.render_block(left, right)
   assert_true(left.get(0) > 0.0)
   assert_eq(sched.active_note_count(), 1)
-  sched.process_song_block(pat, left, right)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 1)
 }
 
 ///|
 test "tempo follows remaining musical duration and preserves physical deadlines" {
   // At 128 Hz a block is one second: both notes initially end at 12 seconds.
-  let (sched, pool, left, right) = transport_fixture(sample_rate=128.0)
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
+  // The second note's hold gives it a physical gate of twelve seconds.
   let pat = single_span(
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(6),
+    physical=@pattern.ControlMap::empty().set(Hold, 12.0),
   )
-  let physical = pool.note_on(fixed([])).unwrap()
-  sched
-  .push_active_note_until(
-    0,
-    physical,
-    @scheduler.PerformanceTime::PerformanceTime(1536L),
-  )
-  .unwrap()
+  sched.accept_playback_snapshot(pat)
   for _ in 0..<10 {
-    sched.process_song_block(pat, left, right)
+    sched.render_block(left, right)
   }
   let before = sched.current_block().unwrap().logical_arc.begin
   sched.set_bpm(60.0).unwrap()
   assert_true(sched.current_block().unwrap().logical_arc.begin == before)
   assert_eq(sched.sample_at(@pattern.Rational::from_int(6)).unwrap(), 1792L)
   for _ in 0..<2 {
-    sched.process_song_block(pat, left, right)
+    sched.render_block(left, right)
   }
   assert_eq(sched.active_note_count(), 1)
-  sched.process_song_block(pat, left, right)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 1)
-  sched.process_song_block(pat, left, right)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   // Released notes cannot be resurrected by slowing again.
   sched.set_bpm(30.0).unwrap()
-  sched.process_song_block(pat, left, right)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   for i in 0..<128 {
     assert_eq(left.get(i), 0.0)
@@ -151,7 +176,8 @@ test "invalid tempo leaves the position and sounding note unchanged" {
     @pattern.Rational::from_int(0),
     @pattern.Rational::from_int(1),
   )
-  sched.process_song_block(pat, left, right)
+  sched.accept_playback_snapshot(pat)
+  sched.render_block(left, right)
   let before = sched.current_block().unwrap().logical_arc
   assert_true(sched.set_bpm(0.0) is Err(_))
   assert_true(sched.current_block().unwrap().logical_arc == before)
@@ -161,12 +187,14 @@ test "invalid tempo leaves the position and sounding note unchanged" {
 
 ///|
 test "set_tempo rejects atomically when an endpoint is unrepresentable" {
-  let (sched, pool, left, right) = transport_fixture()
+  let (sched, _, left, right) = transport_fixture()
   sched.set_bpm(0.001).unwrap()
-  let handle = pool.note_on(fixed([])).unwrap()
   let endpoint = @pattern.Rational(100000000L, 10000019L * 100000003L)
-  sched.push_active_note(0, handle, endpoint).unwrap()
-  sched.process_block(@pattern.Pat::silence(), left, right)
+  sched.accept_playback_snapshot(
+    single_span(@pattern.Rational::from_int(0), endpoint),
+  )
+  sched.render_block(left, right)
+  assert_eq(sched.active_note_count(), 1)
   let before = sched.current_block().unwrap().logical_arc
   let tempo = @scheduler.Tempo::from_bpm(1000.0).unwrap()
   assert_true(sched.set_tempo(tempo) is Err(_))
@@ -192,11 +220,12 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
   let levels = [
     0.5, 1.0, 1.0, 1.0, 1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125, 0.0, 0.0,
   ]
+  sched.accept_playback_snapshot(song)
   for second in 0..<14 {
     if second == 3 {
       sched.set_bpm(240.0).unwrap()
     }
-    sched.process_song_block(song, left, right)
+    sched.render_block(left, right)
     assert_eq(sched.active_note_count(), if second < 4 { 1 } else { 0 })
     assert_true((left.get(127) - levels[second]).abs() < 0.000001)
   }
@@ -205,16 +234,25 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
 ///|
 test "zero hold finishes immediately and invalid hold does not start a voice" {
   let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
-  let silent = @pattern.Pat::pure(
-    played(@pattern.ControlMap::empty().set(Hold, 0.0)),
+  sched.accept_playback_snapshot(
+    single_span(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+      control=@pattern.ControlMap::empty().set(Hold, 0.0),
+    ),
   )
-  sched.process_block(silent, left, right)
+  sched.render_block(left, right)
   assert_eq(left.get(0), 0.0)
   assert_eq(sched.active_note_count(), 0)
-  let invalid = @pattern.Pat::pure(
-    played(@pattern.ControlMap::empty().set(Attack, 2.0).set(Hold, -1.0)),
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
+  sched.accept_playback_snapshot(
+    single_span(
+      @pattern.Rational::from_int(0),
+      @pattern.Rational::from_int(1),
+      control=@pattern.ControlMap::empty().set(Attack, 2.0).set(Hold, -1.0),
+    ),
   )
-  sched.process_block(invalid, left, right)
+  sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   assert_eq(left.get(0), 0.0)
 }
@@ -229,7 +267,8 @@ test "without hold the event end releases an unfinished attack" {
   )
   // A quarter cycle at 120 BPM: the gate closes after half a second, during
   // the attack.
-  sched.process_song_block(song, left, right)
+  sched.accept_playback_snapshot(song)
+  sched.render_block(left, right)
   assert_true(left.get(63) > 0.0)
   assert_true(left.get(127) < left.get(63))
 }
@@ -286,11 +325,13 @@ test "material admission rejects before retiming and restart recovers capacity" 
     name : String,
     note : Double,
   ) -> @scheduler.PlaybackSnapshot raise {
-    @scheduler.PlaybackSnapshot::untracked_pattern(
+    @scheduler.PlaybackSnapshot::pattern(
       @pattern.PatternDoc::from_pattern(
         id=@identity.PatternNodeId::from_string(name),
         pat=@score.note(note).slow(@pattern.Rational::from_int(1000)).material(),
-      ).lower(),
+      )
+      .lower()
+      .playback(),
     )
   }
   let (second, _, left, right) = transport_fixture(sample_rate=128.0)
@@ -305,22 +346,14 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(second.bpm(), 120.0)
   assert_true(second.current_block().unwrap().logical_arc == before)
   assert_eq(second.active_note_count(), 1)
-  let arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  assert_eq(
-    pitch_of(second.accepted_snapshot().unwrap().query(arc)[0].value),
-    Some(60.0),
-  )
+  // The refused material is not staged: nothing waits for a boundary.
+  assert_eq(second.pending_material_change_count(), 0)
   second.render_block(left, right)
   assert_true(left.get(0) > 0.0)
   second.accept_playback(next, tempo, material_limit=1, restart=true).unwrap()
   assert_eq(second.bpm(), 60.0)
   assert_eq(second.sample_counter(), 0L)
   assert_eq(second.pending_material_change_count(), 0)
-  assert_eq(
-    pitch_of(second.accepted_snapshot().unwrap().query(arc)[0].value),
-    Some(80.0),
-  )
+  second.render_block(left, right)
+  assert_eq(second.active_note_count(), 1)
 }

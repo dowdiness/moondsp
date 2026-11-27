@@ -29,9 +29,11 @@ sample-accurate audio voice triggers across block boundaries:
 [ dsp ] (primitive state & buffer processing)
 ```
 
-- **Upstream consumers**: [`player/`](../player/) drives a performance through
-  accepted snapshots, for the browser host and offline renderers (ADR-0029);
-  custom hosts feed `Pat[ScoreEvent]` or `Song` instances into the scheduler.
+- **Upstream consumers**: [`player/`](../player/) drives performances through
+  accepted snapshots for the browser host and offline renderers (ADR-0029).
+  Custom hosts lower `PatternDoc` or `SongDoc` values into playback snapshots;
+  queued updates take effect at the next rendered block, while accepted
+  snapshots take effect immediately.
 - **Downstream dependencies**: [`voice/`](../voice/) receives dispatched note
   events, gates, and controls; [`pattern/`](../pattern/) and [`song/`](../song/)
   supply time intervals and queryable event streams; [`dsp/`](../dsp/) defines
@@ -41,12 +43,12 @@ sample-accurate audio voice triggers across block boundaries:
 
 | Category | Types | Key operations |
 |---|---|---|
-| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler(...)`, `PatternScheduler::process_block`, `PatternScheduler::process_song_block`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
-| **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
-| **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::accepted_snapshot`, `PatternScheduler::queued_snapshot`, `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
+| **Scheduler Engine** | `PatternScheduler` | `PatternScheduler(...)`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
+| **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PatternScheduler::accept_playback_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
+| **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
 | **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
-| **Controls & Notes** | `VoiceControlBatch` | `PatternScheduler::push_active_note`, `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
+| **Controls & Notes** | `VoiceControlBatch` | `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
 
 `render_block(left, right)` renders dry stereo from the current snapshot.
 `render_block_with_send(left, right, send_left, send_right)` also writes
@@ -78,9 +80,8 @@ edited transport.
 
 A tempo edit takes effect at the next unrendered sample. It preserves the
 musical position already reached. Only the remaining distance to musical
-onsets and note endings uses the new tempo. A physical deadline registered
-with `push_active_note_until` stays at its original sample. Tempo edits neither
-retrigger voices nor change their pitch, timbre, or release envelope.
+onsets and note endings uses the new tempo. Tempo edits neither retrigger voices
+nor change their pitch, timbre, or release envelope.
 
 Block rendering splits DSP processing at each onset and gate-off. Boundaries
 round upward to the first sample at or after the musical time. A fractional
@@ -115,13 +116,7 @@ The Player-owner cutover removes the following APIs without compatibility aliase
 |---|---|
 | `normalize_bpm(value)` | `Tempo::from_bpm(value)` returns `Result[Tempo, TransportError]`; read the normalized value with `Tempo::bpm()` |
 | `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` or `set_tempo(tempo, end_?)` and handle its transactional `Result` |
-| `active_playback_revision()` | `accepted_snapshot().map(snapshot => snapshot.revision())` |
-| `active_playback_song_layout_revision()` / `active_song_layout_revision()` | `accepted_snapshot().and_then(snapshot => snapshot.song_layout_revision())` |
-| `active_song_revision()` | Match `accepted_snapshot()` for `Song(snapshot)` or `RepeatSong(snapshot)` and read `snapshot.revision()`; return `None` for Pattern/absence |
-| `has_active_playback_snapshot()` | `accepted_snapshot() is Some(_)` |
-| `has_active_pattern_snapshot()` / `has_active_song_snapshot()` | Match the accepted snapshot's Pattern or Song/RepeatSong variant |
-| `has_pending_playback_snapshot()` | `queued_snapshot() is Some(_)` |
-| `has_pending_pattern_snapshot()` / `has_pending_song_snapshot()` | Match the queued snapshot's Pattern or Song/RepeatSong variant |
+
 
 `Tempo::from_bpm` validates and normalizes a number, not a running clock's
 representability. Do not replace `validate_bpm` with a pure scalar check followed
@@ -132,10 +127,10 @@ budget in the same transaction. It returns
 `PlaybackAdmissionError::MaterialLimit` or `Transport(error)` without changing
 anything; `restart=true` prepares against empty retained state.
 
-Queued snapshots await acceptance; pending material changes await their own
-entry boundaries **after** acceptance. Replace an old pending-snapshot query
-with `queued_snapshot`, not `pending_material_change_count`. Match
-`RepeatSong` in addition to `Pattern` and `Song` when inspecting playback input.
+Queued snapshots are adopted at the next render-block boundary. After adoption,
+pending material changes wait for their own entry boundaries. Use
+`pending_material_change_count()` and `skipped_material_change_count()` to
+observe those changes; they do not indicate whether audio is currently audible.
 
 ## Note envelopes
 
@@ -232,16 +227,12 @@ and material reservations. Accepted plans are installed once; the owner does
 not expose preparation tokens to its clients. See the
 [Player contract](../docs/technical-reference.md#browser-player-ownership-and-source-updates).
 
-`accepted_snapshot()` returns the Pattern, Song, or RepeatSong selected by
-`accept_playback_snapshot()`, `accept_playback()`, or a render-block commit.
-Independent scheduler clients may use `queue_playback_snapshot()` instead; `queued_snapshot()` exposes
-that snapshot until commitment. Player operations accept immediately, including
-while Paused. In the lower-level queued API both observations can be present at once.
-An accepted snapshot's revision does not imply that all changed materials are audible:
-`pending_material_change_count()` reports changes waiting for a reserved entry,
-and `skipped_material_change_count()` reports finite changes that cannot enter
-during this Play. These queries do not describe transport activity or whether
-audio is audible.
+Queued snapshots are adopted at the next render-block boundary; accepted
+snapshots take effect immediately. A snapshot revision does not imply that all
+changed materials are audible. `pending_material_change_count()` reports
+changes waiting for a reserved entry, and `skipped_material_change_count()`
+reports finite changes that cannot enter during this Play. These queries do
+not describe transport activity or whether audio is audible.
 
 The browser owner limits the score to 256 source and retained material entries.
 `PlaybackSnapshot::material_count()` counts all source entries, including future
@@ -311,11 +302,13 @@ test "edit orchestration stages a replacement and reconciles active voices" {
   let replacement = try! replacement_doc.lower()
   let left = @moondsp.AudioBuffer::filled(128)
   let right = @moondsp.AudioBuffer::filled(128)
-  sched.queue_pattern_snapshot(active_snapshot)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(active_snapshot.playback()),
+  )
   sched.render_block(left, right)
   let outcome = sched
     .queue_pattern_snapshot_effect_result(
-      replacement,
+      @scheduler.PlaybackSnapshot::pattern(replacement.playback()),
       @scheduler.PatternVoiceScope::node(edited),
       @scheduler.ActiveVoiceEffect::Release,
     )
@@ -323,11 +316,6 @@ test "edit orchestration stages a replacement and reconciles active voices" {
 
   assert_eq(outcome.retuned_voice_count, 0)
   assert_eq(outcome.detached_note_count, 1)
-  assert_true(sched.accepted_snapshot() is Some(_))
-  assert_true(
-    sched.queued_snapshot()
-    is Some(@scheduler.PlaybackSnapshot::UntrackedPattern(_)),
-  )
   assert_eq(sched.active_note_count(), 0)
 }
 ```

@@ -24,12 +24,14 @@ fn make_section(
   name : String,
   length : @pattern.Rational,
   midi : Double,
-) -> @song.Section[@pattern.Pat[@score.ScoreEvent]] {
+) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   @song.Section(
     name~,
     length_cycles=length,
     scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(@score.note(midi)),
+    body=@song.SectionBody::single(
+      section_test_content("song-section:\{name}", @score.note(midi)),
+    ),
   ) catch {
     _ => abort("section creation failed")
   }
@@ -41,12 +43,14 @@ fn make_scoped_section(
   length : @pattern.Rational,
   scope : @song.TimeScope,
   midi : Double,
-) -> @song.Section[@pattern.Pat[@score.ScoreEvent]] {
+) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   @song.Section(
     name~,
     length_cycles=length,
     scope~,
-    body=@song.SectionBody::single(@score.note(midi)),
+    body=@song.SectionBody::single(
+      section_test_content("song-scoped-section:\{name}", @score.note(midi)),
+    ),
   ) catch {
     _ => abort("section creation failed")
   }
@@ -96,7 +100,9 @@ test "Song constructor computes contiguous duration and occurrences" {
 
 ///|
 test "Song constructor rejects empty layout" {
-  let parts : Array[SongPart[@pattern.Pat[@score.ScoreEvent]]] = []
+  let parts : Array[
+    SongPart[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  ] = []
   try Song(parts~) catch {
     SongBuildError::EmptySong => ()
     _ => assert_true(false)

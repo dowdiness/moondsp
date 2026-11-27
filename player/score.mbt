@@ -30,7 +30,7 @@ priv enum PlaybackSpan {
 /// A score the player can accept: lowered material with its tempo, how it is
 /// laid out, and how long it plays. `Player::compile` builds one from Mini
 /// input and records the query window Mini admitted its work for;
-/// `pattern`, `tracked_pattern`, `song` and `tracked_song` build one from
+/// `pattern` and `song` build one from
 /// content that has no source text, whose work nothing bounds: the caller
 /// answers for it, as it does when it hands the scheduler a snapshot.
 pub struct Score {
@@ -51,67 +51,29 @@ fn Score::finite_end(self : Score) -> @pattern.Rational? {
 }
 
 ///|
-/// A pattern that plays forever at `tempo`; its events carry no event origin.
+/// A pattern that plays forever at `tempo`. Its events carry event origins
+/// when it was built from a tracked snapshot.
 pub fn Score::pattern(
-  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+  pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
   tempo~ : Tempo,
 ) -> Score {
   {
     admitted: None,
     tempo: tempo.value,
     layout: PatternLayout,
-    snapshot: @scheduler.PlaybackSnapshot::untracked_pattern(snapshot),
-    span: Continuous,
-  }
-}
-
-///|
-/// A pattern that plays forever at `tempo`, each event with its event origin.
-pub fn Score::tracked_pattern(
-  snapshot : @pattern.TrackedPatternSnapshot[@score.ScoreEvent],
-  tempo~ : Tempo,
-) -> Score {
-  {
-    admitted: None,
-    tempo: tempo.value,
-    layout: PatternLayout,
-    snapshot: @scheduler.PlaybackSnapshot::tracked_pattern(snapshot),
+    snapshot: @scheduler.PlaybackSnapshot::pattern(pattern),
     span: Continuous,
   }
 }
 
 ///|
 /// A lowered song at `tempo` that ends after its last occurrence, or repeats
-/// when `repeat` is true; its events carry no event origin.
-pub fn Score::song(
-  song : @song.SongSnapshot[@pattern.Pat[@score.ScoreEvent]],
-  tempo~ : Tempo,
-  repeat~ : Bool = false,
-) -> Score raise ScoreError {
-  arrangement(
-    song,
-    tempo.value,
-    repeat,
-    @scheduler.SongMaterial::Untracked(song),
-  )
-}
-
-///|
-/// `Score::song` whose events each carry their event origin.
-pub fn Score::tracked_song(
-  song : @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
-  tempo~ : Tempo,
-  repeat~ : Bool = false,
-) -> Score raise ScoreError {
-  arrangement(song, tempo.value, repeat, @scheduler.SongMaterial::Tracked(song))
-}
-
-///|
-fn[C] arrangement(
+/// when `repeat` is true. Its events carry event origins when its sections
+/// hold tracked snapshots.
+pub fn[C : @song.SongContent] Score::song(
   snapshot : @song.SongSnapshot[C],
-  tempo : @scheduler.Tempo,
-  repeated : Bool,
-  material : @scheduler.SongMaterial,
+  tempo~ : Tempo,
+  repeat~ : Bool = false,
 ) -> Score raise ScoreError {
   let song = snapshot.song()
   guard song.duration() > @pattern.Rational::from_int(0) else {
@@ -119,14 +81,10 @@ fn[C] arrangement(
   }
   {
     admitted: None,
-    tempo,
-    layout: song_layout(song, repeated),
-    snapshot: if repeated {
-      @scheduler.PlaybackSnapshot::repeat_song(material)
-    } else {
-      @scheduler.PlaybackSnapshot::song(material)
-    },
-    span: if repeated {
+    tempo: tempo.value,
+    layout: song_layout(song, repeat),
+    snapshot: @scheduler.PlaybackSnapshot::song(snapshot, repeat~),
+    span: if repeat {
       Repeating(song.duration())
     } else {
       Finite(song.duration())

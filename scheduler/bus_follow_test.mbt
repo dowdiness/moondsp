@@ -81,7 +81,9 @@ fn bus_brightness(
     pools=[bus_pool(ctx)],
     route=_ => 0,
   )
-  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let mut previous = 0.0
@@ -158,7 +160,9 @@ fn bus_first_block_rms(
   let scheduler = @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[pool], route=_ => {
     0
   })
-  scheduler.queue_pattern_snapshot(doc.lower())
+  scheduler.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(doc.lower().playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   scheduler.render_block(left, right)
@@ -255,7 +259,9 @@ test "a signal buffer records the value held voices follow, once per block, on i
   let signals = @scheduler.SignalBuffer()
   signals.enable(true)
   scheduler.attach_signal_buffer(signals)
-  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   // Block 375 starts at sample 48000: one cycle, halfway through the stretched sweep.
@@ -309,7 +315,9 @@ test "a signal buffer keeps recording through a voice's release and stops once i
   let signals = @scheduler.SignalBuffer()
   signals.enable(true)
   scheduler.attach_signal_buffer(signals)
-  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   // The cycle is 48000 samples: the gate closes at sample 24000, the 50 ms
@@ -363,7 +371,9 @@ test "a signal buffer keeps signals of different epochs apart even when their se
   let signals = @scheduler.SignalBuffer()
   signals.enable(true)
   scheduler.attach_signal_buffer(signals)
-  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   let right = @moondsp.AudioBuffer::filled(BUS_BLOCK)
   for _ in 0..<11 {

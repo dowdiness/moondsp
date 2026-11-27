@@ -5,7 +5,10 @@
 /// source is tracked, to untracked patterns otherwise.
 pub enum PlayBody {
   Pattern(ScoreDoc)
-  UntrackedArrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  UntrackedArrangement(
+    @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    Bool,
+  )
   TrackedArrangement(
     @song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
@@ -136,7 +139,7 @@ fn parse_play_source_with_origins(
         builder,
         admission,
         authored_bpm,
-        lower=doc => doc.lower().pat(),
+        lower=doc => doc.lower(),
       )
       { body: UntrackedArrangement(song, repeating), bpm, }
     }

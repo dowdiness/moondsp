@@ -243,7 +243,7 @@ test "a score with no source text plays and reports no source" {
     id=@identity.PatternNodeId::from_string("generated"),
     pat=@pattern.sequence([@score.note(60.0), @score.note(67.0)]),
   )
-  player.restart(Score::pattern(doc.lower(), tempo=Tempo(120.0)))
+  player.restart(Score::pattern(doc.lower().playback(), tempo=Tempo(120.0)))
   assert_eq(player.mode(), Some(Pattern))
   render_blocks(player, 1)
   assert_true(output_energy() > 0.01)

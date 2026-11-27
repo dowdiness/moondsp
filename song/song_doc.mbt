@@ -301,6 +301,28 @@ pub struct SongEntry[C] {
 }
 
 ///|
+/// The section content this entry plays.
+pub fn[C] SongEntry::content(self : SongEntry[C]) -> C {
+  self.content
+}
+
+///|
+/// Which of the content's canonical entries this entry plays.
+pub fn[C] SongEntry::content_entry(self : SongEntry[C]) -> Int32 {
+  self.index
+}
+
+///|
+/// Where the content's time sits in song time: the occurrence's start and
+/// its section's rate.
+pub fn[C] SongEntry::placement(self : SongEntry[C]) -> @pattern.Placement {
+  @pattern.Placement(
+    origin=self.occurrence.start(),
+    rate=self.occurrence.section().scope().rate(),
+  )
+}
+
+///|
 pub fn[C] SongEntry::origin(self : SongEntry[C]) -> SongEventOrigin {
   self.origin
 }
@@ -322,27 +344,6 @@ pub fn[C] SongEntry::start(self : SongEntry[C]) -> @pattern.Rational {
 ///|
 pub fn[C] SongEntry::end_(self : SongEntry[C]) -> @pattern.Rational {
   self.occurrence.end_()
-}
-
-///|
-/// The entry's share of a song-clock query, or `None` when its occurrence
-/// misses `arc`.
-pub fn[C] SongEntry::slice(
-  self : SongEntry[C],
-  arc : @pattern.TimeSpan,
-) -> SongSlice[C]? {
-  guard self.occurrence.span().intersect(arc) is Some(arc) else { return None }
-  let placement = @pattern.Placement(
-    origin=self.occurrence.start(),
-    rate=self.occurrence.section().scope().rate(),
-  )
-  Some({
-    content: self.content,
-    entry: self.index,
-    arc: placement.local_span(arc),
-    placement,
-    origin: self.origin,
-  })
 }
 
 ///|
@@ -415,47 +416,6 @@ pub fn SongEventOrigin::layer(
 }
 
 ///|
-/// One song entry's share of a song-clock query: which content entry to
-/// query, over which content-local arc, and how to place its events back on
-/// the song clock. Querying the content is the caller's job, so song structure
-/// stays independent of what the content's events carry.
-pub struct SongSlice[C] {
-  priv content : C
-  priv entry : Int32
-  priv arc : @pattern.TimeSpan
-  priv placement : @pattern.Placement
-  priv origin : SongEventOrigin
-}
-
-///|
-pub fn[C] SongSlice::content(self : SongSlice[C]) -> C {
-  self.content
-}
-
-///|
-/// The content's canonical entry index.
-pub fn[C] SongSlice::entry(self : SongSlice[C]) -> Int32 {
-  self.entry
-}
-
-///|
-/// The query arc in the content's own time.
-pub fn[C] SongSlice::arc(self : SongSlice[C]) -> @pattern.TimeSpan {
-  self.arc
-}
-
-///|
-/// Maps content time back to the song clock; apply it to events and controls.
-pub fn[C] SongSlice::placement(self : SongSlice[C]) -> @pattern.Placement {
-  self.placement
-}
-
-///|
-pub fn[C] SongSlice::origin(self : SongSlice[C]) -> SongEventOrigin {
-  self.origin
-}
-
-///|
 /// Lowered song snapshot for scheduler/runtime consumers.
 ///
 /// `revision` tracks any authoring content change. `layout_revision` advances
@@ -492,17 +452,6 @@ pub fn[C] SongSnapshot::entries(
   self : SongSnapshot[C],
 ) -> ArrayView[SongEntry[C]] {
   self.entries[:]
-}
-
-///|
-/// Every entry's slice that sounds within `arc`, in song order.
-pub fn[C] SongSnapshot::slices(
-  self : SongSnapshot[C],
-  arc : @pattern.TimeSpan,
-) -> Array[SongSlice[C]] {
-  [
-    for entry in self.entries if entry.slice(arc) is Some(slice) => slice
-  ]
 }
 
 ///|

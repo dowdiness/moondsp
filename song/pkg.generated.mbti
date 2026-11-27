@@ -223,9 +223,11 @@ pub struct SongEntry[C] {
   // private fields
 }
 pub fn[C] SongEntry::body(Self[C]) -> @pattern.Pat[@score.ScoreEvent]
+pub fn[C] SongEntry::content(Self[C]) -> C
+pub fn[C] SongEntry::content_entry(Self[C]) -> Int32
 pub fn[C] SongEntry::end_(Self[C]) -> @pattern.Rational
 pub fn[C] SongEntry::origin(Self[C]) -> SongEventOrigin
-pub fn[C] SongEntry::slice(Self[C], @pattern.TimeSpan) -> SongSlice[C]?
+pub fn[C] SongEntry::placement(Self[C]) -> @pattern.Placement
 pub fn[C] SongEntry::start(Self[C]) -> @pattern.Rational
 
 #derive(Eq, @debug.Debug)
@@ -267,22 +269,12 @@ pub fn[C] SongPart::start(Self[C]) -> @pattern.Rational?
 pub fn[C] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[C]) -> Self[C]
 pub fn[C] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[C]) -> Self[C]
 
-pub struct SongSlice[C] {
-  // private fields
-}
-pub fn[C] SongSlice::arc(Self[C]) -> @pattern.TimeSpan
-pub fn[C] SongSlice::content(Self[C]) -> C
-pub fn[C] SongSlice::entry(Self[C]) -> Int32
-pub fn[C] SongSlice::origin(Self[C]) -> SongEventOrigin
-pub fn[C] SongSlice::placement(Self[C]) -> @pattern.Placement
-
 pub struct SongSnapshot[C] {
   // private fields
 }
 pub fn[C] SongSnapshot::entries(Self[C]) -> ArrayView[SongEntry[C]]
 pub fn[C] SongSnapshot::layout_revision(Self[C]) -> @identity.Revision
 pub fn[C] SongSnapshot::revision(Self[C]) -> @identity.Revision
-pub fn[C] SongSnapshot::slices(Self[C], @pattern.TimeSpan) -> Array[SongSlice[C]]
 pub fn[C] SongSnapshot::song(Self[C]) -> Song[C]
 
 pub struct TimeScope {
@@ -301,6 +293,7 @@ pub fn TimeScope::slow(factor~ : @pattern.Rational) -> Self raise TimeScopeBuild
 // Traits
 pub trait SongContent {
   fn pat(Self) -> @pattern.Pat[@score.ScoreEvent]
+  fn playback(Self) -> @pattern.PlaybackPattern[@score.ScoreEvent]
 }
-pub impl SongContent for @pattern.Pat[@score.ScoreEvent]
 pub impl SongContent for @pattern.TrackedPatternSnapshot[@score.ScoreEvent]
+pub impl SongContent for @pattern.UntrackedPatternSnapshot[@score.ScoreEvent]

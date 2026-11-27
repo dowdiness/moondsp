@@ -24,7 +24,7 @@ pub fn parse_play_source(String, query_window? : @pattern.QueryWindow) -> Result
 
 pub fn parse_snapshot(String) -> Result[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent], String]
 
-pub fn parse_song(String) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String]
+pub fn parse_song(String) -> Result[ParsedSong[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], String]
 
 pub fn project_notation_nodes(String, String) -> Result[@json.Json, String]
 
@@ -193,7 +193,7 @@ pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
 
 pub enum PlayBody {
   Pattern(@pattern.PatternDoc[@score.ScoreEvent])
-  UntrackedArrangement(@song.Song[@pattern.Pat[@score.ScoreEvent]], Bool)
+  UntrackedArrangement(@song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], Bool)
   TrackedArrangement(@song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
 }
 

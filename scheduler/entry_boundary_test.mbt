@@ -14,9 +14,13 @@ test "a prepared entry switch is audible at its rounded sample inside the block"
     id=@identity.PatternNodeId::from_string("entry"),
     pat=note.material(),
   ).lower()
-  sched.queue_pattern_snapshot(old)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(old.playback()),
+  )
   sched.render_block(left, right)
-  sched.queue_pattern_snapshot(next)
+  sched.queue_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(next.playback()),
+  )
   sched.render_block(left, right)
   assert_eq(left.get(0), 0.0)
   assert_true(left.get(1) > 0.0)

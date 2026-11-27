@@ -1,7 +1,10 @@
 ///|
 fn unwrap_parsed_song(
-  result : Result[@mini.ParsedSong[@pattern.Pat[@score.ScoreEvent]], String],
-) -> @song.Song[@pattern.Pat[@score.ScoreEvent]] {
+  result : Result[
+    @mini.ParsedSong[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    String,
+  ],
+) -> @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
   match result {
     Ok(parsed) => parsed.song()
     Err(msg) => abort("expected parsed song, got Err(\{msg})")

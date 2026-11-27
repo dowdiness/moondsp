@@ -30,7 +30,7 @@ test "authored Euclid preserves stacked notes timing and child provenance" {
     .euclid(id=euclid, k=1, n=2)
     .lower()
   let state = PlaybackState()
-  state.queue(PlaybackSnapshot::untracked_pattern(snapshot))
+  state.queue(PlaybackSnapshot::pattern(snapshot.playback()))
   state.commit_pending(@pattern.Rational::from_int(0))
   let whole = @pattern.TimeSpan(
     @pattern.Rational::from_int(0),

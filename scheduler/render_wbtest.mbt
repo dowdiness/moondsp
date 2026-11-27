@@ -15,7 +15,7 @@ test "Unrepresentable render frame silences dry and send without accepting queue
     id=@identity.PatternNodeId::from_string("unaccepted"),
     pat=@score.note(60.0),
   ).lower()
-  sched.queue_pattern_snapshot(snapshot)
+  sched.queue_playback_snapshot(PlaybackSnapshot::pattern(snapshot.playback()))
   // Move directly to the last representable sample at 1000 BPM without
   // rendering billions of blocks. The next 128-sample frame overflows ticks.
   let mut remaining = 9223372036854L
@@ -41,8 +41,5 @@ test "Unrepresentable render frame silences dry and send without accepting queue
   }
   assert_true(sched.last_transport_error() is Some(TimeOutOfRange))
   assert_eq(sched.sample_counter(), before)
-  assert_true(sched.accepted_snapshot() is None)
-  assert_true(
-    sched.queued_snapshot().unwrap().revision() == snapshot.revision(),
-  )
+  assert_eq(sched.active_note_count(), 0)
 }

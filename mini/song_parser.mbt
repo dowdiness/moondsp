@@ -50,7 +50,10 @@ pub fn[C] ParsedSong::bpm(self : ParsedSong[C]) -> Double? {
 /// untracked patterns, without source origins.
 pub fn parse_song(
   input : String,
-) -> Result[ParsedSong[@pattern.Pat[@score.ScoreEvent]], String] {
+) -> Result[
+  ParsedSong[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  String,
+] {
   guard !input.is_empty() else { return Err("empty input") }
   let p = Parser(input)
   let builder = MiniDocBuilder()
@@ -62,9 +65,7 @@ pub fn parse_song(
   guard p.read_call(Arrangement::parse) is Some(Song) else {
     return Err("position \{song_at}: expected 'song('")
   }
-  let result = p.parse_song_body(song_at, builder, lower=doc => {
-    doc.lower().pat()
-  }) catch {
+  let result = p.parse_song_body(song_at, builder, lower=doc => doc.lower()) catch {
     problem => return Err(problem.to_string())
   }
   p.skip_whitespace()

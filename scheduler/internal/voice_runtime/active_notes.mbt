@@ -12,7 +12,7 @@ priv struct ActiveNote {
 fn ActiveNote::ActiveNote(
   instrument~ : Int32,
   handle~ : @voice.VoiceHandle,
-  origin~ : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
+  origin~ : @model.VoiceOrigin,
   end_sample~ : Int64,
   musical_end~ : @pattern.Rational?,
 ) -> ActiveNote {
@@ -71,7 +71,7 @@ pub fn ActiveNotes::push_note(
   self : ActiveNotes,
   instrument~ : Int32,
   handle~ : @voice.VoiceHandle,
-  origin~ : @model.VoiceOrigin = @model.VoiceOrigin::Anonymous,
+  origin~ : @model.VoiceOrigin,
   end_sample~ : Int64,
   musical_end? : @pattern.Rational,
 ) -> Unit {

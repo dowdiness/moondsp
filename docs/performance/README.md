@@ -4,7 +4,7 @@ Keep decision-bearing results here, not a file per benchmark run. These summarie
 
 | Summary | Use it for |
 |---|---|
-| [Tracked and untracked entry allocations](2026-11-25-tracked-untracked-entry-allocations.md) | Executed-construction counts of the Player rendering tracked and untracked patterns and songs across the entry refactor, the two rejected typed source-info variants, and the unexplained song drop (ADR-0028). |
+| [Tracked and untracked entry allocations](2026-11-25-tracked-untracked-entry-allocations.md) | Executed-construction counts of the Player rendering tracked and untracked patterns and songs across the entry refactor, the two rejected typed source-info variants, and the unexplained song drop (ADR-0028); the playback view's song changes and the rejected per-query closure (ADR-0031). |
 | [Sample copy into wasm-gc](2026-11-24-sample-copy.md) | Per-call cost of copying a waveform into a wasm-gc buffer in an AudioWorklet, the chosen 16,384-sample load chunk, the measured start-up cost of the 32 MiB store, the render-path allocation audit of `SamplePlayer`, the realtime loading and playback checks in Chromium, Firefox, WebKit and Safari, and their limits (ADR-0026). |
 | [Browser numeric updates](2026-10-23-browser-updates.md) | Mount-bound updates, transitive Wasm allocation counts, biquad scratch removal, primitive diagnostics, and measured AudioWorklet timing limits. |
 | [Pattern allocation and onset investigations](2026-10-02-pattern-allocation-summary.md) | Adopted allocation reductions, the comparison baselines, rejected constructor caching, exact PCM/origin checks, profiler-attribution corrections the query cost of root-filled control values, typed control keys, and the shared `TimeMap` (ADR-0024). |

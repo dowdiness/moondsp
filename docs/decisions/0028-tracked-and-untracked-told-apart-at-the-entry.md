@@ -1,6 +1,6 @@
 # ADR-0028: Tracked and untracked material are told apart where an entry is built
 
-- **Status:** Accepted
+- **Status:** Accepted; Decision 4 superseded by [ADR-0031](0031-playback-material-is-one-view.md)
 - **Date:** 2026-11-25
 - **Refines:** [ADR-0021](0021-song-structure-generic-over-content.md) §6
   (the scheduler names the two playable kinds)

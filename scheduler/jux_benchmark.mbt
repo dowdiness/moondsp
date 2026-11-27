@@ -13,14 +13,6 @@ fn bench_ctx() -> @moondsp.DspContext {
 }
 
 ///|
-fn bench_arc() -> @pattern.TimeSpan {
-  @pattern.TimeSpan(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-}
-
-///|
 fn bench_template() -> Array[@moondsp.DspNode] {
   [
     @moondsp.DspNode::oscillator(@moondsp.Waveform::Sine, 440.0),
@@ -81,27 +73,39 @@ fn bench_jux_pattern() -> @pattern.Pat[@score.ScoreEvent] {
 
 ///|
 fn bench_seed_jux_voices(scheduler : PatternScheduler) -> Unit {
-  let arc = bench_arc()
-  let events = bench_jux_pattern().query(arc)
-  scheduler.process_events(events, arc)
+  let id = try! @identity.PatternNodeId::from_string("bench:seed")
+  let snapshot = try! @pattern.PatternDoc::from_pattern(
+    id~,
+    pat=bench_jux_pattern(),
+  ).lower()
+  scheduler.queue_playback_snapshot(
+    PlaybackSnapshot::pattern(snapshot.playback()),
+  )
+  let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  scheduler.render_block(left, right)
 }
 
 ///|
-test "bench/jux/scheduler_dispatch" (b : @bench.T) {
+test "bench/jux/scheduler_render" (b : @bench.T) {
   let ctx = bench_ctx()
-  let template = bench_template()
-  let pool = bench_pool(template, ctx)
+  let pool = bench_pool(bench_template(), ctx)
   let scheduler = bench_scheduler(ctx, pool)
-  let arc = bench_arc()
-  let expire_arc = @pattern.TimeSpan(
-    @pattern.Rational::from_int(1),
-    @pattern.Rational::from_int(2),
+  let id = try! @identity.PatternNodeId::from_string("bench:scheduler")
+  let snapshot = try! @pattern.PatternDoc::from_pattern(
+    id~,
+    pat=bench_jux_pattern(),
+  ).lower()
+  scheduler.queue_playback_snapshot(
+    PlaybackSnapshot::pattern(snapshot.playback()),
   )
-  let events = bench_jux_pattern().query(arc)
-  b.bench(name="process_events_8_jux_events", fn() {
-    scheduler.process_events(events.copy(), arc)
-    scheduler.expire_notes(expire_arc).unwrap()
+  let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
+  b.bench(name="render_block_8_jux_events", fn() {
+    scheduler.render_block(left, right)
     b.keep(pool.active_voice_count())
+    b.keep(left)
+    b.keep(right)
   })
 }
 
@@ -124,16 +128,22 @@ test "bench/jux/stereo_routing" (b : @bench.T) {
 }
 
 ///|
-test "bench/jux/process_block" (b : @bench.T) {
+test "bench/jux/render_block" (b : @bench.T) {
   let ctx = bench_ctx()
-  let template = bench_template()
-  let pool = bench_pool(template, ctx)
+  let pool = bench_pool(bench_template(), ctx)
   let scheduler = bench_scheduler(ctx, pool)
-  let pattern = bench_jux_pattern()
+  let id = try! @identity.PatternNodeId::from_string("bench:jux")
+  let snapshot = try! @pattern.PatternDoc::from_pattern(
+    id~,
+    pat=bench_jux_pattern(),
+  ).lower()
+  scheduler.queue_playback_snapshot(
+    PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
-  b.bench(name="process_block_jux_rev", fn() {
-    scheduler.process_block(pattern, left, right)
+  b.bench(name="render_block_jux_rev", fn() {
+    scheduler.render_block(left, right)
     b.keep(left)
     b.keep(right)
   })
@@ -155,14 +165,18 @@ test "bench/entries/prepared_playback" (b : @bench.T) {
   ).lower()
   let left = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
   let right = @moondsp.AudioBuffer::filled(BENCH_BLOCK_SIZE)
-  scheduler.queue_pattern_snapshot(snapshot)
+  scheduler.queue_playback_snapshot(
+    PlaybackSnapshot::pattern(snapshot.playback()),
+  )
   scheduler.render_block(left, right)
   b.bench(name="prepared_two_materials_render", fn() {
     scheduler.render_block(left, right)
     b.keep(left)
   })
   b.bench(name="prepared_two_materials_accept_and_render", fn() {
-    scheduler.queue_pattern_snapshot(snapshot)
+    scheduler.queue_playback_snapshot(
+      PlaybackSnapshot::pattern(snapshot.playback()),
+    )
     scheduler.render_block(left, right)
     b.keep(left)
   })

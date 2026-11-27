@@ -1,25 +1,4 @@
 ///|
-/// Stage an authored snapshot for acceptance at the next render block. Each
-/// edited material keeps its current interval until its next source entry.
-pub fn PatternScheduler::queue_pattern_snapshot(
-  self : PatternScheduler,
-  snapshot : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
-) -> Unit {
-  self.queue_playback_snapshot(PlaybackSnapshot::untracked_pattern(snapshot))
-}
-
-///|
-/// Stage a lowered song snapshot for playback. The snapshot carries both the
-/// authoring revision and the narrower layout revision; both become observable
-/// at acceptance in the next block, before all material edits may be audible.
-pub fn PatternScheduler::queue_song_snapshot(
-  self : PatternScheduler,
-  snapshot : SongMaterial,
-) -> Unit {
-  self.queue_playback_snapshot(PlaybackSnapshot::song(snapshot))
-}
-
-///|
 /// Stage the next prepared playback snapshot. Pattern and song snapshots use
 /// the same pending slot; if several edits arrive before the next audio block,
 /// only the latest successfully prepared snapshot commits.
@@ -27,7 +6,7 @@ pub fn PatternScheduler::queue_playback_snapshot(
   self : PatternScheduler,
   snapshot : PlaybackSnapshot,
 ) -> Unit {
-  self.playback_state.queue(snapshot.raw())
+  self.playback_state.queue(snapshot.raw)
 }
 
 ///|
@@ -42,29 +21,11 @@ pub fn PatternScheduler::accept_playback_snapshot(
 }
 
 ///|
-/// The snapshot accepted by an explicit owner operation or render-block commit.
-///
-/// Its changed materials may still be waiting for their own entry boundaries.
-pub fn PatternScheduler::accepted_snapshot(
-  self : PatternScheduler,
-) -> PlaybackSnapshot? {
-  self.playback_state.inspect().current.map(PlaybackSnapshot::from_raw)
-}
-
-///|
-/// The latest snapshot queued for acceptance at the next render-block boundary.
-pub fn PatternScheduler::queued_snapshot(
-  self : PatternScheduler,
-) -> PlaybackSnapshot? {
-  self.playback_state.inspect().staged.map(PlaybackSnapshot::from_raw)
-}
-
-///|
 /// Accepted material changes still waiting for a reserved entry boundary.
 pub fn PatternScheduler::pending_material_change_count(
   self : PatternScheduler,
 ) -> Int32 {
-  self.playback_state.inspect().pending_materials
+  self.playback_state.pending_entry_count()
 }
 
 ///|
@@ -72,7 +33,7 @@ pub fn PatternScheduler::pending_material_change_count(
 pub fn PatternScheduler::skipped_material_change_count(
   self : PatternScheduler,
 ) -> Int32 {
-  self.playback_state.inspect().skipped_materials
+  self.playback_state.skipped_entry_count()
 }
 
 ///|
