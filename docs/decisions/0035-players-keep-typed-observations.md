@@ -39,7 +39,9 @@ and an offline renderer reading what played got the browser's wire format.
 3. **The browser host encodes.** `player_onset_count` / `player_signal_count`
    encode the recorded observations into preallocated rows, leaving out those
    the wire cannot carry and counting them in `player_*_dropped`. The browser
-   ABI, the row layout and the JavaScript readers are unchanged.
+   ABI, the row layout and the JavaScript readers are unchanged. Encoding
+   reads the event origin's atom, frame, start, binding path and sound, so the
+   host imports `pattern`; the boundary rule for `playback_host` allows it.
 
 ## Consequences
 

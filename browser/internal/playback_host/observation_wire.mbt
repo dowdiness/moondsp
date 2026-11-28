@@ -57,7 +57,11 @@ fn is_wire_safe(value : Int64) -> Bool {
 fn encode_onsets(onsets : @player.Onsets) -> Unit {
   onset_wire.reset()
   for index in 0..<onsets.count() {
-    if encode_onset(onset_wire.count, onsets, index) {
+    if encode_onset(
+        onset_wire.count,
+        onsets.sample(index),
+        onsets.source(index),
+      ) {
       onset_wire.count += 1
     } else {
       onset_wire.left_out += 1
@@ -66,12 +70,14 @@ fn encode_onsets(onsets : @player.Onsets) -> Unit {
 }
 
 ///|
-/// Write onset `index` of `onsets` as row `row`; false, writing no field,
-/// when the wire cannot carry it. A missing frame is serial 0 with start -1,
-/// and a drum hit has no pitch, which is NaN.
-fn encode_onset(row : Int32, onsets : @player.Onsets, index : Int32) -> Bool {
-  let sample = onsets.sample(index)
-  let source = onsets.source(index)
+/// Write the onset of `source` at `sample` as row `row`; false, writing no
+/// field, when the wire cannot carry it. A missing frame is serial 0 with
+/// start -1, and a drum hit has no pitch, which is NaN.
+fn encode_onset(
+  row : Int32,
+  sample : Int64,
+  source : @pattern.EventWithOrigin[@score.ScoreEvent],
+) -> Bool {
   let origin = source.origin()
   let epoch = origin.atom().epoch()
   guard is_wire_safe(sample) &&

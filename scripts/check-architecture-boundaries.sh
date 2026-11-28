@@ -154,8 +154,10 @@ check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(iden
 check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|score|scheduler/internal/model|voice))$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(score|player))$'
-# The browser adapter of the player: globals, wire decoding, diagnostics, samples.
-check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|player|score))$'
+# The browser adapter of the player: globals, wire decoding, diagnostics,
+# samples, and the wire rows of the events it observes, which it reads from
+# `pattern`'s event origins (ADR-0035).
+check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|pattern|player|score))$'
 
 # Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
 # mention @dsp types, but it must not publicly re-export DSP package types,
