@@ -11,10 +11,10 @@ fn wire_test_input(text : String) -> @mini.PlaybackInput raise {
 fn wire_test_snapshot(
   input : @mini.PlaybackInput,
 ) -> @pattern.TrackedPatternSnapshot[@score.ScoreEvent] raise {
-  match input.compile() {
-    Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) => snapshot
-    _ => fail("expected tracked pattern")
+  guard input.compile().material() is TrackedPattern(snapshot) else {
+    fail("expected tracked pattern")
   }
+  snapshot
 }
 
 ///|
@@ -96,7 +96,7 @@ test "wire capabilities cannot downgrade exact failure or forge song mode" {
     fail("expected text decode")
   }
   assert_true(runtime.version() is None)
-  assert_true(runtime.compile() is Ok(@mini.PreparedPlayback::Source(_)))
+  assert_true(runtime.compile().material() is UntrackedPattern(_))
 }
 
 ///|

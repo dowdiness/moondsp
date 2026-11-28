@@ -628,74 +628,88 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 }
 
 ///|
-/// A tracked pattern is lowered here; a parsed source (a tracked song or untracked text) is lowered by the player.
-pub(all) enum PreparedPlayback {
-  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent], Double)
-  Source(PlaySource)
+/// What a compiled input plays: lowered snapshots, tracked when the input
+/// carries source origins. A repeating song's `Bool` is true.
+pub(all) enum CompiledMaterial {
+  TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
+  UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
+  TrackedSong(
+    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    Bool,
+  )
+  UntrackedSong(
+    @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    Bool,
+  )
+}
+
+///|
+/// A compiled input: its material and the tempo its source declares.
+pub struct CompiledPlayback {
+  priv material : CompiledMaterial
+  priv bpm : Double
+}
+
+///|
+pub fn CompiledPlayback::material(self : CompiledPlayback) -> CompiledMaterial {
+  self.material
+}
+
+///|
+pub fn CompiledPlayback::bpm(self : CompiledPlayback) -> Double {
+  self.bpm
 }
 
 ///|
 /// Compile this frozen input, independently of any subsequent Draft edits.
-/// A failed tracked compilation never falls back to untracked playback.
+/// Text compiles untracked; a Draft's input compiles tracked and never falls
+/// back to untracked playback.
 pub fn PlaybackInput::compile(
   self : PlaybackInput,
   query_window? : @pattern.QueryWindow,
-) -> Result[PreparedPlayback, String] {
+) -> CompiledPlayback raise SourceProblem {
   match self.payload {
-    Text =>
-      parse_play_source(self.input, query_window?)
-      .map(source => Source(source))
-      .map_err(SourceProblem::to_string)
-    Song(_, origins) => {
-      let source = parse_play_source_with_origins(
-        self.input,
-        query_window,
-        origins=Some(origins),
-        syntax_depth_limit=Some(32),
-      ) catch {
-        problem => return Err(problem.to_string())
+    Text => {
+      let source = parse_untracked_source(self.input, query_window)
+      let material : CompiledMaterial = match source.body() {
+        Pattern(doc) =>
+          UntrackedPattern(doc.lower() catch { error => raise lowering(error) })
+        Arrangement(song, repeat) => UntrackedSong(song, repeat)
       }
-      guard source.body() is TrackedArrangement(_, _) else {
-        return Err("song input changed source mode")
-      }
-      Ok(Source(source))
+      { material, bpm: source.bpm(), }
     }
-    Pattern(_, origins) => {
-      let source = parse_play_source_with_origins(
-        self.input,
-        query_window,
-        origins=Some(origins),
-        syntax_depth_limit=Some(32),
-      ) catch {
-        problem => return Err(problem.to_string())
+    // The parse decides the shape: the payload's kind only selects tracked
+    // parsing, whether the Draft or the wire decoder set it.
+    Pattern(_, origins) | Song(_, origins) => {
+      let source = parse_tracked_source(self.input, query_window, origins)
+      let material : CompiledMaterial = match source.body() {
+        Pattern(doc) =>
+          TrackedPattern(
+            doc.lower_tracked() catch {
+              error => raise lowering(error)
+            },
+          )
+        Arrangement(song, repeat) => TrackedSong(song, repeat)
       }
-      guard source.body() is Pattern(doc) else {
-        return Err("tracked pattern input changed source mode")
-      }
-      try doc.lower_tracked() catch {
-        error => Err(draft_origin_error(error))
-      } noraise {
-        snapshot => Ok(TrackedPattern(snapshot, source.bpm()))
-      }
+      { material, bpm: source.bpm(), }
     }
   }
 }
 
 ///|
-fn draft_origin_error(error : @pattern.PatternDocError) -> String {
-  match error {
-    MissingNode(id) => "tracked compilation: missing node \{id}"
-    DuplicateNodeId(id) => "tracked compilation: duplicate node \{id}"
-    EmptyPatternDocs => "tracked compilation: empty document list"
-    InvalidSequenceWeights =>
-      "tracked compilation: invalid relative sequence weights"
-    MissingAtomOrigin(id) =>
-      "tracked compilation: missing atom origin \{id.value()}"
-    MissingReferenceBinding(id) =>
-      "tracked compilation: missing reference binding \{id.value()}"
-    UnsupportedControl(id) =>
-      "tracked compilation: unsupported control provider \{id.value()}"
+/// The parser rejects every source it cannot lower, so a lowering failure is
+/// a compiler bug.
+fn lowering(error : @pattern.PatternDocError) -> SourceProblem {
+  let message = match error {
+    MissingNode(id) => "missing node \{id}"
+    DuplicateNodeId(id) => "duplicate node \{id}"
+    EmptyPatternDocs => "empty document list"
+    InvalidSequenceWeights => "invalid relative sequence weights"
+    MissingAtomOrigin(id) => "missing atom origin \{id.value()}"
+    MissingReferenceBinding(id) => "missing reference binding \{id.value()}"
+    UnsupportedControl(id) => "unsupported control provider \{id.value()}"
   }
+  Internal("lowering: \{message}")
 }
 
 ///|
@@ -715,7 +729,10 @@ pub struct Draft {
 ///|
 priv enum DraftAnalysis {
   /// It parses and fits the player's window when that is known.
-  Playable(PlaySource, PlaybackPayload)
+  Playable(
+    PlaySource[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    PlaybackPayload,
+  )
   Rejected(DraftDiagnostic)
 }
 
@@ -767,12 +784,7 @@ fn draft_analysis(
     TrackingUnavailable =>
       return Rejected(DraftDiagnostic(at, OverLimit(Length)))
   }
-  let source = parse_play_source_with_origins(
-    input,
-    query_window,
-    origins=Some(sources),
-    syntax_depth_limit=Some(32),
-  ) catch {
+  let source = parse_tracked_source(input, query_window, sources) catch {
     problem => return Rejected(DraftDiagnostic(at, problem))
   }
   Playable(source, payload)

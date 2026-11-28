@@ -5,7 +5,7 @@ fn play_source_song() -> String {
 
 ///|
 test "play source parses a pattern with comments" {
-  let edited = @mini.parse_play_source("// header\ns(\"sd\") // tail").unwrap()
+  let edited = parse_play_source("// header\ns(\"sd\") // tail").unwrap()
   assert_eq(edited.bpm(), 120.0)
   match edited.body() {
     Pattern(_) => ()
@@ -15,7 +15,7 @@ test "play source parses a pattern with comments" {
 
 ///|
 test "play source parses bindings and default bpm" {
-  let pattern = @mini.parse_play_source("let beat = s(\"bd\"); beat").unwrap()
+  let pattern = parse_play_source("let beat = s(\"bd\"); beat").unwrap()
   assert_eq(pattern.bpm(), 120.0)
   match pattern.body() {
     Pattern(_) => ()
@@ -25,7 +25,7 @@ test "play source parses bindings and default bpm" {
 
 ///|
 test "play source accepts silence pattern" {
-  let parsed = @mini.parse_play_source("silence()").unwrap()
+  let parsed = parse_play_source("silence()").unwrap()
   match parsed.body() {
     Pattern(_) => ()
     _ => fail("expected pattern")
@@ -35,30 +35,30 @@ test "play source accepts silence pattern" {
 ///|
 test "play source parses arrangement declaration and repeat marker" {
   let source = "bpm(96); // authored tempo\n" + play_source_song() + ".repeat()"
-  let parsed = @mini.parse_play_source(source).unwrap()
+  let parsed = parse_play_source(source).unwrap()
   assert_eq(parsed.bpm(), 96.0)
   match parsed.body() {
-    UntrackedArrangement(_, repeats) => assert_true(repeats)
+    Arrangement(_, repeats) => assert_true(repeats)
     _ => fail("expected arrangement")
   }
-  let finite = @mini.parse_play_source(play_source_song()).unwrap()
+  let finite = parse_play_source(play_source_song()).unwrap()
   match finite.body() {
-    UntrackedArrangement(_, repeats) => assert_false(repeats)
+    Arrangement(_, repeats) => assert_false(repeats)
     _ => fail("expected arrangement")
   }
 }
 
 ///|
 test "play source rejects empty and duplicate tempo declarations" {
-  assert_true(@mini.parse_play_source("") is Err(_))
+  assert_true(parse_play_source("") is Err(_))
   assert_true(
-    @mini.parse_play_source(
+    parse_play_source(
       "bpm(90); song(bpm(120),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
     )
     is Err(_),
   )
   assert_true(
-    @mini.parse_play_source(
+    parse_play_source(
       "song(bpm(90),bpm(120),section(\"a\",1,s(\"bd\")),part(\"a1\",\"a\"))",
     )
     is Err(_),
@@ -68,7 +68,7 @@ test "play source rejects empty and duplicate tempo declarations" {
 ///|
 test "play source problems say whether the author made a mistake or exceeded a limit" {
   let problem = (source : String) => {
-    match @mini.parse_play_source(source) {
+    match parse_play_source(source) {
       Ok(_) => None
       Err(problem) => Some(problem)
     }
@@ -92,7 +92,7 @@ test "play source problems say whether the author made a mistake or exceeded a l
   // Valid but too deep for playback: a limit, with no position to blame.
   let nested = "note(\"" + "[".repeat(40) + "60" + "]".repeat(40) + "\")"
   assert_true(
-    @mini.parse_play_source(nested, query_window=calibrated_window())
+    parse_play_source(nested, query_window=calibrated_window())
     is Err(OverLimit(Nesting(32))),
   )
 }
@@ -100,10 +100,7 @@ test "play source problems say whether the author made a mistake or exceeded a l
 ///|
 test "bounded play source preserves ordinary musical output" {
   let source = "let beat = note(\"60 64\"); beat.fast(2)"
-  let bounded = @mini.parse_play_source(
-    source,
-    query_window=calibrated_window(),
-  ).unwrap()
+  let bounded = parse_play_source(source, query_window=calibrated_window()).unwrap()
   guard bounded.body() is Pattern(doc) else { fail("expected pattern") }
   let snapshot = doc.lower()
   let events = snapshot
@@ -128,8 +125,7 @@ test "bounded play source rejects amplification before querying future branches"
   ]
   for source in sources {
     assert_true(
-      @mini.parse_play_source(source, query_window=calibrated_window())
-      is Err(_),
+      parse_play_source(source, query_window=calibrated_window()) is Err(_),
     )
   }
 }
@@ -137,21 +133,15 @@ test "bounded play source rejects amplification before querying future branches"
 ///|
 test "bounded play source prevents eager Euclidean allocation" {
   assert_true(
-    @mini.parse_play_source(
-      "s(\"bd(1,128)\")",
-      query_window=calibrated_window(),
-    )
+    parse_play_source("s(\"bd(1,128)\")", query_window=calibrated_window())
     is Ok(_),
   )
   assert_true(
-    @mini.parse_play_source(
-      "s(\"bd(1,129)\")",
-      query_window=calibrated_window(),
-    )
+    parse_play_source("s(\"bd(1,129)\")", query_window=calibrated_window())
     is Err(_),
   )
   assert_true(
-    @mini.parse_play_source(
+    parse_play_source(
       "song(section(\"a\",1,s(\"bd(1,100000)\")),part(\"a1\",\"a\"))",
       query_window=calibrated_window(),
     )
@@ -163,23 +153,20 @@ test "bounded play source prevents eager Euclidean allocation" {
 test "bounded play source accounts for cumulative layers and repeated occurrences" {
   let layer = "note(\"60\").fast(1000)"
   assert_true(
-    @mini.parse_play_source(layer, query_window=calibrated_window()) is Ok(_),
+    parse_play_source(layer, query_window=calibrated_window()) is Ok(_),
   )
   let layers = Array::make(6, layer).join(" + ")
   assert_true(
-    @mini.parse_play_source(layers, query_window=calibrated_window()) is Err(_),
+    parse_play_source(layers, query_window=calibrated_window()) is Err(_),
   )
   let song = "song(section(\"a\",1," +
     layer +
     "),part(\"a1\",\"a\"),part(\"a2\",\"a\"),part(\"a3\",\"a\"))"
   assert_true(
-    @mini.parse_play_source(song, query_window=calibrated_window()) is Ok(_),
+    parse_play_source(song, query_window=calibrated_window()) is Ok(_),
   )
   assert_true(
-    @mini.parse_play_source(
-      song + ".repeat()",
-      query_window=calibrated_window(),
-    )
+    parse_play_source(song + ".repeat()", query_window=calibrated_window())
     is Err(_),
   )
 }
@@ -188,24 +175,43 @@ test "bounded play source accounts for cumulative layers and repeated occurrence
 test "bounded play source rejects source size and recursive depth before parsing" {
   let window = calibrated_window()
   let oversized = "note(\"60\")" + Array::make(8192, " ").join("")
-  assert_true(@mini.parse_play_source(oversized, query_window=window) is Err(_))
+  assert_true(parse_play_source(oversized, query_window=window) is Err(_))
   let nested = Array::make(40, "(").join("") +
     "note(\"60\")" +
     Array::make(40, ")").join("")
-  assert_true(@mini.parse_play_source(nested, query_window=window) is Err(_))
+  assert_true(parse_play_source(nested, query_window=window) is Err(_))
   let misleading_comment = "// " + Array::make(40, ")").join("") + "\n"
   assert_true(
-    @mini.parse_play_source(misleading_comment + nested, query_window=window)
+    parse_play_source(misleading_comment + nested, query_window=window)
     is Err(_),
   )
   assert_true(
-    @mini.parse_play_source("// ((( ignored\nnote(\"60\")", query_window=window)
+    parse_play_source("// ((( ignored\nnote(\"60\")", query_window=window)
     is Ok(_),
   )
 }
 
 ///|
-/// The 2/45-cycle window these admission bounds are calibrated against.
-fn calibrated_window() -> @pattern.QueryWindow {
-  @pattern.QueryWindow::from_span(@pattern.Rational(2L, 45L)).unwrap()
+/// The pitch `event` plays, if it is a note.
+fn pitch_of(event : @score.ScoreEvent) -> Double? {
+  match event.sound {
+    Note(_, pitch~) | Play(_, pitch~) => Some(pitch)
+    Hit(_) => None
+  }
+}
+
+///|
+/// `input` parsed as untracked text, as a result.
+fn parse_play_source(
+  input : String,
+  query_window? : @pattern.QueryWindow,
+) -> Result[
+  PlaySource[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  SourceProblem,
+] {
+  try parse_untracked_source(input, query_window) catch {
+    problem => Err(problem)
+  } noraise {
+    source => Ok(source)
+  }
 }

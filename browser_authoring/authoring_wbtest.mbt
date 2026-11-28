@@ -224,8 +224,7 @@ test "onset lookup keeps exact references but retires edited literal geometry" {
   guard draft.prepare_playback() is Ok(input) else {
     fail("expected prepared exact pattern")
   }
-  guard input.compile()
-    is Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) else {
+  guard input.compile().material() is TrackedPattern(snapshot) else {
     fail("expected compiled exact pattern")
   }
   let arc = @pattern.TimeSpan(
@@ -312,7 +311,7 @@ test "negative pitch is distinct from an unpitched drum onset" {
     ] {
     let draft = @mini.Draft(text)
     guard draft.prepare_playback() is Ok(input) &&
-      input.compile() is Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) else {
+      input.compile().material() is TrackedPattern(snapshot) else {
       fail("expected tracked playback: \{draft_state(draft)}")
     }
     let event = snapshot.query(

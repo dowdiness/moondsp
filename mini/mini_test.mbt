@@ -71,7 +71,7 @@ test "relative duration weights reject invalid values and excessive sums" {
   // The sum is a rule of the language: the step that goes over is a mistake.
   let sixteen_full_steps = "note(\"C4@16 D4@16 E4@16 F4@16 G4@16 A4@16 B4@16 C5@16 D5@16 E5@16 F5@16 G5@16 A5@16 B5@16 C6@16 D6@16 "
   let source = sixteen_full_steps + "E6@16\")"
-  guard @mini.parse_play_source(source) is Err(Mistake(at, _)) else {
+  guard compile_text(source) is Err(Mistake(at, _)) else {
     fail("expected a mistake")
   }
   assert_eq(at, sixteen_full_steps.length())
@@ -587,11 +587,10 @@ fn draft_snapshot(
     Ok(input) => input
     Err(diagnostic) => fail(diagnostic.problem().to_string())
   }
-  match input.compile() {
-    Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) => snapshot
-    Ok(_) => fail("expected tracked pattern")
-    Err(message) => fail(message)
+  guard input.compile().material() is TrackedPattern(snapshot) else {
+    fail("expected tracked pattern")
   }
+  snapshot
 }
 
 ///|
@@ -666,8 +665,7 @@ test "Draft same-text replacement is causal and frozen input is immutable" {
   assert_eq(old[1].origin(), fresh[1].origin())
   assert_true(draft.locate_origin(old[0].origin()) is Unavailable(AtomRetired))
   assert_eq(input.version(), Some(version))
-  guard input.compile()
-    is Ok(@mini.PreparedPlayback::TrackedPattern(retained, _)) else {
+  guard input.compile().material() is TrackedPattern(retained) else {
     fail("frozen compilation failed")
   }
   assert_eq(retained.query(draft_arc())[0].origin(), old[0].origin())
@@ -1009,11 +1007,12 @@ test "Draft exact lowering preserves music material and graph scopes" {
     ] {
     let draft = @mini.Draft(text)
     let exact = draft_snapshot(draft)
-    guard @mini.parse_play_source(text) is Ok(source) else {
+    guard compile_text(text) is Ok(compiled) else {
       fail("general parse failed")
     }
-    guard source.body() is Pattern(doc) else { fail("expected pattern") }
-    let general = doc.lower()
+    guard compiled.material() is UntrackedPattern(general) else {
+      fail("expected pattern")
+    }
     let span = song_span(0L, 1L, 4L, 1L)
     let actual = exact.query(span)
     let expected = general.query_sourced_events(span)
@@ -1113,8 +1112,7 @@ test "resetting a Draft does not invalidate a separately frozen playback input" 
   let origin = draft_snapshot(draft).query(draft_arc())[0].origin()
   assert_true(draft.reset("note(\"62\")") is Ok(_))
   assert_true(draft.locate_origin(origin) is Unavailable(SourceReset))
-  guard input.compile()
-    is Ok(@mini.PreparedPlayback::TrackedPattern(snapshot, _)) else {
+  guard input.compile().material() is TrackedPattern(snapshot) else {
     fail("frozen input was invalidated")
   }
   assert_eq(snapshot.query(draft_arc())[0].origin(), origin)
@@ -1130,15 +1128,13 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
   guard draft.prepare_playback() is Ok(input) else {
     fail("valid song preparation failed")
   }
-  guard input.compile() is Ok(@mini.PreparedPlayback::Source(source)) else {
-    fail("song must use runtime capability")
-  }
-  assert_eq(source.bpm(), 72.0)
-  guard source.body() is TrackedArrangement(song, repeating) else {
-    fail("expected tracked arrangement")
+  let compiled = input.compile()
+  assert_eq(compiled.bpm(), 72.0)
+  guard compiled.material() is TrackedSong(song, repeating) else {
+    fail("expected tracked song")
   }
   assert_true(repeating)
-  assert_eq(drum_of(song.query(draft_arc())[0].value), Some("bd"))
+  assert_eq(drum_of(song.song().query(draft_arc())[0].value), Some("bd"))
   assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
   edit_draft(draft, 0, text.length(), "/*")
   assert_true(draft.state().tracking() is Song)
@@ -1150,11 +1146,10 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
   )
   let untracked = @mini.PlaybackInput::text("note(\"62\")")
   assert_true(untracked.version() is None)
-  guard untracked.compile() is Ok(@mini.PreparedPlayback::Source(raw)) else {
+  guard untracked.compile().material() is UntrackedPattern(snapshot) else {
     fail("text input must be explicitly untracked")
   }
-  guard raw.body() is Pattern(doc) else { fail("expected runtime pattern") }
-  assert_eq(pitch_of(doc.lower().query(draft_arc())[0].value), Some(62.0))
+  assert_eq(pitch_of(snapshot.query(draft_arc())[0].value), Some(62.0))
 }
 
 ///|
@@ -2367,7 +2362,7 @@ test "every vocabulary call parses as it describes its arguments" {
         [..required, ..optional, ..repeated],
       ] {
       let source = written_in_position(call, arguments)
-      assert_true(@mini.parse_play_source(source) is Ok(_), msg=source)
+      assert_true(compile_text(source) is Ok(_), msg=source)
     }
   }
 }
@@ -2379,7 +2374,7 @@ test "every vocabulary sample plays through s and .s" {
   for sample in samples {
     for
       source in ["s(\"\{sample.name}\")", "note(\"C4\").s(\"\{sample.name}\")"] {
-      assert_true(@mini.parse_play_source(source) is Ok(_), msg=source)
+      assert_true(compile_text(source) is Ok(_), msg=source)
     }
   }
 }
@@ -2401,7 +2396,7 @@ test "unknown names are errors that list their position's names" {
       ("+", "expected 's(', 'note(', 'chord(', 'silence()', 'stack(', or '('"),
     ] {
     let (source, message) = case
-    match @mini.parse_play_source(source) {
+    match compile_text(source) {
       Err(problem) =>
         assert_true(
           problem.to_string().contains(message),
@@ -2536,4 +2531,16 @@ test "a signal keeps its identity across unrelated edits and loses it when its o
     ),
   )
   assert_true(draft.locate_signal_fields(epoch, serial) is None)
+}
+
+///|
+/// `source` compiled as untracked text.
+fn compile_text(
+  source : String,
+) -> Result[@mini.CompiledPlayback, @mini.SourceProblem] {
+  try @mini.PlaybackInput::text(source).compile() catch {
+    problem => Err(problem)
+  } noraise {
+    compiled => Ok(compiled)
+  }
 }

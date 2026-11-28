@@ -32,9 +32,7 @@ pub fn PlayerError::message(Self) -> String
 
 #derive(Eq, @debug.Debug)
 pub suberror ScoreError {
-  InvalidSource(String)
-  PatternLowering(@pattern.PatternDocError)
-  SongLowering(String)
+  InvalidSource(@mini.SourceProblem)
   Tempo(TempoOutOfRange)
   EmptySong
 }

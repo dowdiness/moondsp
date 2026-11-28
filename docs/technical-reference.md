@@ -1637,7 +1637,7 @@ therefore cannot bypass admission. The same canonical conversion checks repeat
 periods without reconstructing millibpm in the browser host. Limits also apply
 to intermediate expressions and can reject sources whose final transform would
 reduce their cost. Direct Mini parsers remain unrestricted unless
-`parse_play_source(..., query_window=window)` is requested.
+`PlaybackInput::compile(query_window=window)` is requested.
 
 The scheduler owns the window. `@scheduler.max_query_window_for(sample_rate~,
 block_size~)` returns a `@pattern.QueryWindow`, which is always positive, or

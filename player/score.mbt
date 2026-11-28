@@ -93,16 +93,6 @@ pub fn[C : @song.SongContent] Score::song(
 }
 
 ///|
-/// Lower a parsed song for playback.
-fn[C : @song.SongContent] lowered_song(
-  song : @song.Song[C],
-) -> @song.SongSnapshot[C] raise ScoreError {
-  song_update_snapshot(song) catch {
-    error => raise SongLowering(error.to_string())
-  }
-}
-
-///|
 /// A tempo a player can play: 0.001..1000 BPM.
 pub struct Tempo {
   priv value : @scheduler.Tempo
@@ -137,59 +127,4 @@ fn[C] song_layout(song : @song.Song[C], repeated : Bool) -> PlaybackLayout {
     }),
     repeated,
   )
-}
-
-///|
-fn[C] live_section_doc_body(
-  body : @song.SectionBody[C],
-) -> @song.SectionDocBody[C] raise {
-  match body {
-    Single(content) =>
-      @song.SectionDocBody::single(
-        @song.SectionLayerDoc(
-          id=@identity.SectionLayerId::from_string("live:body"),
-          name="main",
-          body=content,
-        ),
-      )
-    Layers(layers) => {
-      let docs : Array[@song.SectionLayerDoc[C]] = []
-      for layer in layers {
-        docs.push(
-          @song.SectionLayerDoc(
-            id=@identity.SectionLayerId::from_string(
-              "live:layer:" + layer.name(),
-            ),
-            name=layer.name(),
-            body=layer.body(),
-          ),
-        )
-      }
-      @song.SectionDocBody::layers(docs)
-    }
-  }
-}
-
-///|
-fn[C : @song.SongContent] song_update_snapshot(
-  song : @song.Song[C],
-) -> @song.SongSnapshot[C] raise {
-  let parts = song
-    .occurrences()
-    .map(o => {
-      let section = @song.SectionDoc(
-        id=@identity.SectionId::from_string("live:" + o.id().value()),
-        name=o.section().name(),
-        length_cycles=o.section().length_cycles(),
-        scope=o.section().scope(),
-        body=live_section_doc_body(o.section().section_body()),
-      )
-      @song.SongOccurrenceDoc::at(
-        id=o.id(),
-        start=o.start(),
-        name=o.name(),
-        section~,
-      )
-    })
-  @song.SongDoc(parts~).lower()
 }
