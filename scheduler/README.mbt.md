@@ -117,7 +117,7 @@ The Player-owner cutover removes the following APIs without compatibility aliase
 | Removed API | Replacement |
 |---|---|
 | `normalize_bpm(value)` | `Tempo::from_bpm(value)` returns `Result[Tempo, TransportError]`; read the normalized value with `Tempo::bpm()` |
-| `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` or `set_tempo(tempo, end_?)` and handle its transactional `Result` |
+| `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` or `set_tempo(tempo)` and handle its transactional `Result` |
 
 
 `Tempo::from_bpm` validates and normalizes a number, not a running clock's

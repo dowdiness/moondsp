@@ -250,27 +250,24 @@ fn score_tempo(bpm : Double) -> Tempo raise ScoreError {
 }
 
 ///|
-/// Whether `score` can play at `tempo` on this player: a repeated song lasts
-/// at least one block, and a finite song's end lies within the transport.
+/// Whether `score` can play at `tempo` on this player; the scheduler decides.
 fn Player::check_fits(
   self : Player,
   score : Score,
   tempo : @scheduler.Tempo,
 ) -> Unit raise PlayerError {
-  let sample_rate = self.context.sample_rate()
-  match score.span {
-    Continuous => ()
-    Repeating(period) => {
-      guard tempo.span_for_samples(self.context.block_size(), sample_rate~)
-        is Ok(block_span) else {
-        raise TransportRange
-      }
-      guard period >= block_span else { raise RepeatShorterThanBlock }
-    }
-    Finite(end_) =>
-      if tempo.sample_at_start(end_, sample_rate~) is Err(_) {
-        raise SongEndOutOfRange
-      }
+  match self.scheduler.check_fits(score.snapshot, tempo) {
+    Ok(_) => ()
+    Err(error) => raise fit_error(error)
+  }
+}
+
+///|
+fn fit_error(error : @scheduler.PlaybackFitError) -> PlayerError {
+  match error {
+    RepetitionShorterThanBlock => RepeatShorterThanBlock
+    EndOutOfRange => SongEndOutOfRange
+    Transport(_) => TransportRange
   }
 }
 
@@ -306,9 +303,9 @@ fn Player::install(
       score.tempo,
       material_limit=PLAYBACK_MATERIAL_LIMIT,
       restart~,
-      end_?=score.finite_end(),
     ) {
     Err(ArrangementChanged) => raise RestartRequired
+    Err(Unfit(error)) => raise fit_error(error)
     Err(MaterialLimit) => raise TooManyRetainedMaterials
     Err(Transport(_)) => raise TransportRange
     Ok(_) => ()
@@ -432,13 +429,12 @@ pub fn Player::process(
     left.set(i, (left.get(i) + self.wet_left.get(i)) * self.gain)
     right.set(i, (right.get(i) + self.wet_right.get(i)) * self.gain)
   }
-  if self.session is Playing(score) && score.finite_end() is Some(end_) {
-    let scheduler = self.scheduler
-    match scheduler.sample_at(end_) {
-      Ok(end_sample) if scheduler.sample_counter() >= end_sample =>
-        self.session = Ended(score, end_sample, end_.to_double())
-      Ok(_) => ()
-      Err(_) => {
+  if self.session is Playing(score) {
+    match self.scheduler.song_end() {
+      Ahead => ()
+      Reached(sample, position) =>
+        self.session = Ended(score, sample, position.to_double())
+      Unreachable => {
         self.session = Fault(SongEndUnreachable)
         return Some(Faulted(SongEndUnreachable))
       }
@@ -455,15 +451,14 @@ pub fn Player::set_tempo(
   tempo : Tempo,
 ) -> Unit raise PlayerError {
   let tempo = tempo.value
+  // A Ready or Ended score is not installed yet; it must fit as well.
   if self.session.score() is Some(score) {
     self.check_fits(score, tempo)
   }
-  let end_ = match self.session.score() {
-    Some(score) => score.finite_end()
-    None => None
-  }
-  guard self.scheduler.set_tempo(tempo, end_?) is Ok(_) else {
-    raise TransportRange
+  match self.scheduler.set_tempo(tempo) {
+    Ok(_) => ()
+    Err(Transport(_)) => raise TransportRange
+    Err(error) => raise fit_error(error)
   }
   if self.session.score() is Some(score) {
     let next = { ..score, tempo, }
@@ -504,12 +499,7 @@ pub fn Player::state(self : Player) -> PlayState {
 pub fn Player::mode(self : Player) -> ScoreKind? {
   self.session
   .score()
-  .map(score => {
-    match score.span {
-      Continuous => Pattern
-      Finite(_) | Repeating(_) => Song
-    }
-  })
+  .map(score => if score.snapshot.is_song() { Song } else { Pattern })
 }
 
 ///|

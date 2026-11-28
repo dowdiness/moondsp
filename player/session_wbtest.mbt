@@ -242,11 +242,11 @@ test "workload rejection preserves the accepted song voices and all clocks" {
 test "unrepresentable finite endpoints reject before publication or restart" {
   let player = test_player(sample_rate=192000.0)
   let invalid = "bpm(0.001); song(section(\"a\",2000000000,silence()),part(\"p\",\"a\"))"
-  assert_rejected(submit(player, invalid, restart=false))
+  assert_true(submit(player, invalid, restart=false) is Some(SongEndOutOfRange))
   assert_eq(player.state(), Empty)
   assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
-  assert_rejected(submit(player, invalid))
+  assert_true(submit(player, invalid) is Some(SongEndOutOfRange))
   assert_position(player, 1024)
   assert_tempo(player, 120.0)
   assert_accepted(player, HELD_NOTE)
@@ -267,7 +267,7 @@ test "repeat admission rejects sub-block cycles without replacing music" {
   assert_true(submit(player, HELD_NOTE) is None)
   render_blocks(player, 8)
   let too_short = "bpm(1000); song(section(\"a\",1/100000,silence()),part(\"p\",\"a\")).repeat()"
-  assert_rejected(submit(player, too_short))
+  assert_true(submit(player, too_short) is Some(RepeatShorterThanBlock))
   assert_position(player, 1024)
   assert_tempo(player, 120.0)
   assert_accepted(player, HELD_NOTE)
@@ -283,8 +283,11 @@ test "one-block repeat is valid but faster source and demo tempos reject" {
   render_blocks(player, 4)
   assert_eq(player.state(), Playing)
   assert_position(player, 512)
-  assert_rejected(submit(player, "bpm(120.001); " + body, restart=false))
-  assert_rejected(set_tempo(player, 120.001))
+  assert_true(
+    submit(player, "bpm(120.001); " + body, restart=false)
+    is Some(RepeatShorterThanBlock),
+  )
+  assert_true(set_tempo(player, 120.001) is Some(RepeatShorterThanBlock))
   assert_tempo(player, 120.0)
   assert_accepted(player, body)
   render_blocks(player, 4)

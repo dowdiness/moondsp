@@ -439,3 +439,69 @@ test "a section's rate is content, its occurrences are arrangement" {
     is Ok(_),
   )
 }
+
+///|
+test "the scheduler reports reaching the accepted song's finite end" {
+  let (sched, _, left, right) = transport_fixture(sample_rate=128.0)
+  // Half a cycle at 120 BPM is one second, one block at 128 Hz.
+  let song = single_span(
+    @pattern.Rational::from_int(0),
+    @pattern.Rational(1L, 2L),
+  )
+  sched.accept_playback_snapshot(song)
+  assert_true(sched.song_end() is Ahead)
+  sched.render_block(left, right)
+  guard sched.song_end() is Reached(sample, position) else {
+    fail("expected the end to be reached")
+  }
+  assert_eq(sample, 128L)
+  assert_eq(position, @pattern.Rational(1L, 2L))
+  // A pattern has no finite end.
+  sched.accept_playback_snapshot(
+    @scheduler.PlaybackSnapshot::pattern(
+      @pattern.PatternDoc::from_pattern(
+        id=@identity.PatternNodeId::from_string("end:pattern"),
+        pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
+      )
+      .lower()
+      .playback(),
+    ),
+  )
+  assert_true(sched.song_end() is Ahead)
+}
+
+///|
+test "fit is checked from the snapshot: repetition and finite end" {
+  let (sched, _, _, _) = transport_fixture()
+  let tempo = @scheduler.Tempo::from_bpm(120.0).unwrap()
+  let fast = @scheduler.Tempo::from_bpm(1000.0).unwrap()
+  // A 1/750-cycle repetition is one block at 120 BPM and less at 1000.
+  let section = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("fit"),
+    name="fit",
+    length_cycles=@pattern.Rational(1L, 750L),
+    scope=@song.TimeScope::identity(),
+    layer_id=@identity.SectionLayerId::from_string("main"),
+    body=@pattern.PatternDoc::from_pattern(
+      id=@identity.PatternNodeId::from_string("fit"),
+      pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
+    ).lower(),
+  )
+  let repeating = @scheduler.PlaybackSnapshot::song(
+    @song.SongDoc(parts=[
+      @song.SongOccurrenceDoc(
+        id=@identity.OccurrenceId::from_string("fit"),
+        name="fit",
+        section~,
+      ),
+    ]).lower(),
+    repeat=true,
+  )
+  assert_true(sched.check_fits(repeating, tempo) is Ok(_))
+  assert_true(
+    sched.check_fits(repeating, fast) is Err(RepetitionShorterThanBlock),
+  )
+  sched.accept_playback_snapshot(repeating)
+  assert_true(sched.set_tempo(fast) is Err(RepetitionShorterThanBlock))
+  assert_eq(sched.bpm(), 120.0)
+}

@@ -54,7 +54,7 @@ pub struct PatternScheduler {
   // private fields
 }
 pub fn PatternScheduler::PatternScheduler(bpm~ : Double, ctx~ : @dsp.DspContext, pools~ : Array[@voice.BoundVoicePool], route~ : (@score.Sound) -> Int32) -> Self raise @transport.TransportError
-pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int32, restart? : Bool, end_? : @pattern.Rational) -> Result[Unit, PlaybackAdmissionError]
+pub fn PatternScheduler::accept_playback(Self, PlaybackSnapshot, Tempo, material_limit~ : Int32, restart? : Bool) -> Result[Unit, PlaybackAdmissionError]
 pub fn PatternScheduler::accept_playback_snapshot(Self, PlaybackSnapshot) -> Unit
 pub fn PatternScheduler::active_note_count(Self) -> Int32
 pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
@@ -62,6 +62,7 @@ pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, Ac
 pub fn PatternScheduler::attach_onset_buffer(Self, OnsetBuffer) -> Unit
 pub fn PatternScheduler::attach_signal_buffer(Self, SignalBuffer) -> Unit
 pub fn PatternScheduler::bpm(Self) -> Double
+pub fn PatternScheduler::check_fits(Self, PlaybackSnapshot, Tempo) -> Result[Unit, PlaybackFitError]
 pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
 pub fn PatternScheduler::cycle_position(Self) -> Double
 pub fn PatternScheduler::expire_notes(Self, @pattern.TimeSpan) -> Result[Unit, @transport.TransportError]
@@ -79,9 +80,10 @@ pub fn PatternScheduler::reset_transport(Self) -> Unit
 pub fn PatternScheduler::reset_transport_and_kill_notes(Self) -> Unit
 pub fn PatternScheduler::sample_at(Self, @pattern.Rational) -> Result[Int64, @transport.TransportError]
 pub fn PatternScheduler::sample_counter(Self) -> Int64
-pub fn PatternScheduler::set_bpm(Self, Double) -> Result[Unit, @transport.TransportError]
-pub fn PatternScheduler::set_tempo(Self, Tempo, end_? : @pattern.Rational) -> Result[Unit, @transport.TransportError]
+pub fn PatternScheduler::set_bpm(Self, Double) -> Result[Unit, PlaybackFitError]
+pub fn PatternScheduler::set_tempo(Self, Tempo) -> Result[Unit, PlaybackFitError]
 pub fn PatternScheduler::skipped_material_change_count(Self) -> Int32
+pub fn PatternScheduler::song_end(Self) -> SongEnd
 
 #derive(Eq, @debug.Debug)
 pub struct PatternVoiceScope {
@@ -99,13 +101,25 @@ pub fn PerformanceTime::PerformanceTime(Int64) -> Self
 
 pub(all) enum PlaybackAdmissionError {
   ArrangementChanged
+  Unfit(PlaybackFitError)
   MaterialLimit
   Transport(@transport.TransportError)
 }
 
+#derive(Eq, @debug.Debug)
+pub(all) enum PlaybackFitError {
+  RepetitionShorterThanBlock
+  EndOutOfRange
+  Transport(@transport.TransportError)
+}
+pub fn PlaybackFitError::equal(Self, Self) -> Bool
+pub fn PlaybackFitError::not_equal(Self, Self) -> Bool
+pub fn PlaybackFitError::to_repr(Self) -> @debug.Repr
+
 pub struct PlaybackSnapshot {
   // private fields
 }
+pub fn PlaybackSnapshot::is_song(Self) -> Bool
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
@@ -120,6 +134,12 @@ pub fn SignalBuffer::count(Self) -> Int32
 pub fn SignalBuffer::dropped(Self) -> Double
 pub fn SignalBuffer::enable(Self, Bool) -> Unit
 pub fn SignalBuffer::field(Self, Int32, Int32) -> Double
+
+pub(all) enum SongEnd {
+  Ahead
+  Reached(Int64, @pattern.Rational)
+  Unreachable
+}
 
 #derive(Eq, @debug.Debug)
 pub struct SongVoiceScope {

@@ -69,3 +69,8 @@ Song layout revisions cannot stand for "same layout": Mini lowers a fresh
 - `PlaybackSnapshot::revision` and `song_layout_revision`, and
   `PlaybackPattern::revision`, which only tests read, are deleted.
 - Status code `2` keeps its meaning, for fewer edits.
+- [Issue #306] The scheduler also owns how long the accepted song plays:
+  `check_fits` (a repetition lasts a block, a finite end is representable),
+  `accept_playback` and `set_tempo` check the snapshot's own finite end, and
+  `song_end` reports reaching it. The player's `Score.span` and the `end_?`
+  arguments are gone.

@@ -16,8 +16,11 @@ import {
 pub struct PlaybackSnapshot {
   // private fields
 }
+pub fn PlaybackSnapshot::finite_end(Self) -> @pattern.Rational?
+pub fn PlaybackSnapshot::is_song(Self) -> Bool
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
+pub fn PlaybackSnapshot::period(Self) -> @pattern.Rational?
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.SongSnapshot[C], repeat? : Bool) -> Self
 
@@ -35,8 +38,10 @@ pub struct PlaybackState {
 pub fn PlaybackState::PlaybackState() -> Self
 pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
 pub fn PlaybackState::continues_as(Self, PlaybackSnapshot) -> Bool
+pub fn PlaybackState::finite_end(Self) -> @pattern.Rational?
 pub fn PlaybackState::has_pending(Self) -> Bool
 pub fn PlaybackState::install_acceptance(Self, Self) -> Unit
+pub fn PlaybackState::latest(Self) -> PlaybackSnapshot?
 pub fn PlaybackState::pending_entry_count(Self) -> Int32
 pub fn PlaybackState::prepare_acceptance(Self, PlaybackSnapshot, @pattern.Rational, material_limit~ : Int32, restart~ : Bool) -> Self?
 pub fn PlaybackState::query_active_sourced_events(Self, @pattern.TimeSpan) -> Array[PlaybackSourcedEvent]
