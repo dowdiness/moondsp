@@ -50,3 +50,4 @@ shipped plan or spec.
 - [ADR-0030 — Players accept scores, from text or from content](0030-players-accept-scores.md) (Accepted)
 - [ADR-0031 — Playback takes one view of a pattern, whatever tracks it](0031-playback-material-is-one-view.md) (Accepted)
 - [ADR-0032 — A Mini song's sections and parts are identified by their names](0032-mini-song-identities-are-their-names.md) (Accepted)
+- [ADR-0033 — The scheduler decides whether a song can replace the playing one](0033-the-scheduler-decides-what-continues.md) (Accepted)

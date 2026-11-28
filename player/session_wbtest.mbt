@@ -157,7 +157,7 @@ test "paused Update commits tempo and Current song without advancing" {
 }
 
 ///|
-test "layout rejection changes neither tempo nor Current song" {
+test "an arrangement rejection changes neither tempo nor Current song" {
   let player = test_player()
   let original = test_song(length=8, bpm=120)
   let changed = test_song(length=9, bpm=90)
@@ -363,4 +363,59 @@ test "a fade added by a live edit starts where the edit enters" {
   let middle = cycle_energy(player, rendered, 11)
   assert_true(middle < first * 0.7 && middle > full * 0.1)
   assert_true(cycle_energy(player, rendered, 14) < full * 0.001)
+}
+
+///|
+test "an update that would leave started occurrences silent needs a restart" {
+  let song = "song(section(\"a\",8,note(\"60\")),part(\"a1\",\"a\"))"
+  for
+    (before, after) in [
+      // A started finite occurrence never joins midway: the song would be
+      // silent, and the pattern it replaced would stop.
+      ("note(\"50\")", song),
+      // Repeating or not, and how long a repetition lasts, place every
+      // occurrence anew.
+      (song, song + ".repeat()"),
+      (
+        song + ".repeat()",
+        "song(section(\"a\",6,note(\"60\")),part(\"a1\",\"a\")).repeat()",
+      ),
+      // Another part id places another occurrence.
+      (song, "song(section(\"a\",8,note(\"60\")),part(\"a2\",\"a\"))"),
+    ] {
+    let player = test_player()
+    assert_true(submit(player, before) is None)
+    render_blocks(player, 4)
+    assert_true(
+      submit(player, after, restart=false) is Some(RestartRequired),
+      msg=after,
+    )
+    assert_accepted(player, before)
+  }
+}
+
+///|
+test "names and content edits play on without a restart" {
+  let song = "song(section(\"a\",8,note(\"60\")),part_id(\"p\",\"Intro\",\"a\"))"
+  for
+    after in [
+      // The section's and the part's names are not where it plays.
+      "song(section(\"b\",8,note(\"60\")),part_id(\"p\",\"Verse\",\"b\"))",
+      // Another stacked member is new content, not another occurrence.
+       "song(section(\"a\",8,stack(note(\"60\"),note(\"64\"))),part_id(\"p\",\"Intro\",\"a\"))",
+      // New content for a started occurrence waits for the next Play.
+       "song(section(\"a\",8,note(\"60\").fast(2)),part_id(\"p\",\"Intro\",\"a\"))",
+    ] {
+    let player = test_player()
+    assert_true(submit(player, song) is None)
+    render_blocks(player, 4)
+    assert_true(submit(player, after, restart=false) is None, msg=after)
+    assert_accepted(player, after)
+    assert_position(player, 512)
+  }
+  // A pattern edit stays a pattern.
+  let player = test_player()
+  assert_true(submit(player, "note(\"50\")") is None)
+  render_blocks(player, 4)
+  assert_true(submit(player, "note(\"52 54\")", restart=false) is None)
 }

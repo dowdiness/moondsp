@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** the scheduler decides whether an update can replace the
+  playing song (ADR-0033): `accept_playback` returns `ArrangementChanged`
+  when occurrence ids, starts or ends, or repetition differ, or a pattern and
+  a song are swapped; the player maps it to `RestartRequired`. Renaming a
+  section or a part with a `part_id` no longer needs a Restart.
+  `PlaybackSnapshot::revision`, `song_layout_revision` and
+  `PlaybackPattern::revision` are removed.
 - **Breaking:** `@mini.PlaybackInput::compile` returns one shape, a
   `CompiledPlayback` of lowered `CompiledMaterial` (tracked or untracked
   pattern or song snapshot) and its `bpm()`, and raises `SourceProblem`.

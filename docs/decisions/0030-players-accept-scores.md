@@ -1,6 +1,6 @@
 # ADR-0030: Players accept scores, from text or from content
 
-- **Status:** Accepted
+- **Status:** Accepted; what `update` refuses is refined by [ADR-0033](0033-the-scheduler-decides-what-continues.md)
 - **Date:** 2026-11-27
 - **Refines:** [ADR-0029](0029-platform-free-player.md) Decision 1 (the
   `Player` interface)
@@ -20,7 +20,7 @@ range".
 ## Decision
 
 1. **A `Score` is the value a player accepts.** It holds the lowered
-   material, its tempo, its layout and how long it plays. `Score::pattern` and
+   material, its tempo and how long it plays. `Score::pattern` and
    `song` build one from content with no player (ADR-0031); `Player::compile` builds one from Mini input, because the work
    Mini admits depends on the player's query window, and records that
    window in the score. A player in Fault compiles nothing.

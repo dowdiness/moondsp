@@ -1509,7 +1509,8 @@ unchanged. In particular, invalid editor text does not prevent Play from
 resuming an already accepted song.
 
 Operations return `0` for acceptance, `1` for an invalid/unrepresentable request,
-and `2` when a Playing/Paused layout change requires Restart. The diagnostic is
+and `2` when a Playing/Paused update is arranged differently and requires
+Restart (ADR-0033). The diagnostic is
 available through `get_playback_error` and its length/character exports. Clients
 use the status code, not diagnostic wording, to identify RestartRequired.
 Owner acceptance completes during the command, including while Paused; it does

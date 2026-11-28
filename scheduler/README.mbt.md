@@ -104,9 +104,11 @@ conversion errors are available from `last_transport_error()` until transport
 reset. An unrepresentable event is skipped; exhaustion of the clock range
 silences the block and kills its voices without advancing the clock.
 
-Song tempo edits can continue on the browser's existing playback path. Changing
-a Playing/Paused song layout requires Restart; a Ready/Ended Update may select
-a new layout without starting it.
+Song tempo edits can continue on the browser's existing playback path. `accept_playback`
+refuses, with `ArrangementChanged`, a Playing/Paused update arranged
+differently: other occurrence ids, starts or ends, another repetition, or a
+switch between pattern and song (ADR-0033). A Ready/Ended Update may select a
+new arrangement without starting it.
 
 ### Migrating tempo and snapshot observation
 

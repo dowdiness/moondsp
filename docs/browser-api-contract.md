@@ -863,7 +863,8 @@ is 120 BPM; one cycle is four beats. Patterns repeat; finite arrangements end un
 There are no public preparation tokens.
 
 Commands return `0` for acceptance, `1` for invalid/unrepresentable input, and
-`2` when a Playing/Paused layout change requires Restart. Acceptance is immediate,
+`2` when a Playing/Paused update is arranged differently and requires
+Restart (ADR-0033). Acceptance is immediate,
 including while Paused; it does not wait for a rendered block. Diagnostics use
 the shared playback-error buffer. Rejection preserves Current song, transport,
 voices, room, and pending material reservations.

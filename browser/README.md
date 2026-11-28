@@ -243,7 +243,7 @@ for that request.
 |---|---|
 | `0` | Operation accepted |
 | `1` | Invalid source, unavailable song, or unrepresentable request |
-| `2` | Playing/Paused layout change requires Restart |
+| `2` | Playing/Paused update arranged differently requires Restart (ADR-0033) |
 
 Read errors through `get_playback_error` or its length/character pair.
 `player_state` reports 0 Empty, 1 Ready, 2 Playing, 3 Paused, 4 Ended, or 5 Fault.

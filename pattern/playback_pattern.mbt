@@ -28,16 +28,6 @@ pub fn[A] TrackedPatternSnapshot::playback(
 }
 
 ///|
-pub fn[A] PlaybackPattern::revision(
-  self : PlaybackPattern[A],
-) -> @identity.Revision {
-  match self.material {
-    Untracked(snapshot) => snapshot.revision()
-    Tracked(snapshot) => snapshot.revision()
-  }
-}
-
-///|
 /// The canonical entries playback keys its materials by, in
 /// `Pat::entries` order.
 pub fn[A] PlaybackPattern::entries(self : PlaybackPattern[A]) -> Array[Pat[A]] {

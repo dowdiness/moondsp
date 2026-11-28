@@ -52,9 +52,9 @@ or `part(…)` declarations, and it crosses the browser wire with a fixed shape
   uses. Material retention across live edits keys entries by occurrence and
   layer id and the entry's own key (`song_entry_specs`), so renaming a
   section does not drop retained material by itself.
-- Independently of identity, the player's layout comparison includes each
-  occurrence's id, name and section *name*, so renaming a section or a part
-  is a layout change and an update is refused until Restart (issue #294).
+- Renaming a section, or the name of a part with a `part_id`, plays on;
+  renaming a part without one places another occurrence, which needs a
+  Restart while playing (ADR-0033).
 - Names and part ids containing `.` get a different id than before #293
   (`a.b` → `a.2e.b`); this matters only across the upgrade. A `part_id`
   outside the identity alphabet, rejected before, is accepted.

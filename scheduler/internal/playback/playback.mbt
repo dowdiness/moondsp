@@ -45,15 +45,23 @@ pub fn PlaybackSourcedEvent::origin(
 
 ///|
 /// Playback material built once from a pattern or a lowered song: its
-/// revisions, its repetition period, and one entry per canonical material.
+/// arrangement, its repetition period, and one entry per canonical material.
 /// Whether events carry event origins is the material's own business
 /// (`@pattern.PlaybackPattern`); nothing here branches on it.
 pub struct PlaybackSnapshot {
-  priv revision : @identity.Revision
-  priv layout_revision : @identity.Revision?
+  /// A song's occurrences; a pattern has none.
+  priv arrangement : Array[OccurrenceSpan]?
   /// How long one repetition of a repeating song lasts.
   priv period : @pattern.Rational?
   priv specs : Array[EntrySpec]
+}
+
+///|
+/// Where one occurrence of a song plays.
+priv struct OccurrenceSpan {
+  id : @identity.OccurrenceId
+  start : @pattern.Rational
+  end_ : @pattern.Rational
 }
 
 ///|
@@ -61,12 +69,7 @@ pub struct PlaybackSnapshot {
 pub fn PlaybackSnapshot::pattern(
   pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  {
-    revision: pattern.revision(),
-    layout_revision: None,
-    period: None,
-    specs: pattern_entry_specs(pattern),
-  }
+  { arrangement: None, period: None, specs: pattern_entry_specs(pattern), }
 }
 
 ///|
@@ -77,8 +80,16 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
   repeat~ : Bool = false,
 ) -> PlaybackSnapshot {
   {
-    revision: snapshot.revision(),
-    layout_revision: Some(snapshot.layout_revision()),
+    arrangement: Some(
+      snapshot
+      .song()
+      .occurrences()
+      .map(occurrence => {
+        id: occurrence.id(),
+        start: occurrence.start(),
+        end_: occurrence.end_(),
+      }),
+    ),
     period: if repeat {
       Some(snapshot.song().duration())
     } else {
@@ -89,17 +100,32 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
 }
 
 ///|
-pub fn PlaybackSnapshot::revision(
+/// Whether `next` can replace `self` while playing: both are patterns, or
+/// both are songs that repeat alike and place the same occurrences at the
+/// same spans. A finite occurrence never joins midway, so a song arranged
+/// differently would leave started occurrences silent until a new Play.
+fn PlaybackSnapshot::continues_as(
   self : PlaybackSnapshot,
-) -> @identity.Revision {
-  self.revision
-}
-
-///|
-pub fn PlaybackSnapshot::song_layout_revision(
-  self : PlaybackSnapshot,
-) -> @identity.Revision? {
-  self.layout_revision
+  next : PlaybackSnapshot,
+) -> Bool {
+  match (self.arrangement, next.arrangement) {
+    (None, None) => true
+    (Some(current), Some(arrangement)) =>
+      self.period == next.period &&
+      current.length() == arrangement.length() &&
+      current
+      .iter()
+      .all(span => {
+        arrangement
+        .iter()
+        .any(other => {
+          other.id == span.id &&
+          other.start == span.start &&
+          other.end_ == span.end_
+        })
+      })
+    _ => false
+  }
 }
 
 ///|
@@ -219,6 +245,24 @@ pub fn PlaybackState::prepare_acceptance(
     return None
   }
   Some(proposed)
+}
+
+///|
+/// Whether `snapshot` can replace the latest accepted snapshot without a
+/// restart; see `PlaybackSnapshot::continues_as`. Nothing accepted yet
+/// continues as anything.
+pub fn PlaybackState::continues_as(
+  self : PlaybackState,
+  snapshot : PlaybackSnapshot,
+) -> Bool {
+  let latest = match self.pending {
+    Some(pending) => Some(pending)
+    None => self.running.map(run => run.snapshot)
+  }
+  match latest {
+    Some(current) => current.continues_as(snapshot)
+    None => true
+  }
 }
 
 ///|
