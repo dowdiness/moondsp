@@ -10,6 +10,8 @@ pub(all) suberror SongDocBuildError {
 #derive(Eq, Debug)
 pub(all) suberror SongDocEditError {
   MissingSongDocOccurrenceId(String)
+  /// The new start is before the song's beginning.
+  NegativeSongDocStart(NegativeStart)
   DuplicateEditedSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceName(String)
   InvalidSongDocOccurrenceIndex(Int32)
@@ -53,11 +55,11 @@ pub fn[C] SongOccurrenceDoc::at(
   start~ : @pattern.Rational,
   name~ : String,
   section~ : SectionDoc[C],
-) -> SongOccurrenceDoc[C] {
+) -> SongOccurrenceDoc[C] raise NegativeStart {
   {
     id,
     name,
-    start: Some(start),
+    start: Some(checked_start(start)),
     section,
     revision: @identity.Revision::zero(),
     layout_revision: @identity.Revision::zero().next(),
@@ -123,11 +125,11 @@ pub fn[C] SongOccurrenceDoc::rename(
 pub fn[C] SongOccurrenceDoc::with_start(
   self : SongOccurrenceDoc[C],
   start~ : @pattern.Rational,
-) -> SongOccurrenceDoc[C] {
+) -> SongOccurrenceDoc[C] raise NegativeStart {
   {
     id: self.id,
     name: self.name,
-    start: Some(start),
+    start: Some(checked_start(start)),
     section: self.section,
     revision: self.revision.next(),
     layout_revision: self.layout_revision.next(),
@@ -172,13 +174,14 @@ pub fn[C] SongOccurrenceDoc::replace_section(
 ///|
 fn[C] SongOccurrenceDoc::to_part(self : SongOccurrenceDoc[C]) -> SongPart[C] {
   match self.start {
+    // The start was checked when the document took it.
     Some(start) =>
-      SongPart::with_id_at(
-        id=self.id,
-        start~,
-        name=self.name,
-        section=self.section.to_section(),
-      )
+      {
+        id: Some(self.id),
+        start: Some(start),
+        name: self.name,
+        section: self.section.to_section(),
+      }
     None =>
       SongPart::with_id(
         id=self.id,
@@ -580,7 +583,9 @@ pub fn[C] SongDoc::set_occurrence_start(
     None => raise MissingSongDocOccurrenceId(id.value())
   }
   let result = copy_song_occurrence_docs(self.parts)
-  result[index] = result[index].with_start(start~)
+  result[index] = result[index].with_start(start~) catch {
+    error => raise NegativeSongDocStart(error)
+  }
   {
     revision: self.revision.next(),
     layout_revision: self.layout_revision.next(),

@@ -12,6 +12,12 @@ import {
 
 // Errors
 #derive(Eq, @debug.Debug)
+pub(all) suberror NegativeStart
+pub fn NegativeStart::equal(Self, Self) -> Bool
+pub fn NegativeStart::not_equal(Self, Self) -> Bool
+pub fn NegativeStart::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
 pub(all) suberror SectionBuildError {
   NonPositiveLength
 }
@@ -51,7 +57,6 @@ pub fn SectionPatchError::to_repr(Self) -> @debug.Repr
 #derive(Eq, @debug.Debug)
 pub(all) suberror SongBuildError {
   EmptySong
-  NegativeStart(String)
   DuplicateOccurrence(String)
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)
@@ -73,6 +78,7 @@ pub fn SongDocBuildError::to_repr(Self) -> @debug.Repr
 #derive(Eq, @debug.Debug)
 pub(all) suberror SongDocEditError {
   MissingSongDocOccurrenceId(String)
+  NegativeSongDocStart(NegativeStart)
   DuplicateEditedSongDocOccurrenceId(String)
   DuplicateEditedSongDocOccurrenceName(String)
   InvalidSongDocOccurrenceIndex(Int32)
@@ -246,7 +252,7 @@ pub struct SongOccurrenceDoc[C] {
   // private fields
 }
 pub fn[C] SongOccurrenceDoc::SongOccurrenceDoc(id~ : @identity.OccurrenceId, name~ : String, section~ : SectionDoc[C]) -> Self[C]
-pub fn[C] SongOccurrenceDoc::at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : SectionDoc[C]) -> Self[C]
+pub fn[C] SongOccurrenceDoc::at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : SectionDoc[C]) -> Self[C] raise NegativeStart
 pub fn[C] SongOccurrenceDoc::clear_start(Self[C]) -> Self[C]
 pub fn[C] SongOccurrenceDoc::id(Self[C]) -> @identity.OccurrenceId
 pub fn[C] SongOccurrenceDoc::layout_revision(Self[C]) -> @identity.Revision
@@ -256,19 +262,19 @@ pub fn[C] SongOccurrenceDoc::replace_section(Self[C], section~ : SectionDoc[C]) 
 pub fn[C] SongOccurrenceDoc::revision(Self[C]) -> @identity.Revision
 pub fn[C] SongOccurrenceDoc::section(Self[C]) -> SectionDoc[C]
 pub fn[C] SongOccurrenceDoc::start(Self[C]) -> @pattern.Rational?
-pub fn[C] SongOccurrenceDoc::with_start(Self[C], start~ : @pattern.Rational) -> Self[C]
+pub fn[C] SongOccurrenceDoc::with_start(Self[C], start~ : @pattern.Rational) -> Self[C] raise NegativeStart
 
 pub struct SongPart[C] {
   // private fields
 }
 pub fn[C] SongPart::SongPart(name~ : String, section~ : Section[C]) -> Self[C]
-pub fn[C] SongPart::at(start~ : @pattern.Rational, name~ : String, section~ : Section[C]) -> Self[C]
+pub fn[C] SongPart::at(start~ : @pattern.Rational, name~ : String, section~ : Section[C]) -> Self[C] raise NegativeStart
 pub fn[C] SongPart::id(Self[C]) -> @identity.OccurrenceId?
 pub fn[C] SongPart::name(Self[C]) -> String
 pub fn[C] SongPart::section(Self[C]) -> Section[C]
 pub fn[C] SongPart::start(Self[C]) -> @pattern.Rational?
 pub fn[C] SongPart::with_id(id~ : @identity.OccurrenceId, name~ : String, section~ : Section[C]) -> Self[C]
-pub fn[C] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[C]) -> Self[C]
+pub fn[C] SongPart::with_id_at(id~ : @identity.OccurrenceId, start~ : @pattern.Rational, name~ : String, section~ : Section[C]) -> Self[C] raise NegativeStart
 
 pub struct SongSnapshot[C] {
   // private fields
