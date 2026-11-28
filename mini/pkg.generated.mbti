@@ -84,8 +84,8 @@ pub impl @json.ToJson for Call
 pub(all) enum CompiledMaterial {
   TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
   UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
-  TrackedSong(@song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
-  UntrackedSong(@song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], Bool)
+  TrackedSong(@song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]], Bool)
+  UntrackedSong(@song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]], Bool)
 }
 
 pub struct CompiledPlayback {
@@ -196,11 +196,11 @@ pub fn OriginUnavailable::not_equal(Self, Self) -> Bool
 pub fn OriginUnavailable::to_repr(Self) -> @debug.Repr
 
 pub struct ParsedSong[C] {
-  snapshot : @song.SongSnapshot[C]
+  song : @song.Song[C]
   bpm : Double?
 }
 pub fn[C] ParsedSong::bpm(Self[C]) -> Double?
-pub fn[C] ParsedSong::snapshot(Self[C]) -> @song.SongSnapshot[C]
+pub fn[C] ParsedSong::song(Self[C]) -> @song.Song[C]
 
 pub struct PlaybackInput {
   // private fields

@@ -1,8 +1,11 @@
 ///|
-using @identity {type OccurrenceId}
-
-///|
-using @song {type Song, type SongBuildError, type SongPart}
+using @song {
+  type Section,
+  type SectionBuildError,
+  type Song,
+  type SongBuildError,
+  type SongPart,
+}
 
 ///|
 fn rat(n : Int64, d : Int64) -> @pattern.Rational {
@@ -10,610 +13,380 @@ fn rat(n : Int64, d : Int64) -> @pattern.Rational {
 }
 
 ///|
+fn cycles(n : Int64) -> @pattern.Rational {
+  @pattern.Rational(n, 1L)
+}
+
+///|
 fn span(
-  begin_num : Int64,
-  begin_den : Int64,
-  end_num : Int64,
-  end_den : Int64,
+  begin : @pattern.Rational,
+  end_ : @pattern.Rational,
 ) -> @pattern.TimeSpan {
-  @pattern.TimeSpan(rat(begin_num, begin_den), rat(end_num, end_den))
+  @pattern.TimeSpan(begin, end_)
 }
 
 ///|
-fn make_section(
+fn oid(value : String) -> @identity.OccurrenceId {
+  @identity.OccurrenceId::from_string(value) catch {
+    _ => abort("occurrence id creation failed")
+  }
+}
+
+///|
+fn sid(value : String) -> @identity.SectionId {
+  @identity.SectionId::from_string(value) catch {
+    _ => abort("section id creation failed")
+  }
+}
+
+///|
+fn lid(value : String) -> @identity.SectionLayerId {
+  @identity.SectionLayerId::from_string(value) catch {
+    _ => abort("layer id creation failed")
+  }
+}
+
+///|
+fn untracked(
   name : String,
-  length : @pattern.Rational,
   midi : Double,
-) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
-  @song.Section(
-    name~,
-    length_cycles=length,
-    scope=@song.TimeScope::identity(),
-    body=@song.SectionBody::single(
-      section_test_content("song-section:\{name}", @score.note(midi)),
-    ),
-  ) catch {
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] {
+  @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string(name),
+    pat=@score.note(midi),
+  ).lower() catch {
+    _ => abort("pattern snapshot creation failed")
+  }
+}
+
+///|
+fn tracked(
+  name : String,
+  midi : Double,
+) -> @pattern.TrackedPatternSnapshot[@score.ScoreEvent] {
+  @pattern.PatternDoc::atom(
+    id=@identity.PatternNodeId::from_string(name),
+    source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7000L), 1L),
+    value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=midi)),
+    content="note:\{midi}",
+  ).lower_tracked() catch {
+    _ => abort("pattern lowering failed")
+  }
+}
+
+///|
+/// A one-layer section of `length` cycles.
+fn[C] section(
+  id : String,
+  length : @pattern.Rational,
+  content : C,
+) -> Section[C] {
+  Section(id=sid(id), length_cycles=length, layers=[
+    SectionLayer(id=lid("\{id}:main"), content~),
+  ]) catch {
     _ => abort("section creation failed")
   }
 }
 
 ///|
-fn make_scoped_section(
-  name : String,
-  length : @pattern.Rational,
-  scope : @song.TimeScope,
-  midi : Double,
-) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
-  @song.Section(
-    name~,
-    length_cycles=length,
-    scope~,
-    body=@song.SectionBody::single(
-      section_test_content("song-scoped-section:\{name}", @score.note(midi)),
-    ),
-  ) catch {
-    _ => abort("section creation failed")
+fn[C] at(
+  id : String,
+  start : @pattern.Rational,
+  section : Section[C],
+) -> SongPart[C] {
+  SongPart::at(id=oid(id), start~, section~) catch {
+    _ => abort("part creation failed")
   }
 }
 
 ///|
-fn fast_scope(n : Int32) -> @song.TimeScope {
-  @song.TimeScope::fast(factor=@pattern.Rational::from_int(n)) catch {
-    _ => abort("time scope creation failed")
-  }
-}
-
-///|
-fn[C] make_song(parts : Array[SongPart[C]]) -> Song[C] {
+fn[C] song(parts : Array[SongPart[C]]) -> Song[C] {
   Song(parts~) catch {
     _ => abort("song creation failed")
   }
 }
 
 ///|
-fn occurrence_id(value : String) -> OccurrenceId {
-  OccurrenceId::from_string(value) catch {
-    _ => abort("occurrence id creation failed")
-  }
+/// Each occurrence as its id and span, in written order.
+fn[C] layout(song : Song[C]) -> Array[(String, @pattern.TimeSpan)] {
+  song.occurrences().iter().map(o => (o.id().value(), o.span())).collect()
 }
 
 ///|
-test "Song constructor computes contiguous duration and occurrences" {
-  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
-  let verse = make_section("verse", @pattern.Rational::from_int(2), 62.0)
-  let song = make_song([
-    SongPart(name="intro", section=intro),
-    SongPart(name="verse1", section=verse),
+test "parts without a start follow the latest end, in written order" {
+  let one = section("one", cycles(1), untracked("one", 60.0))
+  let two = section("two", cycles(2), untracked("two", 62.0))
+  let laid_out = song([
+    SongPart(id=oid("intro"), section=one),
+    SongPart(id=oid("verse"), section=two),
+    // Overlaps the verse; the next implicit part follows its end, not its start.
+    at("pad", rat(1L, 2L), two),
+    SongPart(id=oid("outro"), section=one),
   ])
-  assert_true(song.duration() == @pattern.Rational::from_int(3))
-  @debug.assert_eq(song.occurrence_count(), 2)
-  match song.get_occurrence("verse1") {
-    Some(occurrence) => {
-      assert_true(occurrence.start() == @pattern.Rational::from_int(1))
-      assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
-      @debug.assert_eq(occurrence.section().name(), "verse")
-      @debug.assert_eq(occurrence.id().value(), "verse1")
-    }
-    None => abort("expected verse1 occurrence")
-  }
+  @debug.assert_eq(layout(laid_out), [
+    ("intro", span(cycles(0), cycles(1))),
+    ("verse", span(cycles(1), cycles(3))),
+    ("pad", span(rat(1L, 2L), rat(5L, 2L))),
+    ("outro", span(cycles(3), cycles(4))),
+  ])
+  @debug.assert_eq(laid_out.duration(), cycles(4))
 }
 
 ///|
-test "Song constructor rejects empty layout" {
-  let parts : Array[
+test "an explicit start leaves a gap, and the song lasts to its latest end" {
+  let one = section("one", cycles(1), untracked("one", 60.0))
+  let laid_out = song([
+    SongPart(id=oid("first"), section=one),
+    at("late", cycles(5), one),
+    at("middle", cycles(3), one),
+  ])
+  @debug.assert_eq(laid_out.duration(), cycles(6))
+  // Earliest first, whatever order the parts were written in; covered time
+  // is not a gap.
+  @debug.assert_eq(laid_out.gap_spans(), [
+    span(cycles(1), cycles(3)),
+    span(cycles(4), cycles(5)),
+  ])
+  let contiguous = song([
+    SongPart(id=oid("a"), section=one),
+    SongPart(id=oid("b"), section=one),
+  ])
+  @debug.assert_eq(contiguous.gap_spans(), [])
+}
+
+///|
+test "a song needs a part, and its parts distinct ids" {
+  let one = section("one", cycles(1), untracked("one", 60.0))
+  let none : Array[
     SongPart[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
   ] = []
-  try Song(parts~) catch {
-    SongBuildError::EmptySong => ()
-    _ => assert_true(false)
+  let empty = try Song(parts=none) catch {
+    error => Some(error)
   } noraise {
-    _ => assert_true(false)
+    _ => None
   }
-}
-
-///|
-test "Song constructor rejects duplicate occurrence names" {
-  let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  try
+  @debug.assert_eq(empty, Some(SongBuildError::EmptySong))
+  let repeated = try
     Song(parts=[
-      SongPart(name="verse1", section~),
-      SongPart(name="verse1", section~),
+      SongPart(id=oid("same"), section=one),
+      at("same", cycles(4), one),
     ])
   catch {
-    SongBuildError::DuplicateOccurrence("verse1") => ()
-    _ => assert_true(false)
+    error => Some(error)
   } noraise {
-    _ => assert_true(false)
+    _ => None
   }
-}
-
-///|
-test "Song constructor rejects occurrence names that cannot seed IDs" {
-  let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  try Song(parts=[SongPart(name="verse one", section~)]) catch {
-    SongBuildError::InvalidOccurrenceId("verse one") => ()
-    _ => assert_true(false)
-  } noraise {
-    _ => assert_true(false)
-  }
-}
-
-///|
-test "Song constructor rejects duplicate explicit occurrence IDs" {
-  let section = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let id = occurrence_id("verse:shared")
-  try
-    Song(parts=[
-      SongPart::with_id(id~, name="verse one", section~),
-      SongPart::with_id(id~, name="verse two", section~),
-    ])
-  catch {
-    SongBuildError::DuplicateOccurrenceId("verse:shared") => ()
-    _ => assert_true(false)
-  } noraise {
-    _ => assert_true(false)
-  }
-}
-
-///|
-test "Song::from_sections uses section names as occurrence names" {
-  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let song = Song::from_sections([intro, chorus]) catch {
-    _ => abort("song creation failed")
-  }
-  assert_true(song.duration() == @pattern.Rational::from_int(2))
-  assert_true(song.get_occurrence("intro") is Some(_))
-  assert_true(song.get_occurrence("chorus") is Some(_))
-}
-
-///|
-test "Song supports occurrence lookup by stable ID" {
-  let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let id = occurrence_id("verse:1")
-  let song = make_song([SongPart::with_id(id~, name="Verse 1", section=verse)])
-  match song.get_occurrence_by_id(id) {
-    Some(occurrence) => {
-      @debug.assert_eq(occurrence.id().value(), "verse:1")
-      @debug.assert_eq(occurrence.name(), "Verse 1")
-    }
-    None => abort("expected occurrence by ID")
-  }
-}
-
-///|
-test "Song::occurrence_at uses half-open occurrence boundaries" {
-  let verse = make_section("verse", @pattern.Rational::from_int(2), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let song = make_song([
-    SongPart(name="verse1", section=verse),
-    SongPart(name="chorus1", section=chorus),
-  ])
-  match song.occurrence_at(@pattern.Rational::from_int(0)) {
-    Some(occurrence) => @debug.assert_eq(occurrence.name(), "verse1")
-    None => abort("expected verse1 at song start")
-  }
-  match song.occurrence_at(@pattern.Rational::from_int(2)) {
-    Some(occurrence) => @debug.assert_eq(occurrence.name(), "chorus1")
-    None => abort("expected chorus1 at boundary")
-  }
-  match song.occurrence_at(@pattern.Rational::from_int(3)) {
-    None => ()
-    Some(_) => assert_true(false)
-  }
-}
-
-///|
-test "SongPart explicit starts create gaps and set duration to latest end" {
-  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let song = make_song([
-    SongPart(name="intro", section=intro),
-    SongPart::at(
-      start=@pattern.Rational::from_int(2),
-      name="chorus1",
-      section=chorus,
-    ),
-  ])
-  assert_true(song.duration() == @pattern.Rational::from_int(3))
-  match song.occurrence_at(rat(3L, 2L)) {
-    None => ()
-    Some(_) => abort("expected gap between explicit occurrences")
-  }
-  match song.get_occurrence("chorus1") {
-    Some(occurrence) => {
-      assert_true(occurrence.start() == @pattern.Rational::from_int(2))
-      assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
-    }
-    None => abort("expected explicitly placed occurrence")
-  }
-  let events = song.query(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(events.length(), 0)
-}
-
-///|
-test "SongPart explicit starts can overlap and range lookup returns all hits" {
-  let verse = make_section("verse", @pattern.Rational::from_int(2), 60.0)
-  let pad = make_section("pad", @pattern.Rational::from_int(2), 64.0)
-  let song = make_song([
-    SongPart(name="verse1", section=verse),
-    SongPart::at(start=@pattern.Rational::from_int(1), name="pad1", section=pad),
-  ])
-  assert_true(song.duration() == @pattern.Rational::from_int(3))
-  let at_overlap = song.occurrences_at(rat(3L, 2L))
-  @debug.assert_eq(at_overlap.length(), 2)
-  @debug.assert_eq(at_overlap[0].name(), "verse1")
-  @debug.assert_eq(at_overlap[1].name(), "pad1")
-  let range_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(range_hits.length(), 2)
-  let events = song.query(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
-  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 64.0)
-}
-
-///|
-test "indexed occurrence lookups preserve authoring order for timeline-sorted overlaps" {
-  let late = make_section("late", @pattern.Rational::from_int(3), 60.0)
-  let early = make_section("early", @pattern.Rational::from_int(3), 64.0)
-  let song = make_song([
-    SongPart::at(
-      start=@pattern.Rational::from_int(1),
-      name="late1",
-      section=late,
-    ),
-    SongPart::at(
-      start=@pattern.Rational::from_int(0),
-      name="early1",
-      section=early,
-    ),
-  ])
-  match song.occurrence_at(rat(3L, 2L)) {
-    Some(occurrence) => @debug.assert_eq(occurrence.name(), "late1")
-    None => abort("expected first authored occurrence at overlap")
-  }
-  let at_hits = song.occurrences_at(rat(3L, 2L))
-  @debug.assert_eq(at_hits.length(), 2)
-  @debug.assert_eq(at_hits[0].name(), "late1")
-  @debug.assert_eq(at_hits[1].name(), "early1")
-  let range_hits = song.occurrences_intersecting(span(2L, 1L, 3L, 1L))
-  @debug.assert_eq(range_hits.length(), 2)
-  @debug.assert_eq(range_hits[0].name(), "late1")
-  @debug.assert_eq(range_hits[1].name(), "early1")
-}
-
-///|
-test "implicit parts continue after latest explicit occurrence end" {
-  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
-  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
-  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
-  let song = make_song([
-    SongPart::at(start=rat(1L, 1L), name="a1", section=a),
-    SongPart::at(start=rat(1L, 2L), name="b1", section=b),
-    SongPart(name="c1", section=c),
-  ])
-  assert_true(song.duration() == rat(3L, 1L))
-  match song.get_occurrence("c1") {
-    Some(occurrence) => {
-      assert_true(occurrence.start() == rat(2L, 1L))
-      assert_true(occurrence.end_() == rat(3L, 1L))
-    }
-    None => abort("expected implicit occurrence after overlap")
-  }
-}
-
-///|
-test "Song::occurrences_intersecting uses half-open range boundaries" {
-  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
-  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
-  let song = make_song([
-    SongPart(name="a1", section=a),
-    SongPart::at(start=@pattern.Rational::from_int(2), name="b1", section=b),
-  ])
-  let gap_hits = song.occurrences_intersecting(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(gap_hits.length(), 0)
-  let boundary_hits = song.occurrences_intersecting(span(1L, 1L, 3L, 1L))
-  @debug.assert_eq(boundary_hits.length(), 1)
-  @debug.assert_eq(boundary_hits[0].name(), "b1")
-}
-
-///|
-test "Song::gap_spans reports uncovered boundary ranges" {
-  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
-  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
-  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
-  let song = make_song([
-    SongPart(name="a1", section=a),
-    SongPart::at(start=@pattern.Rational::from_int(3), name="b1", section=b),
-    SongPart::at(start=@pattern.Rational::from_int(5), name="c1", section=c),
-  ])
-  let gaps = song.gap_spans()
-  @debug.assert_eq(gaps.length(), 2)
-  assert_true(gaps[0] == span(1L, 1L, 3L, 1L))
-  assert_true(gaps[1] == span(4L, 1L, 5L, 1L))
-}
-
-///|
-test "Song::fill_gaps inserts sized fill occurrences in uncovered ranges" {
-  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
-  let b = make_section("b", @pattern.Rational::from_int(1), 62.0)
-  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
-  let song = make_song([
-    SongPart(name="a1", section=a),
-    SongPart::at(start=@pattern.Rational::from_int(3), name="b1", section=b),
-  ])
-  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
-    _ => abort("expected filled song")
-  }
-  @debug.assert_eq(filled.occurrence_count(), 3)
-  match filled.get_occurrence("fill:0") {
-    Some(occurrence) => {
-      @debug.assert_eq(occurrence.id().value(), "fill:0")
-      assert_true(occurrence.start() == @pattern.Rational::from_int(1))
-      assert_true(occurrence.end_() == @pattern.Rational::from_int(3))
-      assert_true(
-        occurrence.section().length_cycles() == @pattern.Rational::from_int(2),
-      )
-    }
-    None => abort("expected generated fill occurrence")
-  }
-  @debug.assert_eq(filled.gap_spans().length(), 0)
-  let events = filled.query(span(1L, 1L, 3L, 1L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 70.0)
-  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 70.0)
-}
-
-///|
-test "Song::fill_gaps preserves existing IDs and ignores covered overlap" {
-  let a = make_section("a", @pattern.Rational::from_int(2), 60.0)
-  let b = make_section("b", @pattern.Rational::from_int(2), 62.0)
-  let c = make_section("c", @pattern.Rational::from_int(1), 64.0)
-  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
-  let a_id = occurrence_id("a:1")
-  let b_id = occurrence_id("b:1")
-  let c_id = occurrence_id("c:1")
-  let song = make_song([
-    SongPart::with_id(id=a_id, name="A", section=a),
-    SongPart::with_id_at(
-      id=b_id,
-      start=@pattern.Rational::from_int(1),
-      name="B",
-      section=b,
-    ),
-    SongPart::with_id_at(
-      id=c_id,
-      start=@pattern.Rational::from_int(4),
-      name="C",
-      section=c,
-    ),
-  ])
-  let gaps = song.gap_spans()
-  @debug.assert_eq(gaps.length(), 1)
-  assert_true(gaps[0] == span(3L, 1L, 4L, 1L))
-  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
-    _ => abort("expected filled song")
-  }
-  @debug.assert_eq(filled.occurrence_count(), 4)
-  assert_true(filled.get_occurrence_by_id(a_id) is Some(_))
-  assert_true(filled.get_occurrence_by_id(b_id) is Some(_))
-  assert_true(filled.get_occurrence_by_id(c_id) is Some(_))
-  match filled.get_occurrence("fill:0") {
-    Some(occurrence) => {
-      assert_true(occurrence.start() == @pattern.Rational::from_int(3))
-      assert_true(occurrence.end_() == @pattern.Rational::from_int(4))
-    }
-    None => abort("expected generated overlap fill")
-  }
-}
-
-///|
-test "Song::fill_gaps preserves authoring order for out-of-order overlaps" {
-  let late = make_section("late", @pattern.Rational::from_int(2), 60.0)
-  let early = make_section("early", @pattern.Rational::from_int(2), 64.0)
-  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
-  let song = make_song([
-    SongPart::at(
-      start=@pattern.Rational::from_int(1),
-      name="late1",
-      section=late,
-    ),
-    SongPart::at(
-      start=@pattern.Rational::from_int(0),
-      name="early1",
-      section=early,
-    ),
-  ])
-  let filled = song.fill_gaps(prefix="fill", section=fill) catch {
-    _ => abort("expected filled song")
-  }
-  @debug.assert_eq(filled.occurrence_count(), 2)
-  let overlap_hits = filled.occurrences_at(rat(3L, 2L))
-  @debug.assert_eq(overlap_hits.length(), 2)
-  @debug.assert_eq(overlap_hits[0].name(), "late1")
-  @debug.assert_eq(overlap_hits[1].name(), "early1")
-  let events = filled.query(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
-  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 64.0)
-}
-
-///|
-test "Song::fill_gaps rejects generated occurrence name collisions" {
-  let a = make_section("a", @pattern.Rational::from_int(1), 60.0)
-  let existing_fill = make_section(
-    "existing_fill",
-    @pattern.Rational::from_int(1),
-    62.0,
-  )
-  let fill = make_section("fill", @pattern.Rational::from_int(1), 70.0)
-  let song = make_song([
-    SongPart(name="a1", section=a),
-    SongPart::at(
-      start=@pattern.Rational::from_int(2),
-      name="fill:0",
-      section=existing_fill,
-    ),
-  ])
-  try song.fill_gaps(prefix="fill", section=fill) catch {
-    SongBuildError::DuplicateOccurrence("fill:0") => ()
-    _ => assert_true(false)
-  } noraise {
-    _ => assert_true(false)
-  }
-}
-
-///|
-test "Song keeps explicit occurrence IDs across reordering" {
-  let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let verse_id = occurrence_id("verse:1")
-  let chorus_id = occurrence_id("chorus:1")
-  let original = make_song([
-    SongPart::with_id(id=verse_id, name="Verse 1", section=verse),
-    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
-  ])
-  let reordered = make_song([
-    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
-    SongPart::with_id(id=verse_id, name="Verse 1", section=verse),
-  ])
-  match
-    (
-      original.get_occurrence_by_id(verse_id),
-      reordered.get_occurrence_by_id(verse_id),
-    ) {
-    (Some(before), Some(after)) => {
-      @debug.assert_eq(before.id().value(), after.id().value())
-      assert_true(before.start() == @pattern.Rational::from_int(0))
-      assert_true(after.start() == @pattern.Rational::from_int(1))
-    }
-    _ => abort("expected verse occurrence by ID")
-  }
-}
-
-///|
-test "Song keeps explicit occurrence IDs across section length changes" {
-  let verse_short = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let verse_long = make_section("verse", @pattern.Rational::from_int(2), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let verse_id = occurrence_id("verse:1")
-  let chorus_id = occurrence_id("chorus:1")
-  let short_layout = make_song([
-    SongPart::with_id(id=verse_id, name="Verse 1", section=verse_short),
-    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
-  ])
-  let long_layout = make_song([
-    SongPart::with_id(id=verse_id, name="Verse 1", section=verse_long),
-    SongPart::with_id(id=chorus_id, name="Chorus 1", section=chorus),
-  ])
-  match
-    (
-      short_layout.get_occurrence_by_id(chorus_id),
-      long_layout.get_occurrence_by_id(chorus_id),
-    ) {
-    (Some(before), Some(after)) => {
-      @debug.assert_eq(before.id().value(), after.id().value())
-      assert_true(before.start() == @pattern.Rational::from_int(1))
-      assert_true(after.start() == @pattern.Rational::from_int(2))
-    }
-    _ => abort("expected chorus occurrence by ID")
-  }
-}
-
-///|
-test "Song allows repeated sections with distinct occurrence names" {
-  let verse = make_section("verse", @pattern.Rational::from_int(1), 60.0)
-  let song = make_song([
-    SongPart(name="verse1", section=verse),
-    SongPart(name="verse2", section=verse),
-  ])
-  let events = song.query(span(0L, 1L, 2L, 1L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].value.sound is Note(_, pitch~) && pitch == 60.0)
-  assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
-  assert_true(events[1].value.sound is Note(_, pitch~) && pitch == 60.0)
-  assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
-}
-
-///|
-test "Song::query shifts event whole and part into song time" {
-  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(2), 64.0)
-  let song = make_song([
-    SongPart(name="intro", section=intro),
-    SongPart(name="chorus1", section=chorus),
-  ])
-  let events = song.query(span(0L, 1L, 3L, 1L))
-  @debug.assert_eq(events.length(), 3)
-  assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
-  assert_true(events[0].part.begin == @pattern.Rational::from_int(0))
-  assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
-  assert_true(events[1].part.begin == @pattern.Rational::from_int(1))
-  assert_true(events[2].whole.unwrap().begin == @pattern.Rational::from_int(2))
-  assert_true(events[2].part.begin == @pattern.Rational::from_int(2))
-  assert_true(events[2].value.sound is Note(_, pitch~) && pitch == 64.0)
-}
-
-///|
-test "Song::query applies section TimeScope without changing occurrence span" {
-  let section = make_scoped_section(
-    "riff",
-    @pattern.Rational::from_int(1),
-    fast_scope(2),
-    60.0,
-  )
-  let song = make_song([
-    SongPart::at(start=@pattern.Rational::from_int(1), name="riff1", section~),
-  ])
-  match song.get_occurrence("riff1") {
-    Some(occurrence) => {
-      assert_true(occurrence.start() == @pattern.Rational::from_int(1))
-      assert_true(occurrence.end_() == @pattern.Rational::from_int(2))
-    }
-    None => abort("expected scoped occurrence")
-  }
-  let events = song.query(span(1L, 1L, 2L, 1L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(1))
-  assert_true(events[0].part.begin == @pattern.Rational::from_int(1))
-  assert_true(events[1].whole.unwrap().begin == rat(3L, 2L))
-  assert_true(events[1].part.begin == rat(3L, 2L))
-}
-
-///|
-test "Song::query clips parts at occurrence boundaries without clipping whole" {
-  let intro = make_section("intro", @pattern.Rational::from_int(1), 60.0)
-  let chorus = make_section("chorus", @pattern.Rational::from_int(1), 64.0)
-  let song = make_song([
-    SongPart(name="intro", section=intro),
-    SongPart(name="chorus1", section=chorus),
-  ])
-  let events = song.query(span(1L, 2L, 3L, 2L))
-  @debug.assert_eq(events.length(), 2)
-  assert_true(events[0].whole.unwrap().begin == @pattern.Rational::from_int(0))
-  assert_true(events[0].whole.unwrap().end_ == @pattern.Rational::from_int(1))
-  assert_true(events[0].part.begin == rat(1L, 2L))
-  assert_true(events[0].part.end_ == @pattern.Rational::from_int(1))
-  assert_true(events[1].whole.unwrap().begin == @pattern.Rational::from_int(1))
-  assert_true(events[1].whole.unwrap().end_ == @pattern.Rational::from_int(2))
-  assert_true(events[1].part.begin == @pattern.Rational::from_int(1))
-  assert_true(events[1].part.end_ == rat(3L, 2L))
+  @debug.assert_eq(repeated, Some(SongBuildError::DuplicateOccurrence("same")))
 }
 
 ///|
 test "a part cannot start before the song begins" {
-  let section = make_section("a", @pattern.Rational::from_int(4), 60.0)
+  let one = section("one", cycles(1), untracked("one", 60.0))
   let refused = try
-    @song.SongPart::at(start=@pattern.Rational(-1L, 2L), name="early", section~)
+    SongPart::at(id=oid("early"), start=rat(-1L, 2L), section=one)
   catch {
-    @song.NegativeStart => true
+    NegativeStart => true
   } noraise {
     _ => false
   }
   assert_true(refused)
   // The song's beginning is a valid start.
-  let song = @song.Song(parts=[
-    @song.SongPart::at(start=@pattern.Rational::from_int(0), name="a", section~),
+  @debug.assert_eq(song([at("first", cycles(0), one)]).duration(), cycles(1))
+}
+
+///|
+test "a section lasts, plays at a positive rate, and has distinct layers" {
+  let build = (
+    length : @pattern.Rational,
+    rate : @pattern.Rational,
+    layers : Array[String],
+  ) => {
+    try
+      Section(
+        id=sid("checked"),
+        length_cycles=length,
+        rate~,
+        layers=layers.map(id => {
+          SectionLayer(id=lid(id), content=untracked(id, 60.0))
+        }),
+      )
+    catch {
+      error => Some(error)
+    } noraise {
+      _ => None
+    }
+  }
+  @debug.assert_eq(
+    build(cycles(0), cycles(1), ["main"]),
+    Some(SectionBuildError::NonPositiveLength),
+  )
+  @debug.assert_eq(
+    build(cycles(1), rat(-1L, 2L), ["main"]),
+    Some(SectionBuildError::NonPositiveRate),
+  )
+  @debug.assert_eq(
+    build(cycles(1), cycles(1), []),
+    Some(SectionBuildError::EmptyLayers),
+  )
+  @debug.assert_eq(
+    build(cycles(1), cycles(1), ["lead", "lead"]),
+    Some(SectionBuildError::DuplicateLayer("lead")),
+  )
+  @debug.assert_eq(build(rat(1L, 2L), rat(1L, 3L), ["lead", "pad"]), None)
+}
+
+///|
+/// A song event as a consumer sees it: the content's own event placed back on
+/// the song clock, tagged with its song origin.
+priv struct SongTestEvent {
+  origin : @song.SongEventOrigin
+  source : @pattern.EventOrigin
+  event : @pattern.Event[@score.ScoreEvent]
+  controls : @pattern.Controls
+}
+
+///|
+fn query(
+  entries : ArrayView[
+    @song.SongEntry[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+  ],
+  arc : @pattern.TimeSpan,
+) -> Array[SongTestEvent] {
+  let result : Array[SongTestEvent] = []
+  for entry in entries {
+    guard span(entry.start(), entry.end_()).intersect(arc) is Some(arc) else {
+      continue
+    }
+    let placement = entry.placement()
+    for
+      event in entry
+      .content()
+      .query_for_entry(entry.content_entry(), placement.local_span(arc)) {
+      result.push({
+        origin: entry.origin(),
+        source: event.origin(),
+        event: event.event().placed(placement),
+        controls: event.controls().placed(placement),
+      })
+    }
+  }
+  result
+}
+
+///|
+test "entries tag each event with its occurrence, section and layer, in layer order" {
+  let layered = Section(id=sid("section:layered"), length_cycles=cycles(1), layers=[
+    SectionLayer(id=lid("layer:lead"), content=tracked("lead", 60.0)),
+    SectionLayer(id=lid("layer:pad"), content=tracked("pad", 67.0)),
   ])
-  assert_eq(song.duration(), @pattern.Rational::from_int(4))
+  let events = query(
+    song([SongPart(id=oid("occurrence:layered"), section=layered)]).entries(),
+    span(cycles(0), rat(1L, 100L)),
+  )
+  @debug.assert_eq(
+    events.map(event => {
+      let origin = event.origin
+      (
+        origin.occurrence().value(),
+        origin.section().value(),
+        origin.layer().value(),
+        event.event.value.sound is Note(_, pitch=60.0),
+      )
+    }),
+    [
+      ("occurrence:layered", "section:layered", "layer:lead", true),
+      ("occurrence:layered", "section:layered", "layer:pad", false),
+    ],
+  )
+}
+
+///|
+test "exact entry origins survive a placed, rated section" {
+  let epoch = @identity.SourceEpoch(7001L)
+  let c = @identity.SourceAtomId(epoch, 1L)
+  let g = @identity.SourceAtomId(epoch, 2L)
+  let exact = @pattern.PatternDoc::stack(
+    id=@identity.PatternNodeId::from_string("source:stack"),
+    docs=[
+      @pattern.PatternDoc::atom(
+        id=@identity.PatternNodeId::from_string("source:c"),
+        source_atom=c,
+        value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
+      ),
+      @pattern.PatternDoc::atom(
+        id=@identity.PatternNodeId::from_string("source:g"),
+        source_atom=g,
+        value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=67.0)),
+      ),
+    ],
+  ).lower_tracked()
+  let fast = Section(
+    id=sid("section:exact"),
+    length_cycles=cycles(1),
+    rate=cycles(2),
+    layers=[SectionLayer(id=lid("layer:exact"), content=exact)],
+  )
+  let entries = song([at("occurrence:exact", cycles(3), fast)]).entries()
+  let arc = span(rat(13L, 4L), rat(15L, 4L))
+  for index, atom in [c, g] {
+    let events = query(entries[index:index + 1], arc)
+    @debug.assert_eq(events.length(), 2)
+    for event in events {
+      assert_true(event.source.atom() == atom)
+      assert_true(
+        event.event.value.sound is Note(_, pitch~) &&
+        pitch == (if index == 0 { 60.0 } else { 67.0 }),
+      )
+    }
+    @debug.assert_eq(events[0].event.whole, Some(span(cycles(3), rat(7L, 2L))))
+    @debug.assert_eq(events[1].event.whole, Some(span(rat(7L, 2L), cycles(4))))
+    @debug.assert_eq(events[0].event.part.begin, arc.begin)
+    @debug.assert_eq(events[1].event.part.end_, arc.end_)
+  }
+}
+
+///|
+test "song events read their buses on the song clock" {
+  let id = (name : String) => {
+    @identity.PatternNodeId::from_string("song-bus:" + name) catch {
+      _ => abort("bad id")
+    }
+  }
+  let pattern = @pattern.PatternDoc::merge_control(
+    id=id("merge"),
+    left=@pattern.PatternDoc::atom(
+      id=id("note"),
+      source_atom=@identity.SourceAtomId(@identity.SourceEpoch(7002L), 1L),
+      value=@score.ScoreEvent(Note(@score.Instrument::default(), pitch=60.0)),
+    ),
+    right=@pattern.PatternDoc::continuous(
+      id=id("ramp"),
+      key=Lpf,
+      f=(t, _) => 100.0 * t,
+      signature="100t",
+    ),
+  ).lower_tracked()
+  // Placed at cycle 3 and played twice as fast: local = (t - 3) × 2.
+  let fast = Section(
+    id=sid("section:bus"),
+    length_cycles=cycles(1),
+    rate=cycles(2),
+    layers=[SectionLayer(id=lid("layer:bus"), content=pattern)],
+  )
+  let events = query(
+    song([at("occurrence:bus", cycles(3), fast)]).entries(),
+    span(rat(13L, 4L), rat(7L, 2L)),
+  )
+  @debug.assert_eq(events.length(), 1)
+  let reader = events[0].controls.reader(Lpf).unwrap()
+  // (3.25 - 3) × 2 = 0.5 and (3.4 - 3) × 2 = 0.8.
+  @debug.assert_eq("\{reader(13L, 4L)} \{reader(17L, 5L)}", "50 80")
+  // An entry that starts the song at playback time 1 adds 1, after the rate.
+  let entry = @pattern.Placement(origin=cycles(1))
+  let placed = events[0].controls.placed(entry).reader(Lpf).unwrap()
+  @debug.assert_eq("\{placed(17L, 4L)} \{placed(22L, 5L)}", "50 80")
+  @debug.assert_eq(
+    events[0].event.placed(entry).part,
+    span(rat(17L, 4L), rat(9L, 2L)),
+  )
 }

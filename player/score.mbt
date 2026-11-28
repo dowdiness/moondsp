@@ -29,19 +29,19 @@ pub fn Score::pattern(
 }
 
 ///|
-/// A lowered song at `tempo` that ends after its last occurrence, or repeats
-/// when `repeat` is true. Its events carry event origins when its sections
-/// hold tracked snapshots. A song always ends after its beginning: it has a
-/// part, every part starts at or after 0, and every section lasts.
+/// A song at `tempo` that ends after its last occurrence, or repeats when
+/// `repeat` is true. Its events carry event origins when its sections hold
+/// tracked snapshots. A song always ends after its beginning: it has a part,
+/// every part starts at or after 0, and every section lasts.
 pub fn[C : @song.SongContent] Score::song(
-  snapshot : @song.SongSnapshot[C],
+  song : @song.Song[C],
   tempo~ : Tempo,
   repeat~ : Bool = false,
 ) -> Score {
   {
     admitted: None,
     tempo: tempo.value,
-    snapshot: @scheduler.PlaybackSnapshot::song(snapshot, repeat~),
+    snapshot: @scheduler.PlaybackSnapshot::song(song, repeat~),
   }
 }
 

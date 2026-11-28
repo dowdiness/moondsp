@@ -110,8 +110,7 @@ pub fn Draft::signal_graphs(
         })
       })
     }
-    Arrangement(snapshot, _) => {
-      let song = snapshot.song()
+    Arrangement(song, _) => {
       let window = song.duration()
       signals.filter_map(signal => {
         // Curve i follows the i-th trace in every occurrence, placed as
@@ -121,15 +120,11 @@ pub fn Draft::signal_graphs(
           let section = occurrence.section()
           let placement = @pattern.Placement(
             origin=occurrence.start(),
-            rate=section.scope().rate(),
+            rate=section.rate(),
           )
-          let snapshots = match section.section_body() {
-            Single(snapshot) => [snapshot]
-            Layers(layers) => layers.map(layer => layer.body())
-          }
           let mut index = 0
-          for snapshot in snapshots {
-            for trace in snapshot.control_traces(signal.id) {
+          for layer in section.layers() {
+            for trace in layer.content().control_traces(signal.id) {
               if index == curves.length() {
                 curves.push([])
               }

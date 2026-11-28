@@ -19,16 +19,16 @@ priv struct SongFillSpec {
 }
 
 ///|
-/// Song parse result with optional playback metadata: the song lowered with
-/// the identities its source declares (see `song_section_id`).
+/// Song parse result with optional playback metadata: the song laid out
+/// with the identities its source declares (see `song_section_id`).
 pub struct ParsedSong[C] {
-  snapshot : @song.SongSnapshot[C]
+  song : @song.Song[C]
   bpm : Double?
 }
 
 ///|
-pub fn[C] ParsedSong::snapshot(self : ParsedSong[C]) -> @song.SongSnapshot[C] {
-  self.snapshot
+pub fn[C] ParsedSong::song(self : ParsedSong[C]) -> @song.Song[C] {
+  self.song
 }
 
 ///|
@@ -83,7 +83,7 @@ pub fn parse_song(
 ///|
 /// The items of the `song(` opened at `song_start`, from after its `(`.
 /// `lower` turns each section's compiled document into the song's content.
-fn[C : @song.SongContent] Parser::parse_song_body(
+fn[C] Parser::parse_song_body(
   self : Parser,
   song_start : Int32,
   builder : MiniDocBuilder,
@@ -93,7 +93,7 @@ fn[C : @song.SongContent] Parser::parse_song_body(
   guard !self.at_end() && self.input[self.pos] != ')' else {
     raise Mistake(song_start, "song() requires at least one item")
   }
-  let sections : Map[String, @song.SectionDoc[C]] = Map([])
+  let sections : Map[String, @song.Section[C]] = Map([])
   let part_specs : Array[SongPartSpec] = []
   let fill_specs : Array[SongFillSpec] = []
   let bpm_values : Array[Double] = []
@@ -121,23 +121,22 @@ fn[C : @song.SongContent] Parser::parse_song_body(
   }
   self.expect_char(')')
   check_part_identities(part_specs)
-  let parts = [ for spec in part_specs => spec.to_doc(sections) ]
-  let mut doc = song_doc(parts, part_specs, at=song_start)
+  let parts = [ for spec in part_specs => spec.to_part(sections) ]
+  let mut song = song_of(parts, at=song_start)
+  // Names by identity, so a fill that repeats a part says which.
+  let taken : Map[String, String] = Map([])
+  for spec in part_specs {
+    taken[spec.identity()] = spec.name
+  }
   for fill in fill_specs {
     let section = resolve_song_section(
       sections,
       fill.section_name,
       at=fill.section_at,
     )
-    let gaps = song_of(doc, at=fill.at).gap_spans()
-    if self.admission is Some(_) && doc.occurrence_count() + gaps.length() > 128 {
+    let gaps = song.gap_spans()
+    if self.admission is Some(_) && parts.length() + gaps.length() > 128 {
       raise OverLimit(Occurrences)
-    }
-    let filled = doc.occurrences()
-    // Names by identity, so a fill that repeats a part says which.
-    let taken : Map[String, String] = Map([])
-    for occurrence in filled {
-      taken[occurrence.id().value()] = occurrence.name()
     }
     for index, gap in gaps {
       let name = "\{fill.prefix}:\{index}"
@@ -152,30 +151,27 @@ fn[C : @song.SongContent] Parser::parse_song_body(
           },
         )
       }
+      taken[identity] = name
       let section = resized_section(section, gap.duration())
       // A gap lies inside the song, so it starts at or after 0.
-      let occurrence = @song.SongOccurrenceDoc::at(
+      let part = @song.SongPart::at(
         id=occurrence_id(identity),
         start=gap.begin,
-        name~,
         section~,
       ) catch {
         NegativeStart => raise Internal("fill '\{name}' starts before zero")
       }
-      filled.push(occurrence)
+      parts.push(part)
     }
-    doc = song_doc(filled, [], at=fill.at)
+    song = song_of(parts, at=fill.at)
   }
-  let snapshot = doc.lower() catch {
-    error => raise song_mistake(error, part_specs, at=song_start)
-  }
-  { snapshot, bpm: bpm_values.get(0), }
+  { song, bpm: bpm_values.get(0), }
 }
 
 ///|
 fn[C] Parser::parse_song_item(
   self : Parser,
-  sections : Map[String, @song.SectionDoc[C]],
+  sections : Map[String, @song.Section[C]],
   part_specs : Array[SongPartSpec],
   fill_specs : Array[SongFillSpec],
   bpm_values : Array[Double],
@@ -190,11 +186,15 @@ fn[C] Parser::parse_song_item(
   }
   match item {
     Section => {
-      let section = self.parse_song_section(item_start, builder~, lower~)
-      if sections.contains(section.name()) {
-        raise Mistake(item_start, "duplicate section '\{section.name()}'")
+      let (name, section) = self.parse_song_section(
+        item_start,
+        builder~,
+        lower~,
+      )
+      if sections.contains(name) {
+        raise Mistake(item_start, "duplicate section '\{name}'")
       }
-      sections[section.name()] = section
+      sections[name] = section
     }
     Bpm => {
       if !bpm_values.is_empty() {
@@ -232,7 +232,7 @@ fn[C] Parser::parse_song_section(
   item_start : Int32,
   builder~ : MiniDocBuilder,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
-) -> @song.SectionDoc[C] raise SourceProblem {
+) -> (String, @song.Section[C]) raise SourceProblem {
   self.skip_whitespace()
   let name = self.read_quoted_string()
   self.expect_comma()
@@ -242,7 +242,9 @@ fn[C] Parser::parse_song_section(
   // so it is not overlaid with the other sections.
   let syntax = resolve_mini_expr(self.parse_syntax_expr(), self.bindings)
   if self.admission is Some(admission) {
-    admission.sections[name] = admission.expression(syntax)
+    admission.sections[song_section_id(name).value()] = admission.expression(
+      syntax,
+    )
   }
   let doc = compile_score(syntax, builder).doc()
   self.skip_whitespace()
@@ -253,16 +255,13 @@ fn[C] Parser::parse_song_section(
     "section '\{name}' requires a positive length",
   )
   let content = lower(doc) catch { _ => raise compile_error }
-  @song.SectionDoc::single(
-    id=song_section_id(name),
-    name~,
-    length_cycles~,
-    scope=@song.TimeScope::identity(),
-    layer_id=main_layer(),
-    body=content,
-  ) catch {
-    _ => raise length_error
+  let section = @song.Section(id=song_section_id(name), length_cycles~, layers=[
+    @song.SectionLayer(id=main_layer(), content~),
+  ]) catch {
+    NonPositiveLength => raise length_error
+    _ => raise compile_error
   }
+  (name, section)
 }
 
 ///|
@@ -445,10 +444,10 @@ fn check_part_identities(
 
 ///|
 fn[C] resolve_song_section(
-  sections : Map[String, @song.SectionDoc[C]],
+  sections : Map[String, @song.Section[C]],
   name : String,
   at~ : Int32,
-) -> @song.SectionDoc[C] raise SourceProblem {
+) -> @song.Section[C] raise SourceProblem {
   match sections.get(name) {
     Some(section) => section
     None => raise Mistake(at, "unknown song section '\{name}'")
@@ -456,10 +455,10 @@ fn[C] resolve_song_section(
 }
 
 ///|
-fn[C] SongPartSpec::to_doc(
+fn[C] SongPartSpec::to_part(
   self : SongPartSpec,
-  sections : Map[String, @song.SectionDoc[C]],
-) -> @song.SongOccurrenceDoc[C] raise SourceProblem {
+  sections : Map[String, @song.Section[C]],
+) -> @song.SongPart[C] raise SourceProblem {
   let section = resolve_song_section(
     sections,
     self.section_name,
@@ -468,53 +467,40 @@ fn[C] SongPartSpec::to_doc(
   let id = occurrence_id(self.identity())
   match self.start {
     Some((start, at)) =>
-      @song.SongOccurrenceDoc::at(id~, start~, name=self.name, section~) catch {
+      @song.SongPart::at(id~, start~, section~) catch {
         NegativeStart => raise Mistake(at, "part start cannot be negative")
       }
-    None => @song.SongOccurrenceDoc(id~, name=self.name, section~)
+    None => @song.SongPart(id~, section~)
   }
 }
 
 ///|
-fn[C] song_doc(
-  parts : Array[@song.SongOccurrenceDoc[C]],
-  specs : Array[SongPartSpec],
-  at~ : Int32,
-) -> @song.SongDoc[C] raise SourceProblem {
-  @song.SongDoc(parts~) catch {
-    EmptySongDoc => raise Mistake(at, "song() requires at least one part")
-    DuplicateSongDocOccurrenceName(name) =>
-      raise song_mistake(DuplicateOccurrence(name), specs, at~)
-    DuplicateSongDocOccurrenceId(id) =>
-      raise Internal("song part '\{id}' was not checked for repeats")
-  }
-}
-
-///|
-/// The arrangement `doc` lays out.
+/// The song `parts` lay out. `check_part_identities` already reported a
+/// repeated part where it repeats.
 fn[C] song_of(
-  doc : @song.SongDoc[C],
+  parts : Array[@song.SongPart[C]],
   at~ : Int32,
 ) -> @song.Song[C] raise SourceProblem {
-  doc.to_song() catch {
-    error => raise song_mistake(error, [], at~)
+  @song.Song(parts~) catch {
+    EmptySong => raise Mistake(at, "song() requires at least one part")
+    DuplicateOccurrence(id) =>
+      raise Internal("song part '\{id}' was not checked for repeats")
   }
 }
 
 ///|
 /// `section` lasting `length` cycles, as a fill occurrence plays it.
 fn[C] resized_section(
-  section : @song.SectionDoc[C],
+  section : @song.Section[C],
   length : @pattern.Rational,
-) -> @song.SectionDoc[C] raise SourceProblem {
-  @song.SectionDoc(
+) -> @song.Section[C] raise SourceProblem {
+  @song.Section(
     id=section.id(),
-    name=section.name(),
     length_cycles=length,
-    scope=section.scope(),
-    body=section.body(),
+    rate=section.rate(),
+    layers=section.layers().to_owned(),
   ) catch {
-    _ => raise Internal("fill of section '\{section.name()}'")
+    _ => raise Internal("fill of section '\{section.id().value()}'")
   }
 }
 
@@ -555,41 +541,4 @@ fn identity_text(name : String) -> String {
     }
   }
   encoded.to_string()
-}
-
-///|
-/// A song the author arranged inconsistently. A repeated part is reported
-/// where it repeats; anything else at `at`.
-fn song_mistake(
-  error : @song.SongBuildError,
-  specs : Array[SongPartSpec],
-  at~ : Int32,
-) -> SourceProblem {
-  // The first part that repeats an earlier one.
-  let repeated = (same : (SongPartSpec) -> Bool) => {
-    let mut seen = false
-    for spec in specs {
-      if same(spec) {
-        if seen {
-          return spec.at
-        }
-        seen = true
-      }
-    }
-    at
-  }
-  match error {
-    EmptySong => Mistake(at, "song() requires at least one part")
-    DuplicateOccurrence(name) =>
-      Mistake(
-        repeated(spec => spec.name == name),
-        "duplicate song part '\{name}'",
-      )
-    DuplicateOccurrenceId(id) =>
-      Mistake(
-        repeated(spec => spec.id is Some(own) && own == id),
-        "duplicate song part id '\{id}'",
-      )
-    InvalidOccurrenceId(id) => Mistake(at, "invalid song part id '\{id}'")
-  }
 }

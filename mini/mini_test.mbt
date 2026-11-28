@@ -1134,7 +1134,10 @@ test "Draft confirmed song mode and explicit text input remain valid runtime sou
     fail("expected tracked song")
   }
   assert_true(repeating)
-  assert_eq(drum_of(song.song().query(draft_arc())[0].value), Some("bd"))
+  assert_eq(
+    drum_of(song.entries()[0].body().query(draft_arc())[0].value),
+    Some("bd"),
+  )
   assert_true(draft.locate_origin(old) is Unavailable(SourceReset))
   edit_draft(draft, 0, text.length(), "/*")
   assert_true(draft.state().tracking() is Song)

@@ -55,15 +55,11 @@ fn transport_content(
   name : String,
   control : @pattern.ControlMap,
   duration : @pattern.Rational,
-) -> @song.SectionLayerDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
-  @song.SectionLayerDoc(
-    id=@identity.SectionLayerId::from_string("transport:\{name}"),
-    name~,
-    body=@pattern.PatternDoc::from_pattern(
-      id=@identity.PatternNodeId::from_string("transport:\{name}"),
-      pat=@pattern.Pat::pure(played(control)).slow(duration),
-    ).lower(),
-  )
+) -> @pattern.UntrackedPatternSnapshot[@score.ScoreEvent] raise {
+  @pattern.PatternDoc::from_pattern(
+    id=@identity.PatternNodeId::from_string("transport:\{name}"),
+    pat=@pattern.Pat::pure(played(control)).slow(duration),
+  ).lower()
 }
 
 ///|
@@ -76,25 +72,32 @@ fn single_span(
   physical? : @pattern.ControlMap,
 ) -> @scheduler.PlaybackSnapshot raise {
   let duration = end_ - begin
-  let layers = [transport_content("note", control, duration)]
+  let layers = [
+    @song.SectionLayer(
+      id=@identity.SectionLayerId::from_string("transport:note"),
+      content=transport_content("note", control, duration),
+    ),
+  ]
   if physical is Some(physical) {
-    layers.push(transport_content("physical", physical, duration))
+    layers.push(
+      @song.SectionLayer(
+        id=@identity.SectionLayerId::from_string("transport:physical"),
+        content=transport_content("physical", physical, duration),
+      ),
+    )
   }
-  let section = @song.SectionDoc(
+  let section = @song.Section(
     id=@identity.SectionId::from_string("transport:section"),
-    name="note",
     length_cycles=duration,
-    scope=@song.TimeScope::identity(),
-    body=@song.SectionDocBody::layers(layers),
+    layers~,
   )
-  let song = @song.SongDoc(parts=[
-    @song.SongOccurrenceDoc::at(
+  let song = @song.Song(parts=[
+    @song.SongPart::at(
       id=@identity.OccurrenceId::from_string("transport:once"),
       start=begin,
-      name="once",
       section~,
     ),
-  ]).lower()
+  ])
   @scheduler.PlaybackSnapshot::song(song)
 }
 
@@ -367,27 +370,28 @@ fn rated_song(
   rate : Int64,
   length~ : Int64 = 4L,
 ) -> @scheduler.PlaybackSnapshot raise {
-  let section = @song.SectionDoc::single(
+  let section = @song.Section(
     id=@identity.SectionId::from_string("rated"),
-    name="rated",
     length_cycles=@pattern.Rational(length, 1L),
-    scope=@song.TimeScope::at_rate(rate=@pattern.Rational(rate, 1L)),
-    layer_id=@identity.SectionLayerId::from_string("main"),
-    body=@pattern.PatternDoc::from_pattern(
-      id=@identity.PatternNodeId::from_string("rated"),
-      pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
-    ).lower(),
-  )
-  @scheduler.PlaybackSnapshot::song(
-    @song.SongDoc(parts=[
-      @song.SongOccurrenceDoc::at(
-        id=@identity.OccurrenceId::from_string(id),
-        start=@pattern.Rational::from_int(0),
-        name=id,
-        section~,
+    rate=@pattern.Rational(rate, 1L),
+    layers=[
+      @song.SectionLayer(
+        id=@identity.SectionLayerId::from_string("main"),
+        content=@pattern.PatternDoc::from_pattern(
+          id=@identity.PatternNodeId::from_string("rated"),
+          pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
+        ).lower(),
       ),
-    ]).lower(),
+    ],
   )
+  let song = @song.Song(parts=[
+    @song.SongPart::at(
+      id=@identity.OccurrenceId::from_string(id),
+      start=@pattern.Rational::from_int(0),
+      section~,
+    ),
+  ])
+  @scheduler.PlaybackSnapshot::song(song)
 }
 
 ///|
@@ -460,25 +464,23 @@ test "fit is checked from the snapshot: repetition and finite end" {
   let tempo = @scheduler.Tempo::from_bpm(120.0).unwrap()
   let fast = @scheduler.Tempo::from_bpm(1000.0).unwrap()
   // A 1/750-cycle repetition is one block at 120 BPM and less at 1000.
-  let section = @song.SectionDoc::single(
+  let section = @song.Section(
     id=@identity.SectionId::from_string("fit"),
-    name="fit",
     length_cycles=@pattern.Rational(1L, 750L),
-    scope=@song.TimeScope::identity(),
-    layer_id=@identity.SectionLayerId::from_string("main"),
-    body=@pattern.PatternDoc::from_pattern(
-      id=@identity.PatternNodeId::from_string("fit"),
-      pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
-    ).lower(),
+    layers=[
+      @song.SectionLayer(
+        id=@identity.SectionLayerId::from_string("main"),
+        content=@pattern.PatternDoc::from_pattern(
+          id=@identity.PatternNodeId::from_string("fit"),
+          pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
+        ).lower(),
+      ),
+    ],
   )
   let repeating = @scheduler.PlaybackSnapshot::song(
-    @song.SongDoc(parts=[
-      @song.SongOccurrenceDoc(
-        id=@identity.OccurrenceId::from_string("fit"),
-        name="fit",
-        section~,
-      ),
-    ]).lower(),
+    @song.Song(parts=[
+      @song.SongPart(id=@identity.OccurrenceId::from_string("fit"), section~),
+    ]),
     repeat=true,
   )
   assert_true(sched.check_fits(repeating, tempo) is Ok(_))

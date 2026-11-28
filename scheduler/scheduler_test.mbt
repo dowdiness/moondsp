@@ -192,42 +192,32 @@ fn lid(value : String) -> @identity.SectionLayerId {
 }
 
 ///|
-fn scheduler_section_doc(
+fn scheduler_section(
   id_value : String,
-  name : String,
   midi : Double,
-) -> @song.SectionDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
-  @song.SectionDoc::single(
+) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
+  @song.Section(
     id=sid(id_value),
-    name~,
     length_cycles=@pattern.Rational::from_int(1),
-    scope=@song.TimeScope::identity(),
-    layer_id=lid("\{id_value}:main"),
-    body=note_snapshot("\{id_value}:main", midi),
-  ) catch {
-    _ => abort("expected section doc")
-  }
-}
-
-///|
-fn scheduler_song_doc(
-  occurrences : Array[
-    @song.SongOccurrenceDoc[
-      @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+    layers=[
+      @song.SectionLayer(
+        id=lid("\{id_value}:main"),
+        content=note_snapshot("\{id_value}:main", midi),
+      ),
     ],
-  ],
-) -> @song.SongDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
-  @song.SongDoc(parts=occurrences) catch {
-    _ => abort("expected song doc")
+  ) catch {
+    _ => abort("expected section")
   }
 }
 
 ///|
-fn song_snapshot(
-  doc : @song.SongDoc[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
-) -> @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
-  doc.lower() catch {
-    _ => abort("expected song snapshot")
+fn scheduler_song(
+  parts : Array[
+    @song.SongPart[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  ],
+) -> @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] {
+  @song.Song(parts~) catch {
+    _ => abort("expected song")
   }
 }
 
@@ -440,36 +430,36 @@ test "Song layer selection does not cross section boundaries" {
   )
   reference.render_block(expected_left, expected_right)
   let layer = lid("shared-layer")
-  let sections = ["selected", "unrelated"].map(name => {
-    @song.SectionDoc::single(
-      id=sid(name),
-      name~,
-      layer_id=layer,
-      length_cycles=@pattern.Rational::from_int(1),
-      scope=@song.TimeScope::identity(),
-      body=note_snapshot(
-        "\{name}:main",
-        if name == "selected" {
-          60.0
-        } else {
-          72.0
-        },
+  let selected = try! @song.Section(
+    id=sid("selected"),
+    length_cycles=@pattern.Rational::from_int(1),
+    layers=[
+      @song.SectionLayer(id=layer, content=note_snapshot("selected:main", 60.0)),
+    ],
+  )
+  let unrelated = try! @song.Section(
+    id=sid("unrelated"),
+    length_cycles=@pattern.Rational::from_int(1),
+    layers=[
+      @song.SectionLayer(
+        id=layer,
+        content=note_snapshot("unrelated:main", 72.0),
       ),
-    )
-  })
-  let doc = scheduler_song_doc(
-    sections.map(section => {
-      @song.SongOccurrenceDoc::at(
-        id=oid(section.name()),
-        name=section.name(),
-        section~,
-        start=@pattern.Rational::from_int(0),
-      )
-    }),
+    ],
   )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
-  )
+  let song = scheduler_song([
+    try! @song.SongPart::at(
+      id=oid("selected"),
+      start=@pattern.Rational::from_int(0),
+      section=selected,
+    ),
+    try! @song.SongPart::at(
+      id=oid("unrelated"),
+      start=@pattern.Rational::from_int(0),
+      section=unrelated,
+    ),
+  ])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(song))
   sched.render_block(left, right)
   let outcome = sched
     .apply_song_voice_effect_result(
@@ -616,13 +606,9 @@ test "render_block: multiple pending snapshots keep the latest" {
 test "render_block: pending song snapshot commits at block boundary" {
   let (_, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:main")
-  let section = scheduler_section_doc("section:song-snapshot", "Main", 60.0)
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
-  ])
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
-  )
+  let section = scheduler_section("section:song-snapshot", 60.0)
+  let song = scheduler_song([@song.SongPart(id=main_id, section~)])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(song))
   assert_nothing_playing(sched)
   sched.render_block(left, right)
   let outcome = sched
@@ -637,59 +623,50 @@ test "render_block: pending song snapshot commits at block boundary" {
 }
 
 ///|
-test "render_block: same-layout song edit commits without layout boundary change" {
+test "render_block: song content replacement commits at block boundary" {
   let (_, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:same-layout")
   let section_id = "section:same-layout"
   let layer_id = lid("\{section_id}:main")
-  let section = scheduler_section_doc(section_id, "Main", 60.0)
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
-  ])
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
-  )
+  let section = scheduler_section(section_id, 60.0)
+  let doc = scheduler_song([@song.SongPart(id=main_id, section~)])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(doc))
   sched.render_block(left, right)
-  let edited_section = section.replace_layer_body(
-    layer_id,
-    body=note_snapshot(layer_id.value(), 62.0),
+  let edited_section = try! @song.Section(
+    id=sid(section_id),
+    length_cycles=@pattern.Rational::from_int(1),
+    layers=[
+      @song.SectionLayer(
+        id=layer_id,
+        content=note_snapshot(layer_id.value(), 62.0),
+      ),
+    ],
   )
-  let edited = doc.replace_occurrence_section(main_id, section=edited_section)
-  assert_true(edited.revision() != doc.revision())
-  assert_true(edited.layout_revision() == doc.layout_revision())
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
-  )
+  let edited = scheduler_song([
+    @song.SongPart(id=main_id, section=edited_section),
+  ])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(edited))
   sched.render_block(left, right)
   @debug.assert_eq(sched.sample_counter(), 256L)
 }
 
 ///|
-test "render_block: layout edit does not backfill past onsets" {
+test "render_block: earlier song onset does not backfill past events" {
   let (pool, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:no-backfill")
-  let section = scheduler_section_doc("section:no-backfill", "Main", 60.0)
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc::at(
+  let section = scheduler_section("section:no-backfill", 60.0)
+  let doc = scheduler_song([
+    try! @song.SongPart::at(
       id=main_id,
       start=@pattern.Rational::from_int(1),
-      name="Main",
       section~,
     ),
   ])
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
-  )
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(doc))
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
-  let edited = doc.set_occurrence_start(
-    main_id,
-    start=@pattern.Rational::from_int(0),
-  )
-  assert_true(edited.layout_revision() != doc.layout_revision())
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
-  )
+  let edited = scheduler_song([@song.SongPart(id=main_id, section~)])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(edited))
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -697,26 +674,23 @@ test "render_block: layout edit does not backfill past onsets" {
 }
 
 ///|
-test "render_block: layout replacement lets active note ring" {
+test "render_block: moving a song occurrence lets an active note ring" {
   let (pool, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:ring")
-  let section = scheduler_section_doc("section:ring", "Main", 60.0)
-  let doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
-  ])
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(doc)),
-  )
+  let section = scheduler_section("section:ring", 60.0)
+  let doc = scheduler_song([@song.SongPart(id=main_id, section~)])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(doc))
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
-  let edited = doc.set_occurrence_start(
-    main_id,
-    start=@pattern.Rational::from_int(2),
-  )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(edited)),
-  )
+  let edited = scheduler_song([
+    try! @song.SongPart::at(
+      id=main_id,
+      start=@pattern.Rational::from_int(2),
+      section~,
+    ),
+  ])
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(edited))
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 1)
   @debug.assert_eq(sched.active_note_count(), 1)
@@ -726,20 +700,17 @@ test "render_block: layout replacement lets active note ring" {
 test "render_block: multiple pending song snapshots keep the latest" {
   let (pool, sched, left, right) = make_test_sched()
   let main_id = oid("song-snapshot:coalesced")
-  let section = scheduler_section_doc("section:coalesced", "Main", 60.0)
-  let first = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=main_id, name="Main", section~),
+  let section = scheduler_section("section:coalesced", 60.0)
+  let first = scheduler_song([@song.SongPart(id=main_id, section~)])
+  let latest = scheduler_song([
+    try! @song.SongPart::at(
+      id=main_id,
+      start=@pattern.Rational::from_int(2),
+      section~,
+    ),
   ])
-  let latest = first.set_occurrence_start(
-    main_id,
-    start=@pattern.Rational::from_int(2),
-  )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(first)),
-  )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(latest)),
-  )
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(first))
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(latest))
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
   @debug.assert_eq(sched.active_note_count(), 0)
@@ -751,21 +722,18 @@ test "a later queued snapshot replaces an earlier one in the one pending slot" {
   let (pool, sched, left, right) = make_test_sched()
   let pattern = note_snapshot("playback-snapshot:pattern", 60.0)
   let main_id = oid("playback-snapshot:song")
-  let section = scheduler_section_doc("section:playback-snapshot", "Main", 64.0)
-  let song_doc = scheduler_song_doc([
-    @song.SongOccurrenceDoc::at(
+  let section = scheduler_section("section:playback-snapshot", 64.0)
+  let song = scheduler_song([
+    try! @song.SongPart::at(
       id=main_id,
       start=@pattern.Rational::from_int(2),
-      name="Main",
       section~,
     ),
   ])
   sched.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::pattern(pattern.playback()),
   )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(song_doc)),
-  )
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(song))
   assert_eq(sched.active_note_count(), 0)
   sched.render_block(left, right)
   @debug.assert_eq(pool.active_voice_count(), 0)
@@ -1177,48 +1145,38 @@ test "deferred song replacement preserves selected layer provenance" {
   let section_id = sid("deferred-song-provenance-section")
   let lead_id = lid("deferred-song-provenance-lead")
   let pad_id = lid("deferred-song-provenance-pad")
-  let section = @song.SectionDoc::SectionDoc(
+  let lead = note_snapshot(lead_id.value(), 60.0)
+  let pad = note_snapshot(pad_id.value(), 72.0)
+  let section = try! @song.Section(
     id=section_id,
-    name="Deferred",
     length_cycles=@pattern.Rational::from_int(4),
-    scope=@song.TimeScope::identity(),
-    body=@song.SectionDocBody::layers([
-      @song.SectionLayerDoc(
-        id=lead_id,
-        name="Lead",
-        body=note_snapshot(lead_id.value(), 60.0),
-      ),
-      @song.SectionLayerDoc(
-        id=pad_id,
-        name="Pad",
-        body=note_snapshot(pad_id.value(), 72.0),
-      ),
-    ]),
+    layers=[
+      @song.SectionLayer(id=lead_id, content=lead),
+      @song.SectionLayer(id=pad_id, content=pad),
+    ],
   )
-  let initial = scheduler_song_doc([
-    @song.SongOccurrenceDoc(id=occurrence, name="Deferred", section~),
+  let initial = scheduler_song([@song.SongPart(id=occurrence, section~)])
+  let edited_lead = @pattern.PatternDoc::from_pattern(
+    id=pid(lead_id.value()),
+    pat=@score.note(64.0).fast(@pattern.Rational::from_int(2)),
+  ).lower() catch {
+    _ => abort("edited layer snapshot creation failed")
+  }
+  let replacement_section = try! @song.Section(
+    id=section_id,
+    length_cycles=@pattern.Rational::from_int(4),
+    layers=[
+      @song.SectionLayer(id=lead_id, content=edited_lead),
+      @song.SectionLayer(id=pad_id, content=pad),
+    ],
+  )
+  let replacement = scheduler_song([
+    @song.SongPart(id=occurrence, section=replacement_section),
   ])
-  let edited_section = section.replace_layer_body(
-    lead_id,
-    body=@pattern.PatternDoc::from_pattern(
-      id=pid(lead_id.value()),
-      pat=@score.note(64.0).fast(@pattern.Rational::from_int(2)),
-    ).lower() catch {
-      _ => abort("edited layer snapshot creation failed")
-    },
-  )
-  let replacement = initial.replace_occurrence_section(
-    occurrence,
-    section=edited_section,
-  )
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(initial)),
-  )
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(initial))
   sched.render_block(left, right)
   @debug.assert_eq(sched.active_note_count(), 2)
-  sched.queue_playback_snapshot(
-    @scheduler.PlaybackSnapshot::song(song_snapshot(replacement)),
-  )
+  sched.queue_playback_snapshot(@scheduler.PlaybackSnapshot::song(replacement))
   let old_outcome = sched
     .apply_song_voice_effect_result(
       @scheduler.SongVoiceScope::layer(section_id, lead_id),

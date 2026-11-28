@@ -144,7 +144,7 @@ Shared authoring identity:
 | [`identity/`](../identity/README.mbt.md) | Type-safe stable node identifiers and monotonic revision tokens for structural live-editing trees | `GraphNodeId`, `PatternNodeId`, `SectionId`, `SectionLayerId`, `OccurrenceId`, `Revision` |
 | [`pattern/`](../pattern/README.mbt.md) | Queryable musical pattern algebra with exact `Rational` time, polyrhythmic combinators, and `ControlMap` events | `Pat[A]`, `Rational`, `TimeSpan`, `Event[A]`, `ControlMap`, `sequence`, `stack`, `controls`, `PatternDoc` |
 | [`mini/`](../mini/README.mbt.md) | Mini-notation parsing, causal draft editing, and frozen playback inputs with exact pattern origins | `parse`, `parse_song`, `parse_doc`, `parse_snapshot`, `Draft`, `PlaybackInput` |
-| [`song/`](../song/README.mbt.md) | Macro-level musical structure arranging patterns into length-bounded sections, layers, parts, and local `TimeScope` | `Song[C]`, `Section[C]`, `SongPart[C]`, `TimeScope`, `SongDoc[C]`, `SongSnapshot[C]`, `SongContent` |
+| [`song/`](../song/README.mbt.md) | Macro-level musical structure placing length-bounded, layered sections on a timeline and listing their playback entries | `Song[C]`, `Section[C]`, `SectionLayer[C]`, `SongPart[C]`, `SongEntry[C]`, `SongContent` |
 | [`scheduler/`](../scheduler/README.mbt.md) | Audio block quantization, tempo clock, note lifecycle tracking, and voice-scope reconciliation | `PatternScheduler`, `PlaybackSnapshot`, `BlockFrame`, `PatternVoiceScope`, `SongVoiceScope` |
 | `player/` | The performance of one score: compiling and accepting scores, Play/Pause/Ended, tempo, gain, reverb, and block rendering into caller buffers, shared by the browser host and offline renderers (ADR-0029, ADR-0030) | `Player`, `Score`, `Sounds`, `ScoreError`, `PlayerError`, `PlayState`, `ScoreKind`, `NoteVoice`, `SamplerVoice` |
 
@@ -175,7 +175,7 @@ Shared authoring identity:
 │   ├── identity/       Stable ID wrappers and revision tokens for incremental editing
 │   ├── pattern/        Pattern engine: rational time, combinators, and control maps (zero DSP dep)
 │   ├── mini/           Mini-notation parser: text expressions to Pat[ControlMap]
-│   ├── song/           Long-form section scaffolding with identity TimeScope
+│   ├── song/           Long-form song layout: sections, layers, parts, playback entries
 │   └── scheduler/      Bridges pattern events to voice pool and DSP parameter binding
 │
 ├── Platform Adapters & Frontends

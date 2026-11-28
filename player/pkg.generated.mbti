@@ -118,7 +118,7 @@ pub struct Score {
   // private fields
 }
 pub fn Score::pattern(@pattern.PlaybackPattern[@score.ScoreEvent], tempo~ : Tempo) -> Self
-pub fn[C : @song.SongContent] Score::song(@song.SongSnapshot[C], tempo~ : Tempo, repeat? : Bool) -> Self
+pub fn[C : @song.SongContent] Score::song(@song.Song[C], tempo~ : Tempo, repeat? : Bool) -> Self
 
 #derive(Eq, @debug.Debug)
 pub enum ScoreKind {

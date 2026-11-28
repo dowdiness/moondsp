@@ -31,7 +31,7 @@ sample-accurate audio voice triggers across block boundaries:
 
 - **Upstream consumers**: [`player/`](../player/) drives performances through
   accepted snapshots for the browser host and offline renderers (ADR-0029).
-  Custom hosts lower `PatternDoc` or `SongDoc` values into playback snapshots;
+  Custom hosts lower `PatternDoc` values or build `Song` values into playback snapshots;
   queued updates take effect at the next rendered block, while accepted
   snapshots take effect immediately.
 - **Downstream dependencies**: [`voice/`](../voice/) receives dispatched note

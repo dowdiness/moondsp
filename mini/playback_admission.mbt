@@ -306,7 +306,9 @@ fn[C] PlaybackAdmission::arrangement(
   let mut events = 0.0
   let mut work = 0.0
   for occurrence in occurrences {
-    let bound = self.sections[occurrence.section().name()].estimate(self.width)
+    let bound = self.sections[occurrence.section().id().value()].estimate(
+      self.width,
+    )
     guard bound.allowed() else { raise OverLimit(PatternExpansion) }
     events = events.max(bound.events)
     work = work.max(bound.work)

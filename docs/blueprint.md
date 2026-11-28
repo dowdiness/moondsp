@@ -488,7 +488,7 @@ Packages (as shipped):
 - `dowdiness/moondsp/identity` — dependency-free stable ID wrappers and revision tokens for incremental editing
 - `dowdiness/moondsp/pattern` — pattern engine (standalone)
 - `dowdiness/moondsp/mini` — mini-notation parser
-- `dowdiness/moondsp/song` — long-form section scaffold with identity `TimeScope`
+- `dowdiness/moondsp/song` — long-form song layout of sections and parts
 - `dowdiness/moondsp/scheduler` — pattern → voice-pool bridge
 - `dowdiness/moondsp/browser` — AudioWorklet wrapper
 

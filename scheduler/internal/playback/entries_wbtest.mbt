@@ -40,6 +40,34 @@ fn material_snapshot(
 }
 
 ///|
+fn playback_section(
+  id : String,
+  length : Int32,
+  layer : String,
+  content : @pattern.UntrackedPatternSnapshot[@score.ScoreEvent],
+) -> @song.Section[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
+  @song.Section(
+    id=@identity.SectionId::from_string(id),
+    length_cycles=@pattern.Rational::from_int(length),
+    layers=[
+      @song.SectionLayer(
+        id=@identity.SectionLayerId::from_string(layer),
+        content~,
+      ),
+    ],
+  )
+}
+
+///|
+fn playback_song(
+  parts : Array[
+    @song.SongPart[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+  ],
+) -> @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]] raise {
+  @song.Song(parts~)
+}
+
+///|
 fn score(
   parts : Array[@pattern.Pat[@score.ScoreEvent]],
 ) -> PlaybackSnapshot raise {
@@ -127,23 +155,20 @@ test "reordering named entries preserves pending targets and deletion finishes t
 ///|
 test "finite phrase keeps its current content until a new playback" {
   fn finite(note : Int32) -> PlaybackSnapshot raise {
-    let section = @song.SectionDoc::single(
-      id=@identity.SectionId::from_string("section"),
-      name="once",
-      length_cycles=@pattern.Rational::from_int(2),
-      scope=@song.TimeScope::identity(),
-      layer_id=@identity.SectionLayerId::from_string("body"),
-      body=material_snapshot("a", note, 3),
+    let section = playback_section(
+      "section",
+      2,
+      "body",
+      material_snapshot("a", note, 3),
     )
     PlaybackSnapshot::song(
-      @song.SongDoc(parts=[
-        @song.SongOccurrenceDoc::at(
+      playback_song([
+        @song.SongPart::at(
           id=@identity.OccurrenceId::from_string("once"),
           start=@pattern.Rational::from_int(0),
-          name="once",
           section~,
         ),
-      ]).lower(),
+      ]),
     )
   }
   let state = PlaybackState()
@@ -161,23 +186,20 @@ test "finite phrase keeps its current content until a new playback" {
 ///|
 test "settling after an old finite end retains its already entered replacement" {
   fn finite(note : Int32, length : Int32) -> PlaybackSnapshot raise {
-    let section = @song.SectionDoc::single(
-      id=@identity.SectionId::from_string("section"),
-      name="phrase",
-      length_cycles=@pattern.Rational::from_int(length),
-      scope=@song.TimeScope::identity(),
-      layer_id=@identity.SectionLayerId::from_string("body"),
-      body=material_snapshot("a", note, 3),
+    let section = playback_section(
+      "section",
+      length,
+      "body",
+      material_snapshot("a", note, 3),
     )
     PlaybackSnapshot::song(
-      @song.SongDoc(parts=[
-        @song.SongOccurrenceDoc::at(
+      playback_song([
+        @song.SongPart::at(
           id=@identity.OccurrenceId::from_string("once"),
           start=@pattern.Rational::from_int(0),
-          name="phrase",
           section~,
         ),
-      ]).lower(),
+      ]),
     )
   }
   let state = PlaybackState()
@@ -279,41 +301,34 @@ fn finite_occurrence_score(
   lead_start : Int32?,
   repeat~ : Bool = false,
 ) -> PlaybackSnapshot raise {
-  let base = @song.SectionDoc::single(
-    id=@identity.SectionId::from_string("base-section"),
-    name="base",
-    length_cycles=@pattern.Rational::from_int(8),
-    scope=@song.TimeScope::identity(),
-    layer_id=@identity.SectionLayerId::from_string("base-layer"),
-    body=material_snapshot("base", 40, 1),
+  let base = playback_section(
+    "base-section",
+    8,
+    "base-layer",
+    material_snapshot("base", 40, 1),
   )
   let parts = [
-    @song.SongOccurrenceDoc::at(
+    @song.SongPart(
       id=@identity.OccurrenceId::from_string("base-occurrence"),
-      start=@pattern.Rational::from_int(0),
-      name="base",
       section=base,
     ),
   ]
   if lead_start is Some(start) {
-    let lead = @song.SectionDoc::single(
-      id=@identity.SectionId::from_string("lead-section"),
-      name="lead",
-      length_cycles=@pattern.Rational::from_int(8 - start),
-      scope=@song.TimeScope::identity(),
-      layer_id=@identity.SectionLayerId::from_string("lead-layer"),
-      body=material_snapshot("lead", 80, 1),
+    let lead = playback_section(
+      "lead-section",
+      8 - start,
+      "lead-layer",
+      material_snapshot("lead", 80, 1),
     )
     parts.push(
-      @song.SongOccurrenceDoc::at(
+      @song.SongPart::at(
         id=@identity.OccurrenceId::from_string("lead-occurrence"),
         start=@pattern.Rational::from_int(start),
-        name="lead",
         section=lead,
       ),
     )
   }
-  PlaybackSnapshot::song(@song.SongDoc(parts~).lower(), repeat~)
+  PlaybackSnapshot::song(playback_song(parts), repeat~)
 }
 
 ///|
@@ -360,23 +375,20 @@ fn finite_single_score(
   note : Int32,
   repeat~ : Bool = false,
 ) -> PlaybackSnapshot raise {
-  let section = @song.SectionDoc::single(
-    id=@identity.SectionId::from_string("moving-section"),
-    name="moving",
-    length_cycles=@pattern.Rational::from_int(8 - start),
-    scope=@song.TimeScope::identity(),
-    layer_id=@identity.SectionLayerId::from_string("moving-layer"),
-    body=material_snapshot("moving", note, 3),
+  let section = playback_section(
+    "moving-section",
+    8 - start,
+    "moving-layer",
+    material_snapshot("moving", note, 3),
   )
   PlaybackSnapshot::song(
-    @song.SongDoc(parts=[
-      @song.SongOccurrenceDoc::at(
+    playback_song([
+      @song.SongPart::at(
         id=@identity.OccurrenceId::from_string("moving-occurrence"),
         start=@pattern.Rational::from_int(start),
-        name="moving",
         section~,
       ),
-    ]).lower(),
+    ]),
     repeat~,
   )
 }

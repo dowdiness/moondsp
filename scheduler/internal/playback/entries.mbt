@@ -205,12 +205,12 @@ fn pattern_entry_specs(
 }
 
 ///|
-/// One spec per canonical song entry, in the snapshot's entry order. Each
+/// One spec per canonical song entry, in the song's entry order. Each
 /// section content becomes a playback pattern once, not per query.
 fn[C : @song.SongContent] song_entry_specs(
-  snapshot : @song.SongSnapshot[C],
+  song : @song.Song[C],
 ) -> Array[EntrySpec] {
-  snapshot
+  song
   .entries()
   .map(entry => {
     // Layer identity, not stack position, keys an entry within its occurrence.
