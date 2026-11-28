@@ -401,6 +401,8 @@ test "names and content edits play on without a restart" {
     after in [
       // The section's and the part's names are not where it plays.
       "song(section(\"b\",8,note(\"60\")),part_id(\"p\",\"Verse\",\"b\"))",
+      // Another stacked member is new content, not another occurrence.
+       "song(section(\"a\",8,stack(note(\"60\"),note(\"64\"))),part_id(\"p\",\"Intro\",\"a\"))",
       // New content for a started occurrence waits for the next Play.
        "song(section(\"a\",8,note(\"60\").fast(2)),part_id(\"p\",\"Intro\",\"a\"))",
     ] {
