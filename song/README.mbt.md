@@ -38,7 +38,7 @@ between pattern queries and the scheduler:
 | **Timeline & Occurrence** | `Song[C]`, `SectionOccurrence[C]` | `Song::duration`, `Song::occurrences`, `Song::occurrence_at`, `Song::query`, `SectionOccurrence::span` |
 | **Time Scopes** | `TimeScope` | `TimeScope::TimeScope`, `TimeScope::identity`, `TimeScope::at_rate`, `TimeScope::fast`, `TimeScope::slow` |
 | **Live Editing & Documents** | `SongDoc[C]`, `SectionDoc[C]`, `SongSnapshot[C]` | `SongDoc::SongDoc`, `SongDoc::to_song`, `SongDoc::lower`, `SectionDoc::to_section`, `SongSnapshot::entries`, `SongEntry::content`, `SongEntry::placement` |
-| **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
+| **Errors** | `SongBuildError`, `SongDocEditError`, `SectionDocBuildError` | `SongBuildError::EmptySong`, `NegativeStart`, `DuplicateOccurrence`, `DuplicateOccurrenceId`, `InvalidOccurrenceId` |
 
 ## Build a section
 
@@ -152,7 +152,9 @@ stable occurrence IDs in identity-bearing documents, to address each placement.
 
 ## Explicit placement, gaps, and overlap
 
-`SongPart::at` assigns an explicit start cycle. Explicit placements may leave
+`SongPart::at` assigns an explicit start cycle, at or after 0: a song starts
+at cycle 0, and `Song(parts~)` refuses an earlier start with
+`NegativeStart`. Explicit placements may leave
 gaps or overlap; `Song::query` preserves all overlapping events.
 
 ```mbt check

@@ -2,6 +2,8 @@
 #derive(Eq, Debug)
 pub(all) suberror SongBuildError {
   EmptySong
+  /// The named part starts before the song's beginning, cycle 0.
+  NegativeStart(String)
   DuplicateOccurrence(String)
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)
@@ -395,6 +397,9 @@ pub fn[C] Song::Song(
       raise DuplicateOccurrenceId(id.value())
     }
     let start = part.start.unwrap_or(cursor)
+    if start < @pattern.Rational::from_int(0) {
+      raise NegativeStart(part.name)
+    }
     let end_ = start + part.section.length_cycles()
     let index = occurrences.length()
     by_id[id.value()] = index

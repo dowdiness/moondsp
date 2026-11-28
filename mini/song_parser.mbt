@@ -317,7 +317,13 @@ fn Parser::read_optional_song_start(
   let start = if !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
     self.skip_whitespace()
-    Some(self.read_song_rational("part start"))
+    let at = self.pos
+    let start = self.read_song_rational("part start")
+    // The transport starts at the song's beginning, so nothing plays before it.
+    if start < @pattern.Rational::from_int(0) {
+      raise Mistake(at, "part start cannot be negative")
+    }
+    Some(start)
   } else {
     None
   }
@@ -584,5 +590,7 @@ fn song_mistake(
         "duplicate song part id '\{id}'",
       )
     InvalidOccurrenceId(id) => Mistake(at, "invalid song part id '\{id}'")
+    // The parser rejects a negative start where it is written.
+    NegativeStart(name) => Internal("song part '\{name}' starts before zero")
   }
 }

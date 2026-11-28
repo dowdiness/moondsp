@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** a song part cannot start before cycle 0. Mini reports
+  "part start cannot be negative" where the start is written, and
+  `@song.Song(parts~)` raises `SongBuildError::NegativeStart`. Every song
+  therefore ends after its beginning: `@player.Score::song` no longer raises,
+  and `ScoreError::EmptySong` ("song must end after its beginning") is
+  removed.
 - **Breaking:** the scheduler owns how long the accepted song plays.
   `PatternScheduler::check_fits(snapshot, tempo)` reports a repetition
   shorter than a block or an unrepresentable finite end

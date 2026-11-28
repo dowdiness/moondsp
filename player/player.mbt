@@ -137,8 +137,6 @@ pub suberror ScoreError {
   InvalidSource(@mini.SourceProblem)
   /// The score's tempo is out of range.
   Tempo(TempoOutOfRange)
-  /// The song ends at or before its beginning.
-  EmptySong
 }
 
 ///|
@@ -147,7 +145,6 @@ pub fn ScoreError::message(self : ScoreError) -> String {
   match self {
     InvalidSource(problem) => problem.to_string()
     Tempo(error) => error.message()
-    EmptySong => "song must end after its beginning"
   }
 }
 

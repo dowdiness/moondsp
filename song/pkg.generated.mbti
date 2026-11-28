@@ -51,6 +51,7 @@ pub fn SectionPatchError::to_repr(Self) -> @debug.Repr
 #derive(Eq, @debug.Debug)
 pub(all) suberror SongBuildError {
   EmptySong
+  NegativeStart(String)
   DuplicateOccurrence(String)
   DuplicateOccurrenceId(String)
   InvalidOccurrenceId(String)

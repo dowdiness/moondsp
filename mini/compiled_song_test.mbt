@@ -159,3 +159,18 @@ test "repeated part identities name what the author repeated, where" {
   )
   assert_eq(message, "song part id cannot be empty")
 }
+
+///|
+test "a part start before zero is a mistake where it is written" {
+  for start in ["-4", "-1/2", "4/-1"] {
+    let (message, at) = song_mistake_of(
+      "song(section(\"a\",4,note(\"60\")),part(\"p\",\"a\",\{start}))",
+    )
+    assert_eq(message, "part start cannot be negative")
+    assert_true(at.has_prefix(start), msg=start)
+  }
+  // Zero is the song's beginning.
+  ignore(
+    compiled_song("song(section(\"a\",4,note(\"60\")),part(\"p\",\"a\",0))"),
+  )
+}

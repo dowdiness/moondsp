@@ -599,3 +599,30 @@ test "Song::query clips parts at occurrence boundaries without clipping whole" {
   assert_true(events[1].part.begin == @pattern.Rational::from_int(1))
   assert_true(events[1].part.end_ == rat(3L, 2L))
 }
+
+///|
+test "a part cannot start before the song begins" {
+  let section = make_section("a", @pattern.Rational::from_int(4), 60.0)
+  let negative = try
+    @song.Song(parts=[
+      @song.SongPart::at(
+        start=@pattern.Rational(-1L, 2L),
+        name="early",
+        section~,
+      ),
+    ])
+  catch {
+    error => Some(error)
+  } noraise {
+    _ => None
+  }
+  guard negative is Some(NegativeStart(name)) else {
+    fail("expected a negative start to be refused")
+  }
+  assert_eq(name, "early")
+  // A song starting at 0 lasts as long as its parts.
+  let song = @song.Song(parts=[
+    @song.SongPart::at(start=@pattern.Rational::from_int(0), name="a", section~),
+  ])
+  assert_eq(song.duration(), @pattern.Rational::from_int(4))
+}

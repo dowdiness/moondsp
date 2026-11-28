@@ -48,12 +48,13 @@ range".
 7. **Error types follow the call that catches them.** Each names one cause
    per variant, and `message()` on each is the one place that turns it into
    the text the browser shows.
-   - `ScoreError`, from `compile` and the song constructors: Mini's refusal
-     (its `SourceProblem`, which also covers lowering, since Mini returns
-     lowered snapshots), an empty song, and the score's tempo.
+   - `ScoreError`, from `compile`: Mini's refusal (its `SourceProblem`,
+     which also covers lowering, since Mini returns lowered snapshots), and
+     the score's tempo. Score constructors cannot fail: a song always ends
+     after its beginning, since no part starts before 0 (issue #308).
    - `TempoOutOfRange`, from `Tempo(bpm)`, the player's own tempo type,
      which every constructor and `set_tempo` take; `ScoreError::Tempo` wraps it for a
-     source's tempo, a genuine subset. Pattern constructors cannot fail.
+     source's tempo, a genuine subset.
    - `UnsupportedFormat`, from `Player(ctx, sounds)` only.
    - `PlayerError`, from accepting, Play, Pause, tempo changes and
      rendering: the player's limits, layout, state, and buffers. Fault
