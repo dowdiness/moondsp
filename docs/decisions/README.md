@@ -52,3 +52,4 @@ shipped plan or spec.
 - [ADR-0032 — A Mini song's sections and parts are identified by their names](0032-mini-song-identities-are-their-names.md) (Accepted)
 - [ADR-0033 — The scheduler decides whether a song can replace the playing one](0033-the-scheduler-decides-what-continues.md) (Accepted)
 - [ADR-0034 — A song is built one way, from identified parts](0034-a-song-is-built-one-way.md) (Accepted)
+- [ADR-0035 — The scheduler reports observations, the player keeps them typed, the browser encodes them](0035-players-keep-typed-observations.md) (Accepted)

@@ -126,7 +126,7 @@ check_manifest "graph/browser/moon.pkg" '^(dowdiness/moondsp/(dsp|engine/lifecyc
 check_manifest "scheduler/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(control|identity|pattern|score|song|scheduler/internal/(model|transport|playback|voice_runtime|edit_policy)))$'
 # The platform-free player (ADR-0029): prepares, accepts and renders scores for
 # the browser host and offline renderers. It knows no browser or CLAP detail.
-# `identity` names the live song sections it rebuilds for each accepted song.
+# `identity` names the source atom of each signal value it observes.
 check_manifest "player/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(identity|mini|pattern|scheduler|score|song))$'
 check_manifest "browser/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(graph/browser|scheduler|browser/internal/(slot|demo_templates|playback_host)))$'
 check_manifest "browser_test/moon.pkg" '^(dowdiness/moondsp)$'
@@ -154,8 +154,10 @@ check_manifest "scheduler/internal/playback/moon.pkg" '^(dowdiness/moondsp/(iden
 check_manifest "scheduler/internal/voice_runtime/moon.pkg" '^(dowdiness/moondsp/(pattern|score|scheduler/internal/model|voice))$'
 check_manifest "browser/internal/slot/moon.pkg" '^(dowdiness/moondsp)$'
 check_manifest "browser/internal/demo_templates/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(score|player))$'
-# The browser adapter of the player: globals, wire decoding, diagnostics, samples.
-check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|player|score))$'
+# The browser adapter of the player: globals, wire decoding, diagnostics,
+# samples, and the wire rows of the events it observes, which it reads from
+# `pattern`'s event origins (ADR-0035).
+check_manifest "browser/internal/playback_host/moon.pkg" '^(dowdiness/moondsp|dowdiness/moondsp/(mini|pattern|player|score))$'
 
 # Graph is not a secondary DSP facade. It may expose graph APIs whose signatures
 # mention @dsp types, but it must not publicly re-export DSP package types,

@@ -1,8 +1,10 @@
 import {
   "dowdiness/moondsp",
   "dowdiness/moondsp/mini",
+  "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/player",
   "dowdiness/moondsp/score",
+  "moonbitlang/core/double",
   "moonbitlang/core/ref",
 }
 

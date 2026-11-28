@@ -221,7 +221,7 @@ test "a voice starts from its bus value, which rev defines" {
 }
 
 ///|
-test "a signal buffer records the value held voices follow, once per block, on its material clock" {
+test "the scheduler reports the value held voices follow, once per block, on its material clock" {
   let source = @identity.SourceAtomId::SourceAtomId(
     @identity.SourceEpoch::SourceEpoch(3L),
     7L,
@@ -256,9 +256,7 @@ test "a signal buffer records the value held voices follow, once per block, on i
     pools=[bus_pool(ctx)],
     route=_ => 0,
   )
-  let signals = @scheduler.SignalBuffer()
-  signals.enable(true)
-  scheduler.attach_signal_buffer(signals)
+  let observer = RecordingObserver::attached(scheduler)
   scheduler.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
   )
@@ -268,20 +266,19 @@ test "a signal buffer records the value held voices follow, once per block, on i
   for _ in 0..<376 {
     scheduler.render_block(left, right)
   }
-  let last = signals.count() - 1
-  @debug.assert_eq([0, 1, 2, 3, 4].map(field => signals.field(last, field)), [
-    48000.0, 3.0, 7.0, 1.0, 2100.0,
-  ])
-  // One row per block for both tones, also once the ring overwrites: the
-  // chord started in block 0, so blocks 1 to 375 report.
-  @debug.assert_eq((signals.count(), signals.dropped()), (256, 119.0))
-  for index in 1..<signals.count() {
-    assert_eq(signals.field(index, 0) - signals.field(index - 1, 0), 128.0)
+  // Block 375 reports sample 48000: signal 3/7 at material cycle 1, value 2100.
+  let signals = observer.signals
+  @debug.assert_eq(signals[signals.length() - 1], (48000L, 3L, 7L, 1.0, 2100.0))
+  // One report per block for both tones: the chord started in block 0, so
+  // blocks 1 to 375 report.
+  @debug.assert_eq(signals.length(), 375)
+  for index in 1..<signals.length() {
+    assert_eq(signals[index].0 - signals[index - 1].0, 128L)
   }
 }
 
 ///|
-test "a signal buffer keeps recording through a voice's release and stops once it is idle" {
+test "the scheduler keeps reporting through a voice's release and stops once it is idle" {
   let snapshot = @pattern.PatternDoc::merge_control(
     id=bus_id("merge"),
     // The note sounds for the first half of the cycle.
@@ -312,9 +309,7 @@ test "a signal buffer keeps recording through a voice's release and stops once i
     pools=[bus_pool(ctx)],
     route=_ => 0,
   )
-  let signals = @scheduler.SignalBuffer()
-  signals.enable(true)
-  scheduler.attach_signal_buffer(signals)
+  let observer = RecordingObserver::attached(scheduler)
   scheduler.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
   )
@@ -325,17 +320,17 @@ test "a signal buffer keeps recording through a voice's release and stops once i
   for _ in 0..<300 {
     scheduler.render_block(left, right)
   }
-  let last = signals.field(signals.count() - 1, 0)
-  assert_true(last > 24000.0 && last < 24000.0 + 2400.0 + 2.0 * 128.0)
-  let count = signals.count()
+  let last = observer.signals[observer.signals.length() - 1].0
+  assert_true(last > 24000L && last < 24000L + 2400L + 2L * 128L)
+  let count = observer.signals.length()
   for _ in 0..<50 {
     scheduler.render_block(left, right)
   }
-  assert_eq(signals.count(), count)
+  assert_eq(observer.signals.length(), count)
 }
 
 ///|
-test "a signal buffer keeps signals of different epochs apart even when their serials match" {
+test "the scheduler keeps signals of different epochs apart even when their serials match" {
   let voice = (name : String, epoch : Int64, note : Double) => {
     @pattern.PatternDoc::merge_control(
       id=bus_id("merge-\{name}"),
@@ -368,9 +363,7 @@ test "a signal buffer keeps signals of different epochs apart even when their se
     pools=[bus_pool(ctx)],
     route=_ => 0,
   )
-  let signals = @scheduler.SignalBuffer()
-  signals.enable(true)
-  scheduler.attach_signal_buffer(signals)
+  let observer = RecordingObserver::attached(scheduler)
   scheduler.queue_playback_snapshot(
     @scheduler.PlaybackSnapshot::pattern(snapshot.playback()),
   )
@@ -379,9 +372,61 @@ test "a signal buffer keeps signals of different epochs apart even when their se
   for _ in 0..<11 {
     scheduler.render_block(left, right)
   }
-  // Blocks 1 to 10 each give one row per epoch.
-  assert_eq(signals.count(), 20)
-  let epochs = Array::makei(signals.count(), index => signals.field(index, 1))
-  @debug.assert_eq(epochs.filter(epoch => epoch == 3.0).length(), 10)
-  @debug.assert_eq(epochs.filter(epoch => epoch == 4.0).length(), 10)
+  // Blocks 1 to 10 each give one report per epoch.
+  let epochs = observer.signals.map(signal => signal.1)
+  assert_eq(epochs.length(), 20)
+  @debug.assert_eq(epochs.filter(epoch => epoch == 3L).length(), 10)
+  @debug.assert_eq(epochs.filter(epoch => epoch == 4L).length(), 10)
+}
+
+///|
+/// Everything a scheduler reports, in order: onsets as their sample and
+/// pitch (none for a drum hit), signal values as `(sample, epoch, serial,
+/// material, value)`.
+struct RecordingObserver {
+  onsets : Array[(Int64, Double?)]
+  signals : Array[(Int64, Int64, Int64, Double, Double)]
+}
+
+///|
+/// An observer attached to `scheduler`, with onsets and signals observed.
+fn RecordingObserver::attached(
+  scheduler : @scheduler.PatternScheduler,
+) -> RecordingObserver {
+  let observer = { onsets: [], signals: [], }
+  scheduler.attach_observer(observer)
+  scheduler.observe_onsets(true)
+  scheduler.observe_signals(true)
+  observer
+}
+
+///|
+impl @scheduler.PlaybackObserver for RecordingObserver with fn onset(
+  self,
+  sample,
+  source,
+) {
+  let pitch = match source.event().value.sound {
+    Note(_, pitch~) | Play(_, pitch~) => Some(pitch)
+    Hit(_) => None
+  }
+  self.onsets.push((sample, pitch))
+}
+
+///|
+impl @scheduler.PlaybackObserver for RecordingObserver with fn signal(
+  self,
+  sample,
+  signal,
+  material,
+  value,
+) {
+  self.signals.push(
+    (sample, signal.epoch().serial(), signal.serial(), material, value),
+  )
+}
+
+///|
+impl @scheduler.PlaybackObserver for RecordingObserver with fn signal_lost(_) {
+  ()
 }

@@ -40,16 +40,6 @@ pub struct BlockFrame {
   logical_arc : @pattern.TimeSpan
 }
 
-pub struct OnsetBuffer {
-  // private fields
-}
-pub fn OnsetBuffer::OnsetBuffer() -> Self
-pub fn OnsetBuffer::clear(Self) -> Unit
-pub fn OnsetBuffer::count(Self) -> Int32
-pub fn OnsetBuffer::dropped(Self) -> Double
-pub fn OnsetBuffer::enable(Self, Bool) -> Unit
-pub fn OnsetBuffer::field(Self, Int32, Int32) -> Double
-
 pub struct PatternScheduler {
   // private fields
 }
@@ -59,8 +49,7 @@ pub fn PatternScheduler::accept_playback_snapshot(Self, PlaybackSnapshot) -> Uni
 pub fn PatternScheduler::active_note_count(Self) -> Int32
 pub fn PatternScheduler::apply_pattern_voice_effect_result(Self, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::apply_song_voice_effect_result(Self, SongVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
-pub fn PatternScheduler::attach_onset_buffer(Self, OnsetBuffer) -> Unit
-pub fn PatternScheduler::attach_signal_buffer(Self, SignalBuffer) -> Unit
+pub fn PatternScheduler::attach_observer(Self, &PlaybackObserver) -> Unit
 pub fn PatternScheduler::bpm(Self) -> Double
 pub fn PatternScheduler::check_fits(Self, PlaybackSnapshot, Tempo) -> Result[Unit, PlaybackFitError]
 pub fn PatternScheduler::current_block(Self) -> Result[BlockFrame, @transport.TransportError]
@@ -70,6 +59,8 @@ pub fn PatternScheduler::expire_notes_at(Self, PerformanceTime) -> Unit
 pub fn PatternScheduler::kill_all_voices(Self) -> Unit
 pub fn PatternScheduler::last_transport_error(Self) -> @transport.TransportError?
 pub fn PatternScheduler::max_query_window(Self) -> @pattern.QueryWindow
+pub fn PatternScheduler::observe_onsets(Self, Bool) -> Unit
+pub fn PatternScheduler::observe_signals(Self, Bool) -> Unit
 pub fn PatternScheduler::pending_material_change_count(Self) -> Int32
 pub fn PatternScheduler::queue_pattern_snapshot_effect_result(Self, PlaybackSnapshot, PatternVoiceScope, ActiveVoiceEffect) -> Result[ActiveVoiceEffectOutcome, @voice.VoiceControlError]
 pub fn PatternScheduler::queue_playback_snapshot(Self, PlaybackSnapshot) -> Unit
@@ -124,16 +115,6 @@ pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) ->
 pub fn PlaybackSnapshot::query(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
 pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.Song[C], repeat? : Bool) -> Self
 
-pub struct SignalBuffer {
-  // private fields
-}
-pub fn SignalBuffer::SignalBuffer() -> Self
-pub fn SignalBuffer::clear(Self) -> Unit
-pub fn SignalBuffer::count(Self) -> Int32
-pub fn SignalBuffer::dropped(Self) -> Double
-pub fn SignalBuffer::enable(Self, Bool) -> Unit
-pub fn SignalBuffer::field(Self, Int32, Int32) -> Double
-
 pub(all) enum SongEnd {
   Ahead
   Reached(Int64, @pattern.Rational)
@@ -168,3 +149,8 @@ pub fn VoiceControlBatch::VoiceControlBatch(instrument~ : Int32, @graph.GraphCon
 pub using @transport {type TransportError}
 
 // Traits
+pub(open) trait PlaybackObserver {
+  fn onset(Self, Int64, @pattern.EventWithOrigin[@score.ScoreEvent]) -> Unit
+  fn signal(Self, Int64, @identity.SourceAtomId, Double, Double) -> Unit
+  fn signal_lost(Self) -> Unit
+}

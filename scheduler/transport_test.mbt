@@ -331,13 +331,10 @@ test "material admission rejects before retiming and restart recovers capacity" 
     )
   }
   let (second, _, left, right) = transport_fixture(sample_rate=128.0)
-  let onsets = @scheduler.OnsetBuffer()
-  onsets.enable(true)
-  second.attach_onset_buffer(onsets)
+  let observer = RecordingObserver::attached(second)
   second.accept_playback_snapshot(snapshot("old", 60.0))
   second.render_block(left, right)
-  assert_eq(onsets.count(), 1)
-  assert_eq(onsets.field(0, 5), 60.0)
+  @debug.assert_eq(observer.onsets.map(onset => onset.1), [Some(60.0)])
   let before = second.current_block().unwrap().logical_arc
   let next = snapshot("new", 80.0)
   let tempo = @scheduler.Tempo::from_bpm(60.0).unwrap()
@@ -352,14 +349,16 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(second.pending_material_change_count(), 0)
   second.render_block(left, right)
   assert_true(left.get(0) > 0.0)
-  assert_eq(onsets.count(), 1)
+  @debug.assert_eq(observer.onsets.length(), 1)
   second.accept_playback(next, tempo, material_limit=1, restart=true).unwrap()
   assert_eq(second.bpm(), 60.0)
   assert_eq(second.sample_counter(), 0L)
   assert_eq(second.pending_material_change_count(), 0)
   second.render_block(left, right)
-  assert_eq(onsets.count(), 2)
-  assert_eq(onsets.field(1, 5), 80.0)
+  @debug.assert_eq(observer.onsets.map(onset => onset.1), [
+    Some(60.0),
+    Some(80.0),
+  ])
 }
 
 ///|

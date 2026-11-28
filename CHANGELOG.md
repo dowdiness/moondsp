@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** playback observations are typed (ADR-0035). The scheduler
+  reports to a `PlaybackObserver` a host attaches with
+  `PatternScheduler::attach_observer`, turned on with `observe_onsets` /
+  `observe_signals`; `OnsetBuffer`, `SignalBuffer`, `attach_onset_buffer` and
+  `attach_signal_buffer` are removed. `Player::onsets()` returns `Onsets`
+  (`sample`, `source`) and `Player::signals()` returns `SignalValues`
+  (`sample`, `signal`, `material`, `value`), each with `count`, `dropped`
+  and `clear`; `Player::observe_onsets` / `observe_signals` turn recording
+  on. The browser host encodes the rows; the browser ABI and row layout are
+  unchanged.
 - **Breaking:** a song part cannot start before cycle 0.
   `@song.SongPart::at` raises `NegativeStart`, and Mini reports it as "part
   start cannot be negative" where the start is written. Every song
