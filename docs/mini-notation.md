@@ -130,7 +130,7 @@ in the browser bundle.
   <dt>fill("gap", "a")</dt><dd>fill uncovered time between parts with section a</dd>
   <dt>bpm(n)</dt><dd>tempo inside song(); editable while playing</dd>
 </dl>
-<p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
+<p class="cheat-note">Separate calls with commas. Section lengths and explicit starts accept integers or fractions such as <code>3/2</code>; section lengths must be positive and starts must not be negative. Pattern expressions inside sections support <code>+</code> and parentheses.</p>
 <p class="cheat-note">The editor accepts patterns and <code>song(...)</code> without a mode selector. Set tempo in the score with <code>bpm(96);</code> before the pattern or song (default 120), or with <code>bpm(96)</code> inside <code>song(...)</code>. Declare tempo only once; there is no separate header BPM control.</p>
 <!-- LIVE_SYNTAX_REFERENCE_END -->
 

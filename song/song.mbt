@@ -39,12 +39,32 @@ pub fn[C] SongPart::with_id(
 }
 
 ///|
+/// A start before cycle 0, where every song begins: nothing can play there.
+#derive(Eq, Debug)
+pub(all) suberror NegativeStart
+
+///|
+pub extend NegativeStart with Eq::{not_equal, equal}
+
+///|
+pub extend NegativeStart with Debug::{to_repr}
+
+///|
+/// `start`, when it is at or after the song's beginning.
+fn checked_start(
+  start : @pattern.Rational,
+) -> @pattern.Rational raise NegativeStart {
+  guard start >= @pattern.Rational::from_int(0) else { raise NegativeStart }
+  start
+}
+
+///|
 pub fn[C] SongPart::at(
   start~ : @pattern.Rational,
   name~ : String,
   section~ : Section[C],
-) -> SongPart[C] {
-  { id: None, start: Some(start), name, section, }
+) -> SongPart[C] raise NegativeStart {
+  { id: None, start: Some(checked_start(start)), name, section, }
 }
 
 ///|
@@ -53,8 +73,8 @@ pub fn[C] SongPart::with_id_at(
   start~ : @pattern.Rational,
   name~ : String,
   section~ : Section[C],
-) -> SongPart[C] {
-  { id: Some(id), start: Some(start), name, section, }
+) -> SongPart[C] raise NegativeStart {
+  { id: Some(id), start: Some(checked_start(start)), name, section, }
 }
 
 ///|
@@ -516,12 +536,12 @@ fn fill_occurrence_name(prefix : String, index : Int32) -> String {
 
 ///|
 fn[C] occurrence_to_part(occurrence : SectionOccurrence[C]) -> SongPart[C] {
-  SongPart::with_id_at(
-    id=occurrence.id(),
-    start=occurrence.start(),
-    name=occurrence.name(),
-    section=occurrence.section(),
-  )
+  {
+    id: Some(occurrence.id()),
+    start: Some(occurrence.start()),
+    name: occurrence.name(),
+    section: occurrence.section(),
+  }
 }
 
 ///|
@@ -538,13 +558,13 @@ pub fn[C] Song::fill_gaps(
 ) -> Song[C] raise SongBuildError {
   let parts = self.occurrences.map(occurrence_to_part)
   for index, gap in self.gap_spans() {
-    parts.push(
-      SongPart::at(
-        start=gap.begin,
-        name=fill_occurrence_name(prefix, index),
-        section=section_with_length(section, gap.duration()),
-      ),
-    )
+    // A gap lies inside the song, so it starts at or after 0.
+    parts.push({
+      id: None,
+      start: Some(gap.begin),
+      name: fill_occurrence_name(prefix, index),
+      section: section_with_length(section, gap.duration()),
+    })
   }
   Song(parts~)
 }

@@ -51,7 +51,7 @@ pub fn PlaybackSourcedEvent::origin(
 pub struct PlaybackSnapshot {
   /// A song's occurrences; a pattern has none.
   priv arrangement : Array[OccurrenceSpan]?
-  /// How long one repetition of a repeating song lasts.
+  /// How long one repetition of a repeating song lasts; always positive.
   priv period : @pattern.Rational?
   /// Where a song that does not repeat ends.
   priv finite_end : @pattern.Rational?
@@ -171,10 +171,10 @@ fn PlaybackSnapshot::cycle_at(
   self : PlaybackSnapshot,
   now : @pattern.Rational,
 ) -> Int64 {
+  // A song ends after its beginning, so a repetition lasts.
   match self.period {
-    Some(period) if period > @pattern.Rational::from_int(0) =>
-      (now / period).floor()
-    _ => 0L
+    Some(period) => (now / period).floor()
+    None => 0L
   }
 }
 
@@ -369,7 +369,6 @@ fn PlaybackRun::query(
   guard self.snapshot.period is Some(duration) else {
     return query_sourced_entries(self.entries, arc)
   }
-  guard duration > @pattern.Rational::from_int(0) else { return [] }
   let result : Array[PlaybackSourcedEvent] = []
   let mut cursor = arc.begin
   while cursor < arc.end_ {

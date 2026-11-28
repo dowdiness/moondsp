@@ -34,7 +34,6 @@ pub fn PlayerError::message(Self) -> String
 pub suberror ScoreError {
   InvalidSource(@mini.SourceProblem)
   Tempo(TempoOutOfRange)
-  EmptySong
 }
 pub fn ScoreError::message(Self) -> String
 
@@ -119,7 +118,7 @@ pub struct Score {
   // private fields
 }
 pub fn Score::pattern(@pattern.PlaybackPattern[@score.ScoreEvent], tempo~ : Tempo) -> Self
-pub fn[C : @song.SongContent] Score::song(@song.SongSnapshot[C], tempo~ : Tempo, repeat? : Bool) -> Self raise ScoreError
+pub fn[C : @song.SongContent] Score::song(@song.SongSnapshot[C], tempo~ : Tempo, repeat? : Bool) -> Self
 
 #derive(Eq, @debug.Debug)
 pub enum ScoreKind {

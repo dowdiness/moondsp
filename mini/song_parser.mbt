@@ -6,7 +6,8 @@ priv struct SongPartSpec {
   name : String
   section_name : String
   section_at : Int32
-  start : @pattern.Rational?
+  /// The written start and where it was written.
+  start : (@pattern.Rational, Int32)?
 }
 
 ///|
@@ -151,14 +152,17 @@ fn[C : @song.SongContent] Parser::parse_song_body(
           },
         )
       }
-      filled.push(
-        @song.SongOccurrenceDoc::at(
-          id=occurrence_id(identity),
-          start=gap.begin,
-          name~,
-          section=resized_section(section, gap.duration()),
-        ),
-      )
+      let section = resized_section(section, gap.duration())
+      // A gap lies inside the song, so it starts at or after 0.
+      let occurrence = @song.SongOccurrenceDoc::at(
+        id=occurrence_id(identity),
+        start=gap.begin,
+        name~,
+        section~,
+      ) catch {
+        NegativeStart => raise Internal("fill '\{name}' starts before zero")
+      }
+      filled.push(occurrence)
     }
     doc = song_doc(filled, [], at=fill.at)
   }
@@ -312,12 +316,13 @@ fn Parser::parse_song_fill(
 ///|
 fn Parser::read_optional_song_start(
   self : Parser,
-) -> @pattern.Rational? raise SourceProblem {
+) -> (@pattern.Rational, Int32)? raise SourceProblem {
   self.skip_whitespace()
   let start = if !self.at_end() && self.input[self.pos] == ',' {
     self.pos += 1
     self.skip_whitespace()
-    Some(self.read_song_rational("part start"))
+    let at = self.pos
+    Some((self.read_song_rational("part start"), at))
   } else {
     None
   }
@@ -462,8 +467,10 @@ fn[C] SongPartSpec::to_doc(
   )
   let id = occurrence_id(self.identity())
   match self.start {
-    Some(start) =>
-      @song.SongOccurrenceDoc::at(id~, start~, name=self.name, section~)
+    Some((start, at)) =>
+      @song.SongOccurrenceDoc::at(id~, start~, name=self.name, section~) catch {
+        NegativeStart => raise Mistake(at, "part start cannot be negative")
+      }
     None => @song.SongOccurrenceDoc(id~, name=self.name, section~)
   }
 }
