@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "dowdiness/moondsp/sig"
+
+import {
+  "dowdiness/moondsp/dsp",
+  "dowdiness/moondsp/graph",
+}
+
+// Values
+pub fn nodes((Synth[Unit]) -> Sig[Unit]) -> Array[@graph.DspNode] raise SigError
+
+// Errors
+pub(all) suberror SigError {
+  ForeignSignal(Int32)
+}
+
+// Types and methods
+pub struct Param {
+  // private fields
+}
+pub impl ToScalar for Param
+
+pub enum Scalar {
+  Fixed(Double)
+  Bound(Param)
+}
+
+pub struct Sig[K] {
+  // private fields
+}
+pub fn[K] Sig::clip(Self[K], Double) -> Self[K]
+pub fn[K] Sig::envelope(Self[K], Self[K], amount? : Double) -> Self[K]
+pub fn[K] Sig::gain(Self[K], &ToScalar) -> Self[K]
+pub fn[K] Sig::hpf(Self[K], &ToScalar, q? : &ToScalar) -> Self[K]
+pub fn[K] Sig::lpf(Self[K], &ToScalar, q? : &ToScalar) -> Self[K]
+pub fn[K] Sig::osc(Self[K], @dsp.Waveform) -> Self[K]
+pub impl[K] Add for Sig[K]
+pub impl[K] Mul for Sig[K]
+
+pub struct Synth[K] {
+  // private fields
+}
+pub fn[K] Synth::adsr(Self[K], attack_ms~ : Double, decay_ms~ : Double, sustain~ : Double, release_ms~ : Double) -> Sig[K]
+pub fn[K] Synth::build((Self[K]) -> Sig[K]) -> Template[K] raise SigError
+pub fn[K] Synth::constant(Self[K], &ToScalar) -> Sig[K]
+pub fn[K] Synth::gate(Self[K], String, Sig[K]) -> Sig[K]
+pub fn[K] Synth::noise(Self[K], seed~ : UInt32) -> Sig[K]
+pub fn[K] Synth::osc(Self[K], @dsp.Waveform, &ToScalar) -> Sig[K]
+pub fn[K] Synth::param(Self[K], K, default~ : Double) -> Param
+pub fn[K] Synth::saw(Self[K], &ToScalar) -> Sig[K]
+pub fn[K] Synth::sine(Self[K], &ToScalar) -> Sig[K]
+pub fn[K] Synth::voice(Self[K], K, @graph.VoiceParam) -> Unit
+
+pub struct Template[K] {
+  nodes : Array[@graph.DspNode]
+  bindings : @graph.ControlBindingBuilder[K]
+  // private fields
+}
+pub fn[K] Template::gate(Self[K], String) -> Int32?
+
+// Type aliases
+
+// Traits
+pub trait ToScalar {
+  fn to_scalar(Self) -> Scalar
+}
+pub impl ToScalar for Int32
+pub impl ToScalar for Double
