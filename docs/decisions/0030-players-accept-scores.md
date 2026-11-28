@@ -90,4 +90,5 @@ range".
   error is now the one reported, because the span check moved to acceptance.
 - The session tests call `Player` directly and assert the states and errors
   it raises.
-- `onsets()` and `signals()` still return the scheduler's ring types.
+- `onsets()` and `signals()` still return the scheduler's ring types
+  (resolved by [ADR-0035](0035-players-keep-typed-observations.md)).

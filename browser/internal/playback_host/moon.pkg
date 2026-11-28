@@ -3,6 +3,7 @@ import {
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/player",
   "dowdiness/moondsp/score",
+  "moonbitlang/core/double",
   "moonbitlang/core/ref",
 }
 

@@ -143,26 +143,28 @@ pub fn scheduler_sample_position() -> Double {
 ///|
 pub fn player_onset_enable(enabled : Int32) -> Unit {
   if player.val is Some(owner) {
-    owner.onsets().enable(enabled == 1)
+    owner.observe_onsets(enabled == 1)
   }
 }
 
 ///|
+/// Encode the onsets recorded since the last clear and count the rows; read
+/// them with `player_onset_field` before the next count.
 pub fn player_onset_count() -> Int32 {
   match player.val {
-    Some(owner) => owner.onsets().count()
+    Some(owner) => {
+      encode_onsets(owner.onsets())
+      onset_wire.count
+    }
     None => 0
   }
 }
 
 ///|
-/// Read the shared bounded ring; no array or binding path is copied.
+/// Read one field of an encoded onset row; no array or binding path is
+/// copied.
 pub fn player_onset_field(index : Int32, field : Int32) -> Double {
-  guard index >= 0 else { return 0.0 }
-  match player.val {
-    None => 0.0
-    Some(owner) => owner.onsets().field(index, field)
-  }
+  onset_field(index, field)
 }
 
 ///|
@@ -170,12 +172,14 @@ pub fn player_onset_clear() -> Unit {
   if player.val is Some(owner) {
     owner.onsets().clear()
   }
+  onset_wire.reset()
 }
 
 ///|
+/// Onsets overwritten or left out of the encoded rows since the last clear.
 pub fn player_onset_dropped() -> Double {
   match player.val {
-    Some(owner) => owner.onsets().dropped()
+    Some(owner) => (owner.onsets().dropped() + onset_wire.left_out).to_double()
     None => 0.0
   }
 }
@@ -183,25 +187,27 @@ pub fn player_onset_dropped() -> Double {
 ///|
 pub fn player_signal_enable(enabled : Int32) -> Unit {
   if player.val is Some(owner) {
-    owner.signals().enable(enabled == 1)
+    owner.observe_signals(enabled == 1)
   }
 }
 
 ///|
+/// Encode the signal values recorded since the last clear and count the
+/// rows; read them with `player_signal_field` before the next count.
 pub fn player_signal_count() -> Int32 {
   match player.val {
-    Some(owner) => owner.signals().count()
+    Some(owner) => {
+      encode_signals(owner.signals())
+      signal_wire.count
+    }
     None => 0
   }
 }
 
 ///|
-/// Read one scalar field of the bounded signal-value ring.
+/// Read one field of an encoded signal-value row.
 pub fn player_signal_field(index : Int32, field : Int32) -> Double {
-  match player.val {
-    None => 0.0
-    Some(owner) => owner.signals().field(index, field)
-  }
+  signal_field(index, field)
 }
 
 ///|
@@ -209,12 +215,16 @@ pub fn player_signal_clear() -> Unit {
   if player.val is Some(owner) {
     owner.signals().clear()
   }
+  signal_wire.reset()
 }
 
 ///|
+/// Values overwritten, unobserved, or left out of the encoded rows since the
+/// last clear.
 pub fn player_signal_dropped() -> Double {
   match player.val {
-    Some(owner) => owner.signals().dropped()
+    Some(owner) =>
+      (owner.signals().dropped() + signal_wire.left_out).to_double()
     None => 0.0
   }
 }

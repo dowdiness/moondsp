@@ -4,9 +4,9 @@ package "dowdiness/moondsp/player"
 import {
   "dowdiness/moondsp/dsp",
   "dowdiness/moondsp/graph",
+  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/mini",
   "dowdiness/moondsp/pattern",
-  "dowdiness/moondsp/scheduler",
   "dowdiness/moondsp/score",
   "dowdiness/moondsp/song",
   "moonbitlang/core/debug",
@@ -67,6 +67,15 @@ pub(all) struct NoteVoice {
   voices : Int32
 }
 
+pub struct Onsets {
+  // private fields
+}
+pub fn Onsets::clear(Self) -> Unit
+pub fn Onsets::count(Self) -> Int32
+pub fn Onsets::dropped(Self) -> Int32
+pub fn Onsets::sample(Self, Int32) -> Int64
+pub fn Onsets::source(Self, Int32) -> @pattern.EventWithOrigin[@score.ScoreEvent]
+
 #derive(Eq, @debug.Debug)
 pub enum PlayState {
   Empty
@@ -88,7 +97,9 @@ pub fn Player::bpm(Self) -> Double
 pub fn Player::compile(Self, @mini.PlaybackInput) -> Score raise ScoreError
 pub fn Player::cycle_position(Self) -> Double
 pub fn Player::mode(Self) -> ScoreKind?
-pub fn Player::onsets(Self) -> @scheduler.OnsetBuffer
+pub fn Player::observe_onsets(Self, Bool) -> Unit
+pub fn Player::observe_signals(Self, Bool) -> Unit
+pub fn Player::onsets(Self) -> Onsets
 pub fn Player::pause(Self) -> Unit raise PlayerError
 pub fn Player::pending_materials(Self) -> Int32
 pub fn Player::play(Self) -> Unit raise PlayerError
@@ -98,7 +109,7 @@ pub fn Player::restart(Self, Score) -> Unit raise PlayerError
 pub fn Player::sample_position(Self) -> Double
 pub fn Player::set_gain(Self, Double) -> Unit
 pub fn Player::set_tempo(Self, Tempo) -> Unit raise PlayerError
-pub fn Player::signals(Self) -> @scheduler.SignalBuffer
+pub fn Player::signals(Self) -> SignalValues
 pub fn Player::skipped_materials(Self) -> Int32
 pub fn Player::state(Self) -> PlayState
 pub fn Player::update(Self, Score) -> Unit raise PlayerError
@@ -128,6 +139,17 @@ pub enum ScoreKind {
 pub fn ScoreKind::equal(Self, Self) -> Bool
 pub fn ScoreKind::not_equal(Self, Self) -> Bool
 pub fn ScoreKind::to_repr(Self) -> @debug.Repr
+
+pub struct SignalValues {
+  // private fields
+}
+pub fn SignalValues::clear(Self) -> Unit
+pub fn SignalValues::count(Self) -> Int32
+pub fn SignalValues::dropped(Self) -> Int32
+pub fn SignalValues::material(Self, Int32) -> Double
+pub fn SignalValues::sample(Self, Int32) -> Int64
+pub fn SignalValues::signal(Self, Int32) -> @identity.SourceAtomId
+pub fn SignalValues::value(Self, Int32) -> Double
 
 pub(all) struct Sounds {
   drum : (@score.Drum) -> @graph.AnalyzedGraph

@@ -5,8 +5,8 @@
 pub struct Player {
   priv scheduler : @scheduler.PatternScheduler
   priv sampler_pool : @moondsp.BoundVoicePool
-  priv onsets : @scheduler.OnsetBuffer
-  priv signals : @scheduler.SignalBuffer
+  priv onsets : Onsets
+  priv signals : SignalValues
   priv context : @moondsp.DspContext
   priv reverb : @moondsp.StereoReverb
   priv send_left : @moondsp.AudioBuffer
@@ -30,10 +30,9 @@ pub fn Player::Player(
     raise UnsupportedFormat
   }
   let size = ctx.block_size()
-  let onsets = @scheduler.OnsetBuffer()
-  scheduler.attach_onset_buffer(onsets)
-  let signals = @scheduler.SignalBuffer()
-  scheduler.attach_signal_buffer(signals)
+  let onsets = Onsets()
+  let signals = SignalValues()
+  scheduler.attach_observer(Observations::{ onsets, signals, })
   {
     scheduler,
     sampler_pool,
@@ -553,13 +552,27 @@ pub fn Player::skipped_materials(self : Player) -> Int32 {
 }
 
 ///|
-/// The ring of playback onsets the player records when it is enabled.
-pub fn Player::onsets(self : Player) -> @scheduler.OnsetBuffer {
+/// The tracked onsets the player recorded while `observe_onsets` is on.
+pub fn Player::onsets(self : Player) -> Onsets {
   self.onsets
 }
 
 ///|
-/// The ring of control-signal values the player records when it is enabled.
-pub fn Player::signals(self : Player) -> @scheduler.SignalBuffer {
+/// The followed signal values the player recorded while `observe_signals`
+/// is on.
+pub fn Player::signals(self : Player) -> SignalValues {
   self.signals
+}
+
+///|
+/// Whether to record the tracked onsets the player dispatches. Off at first.
+pub fn Player::observe_onsets(self : Player, enabled : Bool) -> Unit {
+  self.scheduler.observe_onsets(enabled)
+}
+
+///|
+/// Whether to record the values sounding voices read from the signals they
+/// follow. Off at first; turning it off forgets the voices followed.
+pub fn Player::observe_signals(self : Player, enabled : Bool) -> Unit {
+  self.scheduler.observe_signals(enabled)
 }
