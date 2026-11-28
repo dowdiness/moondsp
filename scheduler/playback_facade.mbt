@@ -27,20 +27,6 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
 }
 
 ///|
-pub fn PlaybackSnapshot::revision(
-  self : PlaybackSnapshot,
-) -> @identity.Revision {
-  self.raw.revision()
-}
-
-///|
-pub fn PlaybackSnapshot::song_layout_revision(
-  self : PlaybackSnapshot,
-) -> @identity.Revision? {
-  self.raw.song_layout_revision()
-}
-
-///|
 /// Number of source entries, including occurrences outside the current cycle.
 pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   self.raw.material_count()

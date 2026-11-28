@@ -2,7 +2,6 @@
 package "dowdiness/moondsp/scheduler/internal/playback"
 
 import {
-  "dowdiness/moondsp/identity",
   "dowdiness/moondsp/pattern",
   "dowdiness/moondsp/scheduler/internal/model",
   "dowdiness/moondsp/score",
@@ -20,9 +19,7 @@ pub struct PlaybackSnapshot {
 pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
-pub fn PlaybackSnapshot::revision(Self) -> @identity.Revision
 pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.SongSnapshot[C], repeat? : Bool) -> Self
-pub fn PlaybackSnapshot::song_layout_revision(Self) -> @identity.Revision?
 
 pub struct PlaybackSourcedEvent {
   // private fields
@@ -37,6 +34,7 @@ pub struct PlaybackState {
 }
 pub fn PlaybackState::PlaybackState() -> Self
 pub fn PlaybackState::commit_pending(Self, @pattern.Rational) -> Unit
+pub fn PlaybackState::continues_as(Self, PlaybackSnapshot) -> Bool
 pub fn PlaybackState::has_pending(Self) -> Bool
 pub fn PlaybackState::install_acceptance(Self, Self) -> Unit
 pub fn PlaybackState::pending_entry_count(Self) -> Int32

@@ -236,7 +236,6 @@ pub struct PlaybackPattern[A] {
 pub fn[A : WithControls] PlaybackPattern::entered(Self[A], Rational) -> Self[A]
 pub fn[A] PlaybackPattern::entries(Self[A]) -> Array[Pat[A]]
 pub fn[A : WithControls, B] PlaybackPattern::query_for_entry(Self[A], Int32, TimeSpan, at~ : Placement, within? : Placement, (Event[A], PatternNodePath, Controls, EventWithOrigin[A]?) -> B) -> Array[B]
-pub fn[A] PlaybackPattern::revision(Self[A]) -> @identity.Revision
 
 pub struct QueryWindow {
   // private fields

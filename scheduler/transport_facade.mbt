@@ -262,6 +262,9 @@ pub fn PatternScheduler::set_tempo(
 
 ///|
 pub(all) enum PlaybackAdmissionError {
+  /// A song arranged differently cannot replace the playing one without a
+  /// restart: its started occurrences would stay silent.
+  ArrangementChanged
   MaterialLimit
   Transport(TransportError)
 }
@@ -278,6 +281,9 @@ pub fn PatternScheduler::accept_playback(
   restart~ : Bool = false,
   end_? : @pattern.Rational,
 ) -> Result[Unit, PlaybackAdmissionError] {
+  guard restart || self.playback_state.continues_as(snapshot.raw) else {
+    return Err(ArrangementChanged)
+  }
   let plan = match self.tempo_plan(tempo, restart, end_?) {
     Err(error) => return Err(Transport(error))
     Ok(plan) => plan

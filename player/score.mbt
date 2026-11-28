@@ -2,24 +2,6 @@
 const PLAYBACK_MATERIAL_LIMIT = 256
 
 ///|
-#derive(Eq)
-priv struct PlaybackLayoutRow {
-  id : String
-  name : String
-  section : String
-  start : @pattern.Rational
-  length : @pattern.Rational
-  rate : @pattern.Rational
-}
-
-///|
-#derive(Eq)
-priv enum PlaybackLayout {
-  PatternLayout
-  SongLayout(Array[PlaybackLayoutRow], Bool)
-}
-
-///|
 priv enum PlaybackSpan {
   Continuous
   Finite(@pattern.Rational)
@@ -27,15 +9,14 @@ priv enum PlaybackSpan {
 }
 
 ///|
-/// A score the player can accept: lowered material with its tempo, how it is
-/// laid out, and how long it plays. `Player::compile` builds one from Mini
+/// A score the player can accept: lowered material with its tempo and how
+/// long it plays. `Player::compile` builds one from Mini
 /// input and records the query window Mini admitted its work for;
 /// `pattern` and `song` build one from
 /// content that has no source text, whose work nothing bounds: the caller
 /// answers for it, as it does when it hands the scheduler a snapshot.
 pub struct Score {
   priv tempo : @scheduler.Tempo
-  priv layout : PlaybackLayout
   priv snapshot : @scheduler.PlaybackSnapshot
   priv span : PlaybackSpan
   /// The window Mini bounded this score's work for, when it was compiled.
@@ -60,7 +41,6 @@ pub fn Score::pattern(
   {
     admitted: None,
     tempo: tempo.value,
-    layout: PatternLayout,
     snapshot: @scheduler.PlaybackSnapshot::pattern(pattern),
     span: Continuous,
   }
@@ -82,7 +62,6 @@ pub fn[C : @song.SongContent] Score::song(
   {
     admitted: None,
     tempo: tempo.value,
-    layout: song_layout(song, repeat),
     snapshot: @scheduler.PlaybackSnapshot::song(snapshot, repeat~),
     span: if repeat {
       Repeating(song.duration())
@@ -110,21 +89,4 @@ pub fn Tempo::Tempo(bpm : Double) -> Tempo raise TempoOutOfRange {
 ///|
 pub fn Tempo::bpm(self : Tempo) -> Double {
   self.value.bpm()
-}
-
-///|
-fn[C] song_layout(song : @song.Song[C], repeated : Bool) -> PlaybackLayout {
-  SongLayout(
-    song
-    .occurrences()
-    .map(o => {
-      id: o.id().value(),
-      name: o.name(),
-      section: o.section().name(),
-      start: o.start(),
-      length: o.section().length_cycles(),
-      rate: o.section().scope().rate(),
-    }),
-    repeated,
-  )
 }

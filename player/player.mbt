@@ -174,7 +174,8 @@ pub suberror PlayerError {
   TooManyRetainedMaterials
   /// The score was compiled for a player with shorter blocks.
   CompiledForShorterBlocks
-  /// The accepted song's layout differs; accept it with `restart`.
+  /// The song is arranged differently from the playing one; accept it with
+  /// `restart`.
   RestartRequired
   /// There is no score to play or pause.
   NoSong
@@ -307,6 +308,7 @@ fn Player::install(
       restart~,
       end_?=score.finite_end(),
     ) {
+    Err(ArrangementChanged) => raise RestartRequired
     Err(MaterialLimit) => raise TooManyRetainedMaterials
     Err(Transport(_)) => raise TransportRange
     Ok(_) => ()
@@ -319,14 +321,14 @@ fn Player::install(
 
 ///|
 /// Accept `score` without starting or rewinding the performance. Playing and
-/// Paused continue with it; a song whose layout differs raises
-/// `RestartRequired`. Empty and Ready become Ready; Ended keeps its position,
+/// Paused continue with it; a song arranged differently (another set of
+/// occurrences, starts, lengths or repetition, or a switch between pattern
+/// and song) raises `RestartRequired`. Empty and Ready become Ready; Ended keeps its position,
 /// and the next `play` starts `score`.
 pub fn Player::update(self : Player, score : Score) -> Unit raise PlayerError {
   self.admit(score)
   match self.session {
-    Playing(current) | Paused(current) => {
-      guard current.layout == score.layout else { raise RestartRequired }
+    Playing(_) | Paused(_) => {
       self.install(score, false)
       self.session = match self.session {
         Paused(_) => Paused(score)
@@ -503,9 +505,9 @@ pub fn Player::mode(self : Player) -> ScoreKind? {
   self.session
   .score()
   .map(score => {
-    match score.layout {
-      PatternLayout => Pattern
-      SongLayout(_, _) => Song
+    match score.span {
+      Continuous => Pattern
+      Finite(_) | Repeating(_) => Song
     }
   })
 }

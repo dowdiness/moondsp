@@ -84,7 +84,7 @@ fn set_tempo(player : Player, bpm : Double) -> Error? {
 }
 
 ///|
-/// The player refused, for any reason but a layout that needs a restart.
+/// The player refused, for any reason but an arrangement that needs a restart.
 fn assert_rejected(error : Error?) -> Unit raise {
   guard error is Some(error) && !(error is RestartRequired) else {
     fail("expected a refusal other than RestartRequired")
