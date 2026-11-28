@@ -374,3 +374,68 @@ test "material admission rejects before retiming and restart recovers capacity" 
   assert_eq(onsets.count(), 2)
   assert_eq(onsets.field(1, 5), 80.0)
 }
+
+///|
+/// One occurrence `id`, at 0, of a section played at `rate`, `length`
+/// cycles long.
+fn rated_song(
+  id : String,
+  rate : Int64,
+  length~ : Int64 = 4L,
+) -> @scheduler.PlaybackSnapshot raise {
+  let section = @song.SectionDoc::single(
+    id=@identity.SectionId::from_string("rated"),
+    name="rated",
+    length_cycles=@pattern.Rational(length, 1L),
+    scope=@song.TimeScope::at_rate(rate=@pattern.Rational(rate, 1L)),
+    layer_id=@identity.SectionLayerId::from_string("main"),
+    body=@pattern.PatternDoc::from_pattern(
+      id=@identity.PatternNodeId::from_string("rated"),
+      pat=@pattern.Pat::pure(played(@pattern.ControlMap::empty())),
+    ).lower(),
+  )
+  @scheduler.PlaybackSnapshot::song(
+    @song.SongDoc(parts=[
+      @song.SongOccurrenceDoc::at(
+        id=@identity.OccurrenceId::from_string(id),
+        start=@pattern.Rational::from_int(0),
+        name=id,
+        section~,
+      ),
+    ]).lower(),
+  )
+}
+
+///|
+test "a section's rate is content, its occurrences are arrangement" {
+  let (sched, _, left, right) = transport_fixture()
+  let tempo = @scheduler.Tempo::from_bpm(120.0).unwrap()
+  sched.accept_playback(rated_song("a", 1L), tempo, material_limit=8).unwrap()
+  sched.render_block(left, right)
+  // Playing the section twice as fast continues.
+  assert_true(
+    sched.accept_playback(rated_song("a", 2L), tempo, material_limit=8) is Ok(_),
+  )
+  // Another length, or another occurrence, is another arrangement.
+  assert_true(
+    sched.accept_playback(
+      rated_song("a", 2L, length=5L),
+      tempo,
+      material_limit=8,
+    )
+    is Err(ArrangementChanged),
+  )
+  assert_true(
+    sched.accept_playback(rated_song("b", 2L), tempo, material_limit=8)
+    is Err(ArrangementChanged),
+  )
+  assert_true(
+    sched.accept_playback(
+      rated_song("b", 2L),
+      tempo,
+      material_limit=8,
+      restart=true,
+    )
+    is Ok(_),
+  )
+}
