@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** the scheduler owns how long the accepted song plays.
+  `PatternScheduler::check_fits(snapshot, tempo)` reports a repetition
+  shorter than a block or an unrepresentable finite end
+  (`PlaybackFitError`); `accept_playback` returns it as `Unfit` and
+  `set_tempo(tempo)` returns it directly, checking the latest
+  accepted snapshot's end instead of an `end_?` argument, which is removed.
+  `song_end()` reports reaching a finite end (`SongEnd`).
+  `PlaybackSnapshot::is_song` is added; `set_bpm` is removed (use
+  `set_tempo(Tempo::from_bpm(bpm))`). `player`'s `Score` no longer keeps a
+  span of its own; browser codes and messages are unchanged.
 - **Breaking:** the scheduler decides whether an update can replace the
   playing song (ADR-0033): `accept_playback` returns `ArrangementChanged`
   when occurrence ids, starts or ends, or repetition differ, or a pattern and

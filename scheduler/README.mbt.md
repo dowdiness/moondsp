@@ -46,7 +46,7 @@ sample-accurate audio voice triggers across block boundaries:
 | **Scheduler Engine** | `PatternScheduler` | `PatternScheduler(...)`, `PatternScheduler::render_block`, `PatternScheduler::render_block_with_send` |
 | **Playback & Snapshots** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::queue_playback_snapshot`, `PatternScheduler::queue_pattern_snapshot`, `PatternScheduler::queue_song_snapshot`, `PatternScheduler::accept_playback_snapshot`, `PlaybackSnapshot::pattern`, `PlaybackSnapshot::song`, `PlaybackSnapshot::query` |
 | **Snapshot Observation** | `PatternScheduler`, `PlaybackSnapshot` | `PatternScheduler::pending_material_change_count`, `PatternScheduler::skipped_material_change_count` |
-| **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_bpm`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
+| **Timing & Transport** | `PatternScheduler`, `BlockFrame`, `PerformanceTime` | `PatternScheduler::set_tempo`, `PatternScheduler::bpm`, `PatternScheduler::current_block`, `PatternScheduler::sample_at`, `PatternScheduler::sample_counter`, `PatternScheduler::reset_transport` |
 | **Voice Scopes & Reconciliation** | `PatternVoiceScope`, `SongVoiceScope`, `ActiveVoiceEffect` | `PatternVoiceScope::node`, `SongVoiceScope::section`, `SongVoiceScope::occurrence`, `PatternScheduler::apply_pattern_voice_effect_result`, `PatternScheduler::apply_song_voice_effect_result` |
 | **Controls & Notes** | `VoiceControlBatch` | `PatternScheduler::expire_notes`, `PatternScheduler::active_note_count` |
 
@@ -117,7 +117,7 @@ The Player-owner cutover removes the following APIs without compatibility aliase
 | Removed API | Replacement |
 |---|---|
 | `normalize_bpm(value)` | `Tempo::from_bpm(value)` returns `Result[Tempo, TransportError]`; read the normalized value with `Tempo::bpm()` |
-| `PatternScheduler::validate_bpm(value)` | Call `set_bpm(value)` or `set_tempo(tempo, end_?)` and handle its transactional `Result` |
+| `PatternScheduler::validate_bpm(value)` | Call `set_tempo(tempo)` with a `Tempo::from_bpm(value)` and handle its transactional `Result` |
 
 
 `Tempo::from_bpm` validates and normalizes a number, not a running clock's

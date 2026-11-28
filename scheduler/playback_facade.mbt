@@ -27,6 +27,12 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
 }
 
 ///|
+/// Whether this is a song rather than a pattern.
+pub fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
+  self.raw.is_song()
+}
+
+///|
 /// Number of source entries, including occurrences outside the current cycle.
 pub fn PlaybackSnapshot::material_count(self : PlaybackSnapshot) -> Int32 {
   self.raw.material_count()

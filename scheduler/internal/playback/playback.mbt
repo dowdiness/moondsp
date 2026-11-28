@@ -53,6 +53,8 @@ pub struct PlaybackSnapshot {
   priv arrangement : Array[OccurrenceSpan]?
   /// How long one repetition of a repeating song lasts.
   priv period : @pattern.Rational?
+  /// Where a song that does not repeat ends.
+  priv finite_end : @pattern.Rational?
   priv specs : Array[EntrySpec]
 }
 
@@ -69,7 +71,12 @@ priv struct OccurrenceSpan {
 pub fn PlaybackSnapshot::pattern(
   pattern : @pattern.PlaybackPattern[@score.ScoreEvent],
 ) -> PlaybackSnapshot {
-  { arrangement: None, period: None, specs: pattern_entry_specs(pattern), }
+  {
+    arrangement: None,
+    period: None,
+    finite_end: None,
+    specs: pattern_entry_specs(pattern),
+  }
 }
 
 ///|
@@ -95,8 +102,33 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
     } else {
       None
     },
+    finite_end: if repeat {
+      None
+    } else {
+      Some(snapshot.song().duration())
+    },
     specs: song_entry_specs(snapshot),
   }
+}
+
+///|
+/// Whether this is a song rather than a pattern.
+pub fn PlaybackSnapshot::is_song(self : PlaybackSnapshot) -> Bool {
+  self.arrangement is Some(_)
+}
+
+///|
+/// How long one repetition lasts, for a song that repeats.
+pub fn PlaybackSnapshot::period(self : PlaybackSnapshot) -> @pattern.Rational? {
+  self.period
+}
+
+///|
+/// Where a song that does not repeat ends.
+pub fn PlaybackSnapshot::finite_end(
+  self : PlaybackSnapshot,
+) -> @pattern.Rational? {
+  self.finite_end
 }
 
 ///|
@@ -255,13 +287,32 @@ pub fn PlaybackState::continues_as(
   self : PlaybackState,
   snapshot : PlaybackSnapshot,
 ) -> Bool {
-  let latest = match self.pending {
-    Some(pending) => Some(pending)
-    None => self.running.map(run => run.snapshot)
-  }
-  match latest {
+  match self.latest() {
     Some(current) => current.continues_as(snapshot)
     None => true
+  }
+}
+
+///|
+/// The latest accepted snapshot's finite end. Matched directly, not through
+/// `latest`, because the render path asks every block.
+pub fn PlaybackState::finite_end(self : PlaybackState) -> @pattern.Rational? {
+  match self.pending {
+    Some(pending) => pending.finite_end
+    None =>
+      match self.running {
+        Some(run) => run.snapshot.finite_end
+        None => None
+      }
+  }
+}
+
+///|
+/// The latest accepted snapshot: queued, or else running.
+pub fn PlaybackState::latest(self : PlaybackState) -> PlaybackSnapshot? {
+  match self.pending {
+    Some(pending) => Some(pending)
+    None => self.running.map(run => run.snapshot)
   }
 }
 

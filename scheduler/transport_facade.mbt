@@ -111,12 +111,6 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 }
 
 ///|
-/// Parse external tempo input.
-fn parse_tempo(bpm : Double) -> Result[Tempo, TransportError] {
-  Tempo::from_bpm(bpm)
-}
-
-///|
 pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
   self.clock.sample()
 }
@@ -185,7 +179,7 @@ fn PatternScheduler::tempo_plan(
   self : PatternScheduler,
   tempo : Tempo,
   restart : Bool,
-  end_? : @pattern.Rational,
+  end_ : @pattern.Rational?,
 ) -> Result[TempoPlan, TransportError] {
   let proposed = if restart {
     self.clock.reset().with_tempo(tempo.value)
@@ -231,28 +225,63 @@ fn PatternScheduler::apply_tempo_plan(
 }
 
 ///|
-/// Change tempo at the next unrendered sample, retaining musical position.
-pub fn PatternScheduler::set_bpm(
+/// Why a snapshot cannot play at a tempo on this scheduler.
+#derive(Eq, Debug)
+pub(all) enum PlaybackFitError {
+  /// A repeating song's repetition is shorter than one audio block.
+  RepetitionShorterThanBlock
+  /// A finite song's end lies beyond the transport's range.
+  EndOutOfRange
+  Transport(TransportError)
+}
+
+///|
+pub extend PlaybackFitError with Eq::{not_equal, equal}
+
+///|
+pub extend PlaybackFitError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+/// Whether `snapshot` can play at `tempo` from the start: a repeating song's
+/// repetition lasts at least one block, and a finite song's end lies within
+/// the transport. Changes nothing.
+pub fn PatternScheduler::check_fits(
   self : PatternScheduler,
-  bpm : Double,
-) -> Result[Unit, TransportError] {
-  match parse_tempo(bpm) {
-    Ok(tempo) => self.set_tempo(tempo)
-    Err(e) => Err(e)
+  snapshot : PlaybackSnapshot,
+  tempo : Tempo,
+) -> Result[Unit, PlaybackFitError] {
+  let sample_rate = self.ctx.sample_rate()
+  if snapshot.raw.period() is Some(period) {
+    match tempo.span_for_samples(self.ctx.block_size(), sample_rate~) {
+      Err(error) => return Err(Transport(error))
+      Ok(block) => if period < block { return Err(RepetitionShorterThanBlock) }
+    }
   }
+  if snapshot.raw.finite_end() is Some(end_) &&
+    tempo.sample_at_start(end_, sample_rate~) is Err(_) {
+    return Err(EndOutOfRange)
+  }
+  Ok(())
 }
 
 ///|
 /// Change tempo at the next unrendered sample, retaining musical position.
-/// Existing note deadlines and an optional finite performance endpoint are
-/// checked on the proposed clock before anything is mutated.
+/// The latest accepted snapshot must fit the tempo, and its existing note
+/// deadlines and finite end are checked on the proposed clock before
+/// anything is mutated.
 pub fn PatternScheduler::set_tempo(
   self : PatternScheduler,
   tempo : Tempo,
-  end_? : @pattern.Rational,
-) -> Result[Unit, TransportError] {
-  match self.tempo_plan(tempo, false, end_?) {
-    Err(e) => Err(e)
+) -> Result[Unit, PlaybackFitError] {
+  let latest = self.playback_state.latest()
+  if latest is Some(raw) {
+    match self.check_fits({ raw, }, tempo) {
+      Err(error) => return Err(error)
+      Ok(_) => ()
+    }
+  }
+  match self.tempo_plan(tempo, false, latest.bind(raw => raw.finite_end())) {
+    Err(e) => Err(Transport(e))
     Ok(plan) => {
       self.apply_tempo_plan(plan)
       Ok(())
@@ -265,6 +294,8 @@ pub(all) enum PlaybackAdmissionError {
   /// A song arranged differently cannot replace the playing one without a
   /// restart: its started occurrences would stay silent.
   ArrangementChanged
+  /// The snapshot cannot play at the tempo; see `check_fits`.
+  Unfit(PlaybackFitError)
   MaterialLimit
   Transport(TransportError)
 }
@@ -279,12 +310,15 @@ pub fn PatternScheduler::accept_playback(
   tempo : Tempo,
   material_limit~ : Int32,
   restart~ : Bool = false,
-  end_? : @pattern.Rational,
 ) -> Result[Unit, PlaybackAdmissionError] {
   guard restart || self.playback_state.continues_as(snapshot.raw) else {
     return Err(ArrangementChanged)
   }
-  let plan = match self.tempo_plan(tempo, restart, end_?) {
+  match self.check_fits(snapshot, tempo) {
+    Err(error) => return Err(Unfit(error))
+    Ok(_) => ()
+  }
+  let plan = match self.tempo_plan(tempo, restart, snapshot.raw.finite_end()) {
     Err(error) => return Err(Transport(error))
     Ok(plan) => plan
   }
@@ -360,4 +394,27 @@ pub fn PatternScheduler::reset_transport_and_kill_notes(
 ) -> Unit {
   self.kill_all_voices()
   self.reset_transport()
+}
+
+///|
+/// Where the latest accepted snapshot stands against its finite end.
+pub(all) enum SongEnd {
+  /// It has no finite end, or the transport has not reached it.
+  Ahead
+  /// The transport reached the end, at this sample and musical position.
+  Reached(Int64, @pattern.Rational)
+  /// The end lies beyond the transport's range.
+  Unreachable
+}
+
+///|
+/// Whether the transport has reached the latest accepted snapshot's finite
+/// end. Allocates nothing until it is reached.
+pub fn PatternScheduler::song_end(self : PatternScheduler) -> SongEnd {
+  guard self.playback_state.finite_end() is Some(end_) else { return Ahead }
+  match self.clock.sample_at(end_) {
+    Ok(sample) if self.clock.sample() >= sample => Reached(sample, end_)
+    Ok(_) => Ahead
+    Err(_) => Unreachable
+  }
 }

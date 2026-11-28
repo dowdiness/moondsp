@@ -2,15 +2,7 @@
 const PLAYBACK_MATERIAL_LIMIT = 256
 
 ///|
-priv enum PlaybackSpan {
-  Continuous
-  Finite(@pattern.Rational)
-  Repeating(@pattern.Rational)
-}
-
-///|
-/// A score the player can accept: lowered material with its tempo and how
-/// long it plays. `Player::compile` builds one from Mini
+/// A score the player can accept: lowered material with its tempo. `Player::compile` builds one from Mini
 /// input and records the query window Mini admitted its work for;
 /// `pattern` and `song` build one from
 /// content that has no source text, whose work nothing bounds: the caller
@@ -18,17 +10,8 @@ priv enum PlaybackSpan {
 pub struct Score {
   priv tempo : @scheduler.Tempo
   priv snapshot : @scheduler.PlaybackSnapshot
-  priv span : PlaybackSpan
   /// The window Mini bounded this score's work for, when it was compiled.
   priv admitted : @pattern.QueryWindow?
-}
-
-///|
-fn Score::finite_end(self : Score) -> @pattern.Rational? {
-  match self.span {
-    Finite(end_) => Some(end_)
-    Continuous | Repeating(_) => None
-  }
 }
 
 ///|
@@ -42,7 +25,6 @@ pub fn Score::pattern(
     admitted: None,
     tempo: tempo.value,
     snapshot: @scheduler.PlaybackSnapshot::pattern(pattern),
-    span: Continuous,
   }
 }
 
@@ -63,11 +45,6 @@ pub fn[C : @song.SongContent] Score::song(
     admitted: None,
     tempo: tempo.value,
     snapshot: @scheduler.PlaybackSnapshot::song(snapshot, repeat~),
-    span: if repeat {
-      Repeating(song.duration())
-    } else {
-      Finite(song.duration())
-    },
   }
 }
 
