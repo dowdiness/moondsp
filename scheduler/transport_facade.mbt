@@ -111,12 +111,6 @@ pub fn PerformanceTime::PerformanceTime(sample : Int64) -> PerformanceTime {
 }
 
 ///|
-/// Parse external tempo input.
-fn parse_tempo(bpm : Double) -> Result[Tempo, TransportError] {
-  Tempo::from_bpm(bpm)
-}
-
-///|
 pub fn PatternScheduler::sample_counter(self : PatternScheduler) -> Int64 {
   self.clock.sample()
 }
@@ -268,18 +262,6 @@ pub fn PatternScheduler::check_fits(
     return Err(EndOutOfRange)
   }
   Ok(())
-}
-
-///|
-/// Change tempo at the next unrendered sample, retaining musical position.
-pub fn PatternScheduler::set_bpm(
-  self : PatternScheduler,
-  bpm : Double,
-) -> Result[Unit, PlaybackFitError] {
-  match parse_tempo(bpm) {
-    Ok(tempo) => self.set_tempo(tempo)
-    Err(e) => Err(Transport(e))
-  }
 }
 
 ///|

@@ -126,7 +126,7 @@ test "fractional onset rounded across a block survives a tempo edit exactly once
   for i in 0..<128 {
     assert_eq(left.get(i), 0.0)
   }
-  sched.set_bpm(60.0).unwrap()
+  sched.set_tempo(@scheduler.Tempo::from_bpm(60.0).unwrap()).unwrap()
   sched.render_block(left, right)
   assert_true(left.get(0) > 0.0)
   assert_eq(sched.active_note_count(), 1)
@@ -149,7 +149,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
     sched.render_block(left, right)
   }
   let before = sched.current_block().unwrap().logical_arc.begin
-  sched.set_bpm(60.0).unwrap()
+  sched.set_tempo(@scheduler.Tempo::from_bpm(60.0).unwrap()).unwrap()
   assert_true(sched.current_block().unwrap().logical_arc.begin == before)
   assert_eq(sched.sample_at(@pattern.Rational::from_int(6)).unwrap(), 1792L)
   for _ in 0..<2 {
@@ -161,7 +161,7 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
   sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   // Released notes cannot be resurrected by slowing again.
-  sched.set_bpm(30.0).unwrap()
+  sched.set_tempo(@scheduler.Tempo::from_bpm(30.0).unwrap()).unwrap()
   sched.render_block(left, right)
   assert_eq(sched.active_note_count(), 0)
   for i in 0..<128 {
@@ -170,25 +170,9 @@ test "tempo follows remaining musical duration and preserves physical deadlines"
 }
 
 ///|
-test "invalid tempo leaves the position and sounding note unchanged" {
-  let (sched, _, left, right) = transport_fixture()
-  let pat = single_span(
-    @pattern.Rational::from_int(0),
-    @pattern.Rational::from_int(1),
-  )
-  sched.accept_playback_snapshot(pat)
-  sched.render_block(left, right)
-  let before = sched.current_block().unwrap().logical_arc
-  assert_true(sched.set_bpm(0.0) is Err(_))
-  assert_true(sched.current_block().unwrap().logical_arc == before)
-  assert_eq(sched.active_note_count(), 1)
-  assert_eq(sched.sample_at(@pattern.Rational::from_int(1)).unwrap(), 96000L)
-}
-
-///|
 test "set_tempo rejects atomically when an endpoint is unrepresentable" {
   let (sched, _, left, right) = transport_fixture()
-  sched.set_bpm(0.001).unwrap()
+  sched.set_tempo(@scheduler.Tempo::from_bpm(0.001).unwrap()).unwrap()
   let endpoint = @pattern.Rational(100000000L, 10000019L * 100000003L)
   sched.accept_playback_snapshot(
     single_span(@pattern.Rational::from_int(0), endpoint),
@@ -223,7 +207,7 @@ test "physical envelope lasts thirteen seconds across a tempo change" {
   sched.accept_playback_snapshot(song)
   for second in 0..<14 {
     if second == 3 {
-      sched.set_bpm(240.0).unwrap()
+      sched.set_tempo(@scheduler.Tempo::from_bpm(240.0).unwrap()).unwrap()
     }
     sched.render_block(left, right)
     assert_eq(sched.active_note_count(), if second < 4 { 1 } else { 0 })

@@ -9,16 +9,16 @@ test "PatternScheduler constructor initializes with zero position" {
 }
 
 ///|
-test "PatternScheduler::bpm round-trips construction and set_bpm" {
+test "PatternScheduler::bpm round-trips construction and set_tempo" {
   let ctx = @moondsp.DspContext(sample_rate=48000.0, block_size=128)
   let sched = @scheduler.PatternScheduler(bpm=120.0, ctx~, pools=[], route=_ => {
     0
   })
   @debug.assert_eq(sched.bpm(), 120.0)
-  sched.set_bpm(174.0).unwrap()
+  sched.set_tempo(@scheduler.Tempo::from_bpm(174.0).unwrap()).unwrap()
   @debug.assert_eq(sched.bpm(), 174.0)
-  assert_true(sched.set_bpm(0.0) is Err(_))
-  @debug.assert_eq(sched.bpm(), 174.0)
+  // An out-of-range tempo cannot be made, so it cannot reach the scheduler.
+  assert_true(@scheduler.Tempo::from_bpm(0.0) is Err(_))
 }
 
 ///|
