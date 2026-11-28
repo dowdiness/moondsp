@@ -69,8 +69,8 @@ test "one definition edit changes every section while preserving song layout" {
   )
   @debug.assert_eq(before.duration(), after.duration())
   let span = song_span(0L, 1L, 7L, 1L)
-  let old_events = before.query(span)
-  let events = after.query(span)
+  let old_events = song_events(before, span)
+  let events = song_events(after, span)
   @debug.assert_eq(events.length(), old_events.length())
   for i in 0..<events.length() {
     @debug.assert_eq(events[i].whole, old_events[i].whole)

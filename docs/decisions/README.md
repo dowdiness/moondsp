@@ -51,3 +51,4 @@ shipped plan or spec.
 - [ADR-0031 — Playback takes one view of a pattern, whatever tracks it](0031-playback-material-is-one-view.md) (Accepted)
 - [ADR-0032 — A Mini song's sections and parts are identified by their names](0032-mini-song-identities-are-their-names.md) (Accepted)
 - [ADR-0033 — The scheduler decides whether a song can replace the playing one](0033-the-scheduler-decides-what-continues.md) (Accepted)
+- [ADR-0034 — A song is built one way, from identified parts](0034-a-song-is-built-one-way.md) (Accepted)

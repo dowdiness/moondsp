@@ -23,9 +23,9 @@ They are now:
   became `ScoreEvent` with
   [ADR-0022](0022-score-events-carry-their-sound.md).
 - `@mini.parse_song(String) -> Result[ParsedSong[UntrackedPatternSnapshot[ScoreEvent]], String]`,
-  with `ParsedSong::snapshot()` (the song lowered with the identities its
+  with `ParsedSong::song()` (the song laid out with the identities its
   source declares) and `bpm()`. `parse_song` replaced `parse_song_with_bpm`
-  (see CHANGELOG); `snapshot()` replaced `song()` with issue #293.
+  (see CHANGELOG); `song()` returns a `Song` since ADR-0034.
 
 Playback enters through `PlaybackInput::compile`, not through these. The
 `specs/loom-mini-cst` prototype still names the earlier surface

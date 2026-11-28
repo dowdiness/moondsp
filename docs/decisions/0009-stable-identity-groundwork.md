@@ -1,6 +1,6 @@
 # ADR-0009: Stable identity groundwork for Phase 6
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0034](0034-a-song-is-built-one-way.md) (ids derived from display names, revisions)
 - **Date:** 2026-05-12
 - **Source:** [`docs/superpowers/specs/2026-05-12-phase6-incremental-playback-design.md`](../superpowers/specs/2026-05-12-phase6-incremental-playback-design.md)
 

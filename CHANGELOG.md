@@ -45,15 +45,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Breaking:** a song part cannot start before cycle 0. The constructors
-  that take a start — `@song.SongPart::at`, `with_id_at`,
-  `SongOccurrenceDoc::at`, `with_start` — raise `NegativeStart`
-  (`SongDoc::set_occurrence_start` wraps it in `SongDocEditError`), and
-  Mini reports it as "part start cannot be negative" where the start is
-  written. Every song
+- **Breaking:** a song part cannot start before cycle 0.
+  `@song.SongPart::at` raises `NegativeStart`, and Mini reports it as "part
+  start cannot be negative" where the start is written. Every song
   therefore ends after its beginning: `@player.Score::song` no longer raises,
   and `ScoreError::EmptySong` ("song must end after its beginning") is
   removed.
+- **Breaking:** a song is built one way (ADR-0034). `@song.Song(parts~)`
+  takes `SongPart(id~, section~)` / `SongPart::at(id~, start~, section~)`,
+  sections are `Section(id~, length_cycles~, rate?, layers~)` of
+  `SectionLayer(id~, content~)`, and the `Song` is what the scheduler, the
+  player and Mini pass on: `PlaybackSnapshot::song`, `Score::song`,
+  `CompiledMaterial::TrackedSong` / `UntrackedSong` take a `Song`,
+  `ParsedSong::song()` replaces `snapshot()`, and `Song::entries()` replaces
+  `SongSnapshot::entries()`. Occurrences, sections and layers have no names.
+  `rate` replaces `TimeScope`. `Section` raises `SectionBuildError`
+  (`NonPositiveLength`, `NonPositiveRate`, `EmptyLayers`, `DuplicateLayer`)
+  and `Song` raises `SongBuildError` (`EmptySong`, `DuplicateOccurrence`).
+  Removed: `SongDoc`, `SongSnapshot`, `SongOccurrenceDoc`, `SectionDoc`,
+  `SectionLayerDoc`, `SectionDocBody`, `SectionBody`, `SectionPatch`,
+  `TimeScope`, all revisions and edit methods, `Song::query`,
+  `Section::query` / `body`, name and time lookups, `Song::fill_gaps`,
+  `Song::from_sections`, `SongPart::with_id` / `with_id_at`, and their
+  errors. Mini parts with distinct `part_id`s may share a display name.
 - **Breaking:** the scheduler owns how long the accepted song plays.
   `PatternScheduler::check_fits(snapshot, tempo)` reports a repetition
   shorter than a block or an unrepresentable finite end

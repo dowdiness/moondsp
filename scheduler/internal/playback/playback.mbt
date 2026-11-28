@@ -80,16 +80,15 @@ pub fn PlaybackSnapshot::pattern(
 }
 
 ///|
-/// A lowered song that ends after its last occurrence, or repeats without
-/// resetting the transport when `repeat` is true.
+/// A song that ends after its last occurrence, or repeats without resetting
+/// the transport when `repeat` is true.
 pub fn[C : @song.SongContent] PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot[C],
+  song : @song.Song[C],
   repeat~ : Bool = false,
 ) -> PlaybackSnapshot {
   {
     arrangement: Some(
-      snapshot
-      .song()
+      song
       .occurrences()
       .map(occurrence => {
         id: occurrence.id(),
@@ -98,16 +97,16 @@ pub fn[C : @song.SongContent] PlaybackSnapshot::song(
       }),
     ),
     period: if repeat {
-      Some(snapshot.song().duration())
+      Some(song.duration())
     } else {
       None
     },
     finite_end: if repeat {
       None
     } else {
-      Some(snapshot.song().duration())
+      Some(song.duration())
     },
-    specs: song_entry_specs(snapshot),
+    specs: song_entry_specs(song),
   }
 }
 

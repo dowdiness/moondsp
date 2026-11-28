@@ -1,6 +1,6 @@
 # ADR-0005: Song sections as the long-form structure layer
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0034](0034-a-song-is-built-one-way.md) (`TimeScope`, `SectionBody`, `SectionPatch`, named layers)
 - **Date:** 2026-05-11
 - **Source:** [PR #29](https://github.com/dowdiness/moondsp/pull/29) design discussion and implementation
 

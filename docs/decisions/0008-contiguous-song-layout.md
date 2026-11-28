@@ -1,6 +1,6 @@
 # ADR-0008: Contiguous song layout with computed occurrences
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0034](0034-a-song-is-built-one-way.md) (`Song::query`, `Song::from_sections`, occurrence names)
 - **Date:** 2026-05-11
 - **Source:** Song layout implementation following PR #29
 

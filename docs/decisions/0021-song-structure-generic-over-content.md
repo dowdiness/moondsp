@@ -1,6 +1,6 @@
 # ADR-0021: Song structure is generic over its content
 
-- **Status:** Accepted 2026-11-19. Implemented.
+- **Status:** Accepted 2026-11-19. Implemented. Decision 1's document types and decision 4's `snapshot.song().query(arc)` are superseded by [ADR-0034](0034-a-song-is-built-one-way.md).
 - **Date:** 2026-11-19
 - **Refines:** [ADR-0005](0005-song-section-layer.md) and
   [ADR-0008](0008-contiguous-song-layout.md). Their decision that song

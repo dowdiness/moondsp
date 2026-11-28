@@ -628,17 +628,17 @@ pub fn PlaybackInput::version(self : PlaybackInput) -> DraftVersion? {
 }
 
 ///|
-/// What a compiled input plays: lowered snapshots, tracked when the input
-/// carries source origins. A repeating song's `Bool` is true.
+/// What a compiled input plays: lowered snapshots, or songs of them, tracked
+/// when the input carries source origins. A repeating song's `Bool` is true.
 pub(all) enum CompiledMaterial {
   TrackedPattern(@pattern.TrackedPatternSnapshot[@score.ScoreEvent])
   UntrackedPattern(@pattern.UntrackedPatternSnapshot[@score.ScoreEvent])
   TrackedSong(
-    @song.SongSnapshot[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
+    @song.Song[@pattern.TrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
   )
   UntrackedSong(
-    @song.SongSnapshot[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
+    @song.Song[@pattern.UntrackedPatternSnapshot[@score.ScoreEvent]],
     Bool,
   )
 }

@@ -5,7 +5,7 @@
 /// when the source is tracked, untracked ones otherwise.
 priv enum PlayBody[S] {
   Pattern(ScoreDoc)
-  Arrangement(@song.SongSnapshot[S], Bool)
+  Arrangement(@song.Song[S], Bool)
 }
 
 ///|
@@ -83,7 +83,7 @@ fn parse_tracked_source(
 }
 
 ///|
-fn[S : @song.SongContent] parse_source(
+fn[S] parse_source(
   input : String,
   query_window : @pattern.QueryWindow?,
   origins~ : SourceMap?,
@@ -160,14 +160,14 @@ fn[S : @song.SongContent] parse_source(
 ///|
 /// Parse the `song(` body opened at `song_at`, from after its `(`, and its
 /// optional `.repeat()`, returning the song, whether it repeats, and its tempo.
-fn[C : @song.SongContent] Parser::parse_play_song(
+fn[C] Parser::parse_play_song(
   self : Parser,
   song_at : Int32,
   builder : MiniDocBuilder,
   admission : PlaybackAdmission?,
   authored_bpm : (Int32, Double)?,
   lower~ : (ScoreDoc) -> C raise @pattern.PatternDocError,
-) -> (@song.SongSnapshot[C], Bool, Double) raise SourceProblem {
+) -> (@song.Song[C], Bool, Double) raise SourceProblem {
   let parsed = self.parse_song_body(song_at, builder, lower~)
   self.skip_whitespace()
   let before_method = self.pos
@@ -201,7 +201,7 @@ fn[C : @song.SongContent] Parser::parse_play_song(
     None => parsed.bpm().unwrap_or(DEFAULT_BPM)
   }
   if admission is Some(admission) {
-    admission.arrangement(parsed.snapshot().song(), repeating)
+    admission.arrangement(parsed.song(), repeating)
   }
-  (parsed.snapshot(), repeating, bpm)
+  (parsed.song(), repeating, bpm)
 }

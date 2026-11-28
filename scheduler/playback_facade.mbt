@@ -17,13 +17,13 @@ pub fn PlaybackSnapshot::pattern(
 }
 
 ///|
-/// A lowered song that ends after its last occurrence, or repeats without
-/// resetting the transport or releasing voices when `repeat` is true.
+/// A song that ends after its last occurrence, or repeats without resetting
+/// the transport or releasing voices when `repeat` is true.
 pub fn[C : @song.SongContent] PlaybackSnapshot::song(
-  snapshot : @song.SongSnapshot[C],
+  song : @song.Song[C],
   repeat~ : Bool = false,
 ) -> PlaybackSnapshot {
-  { raw: @playback.PlaybackSnapshot::song(snapshot, repeat~), }
+  { raw: @playback.PlaybackSnapshot::song(song, repeat~), }
 }
 
 ///|

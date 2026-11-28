@@ -73,13 +73,13 @@ test "Light Orbit named score preserves every event across 240 cycles and the en
   let original = unwrap_parsed_song(@mini.parse_song(ORBIT_ORIGINAL))
   let named = unwrap_parsed_song(@mini.parse_song(ORBIT_NAMED))
   @debug.assert_eq(named.duration(), @pattern.Rational::from_int(240))
-  @debug.assert_eq(named.occurrence_count(), 12)
+  @debug.assert_eq(named.occurrences().length(), 12)
   for cycle in 0..<242 {
     // Half-cycle queries cross non-integral onsets as well as section boundaries.
     for half in 0..<2 {
       let begin = (cycle * 2 + half).to_int64()
       let span = song_span(begin, 2L, begin + 1L, 2L)
-      assert_named_events(named.query(span), original.query(span))
+      assert_named_events(song_events(named, span), song_events(original, span))
     }
   }
 }

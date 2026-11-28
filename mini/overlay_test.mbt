@@ -78,7 +78,7 @@ test "plus works in song sections" {
       "song(section(\"a\",1,s(\"bd\") + s(\"sd\")),part(\"a1\",\"a\"))",
     ),
   )
-  let actual = song.query(song_span(0L, 1L, 1L, 1L))
+  let actual = song_events(song, song_span(0L, 1L, 1L, 1L))
   let explicit = unwrap_ok(@mini.parse("stack(s(\"bd\"), s(\"sd\"))"))
   @debug.assert_eq(
     overlay_event_signatures(actual),

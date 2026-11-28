@@ -22,7 +22,7 @@ pub fn PlaybackSnapshot::material_count(Self) -> Int32
 pub fn PlaybackSnapshot::pattern(@pattern.PlaybackPattern[@score.ScoreEvent]) -> Self
 pub fn PlaybackSnapshot::period(Self) -> @pattern.Rational?
 pub fn PlaybackSnapshot::query_events(Self, @pattern.TimeSpan) -> Array[@pattern.Event[@score.ScoreEvent]]
-pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.SongSnapshot[C], repeat? : Bool) -> Self
+pub fn[C : @song.SongContent] PlaybackSnapshot::song(@song.Song[C], repeat? : Bool) -> Self
 
 pub struct PlaybackSourcedEvent {
   // private fields

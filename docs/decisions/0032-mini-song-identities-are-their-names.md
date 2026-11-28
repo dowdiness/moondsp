@@ -1,6 +1,6 @@
 # ADR-0032: A Mini song's sections and parts are identified by their names
 
-- **Status:** Accepted
+- **Status:** Accepted; since [ADR-0034](0034-a-song-is-built-one-way.md) Mini builds a `Song` directly rather than lowering a `SongDoc`
 - **Date:** 2026-11-27
 - **Related:** issue #293, [ADR-0016](0016-loom-backed-runtime-mini-parser.md),
   [ADR-0030](0030-players-accept-scores.md),
